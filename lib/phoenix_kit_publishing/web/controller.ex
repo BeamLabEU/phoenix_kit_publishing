@@ -33,6 +33,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.Web.Controller.Routing
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
+  alias PhoenixKit.Utils.Routes
+  alias PhoenixKitWeb.AdminEditHelper
 
   # ============================================================================
   # Main Entry Points
@@ -185,6 +187,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           locale: assigns.current_language,
           type: "website"
         })
+        |> AdminEditHelper.assign_admin_edit(
+          Routes.path("/admin/publishing/#{group_slug}"),
+          "Edit Blog"
+        )
         |> render(:index)
 
       {:redirect, url} ->
@@ -215,6 +221,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:version_dropdown, assigns.version_dropdown)
         |> assign(:og, build_og_data(conn, assigns.post, canonical_url, assigns.current_language))
+        |> AdminEditHelper.assign_admin_edit(
+          Routes.path("/admin/publishing/#{group_slug}/#{assigns.post.uuid}/edit"),
+          "Edit Post"
+        )
         |> render(:show)
 
       {:redirect, url} ->
@@ -273,6 +283,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:version_dropdown, assigns.version_dropdown)
         |> assign(:og, build_og_data(conn, assigns.post, canonical_url, assigns.current_language))
+        |> AdminEditHelper.assign_admin_edit(
+          Routes.path("/admin/publishing/#{group_slug}/#{assigns.post.uuid}/edit"),
+          "Edit Post"
+        )
         |> render(:show)
 
       {:redirect, url} ->
