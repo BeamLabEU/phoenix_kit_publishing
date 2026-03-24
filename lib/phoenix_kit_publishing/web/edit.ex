@@ -118,14 +118,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
 
   def render(assigns) do
     ~H"""
-<PhoenixKitWeb.Components.LayoutWrapper.app_layout
-  flash={@flash}
-  phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-  page_title={@page_title}
-  current_path={@current_path}
-  project_title={@project_title}
-  current_locale={@current_locale}
->
   <div class="container flex flex-col mx-auto px-4 py-6">
     <%!-- Header Section --%>
     <.admin_page_header
@@ -209,7 +201,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       </div>
     </div>
   </div>
-</PhoenixKitWeb.Components.LayoutWrapper.app_layout>
     """
   end
 end

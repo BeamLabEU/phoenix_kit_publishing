@@ -111,13 +111,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   @impl true
   def render(assigns) do
     ~H"""
-<PhoenixKitWeb.Components.LayoutWrapper.app_layout
-  flash={@flash}
-  phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-  page_title={@page_title}
-  current_path={PhoenixKit.Utils.Routes.path("/admin/publishing/#{@group_slug}/#{@post_uuid}")}
-  current_locale={assigns[:current_locale]}
->
   <%= if @post do %>
     <div class="max-w-4xl mx-auto p-4 md:p-6">
       <%!-- Breadcrumb --%>
@@ -263,7 +256,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
       </div>
     </div>
   <% end %>
-</PhoenixKitWeb.Components.LayoutWrapper.app_layout>
     """
   end
 end

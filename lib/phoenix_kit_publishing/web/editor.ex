@@ -1693,14 +1693,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   @impl true
   def render(assigns) do
     ~H"""
-<PhoenixKitWeb.Components.LayoutWrapper.app_layout
-  flash={@flash}
-  phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-  page_title={@page_title}
-  current_path={PhoenixKit.Utils.Routes.path("/admin/publishing/#{@group_slug}/edit")}
-  project_title={@project_title}
-  current_locale={@current_locale}
->
   <% nonce = assigns[:script_csp_nonce] || assigns[:csp_nonce] || "" %>
   <% edit_disabled? = @readonly? or @translation_locked? %>
 
@@ -2891,7 +2883,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     selected_uuids={@media_selected_uuids}
     phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
   />
-</PhoenixKitWeb.Components.LayoutWrapper.app_layout>
     """
   end
 end

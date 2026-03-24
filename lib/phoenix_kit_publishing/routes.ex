@@ -6,11 +6,63 @@ defmodule PhoenixKitWeb.Routes.PublishingRoutes do
   """
 
   @doc """
-  Returns quoted code for publishing non-LiveView routes.
-  Currently a no-op — reserved for future non-LiveView routes.
+  Returns quoted code for publishing non-LiveView routes via `generate/1`.
+  No-op — public routes are provided via `public_routes/1` instead, which
+  is placed later in the route order to avoid catch-all conflicts.
   """
   def generate(_url_prefix) do
     quote do
+    end
+  end
+
+  @doc """
+  Public blog/publishing catch-all routes.
+
+  Placed AFTER all other routes by phoenix_kit's `compile_external_public_routes`
+  to prevent the `/:group` catch-all from intercepting admin or other paths.
+
+  Includes `:phoenix_kit_optional_scope` pipeline so `AdminEditHelper` can show
+  edit buttons for logged-in admins/owners on public pages.
+  """
+  def public_routes(url_prefix) do
+    quote do
+      blog_scope_multi =
+        case unquote(url_prefix) do
+          "/" -> "/:language"
+          prefix -> "#{prefix}/:language"
+        end
+
+      scope blog_scope_multi do
+        pipe_through [:browser, :phoenix_kit_auto_setup, :phoenix_kit_locale_validation, :phoenix_kit_optional_scope]
+
+        get "/:group", PhoenixKit.Modules.Publishing.Web.Controller, :show,
+          constraints: %{
+            "group" => ~r/^(?!admin$|assets$|images$|fonts$|js$|css$|favicon)/,
+            "language" => ~r/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/
+          }
+
+        get "/:group/*path", PhoenixKit.Modules.Publishing.Web.Controller, :show,
+          constraints: %{
+            "group" => ~r/^(?!admin$|assets$|images$|fonts$|js$|css$|favicon)/,
+            "language" => ~r/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/
+          }
+      end
+
+      blog_scope_non_localized =
+        case unquote(url_prefix) do
+          "/" -> "/"
+          prefix -> prefix
+        end
+
+      scope blog_scope_non_localized do
+        pipe_through [:browser, :phoenix_kit_auto_setup, :phoenix_kit_locale_validation, :phoenix_kit_optional_scope]
+
+        get "/:group", PhoenixKit.Modules.Publishing.Web.Controller, :show,
+          constraints: %{"group" => ~r/^(?!admin$|assets$|images$|fonts$|js$|css$|favicon)/}
+
+        get "/:group/*path", PhoenixKit.Modules.Publishing.Web.Controller, :show,
+          constraints: %{"group" => ~r/^(?!admin$|assets$|images$|fonts$|js$|css$|favicon)/}
+      end
     end
   end
 

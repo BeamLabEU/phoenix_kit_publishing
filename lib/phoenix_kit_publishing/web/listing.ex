@@ -948,14 +948,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   @impl true
   def render(assigns) do
     ~H"""
-<PhoenixKitWeb.Components.LayoutWrapper.app_layout
-  flash={@flash}
-  phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-  page_title={@page_title}
-  current_path={@current_path}
-  project_title={@project_title}
-  current_locale={@current_locale}
->
   <div class="container flex-col mx-auto px-4 py-6">
     <%!-- Header Section --%>
     <% group_slug = (@current_group && @current_group["slug"]) || @group_slug || "your-group" %>
@@ -1404,7 +1396,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       </div>
     </div>
   </div>
-</PhoenixKitWeb.Components.LayoutWrapper.app_layout>
     """
   end
 end

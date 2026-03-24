@@ -167,14 +167,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
   @impl true
   def render(assigns) do
     ~H"""
-<PhoenixKitWeb.Components.LayoutWrapper.app_layout
-  flash={@flash}
-  phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-  page_title={@page_title}
-  current_path={@current_path}
-  project_title={@project_title}
-  current_locale={@current_locale}
->
   <div class="min-h-screen bg-base-100">
     <%!-- Preview Banner --%>
     <div class="bg-warning text-warning-content py-2 px-4 sticky top-0 z-50 shadow-lg">
@@ -314,7 +306,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
       <% end %>
     <% end %>
   </div>
-</PhoenixKitWeb.Components.LayoutWrapper.app_layout>
     """
   end
 end
