@@ -1,0 +1,88 @@
+defmodule PhoenixKitPublishing.MixProject do
+  use Mix.Project
+
+  @version "0.1.0"
+  @source_url "https://github.com/mdon/phoenix_kit_publishing"
+
+  def project do
+    [
+      app: :phoenix_kit_publishing,
+      version: @version,
+      elixir: "~> 1.15",
+      elixirc_paths: elixirc_paths(Mix.env()),
+      start_permanent: Mix.env() == :prod,
+      deps: deps(),
+      aliases: aliases(),
+
+      # Hex
+      description: "Publishing module for PhoenixKit — database-backed CMS with multi-language support",
+      package: package(),
+
+      # Dialyzer
+      dialyzer: [plt_add_apps: [:phoenix_kit]],
+
+      # Docs
+      name: "PhoenixKitPublishing",
+      source_url: @source_url,
+      docs: docs()
+    ]
+  end
+
+  def application do
+    [
+      extra_applications: [:logger]
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
+  defp aliases do
+    [
+      quality: ["format", "credo --strict", "dialyzer"],
+      "quality.ci": ["format --check-formatted", "credo --strict", "dialyzer"],
+      "test.setup": ["ecto.create --quiet", "ecto.migrate --quiet"],
+      "test.reset": ["ecto.drop --quiet", "test.setup"]
+    ]
+  end
+
+  defp deps do
+    [
+      # PhoenixKit provides the Module behaviour, Settings API, and core infrastructure.
+      {:phoenix_kit, "~> 1.7 and >= 1.7.50"},
+
+      # LiveView for admin pages
+      {:phoenix_live_view, "~> 1.0"},
+
+      # Markdown rendering
+      {:earmark, "~> 1.4"},
+
+      # XML parsing for PHK page builder components
+      {:saxy, "~> 1.5"},
+
+      # Background jobs (translation worker, migration worker)
+      {:oban, "~> 2.18"},
+
+      # Code quality (dev/test only)
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => @source_url},
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "PhoenixKit.Modules.Publishing",
+      source_ref: "v#{@version}",
+      extras: ["phk-publishing-format.md"]
+    ]
+  end
+end
