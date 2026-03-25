@@ -2,13 +2,13 @@ defmodule PhoenixKitPublishing.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/mdon/phoenix_kit_publishing"
+  @source_url "https://github.com/BeamLabEU/phoenix_kit_publishing"
 
   def project do
     [
       app: :phoenix_kit_publishing,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -41,15 +41,14 @@ defmodule PhoenixKitPublishing.MixProject do
     [
       quality: ["format", "credo --strict", "dialyzer"],
       "quality.ci": ["format --check-formatted", "credo --strict", "dialyzer"],
-      "test.setup": ["ecto.create --quiet", "ecto.migrate --quiet"],
-      "test.reset": ["ecto.drop --quiet", "test.setup"]
+      precommit: ["compile", "quality"]
     ]
   end
 
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, and core infrastructure.
-      {:phoenix_kit, "~> 1.7 and >= 1.7.50"},
+      {:phoenix_kit, "~> 1.7"},
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},
@@ -74,7 +73,7 @@ defmodule PhoenixKitPublishing.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
-      files: ~w(lib .formatter.exs mix.exs README.md LICENSE)
+      files: ~w(lib .formatter.exs mix.exs README.md CHANGELOG.md LICENSE)
     ]
   end
 
