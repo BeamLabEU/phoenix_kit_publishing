@@ -9,9 +9,6 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
 
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
-
-  @content_statuses Constants.content_statuses()
-  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
@@ -180,8 +177,11 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
   @spec set_translation_status(String.t(), String.t(), integer(), String.t(), String.t()) ::
           :ok | {:error, any()}
   def set_translation_status(_group_slug, _post_identifier, _version, _language, _status) do
-    # No-op: status is now version-level, not per-language.
-    # Use Versions.publish_version/3 or Publishing.unpublish_post/3 instead.
+    Logger.warning(
+      "[Publishing] set_translation_status/5 is deprecated (no-op). " <>
+        "Status is now version-level. Use Versions.publish_version/3 or Publishing.unpublish_post/3 instead."
+    )
+
     :ok
   end
 

@@ -28,7 +28,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     # Load initial data in mount so the connected render's join reply matches
     # the dead render output, preventing the visual flash caused by morphdom
     # patching empty assigns before handle_params fills them.
-    {groups, current_group, filtered_posts, default_mode, status_counts, all_posts} =
+    {groups, current_group, filtered_posts, default_mode, status_counts, _all_posts} =
       load_initial_data(group_slug)
 
     socket =
@@ -651,7 +651,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   end
 
   defp apply_full_reload(socket, group_slug, uri) do
-    {groups, current_group, filtered_posts, default_mode, status_counts, all_posts} =
+    {groups, current_group, filtered_posts, default_mode, status_counts, _all_posts} =
       load_initial_data(group_slug)
 
     socket

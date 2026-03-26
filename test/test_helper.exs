@@ -79,12 +79,14 @@ repo_available =
       defmodule PhoenixKitPublishing.Test.SetupMigration do
         use Ecto.Migration
 
+        alias PhoenixKit.Modules.Publishing.Migrations.PublishingTables
+
         def up do
-          PhoenixKit.Modules.Publishing.Migrations.PublishingTables.up(%{prefix: nil})
+          PublishingTables.up(%{prefix: nil})
         end
 
         def down do
-          PhoenixKit.Modules.Publishing.Migrations.PublishingTables.down(%{prefix: nil})
+          PublishingTables.down(%{prefix: nil})
         end
       end
 

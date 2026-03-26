@@ -8,13 +8,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
 
   use Gettext, backend: PhoenixKitWeb.Gettext
 
-  alias PhoenixKitAI, as: AI
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PresenceHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker
   alias PhoenixKit.Settings
+  alias PhoenixKitAI, as: AI
 
   @translation_prompt_slug "translate-publishing-posts"
 

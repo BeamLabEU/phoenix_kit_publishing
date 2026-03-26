@@ -193,68 +193,61 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     tx_result =
       repo.transaction(fn ->
         versions = DBStorage.list_versions(db_post.uuid)
-
-        target_version =
-          Enum.find(versions, &(&1.version_number == version))
+        target_version = Enum.find(versions, &(&1.version_number == version))
 
         unless target_version do
           repo.rollback(:version_not_found)
         end
 
         validate_primary_title!(repo, target_version)
-
-        # Archive the previously published version (if any)
-        for v <- versions do
-          if v.version_number != version and v.status == "published" do
-            case DBStorage.update_version(v, %{status: "archived"}) do
-              {:ok, _} -> :ok
-              {:error, reason} -> repo.rollback(reason)
-            end
-          end
-        end
-
-        # Set target version to published with published_at timestamp
-        publish_attrs = %{status: "published"}
-
-        publish_attrs =
-          if target_version.published_at do
-            publish_attrs
-          else
-            Map.put(publish_attrs, :published_at, UtilsDate.utc_now())
-          end
-
-        case DBStorage.update_version(target_version, publish_attrs) do
-          {:ok, published_version} ->
-            # Set post.active_version_uuid to the published version
-            case DBStorage.update_post(db_post, %{active_version_uuid: published_version.uuid}) do
-              {:ok, _} -> :ok
-              {:error, reason} -> repo.rollback(reason)
-            end
-
-          {:error, reason} ->
-            repo.rollback(reason)
-        end
+        archive_other_published_versions!(repo, versions, version)
+        publish_and_activate!(repo, db_post, target_version)
       end)
 
     case tx_result do
       {:ok, _} ->
-        source_id = Keyword.get(opts, :source_id)
-        broadcast_id = db_post.uuid
-        ListingCache.regenerate(group_slug)
-        PublishingPubSub.broadcast_version_live_changed(group_slug, broadcast_id, version)
-
-        PublishingPubSub.broadcast_post_version_published(
-          group_slug,
-          broadcast_id,
-          version,
-          source_id
-        )
-
+        broadcast_publish(group_slug, db_post.uuid, version, opts)
         :ok
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp archive_other_published_versions!(repo, versions, target_version_number) do
+    for v <- versions,
+        v.version_number != target_version_number,
+        v.status == "published" do
+      case DBStorage.update_version(v, %{status: "archived"}) do
+        {:ok, _} -> :ok
+        {:error, reason} -> repo.rollback(reason)
+      end
+    end
+  end
+
+  defp publish_and_activate!(repo, db_post, target_version) do
+    publish_attrs =
+      if target_version.published_at,
+        do: %{status: "published"},
+        else: %{status: "published", published_at: UtilsDate.utc_now()}
+
+    case DBStorage.update_version(target_version, publish_attrs) do
+      {:ok, published_version} ->
+        case DBStorage.update_post(db_post, %{active_version_uuid: published_version.uuid}) do
+          {:ok, _} -> :ok
+          {:error, reason} -> repo.rollback(reason)
+        end
+
+      {:error, reason} ->
+        repo.rollback(reason)
+    end
+  end
+
+  defp broadcast_publish(group_slug, post_uuid, version, opts) do
+    source_id = Keyword.get(opts, :source_id)
+    ListingCache.regenerate(group_slug)
+    PublishingPubSub.broadcast_version_live_changed(group_slug, post_uuid, version)
+    PublishingPubSub.broadcast_post_version_published(group_slug, post_uuid, version, source_id)
   end
 
   defp do_unpublish_post(group_slug, db_post, opts) do

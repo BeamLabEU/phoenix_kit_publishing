@@ -1,3 +1,16 @@
+## 0.1.1 - 2026-03-26
+
+### Fixed
+- Remove `Code.ensure_loaded?` guards on `LanguageHelpers` in `db_storage.ex` and `mapper.ex` — call directly via alias instead of silently falling back to `"en"`
+- Add deprecation warning to `set_translation_status/5` no-op (was returning `:ok` silently)
+- Remove duplicate `site_default_language/0` private functions from `db_storage.ex` and `mapper.ex` — use `LanguageHelpers.get_primary_language()` directly
+- Fix unused `all_posts` variable warnings in `listing.ex` (leftover from primary language removal)
+- Remove unused `Helpers` alias in `collaborative.ex`
+- Remove unused `@content_statuses` and `LanguageHelpers` alias in `translation_manager.ex`
+- Fix alias ordering (credo) in `editor.ex`, `translation.ex`, `translate_post_worker.ex`, `renderer.ex`
+- Reduce nesting depth in `do_publish_version`, `translate_single_language`, `skip_already_translated`, `render_versioned_post`, `build_post_url`, `toggle_version_access`, `translate_content`, `translate_now`
+- Alias nested module in `test_helper.exs`
+
 ## 0.1.0 - 2026-03-25
 
 ### Added

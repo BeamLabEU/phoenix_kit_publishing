@@ -26,12 +26,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   @dialyzer {:nowarn_function, handle_event: 3}
 
   alias Phoenix.LiveView.JS
-  alias PhoenixKitAI, as: AI
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
+  alias PhoenixKitAI, as: AI
 
   # Submodule aliases
   alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
@@ -790,32 +790,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     if socket.assigns[:readonly?] do
       {:noreply, socket}
     else
-      enabled = enabled_str == "true"
-      post = socket.assigns.post
-      group_slug = socket.assigns.group_slug
-
-      updated_metadata = Map.put(post.metadata, :allow_version_access, enabled)
-      updated_post = %{post | metadata: updated_metadata}
-
-      scope = socket.assigns[:phoenix_kit_current_scope]
-      params = %{"allow_version_access" => enabled}
-
-      case Publishing.update_post(group_slug, updated_post, params, %{scope: scope}) do
-        {:ok, saved_post} ->
-          flash_msg =
-            if enabled,
-              do: gettext("Version access enabled - older versions are now publicly accessible"),
-              else: gettext("Version access disabled - only live version is publicly accessible")
-
-          {:noreply,
-           socket
-           |> assign(:post, saved_post)
-           |> put_flash(:info, flash_msg)}
-
-        {:error, _reason} ->
-          {:noreply,
-           put_flash(socket, :error, gettext("Failed to update version access setting"))}
-      end
+      do_toggle_version_access(socket, enabled_str == "true")
     end
   end
 
@@ -955,6 +930,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   def handle_event("back_to_list", _params, socket) do
     handle_event("attempt_cancel", %{}, socket)
   end
+
+  defp do_toggle_version_access(socket, enabled) do
+    post = socket.assigns.post
+    group_slug = socket.assigns.group_slug
+
+    updated_metadata = Map.put(post.metadata, :allow_version_access, enabled)
+    updated_post = %{post | metadata: updated_metadata}
+
+    scope = socket.assigns[:phoenix_kit_current_scope]
+    params = %{"allow_version_access" => enabled}
+
+    case Publishing.update_post(group_slug, updated_post, params, %{scope: scope}) do
+      {:ok, saved_post} ->
+        flash_msg = version_access_flash(enabled)
+
+        {:noreply,
+         socket
+         |> assign(:post, saved_post)
+         |> put_flash(:info, flash_msg)}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, gettext("Failed to update version access setting"))}
+    end
+  end
+
+  defp version_access_flash(true),
+    do: gettext("Version access enabled - older versions are now publicly accessible")
+
+  defp version_access_flash(false),
+    do: gettext("Version access disabled - only live version is publicly accessible")
 
   # Update post struct with current form values for accurate public URL and status display
   defp update_post_from_form(post, form, language) do

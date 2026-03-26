@@ -10,10 +10,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   alias Phoenix.HTML.Safe
   alias PhoenixKit.Modules.Publishing.PageBuilder
-  alias PhoenixKitEntities.Components.EntityForm
   alias PhoenixKit.Modules.Shared.Components.Image
   alias PhoenixKit.Modules.Shared.Components.Video
   alias PhoenixKit.Settings
+  alias PhoenixKitEntities.Components.EntityForm
 
   @cache_name :publishing_posts
   @cache_version "v2"

@@ -108,62 +108,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   Renders a specific version of a post (for version browsing feature).
   """
   def render_versioned_post(conn, group_slug, url_slug, version, language) do
-    # Resolve URL slug to internal slug (handles per-language custom slugs)
     internal_slug = SlugResolution.resolve_url_slug_to_internal(group_slug, url_slug, language)
 
-    # Check per-post version access setting (from the live version's metadata)
-    # Each post controls its own version access - no global setting required
     if post_allows_version_access?(group_slug, internal_slug, language) do
-      # Fetch the specific version - the DB handles language resolution
       case Publishing.read_post(group_slug, internal_slug, language, version) do
-        {:ok, post} ->
-          # Check if version is published
-          if post.metadata.status == "published" do
-            # Get canonical language
-            canonical_language = Language.get_canonical_url_language_for_post(post.language)
+        {:ok, %{metadata: %{status: "published"}} = post} ->
+          build_versioned_post_response(group_slug, post, version)
 
-            # Render markdown (cached for published posts)
-            html_content = render_post_content(post)
-
-            # Build translation links (preserve version in URLs)
-            translations =
-              Translations.build_translation_links(group_slug, post, canonical_language,
-                version: version
-              )
-
-            # Build breadcrumbs
-            breadcrumbs = build_breadcrumbs(group_slug, post, canonical_language)
-
-            # Build canonical URL (points to main post URL, not versioned URL)
-            canonical_url = PublishingHTML.build_post_url(group_slug, post, canonical_language)
-
-            # Build version dropdown data (also gives us the live version)
-            version_dropdown = build_version_dropdown(group_slug, post, canonical_language)
-
-            # Check if this is the live version by comparing to the published version
-            # (is_live field was removed from metadata, now derived from status)
-            {_allow_access, live_version} = get_cached_version_info(group_slug, post)
-            is_live = version == live_version
-
-            {:ok,
-             %{
-               page_title: post.metadata.title || Constants.default_title(),
-               group_slug: group_slug,
-               post: post,
-               html_content: html_content,
-               current_language: canonical_language,
-               translations: translations,
-               breadcrumbs: breadcrumbs,
-               canonical_url: canonical_url,
-               is_versioned_view: true,
-               is_live_version: is_live,
-               version: version,
-               version_dropdown: version_dropdown
-             }}
-          else
-            log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
-            {:error, :unpublished}
-          end
+        {:ok, _unpublished} ->
+          log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
+          {:error, :unpublished}
 
         {:error, reason} ->
           log_404(conn, group_slug, {:slug, internal_slug, version}, language, reason)
@@ -172,6 +126,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     else
       {:error, :version_access_disabled}
     end
+  end
+
+  defp build_versioned_post_response(group_slug, post, version) do
+    canonical_language = Language.get_canonical_url_language_for_post(post.language)
+    html_content = render_post_content(post)
+
+    translations =
+      Translations.build_translation_links(group_slug, post, canonical_language, version: version)
+
+    breadcrumbs = build_breadcrumbs(group_slug, post, canonical_language)
+    canonical_url = PublishingHTML.build_post_url(group_slug, post, canonical_language)
+    version_dropdown = build_version_dropdown(group_slug, post, canonical_language)
+
+    {_allow_access, live_version} = get_cached_version_info(group_slug, post)
+
+    {:ok,
+     %{
+       page_title: post.metadata.title || Constants.default_title(),
+       group_slug: group_slug,
+       post: post,
+       html_content: html_content,
+       current_language: canonical_language,
+       translations: translations,
+       breadcrumbs: breadcrumbs,
+       canonical_url: canonical_url,
+       is_versioned_view: true,
+       is_live_version: version == live_version,
+       version: version,
+       version_dropdown: version_dropdown
+     }}
   end
 
   @doc """

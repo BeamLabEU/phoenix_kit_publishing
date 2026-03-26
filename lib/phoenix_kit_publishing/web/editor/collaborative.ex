@@ -10,7 +10,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
   alias PhoenixKit.Modules.Publishing.PresenceHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
-  alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
   require Logger
 

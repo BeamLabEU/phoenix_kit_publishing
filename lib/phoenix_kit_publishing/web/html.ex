@@ -411,27 +411,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         build_public_path(segments)
 
       mode when mode in @timestamp_modes ->
-        # For timestamp mode, use the date/time from the DB fields
-        # (stored in post.date and post.time), not from metadata.published_at
         date = get_timestamp_date(post)
-
-        # Check if we need time in URL (only if multiple posts on same date)
         post_count = lookup_date_count(date_counts, group_slug, date)
 
-        segments =
-          if post_count > 1 do
-            # Multiple posts - include time
-            time = get_timestamp_time(post)
-
-            if single_language_mode?(),
-              do: [group_slug, date, time],
-              else: [language, group_slug, date, time]
-          else
-            # Single post or no posts - date only
-            if single_language_mode?(),
-              do: [group_slug, date],
-              else: [language, group_slug, date]
-          end
+        segments = timestamp_url_segments(language, group_slug, date, post_count > 1, post)
 
         build_public_path(segments)
 
@@ -446,6 +429,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
         build_public_path(segments)
     end
+  end
+
+  defp timestamp_url_segments(language, group_slug, date, true = _include_time, post) do
+    time = get_timestamp_time(post)
+
+    if single_language_mode?(),
+      do: [group_slug, date, time],
+      else: [language, group_slug, date, time]
+  end
+
+  defp timestamp_url_segments(language, group_slug, date, false = _include_time, _post) do
+    if single_language_mode?(),
+      do: [group_slug, date],
+      else: [language, group_slug, date]
   end
 
   # Gets the URL slug for a specific language

@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   - **Content** — per-language: title, body, url_slug (for routing)
   """
 
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.PublishingVersion
@@ -98,10 +99,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       end)
 
     # Use site default language for primary content selection
-    site_default = site_default_language()
-
     primary_content =
-      Enum.find(all_contents, fn c -> c.language == site_default end) ||
+      Enum.find(all_contents, fn c -> c.language == LanguageHelpers.get_primary_language() end) ||
         List.first(all_contents)
 
     %{
@@ -112,7 +111,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       date: post.post_date,
       time: post.post_time,
       mode: safe_mode_atom(post.mode),
-      language: site_default,
+      language: LanguageHelpers.get_primary_language(),
       available_languages: available_languages,
       language_statuses: language_statuses,
       language_slugs: build_language_slugs(all_contents, post.slug),
@@ -258,12 +257,4 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   defp presence(nil), do: nil
   defp presence(""), do: nil
   defp presence(value), do: value
-
-  defp site_default_language do
-    if Code.ensure_loaded?(PhoenixKit.Modules.Publishing.LanguageHelpers) do
-      PhoenixKit.Modules.Publishing.LanguageHelpers.get_primary_language()
-    else
-      "en"
-    end
-  end
 end

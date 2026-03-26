@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   import Ecto.Query
 
   alias PhoenixKit.Modules.Publishing.DBStorage.Mapper
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PublishingPost
@@ -763,26 +764,18 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   Fallback chain: exact language match → site default language → first available.
   """
   def resolve_content(contents, nil) do
-    site_default = site_default_language()
+    default = LanguageHelpers.get_primary_language()
 
-    Enum.find(contents, fn c -> c.language == site_default end) ||
+    Enum.find(contents, fn c -> c.language == default end) ||
       List.first(contents)
   end
 
   def resolve_content(contents, language) do
-    site_default = site_default_language()
+    default = LanguageHelpers.get_primary_language()
 
     Enum.find(contents, fn c -> c.language == language end) ||
-      Enum.find(contents, fn c -> c.language == site_default end) ||
+      Enum.find(contents, fn c -> c.language == default end) ||
       List.first(contents)
-  end
-
-  defp site_default_language do
-    if Code.ensure_loaded?(PhoenixKit.Modules.Publishing.LanguageHelpers) do
-      PhoenixKit.Modules.Publishing.LanguageHelpers.get_primary_language()
-    else
-      "en"
-    end
   end
 
   defp order_by_mode(query) do

@@ -68,7 +68,6 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
 
   require Logger
 
-  alias PhoenixKitAI, as: AI
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
@@ -76,6 +75,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
   alias PhoenixKit.Settings
   alias PhoenixKit.Users.Auth
   alias PhoenixKit.Users.Auth.Scope
+  alias PhoenixKitAI, as: AI
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: args, attempt: attempt, inserted_at: inserted_at}) do
@@ -329,44 +329,33 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
     elapsed = System.monotonic_time(:millisecond) - start_time
     Logger.info("[TranslatePostWorker] AI call for #{target_language} completed in #{elapsed}ms")
 
-    case result do
-      {:ok, response} ->
-        case AI.extract_content(response) do
-          {:ok, translated_text} ->
-            # Parse the translated title, slug, and content
-            {translated_title, translated_slug, translated_content} =
-              parse_translated_response(translated_text)
+    with {:ok, response} <- result,
+         {:ok, translated_text} <- AI.extract_content(response) do
+      {translated_title, translated_slug, translated_content} =
+        parse_translated_response(translated_text)
 
-            if translated_slug do
-              Logger.info(
-                "[TranslatePostWorker] Got translated slug for #{target_language}: #{translated_slug}"
-              )
-            end
+      if translated_slug do
+        Logger.info(
+          "[TranslatePostWorker] Got translated slug for #{target_language}: #{translated_slug}"
+        )
+      end
 
-            # Get source post status to inherit for new translation
-            source_status = Map.get(source_post.metadata, :status, "draft")
+      source_status = Map.get(source_post.metadata, :status, "draft")
 
-            # Create or update the translation
-            translation_opts = %{
-              group_slug: group_slug,
-              post_uuid: post_uuid,
-              language: target_language,
-              title: translated_title,
-              url_slug: translated_slug,
-              content: translated_content,
-              version: version,
-              user_uuid: user_uuid,
-              source_status: source_status
-            }
-
-            save_translation(translation_opts)
-
-          {:error, reason} ->
-            {:error, "Failed to extract AI response: #{inspect(reason)}"}
-        end
-
+      save_translation(%{
+        group_slug: group_slug,
+        post_uuid: post_uuid,
+        language: target_language,
+        title: translated_title,
+        url_slug: translated_slug,
+        content: translated_content,
+        version: version,
+        user_uuid: user_uuid,
+        source_status: source_status
+      })
+    else
       {:error, reason} ->
-        {:error, "AI request failed: #{inspect(reason)}"}
+        {:error, "AI translation failed: #{inspect(reason)}"}
     end
   end
 
@@ -665,24 +654,8 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
   def skip_already_translated(target_languages, _group_slug, post_uuid, version, job_inserted_at) do
     alias PhoenixKit.Modules.Publishing.DBStorage
 
-    # Resolve the version UUID to check content rows directly
     version_uuid = resolve_version_uuid(post_uuid, version)
-
-    already_done =
-      if version_uuid do
-        Enum.filter(target_languages, fn lang ->
-          case DBStorage.get_content(version_uuid, lang) do
-            %{updated_at: updated_at} when not is_nil(updated_at) ->
-              DateTime.compare(updated_at, job_inserted_at) == :gt
-
-            _ ->
-              false
-          end
-        end)
-      else
-        []
-      end
-
+    already_done = find_already_translated(version_uuid, target_languages, job_inserted_at)
     remaining = target_languages -- already_done
 
     if already_done != [] do
@@ -692,6 +665,22 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
     end
 
     remaining
+  end
+
+  defp find_already_translated(nil, _languages, _cutoff), do: []
+
+  defp find_already_translated(version_uuid, languages, cutoff) do
+    alias PhoenixKit.Modules.Publishing.DBStorage
+
+    Enum.filter(languages, fn lang ->
+      case DBStorage.get_content(version_uuid, lang) do
+        %{updated_at: updated_at} when not is_nil(updated_at) ->
+          DateTime.compare(updated_at, cutoff) == :gt
+
+        _ ->
+          false
+      end
+    end)
   end
 
   defp resolve_version_uuid(post_uuid, nil) do
@@ -832,36 +821,10 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
       Keyword.get(opts, :source_language) ||
         LanguageHelpers.get_primary_language()
 
-    cond do
-      not (Code.ensure_loaded?(PhoenixKitAI) and AI.enabled?()) ->
-        {:error, "AI module is not enabled"}
-
-      is_nil(prompt_uuid) ->
-        {:error, "No prompt selected"}
-
-      true ->
-        case AI.get_endpoint(endpoint_uuid) do
-          nil ->
-            {:error, "AI endpoint not found: #{endpoint_uuid}"}
-
-          %{enabled: false} ->
-            {:error, "AI endpoint is disabled"}
-
-          endpoint ->
-            case Publishing.read_post_by_uuid(post_uuid, source_language, version) do
-              {:ok, source_post} ->
-                do_translate_content(
-                  source_post,
-                  target_language,
-                  endpoint,
-                  source_language,
-                  prompt_uuid
-                )
-
-              {:error, reason} ->
-                {:error, "Failed to read source post: #{inspect(reason)}"}
-            end
-        end
+    with :ok <- validate_ai_available(prompt_uuid),
+         {:ok, endpoint} <- fetch_ai_endpoint(endpoint_uuid),
+         {:ok, source_post} <- read_source_post(post_uuid, source_language, version) do
+      do_translate_content(source_post, target_language, endpoint, source_language, prompt_uuid)
     end
   end
 
@@ -937,6 +900,21 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
       Keyword.get(opts, :source_language) ||
         LanguageHelpers.get_primary_language()
 
+    with :ok <- validate_ai_available(prompt_uuid),
+         {:ok, endpoint} <- fetch_ai_endpoint(endpoint_uuid),
+         {:ok, source_post} <- read_source_post(post_uuid, source_language, version) do
+      translate_single_language(
+        source_post,
+        target_language,
+        endpoint,
+        source_language,
+        user_uuid,
+        prompt_uuid
+      )
+    end
+  end
+
+  defp validate_ai_available(prompt_uuid) do
     cond do
       not (Code.ensure_loaded?(PhoenixKitAI) and AI.enabled?()) ->
         {:error, "AI module is not enabled"}
@@ -945,29 +923,22 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
         {:error, "No prompt selected"}
 
       true ->
-        case AI.get_endpoint(endpoint_uuid) do
-          nil ->
-            {:error, "AI endpoint not found: #{endpoint_uuid}"}
+        :ok
+    end
+  end
 
-          %{enabled: false} ->
-            {:error, "AI endpoint is disabled"}
+  defp fetch_ai_endpoint(endpoint_uuid) do
+    case AI.get_endpoint(endpoint_uuid) do
+      nil -> {:error, "AI endpoint not found: #{endpoint_uuid}"}
+      %{enabled: false} -> {:error, "AI endpoint is disabled"}
+      endpoint -> {:ok, endpoint}
+    end
+  end
 
-          endpoint ->
-            case Publishing.read_post_by_uuid(post_uuid, source_language, version) do
-              {:ok, source_post} ->
-                translate_single_language(
-                  source_post,
-                  target_language,
-                  endpoint,
-                  source_language,
-                  user_uuid,
-                  prompt_uuid
-                )
-
-              {:error, reason} ->
-                {:error, "Failed to read source post: #{inspect(reason)}"}
-            end
-        end
+  defp read_source_post(post_uuid, source_language, version) do
+    case Publishing.read_post_by_uuid(post_uuid, source_language, version) do
+      {:ok, _} = ok -> ok
+      {:error, reason} -> {:error, "Failed to read source post: #{inspect(reason)}"}
     end
   end
 end
