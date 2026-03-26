@@ -4,6 +4,10 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   Handles creating, reading, updating, and trashing posts,
   as well as slug/version/language extraction and timestamp management.
+
+  Posts are routing shells — versions are the source of truth for status,
+  published_at, and metadata (featured_image, tags, seo, description).
+  Content rows hold per-language title + body + url_slug.
   """
 
   require Logger
@@ -107,14 +111,6 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       else: DBStorage.list_posts(group_slug)
   end
 
-  @doc "Counts primary language migration status from a list of posts."
-  @spec count_primary_language_status(list(), String.t()) :: map() | nil
-  def count_primary_language_status([], _primary), do: nil
-
-  def count_primary_language_status(posts, primary_language) do
-    DBStorage.count_primary_language_status_from_posts(posts, primary_language)
-  end
-
   @doc """
   Creates a new post for the given publishing group using the current timestamp.
   """
@@ -185,7 +181,6 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       opts_map
       |> Shared.fetch_option(:scope)
       |> Shared.audit_metadata(:update)
-      |> Map.put(:is_primary_language, Map.get(opts_map, :is_primary_language, true))
 
     result = update_post_in_db(group_slug, post, params, audit_meta)
 
@@ -201,45 +196,9 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc """
-  Changes a post's status by UUID.
+  Restores a trashed post by UUID, clearing its trashed_at timestamp.
 
-  Reads the post, resolves primary language, updates status via `update_post`,
-  invalidates render cache, and broadcasts the change.
-
-  Returns `{:ok, updated_post}` or `{:error, reason}`.
-  """
-  @spec change_post_status(String.t(), String.t(), String.t(), keyword()) ::
-          {:ok, map()} | {:error, term()}
-  def change_post_status(group_slug, post_uuid, new_status, opts \\ []) do
-    case read_post_by_uuid(post_uuid) do
-      {:ok, post} ->
-        primary_language = post[:primary_language] || LanguageHelpers.get_primary_language()
-        is_primary_language = post.language == primary_language
-
-        case update_post(group_slug, post, %{"status" => new_status},
-               scope: opts[:scope],
-               is_primary_language: is_primary_language,
-               skip_broadcast: true
-             ) do
-          {:ok, updated_post} ->
-            identifier = updated_post[:uuid] || updated_post.slug
-            Publishing.Renderer.invalidate_cache(group_slug, identifier, updated_post.language)
-            PublishingPubSub.broadcast_post_status_changed(group_slug, updated_post)
-            {:ok, updated_post}
-
-          {:error, _} = err ->
-            err
-        end
-
-      {:error, _} = err ->
-        err
-    end
-  end
-
-  @doc """
-  Restores a trashed post by UUID, setting its status back to "draft".
-
-  Reconciles version/content statuses and regenerates the group cache.
+  Regenerates the group cache and broadcasts the update.
   Returns {:ok, post_uuid} on success or {:error, reason} on failure.
   """
   @spec restore_post(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
@@ -249,12 +208,10 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         {:error, :not_found}
 
       db_post ->
-        case DBStorage.update_post(db_post, %{status: "draft"}) do
+        case DBStorage.update_post(db_post, %{trashed_at: nil}) do
           {:ok, _} ->
-            StaleFixer.reconcile_post_status(db_post)
             ListingCache.regenerate(group_slug)
-            broadcast_id = db_post.slug || db_post.uuid
-            PublishingPubSub.broadcast_post_updated(group_slug, %{slug: broadcast_id})
+            PublishingPubSub.broadcast_post_updated(group_slug, %{uuid: db_post.uuid})
             {:ok, post_uuid}
 
           {:error, reason} ->
@@ -264,7 +221,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc """
-  Soft-deletes a post by UUID.
+  Soft-deletes a post by UUID (sets trashed_at timestamp).
 
   Returns {:ok, post_uuid} on success or {:error, reason} on failure.
   """
@@ -277,7 +234,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       db_post ->
         case DBStorage.trash_post(db_post) do
           {:ok, _} ->
-            broadcast_id = db_post.slug || db_post.uuid
+            broadcast_id = db_post.uuid
             ListingCache.regenerate(group_slug)
             PublishingPubSub.broadcast_post_deleted(group_slug, broadcast_id)
             {:ok, post_uuid}
@@ -343,6 +300,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   defp db_content_to_post_map(content) do
     version = content.version
     post = version.post
+    version_data = version.data || %{}
 
     %{
       slug: post.slug,
@@ -350,8 +308,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       language: content.language,
       metadata: %{
         title: content.title,
-        status: content.status,
-        description: (content.data || %{})["description"]
+        status: version.status,
+        description: version_data["description"]
       }
     }
   end
@@ -388,16 +346,12 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       end
 
     with {:ok, post_slug} <- slug_result do
-      # Build post attributes
+      # Build post attributes — posts are routing shells only
       post_attrs = %{
         group_uuid: group.uuid,
         slug: post_slug,
-        status: "draft",
         mode: mode,
-        primary_language: primary_language,
-        published_at: nil,
-        created_by_uuid: created_by_uuid,
-        updated_by_uuid: created_by_uuid
+        created_by_uuid: created_by_uuid
       }
 
       # Add initial date/time for timestamp mode (truncate seconds since URLs use HH:MM only)
@@ -444,7 +398,6 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
                    language: primary_language,
                    title: Shared.fetch_option(opts, :title) || "",
                    content: Shared.fetch_option(opts, :content) || "",
-                   status: "draft",
                    url_slug: post_slug
                  }) do
             db_post
@@ -544,13 +497,21 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # Content rows store full dialect codes, but URL paths use base codes.
   defp resolve_language_to_dialect(nil), do: nil
 
+  # Only resolve base codes (e.g. "en") to dialects (e.g. "en-US") if the base
+  # code doesn't exist as an enabled language. If "en" is enabled, use "en" directly.
   defp resolve_language_to_dialect(language) do
-    base = DialectMapper.extract_base(language)
+    enabled = LanguageHelpers.enabled_language_codes()
 
-    if base == language do
-      DialectMapper.base_to_dialect(language)
-    else
+    if language in enabled do
       language
+    else
+      base = DialectMapper.extract_base(language)
+
+      if base == language do
+        DialectMapper.base_to_dialect(language)
+      else
+        language
+      end
     end
   end
 
@@ -586,7 +547,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   # Updates a post in the database.
-  # Writes directly to the database and returns the updated post map.
+  # Writes title + content to the content row, version-level metadata to version.data.
   defp update_post_in_db(group_slug, post, params, audit_meta) do
     db_post = find_db_post_for_update(group_slug, post)
 
@@ -667,18 +628,17 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     version = DBStorage.get_version(db_post.uuid, version_number)
 
     if version do
-      language = post[:language] || db_post.primary_language
+      language = post[:language] || LanguageHelpers.get_primary_language()
       post_metadata = post[:metadata] || %{}
-      new_status = Map.get(params, "status", post_metadata[:status] || "draft")
       content = Map.get(params, "content", post[:content] || "")
       new_title = resolve_post_title(params, post, content)
+      new_status = Map.get(params, "status", post_metadata[:status] || "draft")
 
-      with :ok <- validate_title_for_publish(db_post, language, new_status, new_title),
-           old_db_status = db_post.status,
-           :ok <- update_post_level_fields(db_post, new_status, params, audit_meta),
-           :ok <-
-             upsert_post_content(version, language, new_title, content, new_status, params, post) do
-        maybe_propagate_status(version, language, db_post, new_status, old_db_status)
+      with :ok <- validate_title_for_publish(language, new_status, new_title),
+           :ok <- upsert_post_content(version, language, new_title, content, params, post),
+           :ok <- update_version_defaults(version, params, post),
+           {:ok, db_post} <- maybe_sync_post_datetime(db_post, params),
+           :ok <- maybe_update_audit_fields(db_post, audit_meta) do
         read_updated_post(db_post, group_slug, final_slug, language, version_number)
       end
     else
@@ -688,14 +648,16 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   @default_title Constants.default_title()
 
-  defp validate_title_for_publish(db_post, language, "published", title)
+  defp validate_title_for_publish(language, "published", title)
        when title in ["", @default_title] do
-    if language == db_post.primary_language,
+    primary_language = LanguageHelpers.get_primary_language()
+
+    if language == primary_language,
       do: {:error, :title_required},
       else: :ok
   end
 
-  defp validate_title_for_publish(_db_post, _language, _status, _title), do: :ok
+  defp validate_title_for_publish(_language, _status, _title), do: :ok
 
   defp read_updated_post(db_post, group_slug, final_slug, language, version_number) do
     if db_post.mode == "timestamp" do
@@ -719,25 +681,12 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       Constants.default_title()
   end
 
-  defp update_post_level_fields(db_post, new_status, params, audit_meta) do
-    update_attrs =
-      %{
-        status: new_status,
-        published_at: parse_published_at(params, db_post)
-      }
-      |> maybe_put(:updated_by_uuid, audit_meta[:updated_by_uuid])
-      |> maybe_put(:updated_by_email, audit_meta[:updated_by_email])
-
-    case DBStorage.update_post(db_post, update_attrs) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp upsert_post_content(version, language, new_title, content, new_status, params, post) do
+  # Writes title + content + language + url_slug to the content row.
+  # Content rows no longer carry status or featured_image_uuid — those live on the version.
+  defp upsert_post_content(version, language, new_title, content, params, post) do
     existing_content = DBStorage.get_content(version.uuid, language)
     existing_url_slug = if existing_content, do: existing_content.url_slug
     existing_data = if existing_content, do: existing_content.data || %{}, else: %{}
@@ -748,44 +697,79 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         :error -> existing_url_slug
       end
 
+    # Content data only holds content-row-specific metadata (previous_url_slugs, etc.)
+    content_data = preserve_content_data(existing_data, params, post)
+
     case DBStorage.upsert_content(%{
            version_uuid: version.uuid,
            language: language,
            title: new_title,
            content: content,
-           status: new_status,
            url_slug: resolved_url_slug,
-           data: build_content_data(params, post, existing_data)
+           data: content_data
          }) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
     end
   end
 
-  defp maybe_propagate_status(version, language, db_post, new_status, old_db_status) do
-    is_primary = language == db_post.primary_language
+  # Preserve content-row-specific data (e.g. previous_url_slugs).
+  # Version-level metadata (featured_image, description, seo, tags) is handled by update_version_defaults.
+  defp preserve_content_data(existing_data, _params, _post) do
+    # Keep only content-specific keys from existing data
+    Map.take(existing_data, ["previous_url_slugs"])
+  end
 
-    if is_primary and new_status != old_db_status do
-      propagate_db_status_to_translations(version.uuid, language, new_status)
+  @doc """
+  Updates version.data with metadata like featured_image_uuid, description, seo_title, tags, etc.
+
+  Version is the source of truth for all post metadata beyond title and body.
+  Merges new values into existing version.data, preserving keys not present in the update.
+  """
+  @spec update_version_defaults(struct(), map(), map()) :: :ok | {:error, term()}
+  def update_version_defaults(version, params, post) do
+    existing_data = version.data || %{}
+    post_metadata = post[:metadata] || %{}
+
+    new_data =
+      existing_data
+      |> maybe_put_version_field("featured_image_uuid", Map.get(params, "featured_image_uuid"))
+      |> maybe_put_version_field(
+        "description",
+        Map.get(params, "description", post_metadata[:description])
+      )
+      |> maybe_put_version_field("seo_title", Map.get(params, "seo_title"))
+      |> maybe_put_version_field("tags", Map.get(params, "tags"))
+      |> maybe_put_version_field("seo", Map.get(params, "seo"))
+      |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
+
+    # Also update version-level status and published_at if provided
+    version_attrs =
+      %{data: new_data}
+      |> maybe_put(:status, Map.get(params, "status"))
+      |> maybe_put(:published_at, parse_published_at_from_params(params))
+
+    case DBStorage.update_version(version, version_attrs) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 
-  defp propagate_db_status_to_translations(version_uuid, primary_language, new_status) do
-    DBStorage.update_content_status_except(version_uuid, primary_language, new_status)
-  end
+  defp maybe_put_version_field(data, _key, nil), do: data
+  defp maybe_put_version_field(data, key, value), do: Map.put(data, key, value)
 
-  defp parse_published_at(params, db_post) do
+  defp parse_published_at_from_params(params) do
     case Map.get(params, "published_at") do
       nil ->
-        db_post.published_at
+        nil
 
       "" ->
-        db_post.published_at
+        nil
 
       dt_string when is_binary(dt_string) ->
         case DateTime.from_iso8601(dt_string) do
           {:ok, dt, _} -> dt
-          _ -> db_post.published_at
+          _ -> nil
         end
 
       dt ->
@@ -793,21 +777,44 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  defp build_content_data(params, post, existing_data) do
-    # Start from existing data to preserve previous_url_slugs, excerpt, seo_title, etc.
-    data = existing_data
+  # For timestamp-mode posts, syncs post_date/post_time when published_at changes.
+  # This ensures the public URL path matches the publication date shown in the editor.
+  defp maybe_sync_post_datetime(%{mode: "timestamp"} = db_post, params) do
+    case parse_published_at_from_params(params) do
+      nil ->
+        {:ok, db_post}
 
-    data =
-      case Map.get(params, "featured_image_uuid") do
-        nil -> data
-        id -> Map.put(data, "featured_image_uuid", id)
+      %DateTime{} = dt ->
+        new_date = DateTime.to_date(dt)
+        new_time = %Time{hour: dt.hour, minute: dt.minute, second: 0, microsecond: {0, 0}}
+
+        if new_date != db_post.post_date or new_time != db_post.post_time do
+          case DBStorage.update_post(db_post, %{post_date: new_date, post_time: new_time}) do
+            {:ok, updated} -> {:ok, updated}
+            {:error, reason} -> {:error, reason}
+          end
+        else
+          {:ok, db_post}
+        end
+    end
+  end
+
+  defp maybe_sync_post_datetime(db_post, _params), do: {:ok, db_post}
+
+  # Updates audit fields (updated_by_uuid, updated_by_email) on the post record
+  defp maybe_update_audit_fields(db_post, audit_meta) do
+    audit_attrs =
+      %{}
+      |> maybe_put(:updated_by_uuid, audit_meta[:updated_by_uuid])
+      |> maybe_put(:updated_by_email, audit_meta[:updated_by_email])
+
+    if map_size(audit_attrs) > 0 do
+      case DBStorage.update_post(db_post, audit_attrs) do
+        {:ok, _} -> :ok
+        {:error, reason} -> {:error, reason}
       end
-
-    post_metadata = post[:metadata] || %{}
-
-    case Map.get(params, "description", post_metadata[:description]) do
-      nil -> data
-      desc -> Map.put(data, "description", desc)
+    else
+      :ok
     end
   end
 

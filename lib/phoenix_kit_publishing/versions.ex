@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
 
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
@@ -60,19 +61,18 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   end
 
   @doc "Gets the status of a specific version/language."
-  def get_version_status(group_slug, post_slug, version_number, language) do
+  def get_version_status(group_slug, post_slug, version_number, _language) do
     with db_post when not is_nil(db_post) <- DBStorage.get_post(group_slug, post_slug),
          db_version when not is_nil(db_version) <-
-           DBStorage.get_version(db_post.uuid, version_number),
-         content when not is_nil(content) <- DBStorage.get_content(db_version.uuid, language) do
-      content.status
+           DBStorage.get_version(db_post.uuid, version_number) do
+      db_version.status
     else
       _ -> "draft"
     end
   rescue
     e ->
       Logger.warning(
-        "[Publishing] get_version_status failed for #{group_slug}/#{post_slug}/v#{version_number}/#{language}: #{inspect(e)}"
+        "[Publishing] get_version_status failed for #{group_slug}/#{post_slug}/v#{version_number}: #{inspect(e)}"
       )
 
       "draft"
@@ -85,7 +85,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
            DBStorage.get_version(db_post.uuid, version_number),
          content when not is_nil(content) <- DBStorage.get_content(db_version.uuid, language) do
       %{
-        status: content.status,
+        status: db_version.status,
         title: content.title,
         url_slug: content.url_slug,
         version: version_number
@@ -118,11 +118,11 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   end
 
   @doc """
-  Publishes a version, making it the only published version.
+  Publishes a version, making it the live version for the post.
 
-  - All content in the target version (primary and translations) → `status: "published"`
-  - All content in other versions that were "published" → `status: "archived"`
-  - Draft/archived content in other versions keeps its current status
+  - Sets the target version status to "published" and `published_at` (if not already set)
+  - Archives the previously published version (status -> "archived")
+  - Sets `post.active_version_uuid` to the target version's UUID
 
   ## Options
 
@@ -146,11 +146,44 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       nil ->
         {:error, :not_found}
 
-      %{status: "trashed"} ->
-        {:error, :post_trashed}
+      db_post ->
+        if db_post.trashed_at do
+          {:error, :post_trashed}
+        else
+          do_publish_version(group_slug, db_post, version, opts)
+        end
+    end
+  end
+
+  @doc """
+  Unpublishes a post by clearing its active version.
+
+  - Clears `post.active_version_uuid`
+  - Sets the previously-active version status to "draft"
+
+  ## Options
+
+  - `:source_id` - ID of the source to include in broadcasts
+
+  ## Examples
+
+      iex> Publishing.Versions.unpublish_post("blog", post_uuid)
+      :ok
+
+      iex> Publishing.Versions.unpublish_post("blog", "nonexistent")
+      {:error, :not_found}
+  """
+  @spec unpublish_post(String.t(), String.t(), keyword()) :: :ok | {:error, any()}
+  def unpublish_post(group_slug, post_uuid, opts \\ []) do
+    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+      nil ->
+        {:error, :not_found}
+
+      %{active_version_uuid: nil} ->
+        {:error, :not_published}
 
       db_post ->
-        do_publish_version(group_slug, db_post, version, opts)
+        do_unpublish_post(group_slug, db_post, opts)
     end
   end
 
@@ -161,19 +194,52 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       repo.transaction(fn ->
         versions = DBStorage.list_versions(db_post.uuid)
 
-        unless Enum.any?(versions, &(&1.version_number == version)) do
+        target_version =
+          Enum.find(versions, &(&1.version_number == version))
+
+        unless target_version do
           repo.rollback(:version_not_found)
         end
 
-        validate_primary_title!(repo, db_post, version)
-        update_version_statuses!(repo, versions, version)
-        update_post_published!(repo, db_post)
+        validate_primary_title!(repo, target_version)
+
+        # Archive the previously published version (if any)
+        for v <- versions do
+          if v.version_number != version and v.status == "published" do
+            case DBStorage.update_version(v, %{status: "archived"}) do
+              {:ok, _} -> :ok
+              {:error, reason} -> repo.rollback(reason)
+            end
+          end
+        end
+
+        # Set target version to published with published_at timestamp
+        publish_attrs = %{status: "published"}
+
+        publish_attrs =
+          if target_version.published_at do
+            publish_attrs
+          else
+            Map.put(publish_attrs, :published_at, UtilsDate.utc_now())
+          end
+
+        case DBStorage.update_version(target_version, publish_attrs) do
+          {:ok, published_version} ->
+            # Set post.active_version_uuid to the published version
+            case DBStorage.update_post(db_post, %{active_version_uuid: published_version.uuid}) do
+              {:ok, _} -> :ok
+              {:error, reason} -> repo.rollback(reason)
+            end
+
+          {:error, reason} ->
+            repo.rollback(reason)
+        end
       end)
 
     case tx_result do
       {:ok, _} ->
         source_id = Keyword.get(opts, :source_id)
-        broadcast_id = db_post.slug || db_post.uuid
+        broadcast_id = db_post.uuid
         ListingCache.regenerate(group_slug)
         PublishingPubSub.broadcast_version_live_changed(group_slug, broadcast_id, version)
 
@@ -181,6 +247,50 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           group_slug,
           broadcast_id,
           version,
+          source_id
+        )
+
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp do_unpublish_post(group_slug, db_post, opts) do
+    repo = PhoenixKit.RepoHelper.repo()
+
+    tx_result =
+      repo.transaction(fn ->
+        # Find the currently active version
+        active_version = DBStorage.get_active_version(db_post)
+
+        # Clear active_version_uuid on the post
+        case DBStorage.update_post(db_post, %{active_version_uuid: nil}) do
+          {:ok, _} -> :ok
+          {:error, reason} -> repo.rollback(reason)
+        end
+
+        # Set the previously-active version back to draft
+        if active_version do
+          case DBStorage.update_version(active_version, %{status: "draft"}) do
+            {:ok, _} -> :ok
+            {:error, reason} -> repo.rollback(reason)
+          end
+        end
+      end)
+
+    case tx_result do
+      {:ok, _} ->
+        source_id = Keyword.get(opts, :source_id)
+        broadcast_id = db_post.uuid
+        ListingCache.regenerate(group_slug)
+        PublishingPubSub.broadcast_version_live_changed(group_slug, broadcast_id, nil)
+
+        PublishingPubSub.broadcast_post_version_published(
+          group_slug,
+          broadcast_id,
+          nil,
           source_id
         )
 
@@ -231,7 +341,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
          db_version when not is_nil(db_version) <- DBStorage.get_version(db_post.uuid, version),
          :ok <- validate_version_deletable(db_post, db_version) do
-      broadcast_id = db_post.slug || db_post.uuid
+      broadcast_id = db_post.uuid
 
       case DBStorage.update_version(db_version, %{status: "archived"}) do
         {:ok, _} ->
@@ -251,7 +361,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
 
   defp validate_version_deletable(db_post, db_version) do
     cond do
-      db_version.status == "published" ->
+      db_post.active_version_uuid == db_version.uuid ->
         {:error, :cannot_delete_live}
 
       length(Enum.reject(DBStorage.list_versions(db_post.uuid), &(&1.status == "archived"))) <= 1 ->
@@ -295,7 +405,9 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       if source_version do
         DBStorage.create_version_from(db_post.uuid, source_version, user_opts)
       else
-        # Blank version — create empty version with primary language content
+        # Blank version — create empty version with site default language content
+        primary_language = LanguageHelpers.get_primary_language()
+
         with {:ok, db_version} <-
                DBStorage.create_version(%{
                  post_uuid: db_post.uuid,
@@ -306,7 +418,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
              {:ok, _content} <-
                DBStorage.create_content(%{
                  version_uuid: db_version.uuid,
-                 language: db_post.primary_language,
+                 language: primary_language,
                  title: "",
                  content: "",
                  status: "draft"
@@ -318,7 +430,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     with {:ok, db_version} <- result do
       case Shared.read_back_post(group_slug, post_uuid, db_post, nil, db_version.version_number) do
         {:ok, post} ->
-          broadcast_id = db_post.slug || db_post.uuid
+          broadcast_id = db_post.uuid
           ListingCache.regenerate(group_slug)
           broadcast_version_created(group_slug, broadcast_id, post)
           {:ok, post}
@@ -329,44 +441,12 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     end
   end
 
-  defp update_version_statuses!(repo, versions, target_version) do
-    for v <- versions do
-      new_status =
-        cond do
-          v.version_number == target_version -> "published"
-          v.status == "published" -> "archived"
-          true -> v.status
-        end
-
-      if new_status != v.status do
-        case DBStorage.update_version(v, %{status: new_status}) do
-          {:ok, _} -> :ok
-          {:error, reason} -> repo.rollback(reason)
-        end
-
-        DBStorage.update_content_status(v.uuid, new_status)
-      end
-    end
-  end
-
-  defp validate_primary_title!(repo, db_post, version_number) do
-    version =
-      Enum.find(DBStorage.list_versions(db_post.uuid), &(&1.version_number == version_number))
-
-    content = version && DBStorage.get_content(version.uuid, db_post.primary_language)
+  defp validate_primary_title!(repo, target_version) do
+    primary_language = LanguageHelpers.get_primary_language()
+    content = DBStorage.get_content(target_version.uuid, primary_language)
 
     if is_nil(content) or content.title in ["", nil, Constants.default_title()] do
       repo.rollback(:title_required)
-    end
-  end
-
-  defp update_post_published!(repo, db_post) do
-    case DBStorage.update_post(db_post, %{
-           status: "published",
-           published_at: db_post.published_at || UtilsDate.utc_now()
-         }) do
-      {:ok, _} -> :ok
-      {:error, reason} -> repo.rollback(reason)
     end
   end
 end

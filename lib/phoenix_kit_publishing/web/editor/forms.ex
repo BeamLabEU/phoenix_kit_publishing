@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Utils.Date, as: UtilsDate
   alias PhoenixKit.Utils.Slug
 
@@ -33,7 +34,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   """
   def post_form_with_primary_status(_group_slug, post, version) do
     form = post_form(post)
-    primary_language = post[:primary_language] || Publishing.get_primary_language()
+    primary_language = LanguageHelpers.get_primary_language()
     original_language = post[:original_language] || post.language
     is_new_translation = Map.get(post, :is_new_translation, false)
 
@@ -244,13 +245,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   def maybe_update_slug_from_title(socket, title, opts \\ []) do
     title = title || ""
 
+    default_language = Map.get(socket.assigns, :default_language)
+    current_language = Map.get(socket.assigns, :current_language)
+
     cond do
       socket.assigns.group_mode != "slug" or String.trim(title) == "" ->
         no_slug_update(socket)
 
-      Map.get(socket.assigns, :is_primary_language, true) ->
+      # When editing the site default language, update the post-level slug
+      default_language == nil or current_language == default_language ->
         maybe_update_primary_slug_from_title(socket, title, opts)
 
+      # When editing other languages, update the per-language url_slug
       true ->
         maybe_update_translation_url_slug_from_title(socket, title, opts)
     end

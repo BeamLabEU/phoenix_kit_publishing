@@ -3,25 +3,11 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   Mapper: converts DB records to the map format expected by
   Publishing's web layer (LiveViews, templates, controllers).
 
-  ## Map Shape
+  ## Data Sources (V2)
 
-  The web layer expects maps with these keys:
-  - `:group` - group slug
-  - `:slug` - post slug identifier
-  - `:url_slug` - per-language URL slug
-  - `:date` - Date struct (timestamp mode)
-  - `:time` - Time struct (timestamp mode)
-  - `:mode` - :timestamp or :slug atom
-  - `:language` - current language code
-  - `:available_languages` - list of language codes
-  - `:language_statuses` - %{language => status}
-  - `:version` - current version number
-  - `:available_versions` - list of version numbers
-  - `:version_statuses` - %{version_number => status}
-  - `:version_dates` - %{version_number => date_string}
-  - `:content` - markdown/PHK body
-  - `:metadata` - map with :title, :description, :status, :slug, etc.
-  - `:primary_language` - primary language code
+  - **Post** — routing only: slug, mode, post_date, post_time, active_version_uuid
+  - **Version** — source of truth: status, published_at, featured_image, tags, seo, description
+  - **Content** — per-language: title, body, url_slug (for routing)
   """
 
   alias PhoenixKit.Modules.Publishing.PublishingContent
@@ -42,8 +28,12 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       ) do
     available_languages = Enum.map(all_contents, & &1.language) |> Enum.sort()
 
+    # Derive status from active_version_uuid
+    status = derive_status(post, version)
+
+    # All languages share the version's status (status is version-level, not per-language)
     language_statuses =
-      Map.new(all_contents, fn c -> {c.language, c.status} end)
+      Map.new(all_contents, fn c -> {c.language, status} end)
       |> merge_published_statuses(Keyword.get(opts, :published_language_statuses, %{}))
 
     available_versions = Enum.map(all_versions, & &1.version_number) |> Enum.sort()
@@ -77,8 +67,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       version_dates: version_dates,
       content: content.content,
       content_updated_at: content.updated_at,
-      metadata: build_metadata(post, version, content),
-      primary_language: post.primary_language
+      metadata: build_metadata(post, version, content, status)
     }
   end
 
@@ -89,8 +78,13 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   def to_listing_map(%PublishingPost{} = post, version, all_contents, all_versions, opts \\ []) do
     available_languages = Enum.map(all_contents, & &1.language) |> Enum.sort()
 
+    group_slug = get_group_slug(post)
+    current_version = if version, do: version.version_number, else: 1
+    status = if version, do: derive_status(post, version), else: "draft"
+
+    # All languages share the version's status (status is version-level, not per-language)
     language_statuses =
-      Map.new(all_contents, fn c -> {c.language, c.status} end)
+      Map.new(all_contents, fn c -> {c.language, status} end)
       |> merge_published_statuses(Keyword.get(opts, :published_language_statuses, %{}))
 
     available_versions = Enum.map(all_versions, & &1.version_number) |> Enum.sort()
@@ -103,12 +97,12 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
         {v.version_number, format_datetime(v.inserted_at)}
       end)
 
-    primary_content =
-      Enum.find(all_contents, fn c -> c.language == post.primary_language end) ||
-        List.first(all_contents)
+    # Use site default language for primary content selection
+    site_default = site_default_language()
 
-    group_slug = get_group_slug(post)
-    current_version = if version, do: version.version_number, else: 1
+    primary_content =
+      Enum.find(all_contents, fn c -> c.language == site_default end) ||
+        List.first(all_contents)
 
     %{
       uuid: post.uuid,
@@ -118,7 +112,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       date: post.post_date,
       time: post.post_time,
       mode: safe_mode_atom(post.mode),
-      language: post.primary_language,
+      language: site_default,
       available_languages: available_languages,
       language_statuses: language_statuses,
       language_slugs: build_language_slugs(all_contents, post.slug),
@@ -128,8 +122,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       version_statuses: version_statuses,
       version_dates: version_dates,
       content: primary_content && extract_excerpt(primary_content),
-      metadata: build_listing_metadata(post, primary_content),
-      primary_language: post.primary_language,
+      metadata: build_listing_metadata(post, version, primary_content, status),
       # Per-language data for listing pages (so language switching shows correct titles)
       language_titles: Map.new(all_contents, fn c -> {c.language, c.title} end),
       language_excerpts: Map.new(all_contents, fn c -> {c.language, extract_excerpt(c)} end)
@@ -143,43 +136,63 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   defp get_group_slug(%PublishingPost{group: %{slug: slug}}), do: slug
   defp get_group_slug(%PublishingPost{} = _post), do: nil
 
-  defp build_metadata(post, version, content) do
+  # Derive status from active_version_uuid: if the post's active version matches
+  # this version, the post is "published". Otherwise use the version's own status.
+  defp derive_status(%PublishingPost{} = post, %PublishingVersion{uuid: version_uuid} = version) do
+    active_uuid = Map.get(post, :active_version_uuid)
+
+    if not is_nil(active_uuid) and active_uuid == version_uuid do
+      "published"
+    else
+      version.status
+    end
+  end
+
+  defp build_metadata(post, version, content, status) do
     %{
       title: content.title,
-      description: PublishingContent.get_description(content),
-      status: content.status,
+      description: PublishingVersion.get_description(version),
+      status: status,
       slug: post.slug,
       version: version.version_number,
-      allow_version_access: PublishingPost.allow_version_access?(post),
+      allow_version_access: PublishingVersion.get_allow_version_access(version),
       url_slug: content.url_slug,
       previous_url_slugs: PublishingContent.get_previous_url_slugs(content),
-      published_at: format_datetime(post.published_at),
-      featured_image_uuid: PublishingContent.get_featured_image_uuid(content),
-      primary_language: post.primary_language
+      published_at: format_datetime(version.published_at),
+      featured_image_uuid: PublishingVersion.get_featured_image_uuid(version)
     }
   end
 
-  defp build_listing_metadata(post, nil) do
+  defp build_listing_metadata(_post, nil, _content, status) do
     %{
       title: nil,
       description: nil,
-      status: post.status,
-      slug: post.slug,
-      published_at: format_datetime(post.published_at),
-      featured_image_uuid: nil,
-      primary_language: post.primary_language
+      status: status,
+      slug: nil,
+      published_at: nil,
+      featured_image_uuid: nil
     }
   end
 
-  defp build_listing_metadata(post, content) do
+  defp build_listing_metadata(post, version, nil, status) do
+    %{
+      title: nil,
+      description: PublishingVersion.get_description(version),
+      status: status,
+      slug: post.slug,
+      published_at: format_datetime(version.published_at),
+      featured_image_uuid: PublishingVersion.get_featured_image_uuid(version)
+    }
+  end
+
+  defp build_listing_metadata(post, version, content, status) do
     %{
       title: content.title,
-      description: PublishingContent.get_description(content),
-      status: content.status,
+      description: PublishingVersion.get_description(version),
+      status: status,
       slug: post.slug,
-      published_at: format_datetime(post.published_at),
-      featured_image_uuid: PublishingContent.get_featured_image_uuid(content),
-      primary_language: post.primary_language
+      published_at: format_datetime(version.published_at),
+      featured_image_uuid: PublishingVersion.get_featured_image_uuid(version)
     }
   end
 
@@ -196,7 +209,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   end
 
   defp extract_excerpt(%PublishingContent{} = content) do
-    # Use custom excerpt from data, or description, or first paragraph
     case PublishingContent.get_excerpt(content) do
       excerpt when is_binary(excerpt) and excerpt != "" ->
         excerpt
@@ -229,10 +241,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   defp format_datetime(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
   defp format_datetime(other), do: to_string(other)
 
-  # Merges published version's language statuses into the latest version's statuses.
-  # For each language, if the published version has it as "published", override the
-  # latest version's status. This ensures the listing page shows "published" when
-  # a language is live on an older version even if the latest draft doesn't have it published.
   defp merge_published_statuses(latest_statuses, published_statuses)
        when map_size(published_statuses) == 0,
        do: latest_statuses
@@ -247,8 +255,15 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   defp safe_mode_atom("slug"), do: :slug
   defp safe_mode_atom(_), do: :timestamp
 
-  # Returns nil for nil and empty string, otherwise the value
   defp presence(nil), do: nil
   defp presence(""), do: nil
   defp presence(value), do: value
+
+  defp site_default_language do
+    if Code.ensure_loaded?(PhoenixKit.Modules.Publishing.LanguageHelpers) do
+      PhoenixKit.Modules.Publishing.LanguageHelpers.get_primary_language()
+    else
+      "en"
+    end
+  end
 end

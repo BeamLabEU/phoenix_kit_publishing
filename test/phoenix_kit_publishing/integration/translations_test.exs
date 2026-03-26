@@ -97,21 +97,15 @@ defmodule PhoenixKit.Integration.Publishing.TranslationsTest do
   end
 
   # ============================================================================
-  # get_post_primary_language/3
+  # LanguageHelpers.get_primary_language/0
   # ============================================================================
 
-  describe "get_post_primary_language/3" do
+  describe "get_primary_language/0" do
     test "returns primary language" do
-      {group, post} = create_group_and_post()
-
-      lang =
-        TranslationManager.get_post_primary_language(
-          group["slug"],
-          post[:slug] || post[:uuid],
-          nil
-        )
-
-      assert lang == "en"
+      alias PhoenixKit.Modules.Publishing.LanguageHelpers
+      lang = LanguageHelpers.get_primary_language()
+      assert is_binary(lang)
+      assert lang =~ ~r/^[a-z]{2}/
     end
   end
 
@@ -120,22 +114,11 @@ defmodule PhoenixKit.Integration.Publishing.TranslationsTest do
   # ============================================================================
 
   describe "set_translation_status/5" do
-    test "sets primary language to draft" do
+    test "is a no-op — status is now version-level" do
       {group, post} = create_group_and_post()
 
-      assert :ok =
-               TranslationManager.set_translation_status(
-                 group["slug"],
-                 post[:uuid],
-                 1,
-                 "en",
-                 "draft"
-               )
-    end
-
-    test "publishes primary language" do
-      {group, post} = create_group_and_post(title: "Publishable")
-
+      # set_translation_status is a no-op since status is version-level.
+      # Use Versions.publish_version/3 instead.
       assert :ok =
                TranslationManager.set_translation_status(
                  group["slug"],
@@ -144,91 +127,16 @@ defmodule PhoenixKit.Integration.Publishing.TranslationsTest do
                  "en",
                  "published"
                )
-    end
 
-    test "cannot publish non-primary when primary is draft" do
-      {group, post} = create_group_and_post(title: "Primary Draft")
-      {:ok, _} = TranslationManager.add_language_to_post(group["slug"], post[:uuid], "es", nil)
-
-      result =
-        TranslationManager.set_translation_status(
-          group["slug"],
-          post[:uuid],
-          1,
-          "es",
-          "published"
-        )
-
-      assert result == {:error, :primary_not_published}
-    end
-
-    test "can publish non-primary when primary is published" do
-      {group, post} = create_group_and_post(title: "Primary Published")
-      {:ok, _} = TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de", nil)
-
-      # Publish primary first
-      :ok =
-        TranslationManager.set_translation_status(
-          group["slug"],
-          post[:uuid],
-          1,
-          "en",
-          "published"
-        )
-
-      # Now publish secondary
+      # Even invalid status returns :ok (no-op)
       assert :ok =
                TranslationManager.set_translation_status(
                  group["slug"],
                  post[:uuid],
                  1,
-                 "de",
-                 "published"
+                 "en",
+                 "invalid"
                )
-    end
-
-    test "can set non-primary to draft regardless of primary status" do
-      {group, post} = create_group_and_post()
-      {:ok, _} = TranslationManager.add_language_to_post(group["slug"], post[:uuid], "fr", nil)
-
-      assert :ok =
-               TranslationManager.set_translation_status(
-                 group["slug"],
-                 post[:uuid],
-                 1,
-                 "fr",
-                 "draft"
-               )
-    end
-
-    test "rejects invalid status" do
-      {group, post} = create_group_and_post()
-
-      result =
-        TranslationManager.set_translation_status(
-          group["slug"],
-          post[:uuid],
-          1,
-          "en",
-          "invalid"
-        )
-
-      assert result == {:error, :invalid_status}
-    end
-
-    test "returns error for nonexistent post" do
-      {group, _post} = create_group_and_post()
-
-      result =
-        TranslationManager.set_translation_status(
-          group["slug"],
-          UUIDv7.generate(),
-          1,
-          "en",
-          "draft"
-        )
-
-      assert match?({:error, _}, result)
     end
   end
 
@@ -237,17 +145,17 @@ defmodule PhoenixKit.Integration.Publishing.TranslationsTest do
   # ============================================================================
 
   describe "full multilingual workflow" do
-    test "create → add languages → publish via version → verify all published" do
+    test "create → add languages → publish version → verify all published" do
       {group, post} = create_group_and_post(title: "Multilingual Post")
 
       # Add languages
       {:ok, _} = TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de", nil)
       {:ok, _} = TranslationManager.add_language_to_post(group["slug"], post[:uuid], "fr", nil)
 
-      # Publish version (publishes all content in the version)
+      # Publish the version — status is version-level, applies to all languages
       :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
 
-      # Verify all languages are published via language_statuses
+      # Verify all languages show as published via language_statuses
       {:ok, post_map} = Posts.read_post(group["slug"], post[:uuid], nil, nil)
       statuses = post_map[:language_statuses]
 

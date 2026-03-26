@@ -241,7 +241,7 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
   """
   def build_post_languages(post, enabled_languages, primary_language \\ nil) do
     primary_lang =
-      primary_language || post[:primary_language] || get_primary_language()
+      primary_language || get_primary_language()
 
     all_languages =
       order_languages_for_display(
@@ -273,7 +273,8 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
       exists: content_exists,
       enabled: language_enabled?(lang_code, enabled_languages),
       known: lang_info != nil,
-      is_primary: lang_code == primary_lang,
+      # is_default is used for ordering only, not for special UI treatment
+      is_default: lang_code == primary_lang,
       uuid: post[:uuid]
     }
   end

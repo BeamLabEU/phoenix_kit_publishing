@@ -25,12 +25,10 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   @doc """
   Returns the broadcast identifier for a post.
 
-  Uses slug when available, falls back to uuid. This identifier is used
-  for PubSub topic construction and must be consistent between broadcasters
-  (e.g. translation worker) and subscribers (e.g. editor).
+  Always uses uuid — it's present on every post regardless of mode.
   """
   def broadcast_id(post) do
-    post[:slug] || post[:uuid]
+    post[:uuid]
   end
 
   # ============================================================================
@@ -526,25 +524,5 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
 
   def generate_form_key(group_slug, _, _) do
     "#{group_slug}:unknown"
-  end
-
-  # ============================================================================
-  # Primary Language Migration Progress
-  # ============================================================================
-
-  @doc """
-  Broadcasts that primary language migration has completed.
-  """
-  def broadcast_primary_language_migration_completed(
-        group_slug,
-        success_count,
-        error_count,
-        primary_language
-      ) do
-    Manager.broadcast(
-      posts_topic(group_slug),
-      {:primary_language_migration_completed, group_slug, success_count, error_count,
-       primary_language}
-    )
   end
 end

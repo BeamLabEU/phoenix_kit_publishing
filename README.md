@@ -75,14 +75,73 @@ Single-language mode omits the language segment automatically.
 
 ### Database Schema (4 tables)
 
-| Table | Purpose | Key Fields |
-|-------|---------|------------|
-| `phoenix_kit_publishing_groups` | Content groups | name, slug, mode, status, position |
-| `phoenix_kit_publishing_posts` | Posts within groups | group_uuid, slug, status, mode, post_date/time |
-| `phoenix_kit_publishing_versions` | Version history | post_uuid, version_number, status |
-| `phoenix_kit_publishing_contents` | Per-language content | version_uuid, language, title, content, url_slug |
+```
+Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many) Content
+```
 
-All tables use UUIDv7 primary keys and JSONB `data` columns for extensibility.
+#### `phoenix_kit_publishing_groups` — Content containers
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| uuid | UUIDv7 | PK |
+| name | string | Display name |
+| slug | string | URL identifier (unique) |
+| mode | string | `"timestamp"` or `"slug"` — locked at creation |
+| status | string | `"active"` or `"trashed"` |
+| position | integer | Display ordering |
+| data | JSONB | type, item_singular/plural, icon, comments/likes/views_enabled |
+| title_i18n | JSONB | Translatable group title (keyed by language code) |
+| description_i18n | JSONB | Translatable group description (keyed by language code) |
+
+#### `phoenix_kit_publishing_posts` — Routing shell
+
+Posts hold URL identity and point to their live version. No content or metadata — that lives on versions.
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| uuid | UUIDv7 | PK |
+| group_uuid | UUIDv7 | FK → groups |
+| slug | string | URL path segment (slug mode, unique per group) |
+| mode | string | `"timestamp"` or `"slug"` |
+| post_date | date | URL date segment (timestamp mode) |
+| post_time | time | URL time segment (timestamp mode, unique per group+date) |
+| active_version_uuid | UUIDv7 | FK → versions — the live version (null = unpublished) |
+| trashed_at | utc_datetime | Soft delete timestamp (null = active) |
+| created_by_uuid | UUIDv7 | FK → users (audit) |
+| updated_by_uuid | UUIDv7 | FK → users (audit) |
+
+Publishing = setting `active_version_uuid`. Trashing = setting `trashed_at`.
+
+#### `phoenix_kit_publishing_versions` — Source of truth
+
+Each post has one or more versions. The version holds all metadata that applies across languages.
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| uuid | UUIDv7 | PK |
+| post_uuid | UUIDv7 | FK → posts |
+| version_number | integer | Sequential (v1, v2, ...), unique per post |
+| status | string | `"draft"` / `"published"` / `"archived"` |
+| published_at | utc_datetime | When this version was first published |
+| created_by_uuid | UUIDv7 | FK → users (audit) |
+| data | JSONB | featured_image_uuid, tags, seo, description, allow_version_access, notes, created_from |
+
+#### `phoenix_kit_publishing_contents` — Per-language title + body
+
+One row per language per version. All languages share the version's status and metadata.
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| uuid | UUIDv7 | PK |
+| version_uuid | UUIDv7 | FK → versions |
+| language | string | Language code (unique per version) |
+| title | string | Post title in this language |
+| content | text | Markdown/PHK body in this language |
+| url_slug | string | Per-language URL slug (for localized URLs) |
+| status | string | Reserved for future per-language overrides (unused by UI) |
+| data | JSONB | Reserved for future per-language overrides (unused by UI) |
+
+All tables use UUIDv7 primary keys. Language fallback chain: requested language → site default → first available.
 
 ### Module Structure
 

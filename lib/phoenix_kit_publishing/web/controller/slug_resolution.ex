@@ -107,14 +107,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution do
   # ============================================================================
 
   # Resolves a URL language code to the stored dialect code for DB queries.
-  # URL paths use base codes (de, en, fr) but content rows store full
-  # BCP-47 dialect codes (de-DE, en-US, fr-FR).
+  # Resolve language for DB lookup. If the language is an enabled code, use it directly.
+  # Only resolve base codes to dialects when the base itself isn't enabled.
   defp resolve_language_for_db(language) do
-    if Language.base_code?(language) do
-      Language.find_dialect_for_base(language, Language.get_enabled_languages()) ||
-        DialectMapper.base_to_dialect(language)
-    else
+    enabled = Language.get_enabled_languages()
+
+    if language in enabled do
       language
+    else
+      if Language.base_code?(language) do
+        Language.find_dialect_for_base(language, enabled) ||
+          DialectMapper.base_to_dialect(language)
+      else
+        language
+      end
     end
   end
 end

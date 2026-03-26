@@ -289,7 +289,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Preview do
             |> Map.put(:version_statuses, Map.get(db_post, :version_statuses, %{}))
             |> Map.put(:version_dates, Map.get(db_post, :version_dates, %{}))
             |> Map.put(:version, Map.get(db_post, :version))
-            |> Map.put(:primary_language, Map.get(db_post, :primary_language))
 
           {enriched, db_post}
 

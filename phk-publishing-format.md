@@ -1,4 +1,6 @@
-# .phk Publishing Format (Current Implementation)
+> **Legacy format.** The V2 schema is database-backed (see README.md for the current DB schema). This document describes the `.phk` flat-file format used in earlier versions.
+
+# .phk Publishing Format (Legacy)
 
 PhoenixKit's publishing module stores every post as a `.phk` file. Each file is a **YAML frontmatter block** followed by regular **Markdown**. Authors can sprinkle inline PHK components (for example `<Image … />`) anywhere inside the Markdown, but there is no longer a root `<Post>` wrapper or XML layout.
 

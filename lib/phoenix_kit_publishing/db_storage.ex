@@ -105,7 +105,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   def get_post(group_slug, post_slug) do
     from(p in PublishingPost,
       join: g in assoc(p, :group),
-      where: g.slug == ^group_slug and p.slug == ^post_slug and p.status != "trashed",
+      where: g.slug == ^group_slug and p.slug == ^post_slug and is_nil(p.trashed_at),
       preload: [group: g]
     )
     |> repo().one()
@@ -118,6 +118,18 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   and new posts are stored with seconds zeroed. For older posts with non-zero
   seconds, falls back to hour:minute matching.
   """
+  def get_post_by_datetime(group_slug, %Date{} = date, nil) do
+    # Date-only lookup — return the first post on this date (by time asc)
+    from(p in PublishingPost,
+      join: g in assoc(p, :group),
+      where: g.slug == ^group_slug and p.post_date == ^date and is_nil(p.trashed_at),
+      order_by: [asc: p.post_time],
+      limit: 1,
+      preload: [group: g]
+    )
+    |> repo().one()
+  end
+
   def get_post_by_datetime(group_slug, %Date{} = date, %Time{} = time) do
     # Normalize to zero seconds (URLs only carry HH:MM)
     normalized_time = %Time{hour: time.hour, minute: time.minute, second: 0, microsecond: {0, 0}}
@@ -128,7 +140,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         join: g in assoc(p, :group),
         where:
           g.slug == ^group_slug and p.post_date == ^date and p.post_time == ^normalized_time and
-            p.status != "trashed",
+            is_nil(p.trashed_at),
         preload: [group: g]
       )
       |> repo().one()
@@ -143,7 +155,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       from(p in PublishingPost,
         join: g in assoc(p, :group),
         where:
-          g.slug == ^group_slug and p.post_date == ^date and p.status != "trashed" and
+          g.slug == ^group_slug and p.post_date == ^date and is_nil(p.trashed_at) and
             fragment(
               "EXTRACT(HOUR FROM ?)::integer = ? AND EXTRACT(MINUTE FROM ?)::integer = ?",
               p.post_time,
@@ -171,15 +183,28 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     query =
       from(p in PublishingPost,
         join: g in assoc(p, :group),
-        where: g.slug == ^group_slug,
+        where: g.slug == ^group_slug and is_nil(p.trashed_at),
         preload: [group: g]
       )
 
     query =
-      if status do
-        where(query, [p], p.status == ^status)
-      else
-        where(query, [p], p.status != "trashed")
+      case status do
+        "published" ->
+          where(query, [p], not is_nil(p.active_version_uuid))
+
+        "draft" ->
+          where(query, [p], is_nil(p.active_version_uuid))
+
+        "trashed" ->
+          # Override the trashed_at filter for listing trashed posts
+          from(p in PublishingPost,
+            join: g in assoc(p, :group),
+            where: g.slug == ^group_slug and not is_nil(p.trashed_at),
+            preload: [group: g]
+          )
+
+        _ ->
+          query
       end
 
     query
@@ -191,7 +216,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   def count_posts(group_slug) do
     from(p in PublishingPost,
       join: g in assoc(p, :group),
-      where: g.slug == ^group_slug and p.status != "trashed",
+      where: g.slug == ^group_slug and is_nil(p.trashed_at),
       select: count(p.uuid)
     )
     |> repo().one() || 0
@@ -207,16 +232,16 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     query =
       from(p in PublishingPost,
         join: g in assoc(p, :group),
-        where: g.slug == ^group_slug,
+        where: g.slug == ^group_slug and is_nil(p.trashed_at),
         order_by: [desc: p.post_date, desc: p.post_time],
         preload: [group: g]
       )
 
     query =
-      if status do
-        where(query, [p], p.status == ^status)
-      else
-        query
+      case status do
+        "published" -> where(query, [p], not is_nil(p.active_version_uuid))
+        "draft" -> where(query, [p], is_nil(p.active_version_uuid))
+        _ -> query
       end
 
     query =
@@ -239,115 +264,41 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     query =
       from(p in PublishingPost,
         join: g in assoc(p, :group),
-        where: g.slug == ^group_slug,
+        where: g.slug == ^group_slug and is_nil(p.trashed_at),
         order_by: [asc: p.slug],
         preload: [group: g]
       )
 
-    if status do
-      where(query, [p], p.status == ^status)
-    else
-      query
+    case status do
+      "published" -> where(query, [p], not is_nil(p.active_version_uuid))
+      "draft" -> where(query, [p], is_nil(p.active_version_uuid))
+      _ -> query
     end
     |> repo().all()
   end
 
   @doc "Finds a post by date and time (timestamp mode, matches hour:minute only)."
   def find_post_by_date_time(group_slug, date, time) do
-    # Delegate to get_post_by_datetime which handles normalization and fallback
     get_post_by_datetime(group_slug, date, time)
   end
 
-  @doc "Trashes a post by setting status to 'trashed'."
-  # Uses Ecto.Changeset.change/2 instead of the full changeset to avoid
-  # slug validation errors on posts with nil/blank slugs.
+  @doc "Trashes a post by setting trashed_at timestamp."
   def trash_post(%PublishingPost{} = post) do
     post
-    |> Ecto.Changeset.change(status: "trashed")
+    |> Ecto.Changeset.change(trashed_at: DateTime.utc_now() |> DateTime.truncate(:second))
+    |> repo().update()
+  end
+
+  @doc "Restores a trashed post by clearing trashed_at."
+  def restore_post(%PublishingPost{} = post) do
+    post
+    |> Ecto.Changeset.change(trashed_at: nil)
     |> repo().update()
   end
 
   @doc "Hard-deletes a post and all its versions/contents (cascade)."
   def delete_post(%PublishingPost{} = post) do
     repo().delete(post)
-  end
-
-  @doc """
-  Counts posts by primary language status for a group.
-
-  Returns `%{current: n, needs_migration: n, needs_backfill: n}` where:
-  - `current` — primary_language matches the global setting
-  - `needs_migration` — primary_language is set but differs from global
-  - `needs_backfill` — primary_language is nil
-  """
-  def count_primary_language_status(group_slug, global_primary) do
-    posts = list_posts(group_slug)
-    count_primary_language_status_from_posts(posts, global_primary)
-  end
-
-  @doc """
-  Counts primary language status from an already-loaded list of posts.
-  Avoids re-querying when posts are already available.
-
-  Posts can be DB structs or maps (with `:primary_language` key).
-  """
-  def count_primary_language_status_from_posts(posts, global_primary) do
-    Enum.reduce(posts, %{current: 0, needs_migration: 0, needs_backfill: 0}, fn post, acc ->
-      primary_lang = Map.get(post, :primary_language)
-
-      cond do
-        is_nil(primary_lang) ->
-          %{acc | needs_backfill: acc.needs_backfill + 1}
-
-        primary_lang == global_primary ->
-          %{acc | current: acc.current + 1}
-
-        true ->
-          %{acc | needs_migration: acc.needs_migration + 1}
-      end
-    end)
-  end
-
-  @doc """
-  Updates all posts in a group to use the given primary language.
-
-  Returns `{:ok, count}` with the number of updated posts.
-  """
-  def update_primary_language(group_slug, primary_language) do
-    group = get_group_by_slug(group_slug)
-
-    if group do
-      {count, _} =
-        from(p in PublishingPost,
-          where:
-            p.group_uuid == ^group.uuid and
-              (is_nil(p.primary_language) or p.primary_language != ^primary_language)
-        )
-        |> repo().update_all(
-          set: [primary_language: primary_language, updated_at: DateTime.utc_now()]
-        )
-
-      {:ok, count}
-    else
-      {:ok, 0}
-    end
-  end
-
-  @doc "Counts posts needing primary language update in a group."
-  def count_posts_needing_language_update(group_slug, primary_language) do
-    group = get_group_by_slug(group_slug)
-
-    if group do
-      from(p in PublishingPost,
-        where:
-          p.group_uuid == ^group.uuid and
-            (is_nil(p.primary_language) or p.primary_language != ^primary_language),
-        select: count(p.uuid)
-      )
-      |> repo().one() || 0
-    else
-      0
-    end
   end
 
   # ===========================================================================
@@ -378,6 +329,14 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     |> repo().one()
   end
 
+  @doc "Gets the active (published) version for a post via active_version_uuid."
+  def get_active_version(%PublishingPost{} = post) do
+    case Map.get(post, :active_version_uuid) do
+      nil -> nil
+      uuid -> repo().get(PublishingVersion, uuid)
+    end
+  end
+
   @doc "Gets a specific version by post and version number."
   def get_version(post_uuid, version_number) do
     repo().get_by(PublishingVersion,
@@ -402,9 +361,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   from getting the same number.
   """
   def next_version_number(post_uuid) do
-    # Lock existing version rows to prevent concurrent inserts,
-    # then compute max in Elixir. FOR UPDATE cannot be combined
-    # with aggregate functions in PostgreSQL.
     versions =
       from(v in PublishingVersion,
         where: v.post_uuid == ^post_uuid,
@@ -420,6 +376,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   Creates a new version by cloning content from a source version.
 
   Creates a new version row and copies all content rows from the source.
+  Also copies version-level data (featured_image, tags, seo, etc.).
   Wrapped in a transaction for atomicity.
 
   Returns `{:ok, %PublishingVersion{}}` or `{:error, reason}`.
@@ -438,12 +395,18 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   defp do_create_cloned_version(post_uuid, source_version, opts) do
     new_number = next_version_number(post_uuid)
 
+    # Carry forward version-level data (featured_image, tags, seo, etc.)
+    source_data = source_version.data || %{}
+
+    version_data =
+      Map.merge(source_data, %{"created_from" => source_version.version_number})
+
     case create_version(%{
            post_uuid: post_uuid,
            version_number: new_number,
            status: "draft",
            created_by_uuid: opts[:created_by_uuid],
-           data: %{"created_from" => source_version.version_number}
+           data: version_data
          }) do
       {:ok, new_version} -> new_version
       {:error, reason} -> repo().rollback(reason)
@@ -547,7 +510,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         join: g in assoc(p, :group),
         where:
           g.slug == ^group_slug and c.language == ^language and c.url_slug == ^url_slug and
-            p.status != "trashed",
+            is_nil(p.trashed_at),
         preload: [version: {v, post: {p, group: g}}]
       )
       |> repo().one()
@@ -561,7 +524,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         join: g in assoc(p, :group),
         where:
           g.slug == ^group_slug and c.language == ^language and p.slug == ^url_slug and
-            p.status != "trashed" and
+            is_nil(p.trashed_at) and
             (is_nil(c.url_slug) or c.url_slug == ""),
         preload: [version: {v, post: {p, group: g}}]
       )
@@ -577,7 +540,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       where:
         g.slug == ^group_slug and
           c.language == ^language and
-          p.status != "trashed" and
+          is_nil(p.trashed_at) and
           fragment("? @> ?", c.data, ^%{"previous_url_slugs" => [url_slug]}),
       preload: [version: {v, post: {p, group: g}}]
     )
@@ -591,7 +554,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         []
 
       db_post ->
-        # Find affected languages, then bulk-clear url_slugs
         contents =
           from(c in PublishingContent,
             join: v in assoc(c, :version),
@@ -600,7 +562,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
           )
           |> repo().all()
 
-        # Bulk clear in one query
         from(c in PublishingContent,
           join: v in assoc(c, :version),
           where: v.post_uuid == ^db_post.uuid and c.url_slug == ^url_slug_to_clear
@@ -616,7 +577,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     changeset = PublishingContent.changeset(%PublishingContent{}, attrs)
 
     repo().insert(changeset,
-      on_conflict: {:replace, [:title, :content, :status, :url_slug, :data, :updated_at]},
+      on_conflict: {:replace, [:title, :content, :url_slug, :data, :updated_at]},
       conflict_target: [:version_uuid, :language],
       returning: true
     )
@@ -635,7 +596,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     with post when not is_nil(post) <- get_post(group_slug, post_slug),
          version when not is_nil(version) <- resolve_version(post, version_number),
          contents <- list_contents(version.uuid),
-         content when not is_nil(content) <- resolve_content(contents, language, post) do
+         content when not is_nil(content) <- resolve_content(contents, language) do
       all_versions = list_versions(post.uuid)
 
       {:ok, Mapper.to_post_map(post, version, content, contents, all_versions)}
@@ -651,7 +612,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     with post when not is_nil(post) <- get_post_by_datetime(group_slug, date, time),
          version when not is_nil(version) <- resolve_version(post, version_number),
          contents <- list_contents(version.uuid),
-         content when not is_nil(content) <- resolve_content(contents, language, post) do
+         content when not is_nil(content) <- resolve_content(contents, language) do
       all_versions = list_versions(post.uuid)
 
       {:ok, Mapper.to_post_map(post, version, content, contents, all_versions)}
@@ -672,7 +633,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     # Batch-load ALL versions for all posts in one query
     all_versions_by_post = batch_load_versions(post_uuids)
 
-    # Find latest version per post and collect all version UUIDs we need contents for
+    # Find latest version per post
     latest_by_post =
       Map.new(all_versions_by_post, fn {post_uuid, versions} ->
         {post_uuid, List.last(versions)}
@@ -710,7 +671,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         published_statuses =
           build_published_statuses(published_version, version, all_contents_by_version)
 
-        primary_content = resolve_content(contents, nil, post)
+        primary_content = resolve_content(contents, nil)
 
         if primary_content do
           Mapper.to_post_map(post, version, primary_content, contents, all_versions,
@@ -740,46 +701,38 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
     all_versions_by_post = batch_load_versions(post_uuids)
 
-    latest_by_post =
-      Map.new(all_versions_by_post, fn {post_uuid, versions} ->
-        {post_uuid, List.last(versions)}
+    # For the public listing, use the ACTIVE (published) version, not the latest draft.
+    # This ensures the public site shows the content that's actually live.
+    active_by_post =
+      Map.new(posts, fn post ->
+        active_uuid = Map.get(post, :active_version_uuid)
+        versions = Map.get(all_versions_by_post, post.uuid, [])
+
+        active_version =
+          if active_uuid do
+            Enum.find(versions, fn v -> v.uuid == active_uuid end)
+          end
+
+        {post.uuid, active_version}
       end)
 
-    published_by_post =
-      Map.new(all_versions_by_post, fn {post_uuid, versions} ->
-        {post_uuid, Enum.find(versions, fn v -> v.status == "published" end)}
-      end)
-
+    # Only load contents for posts that have an active version
     version_uuids_needed =
-      Enum.flat_map(posts, fn post ->
-        latest = latest_by_post[post.uuid]
-        published = published_by_post[post.uuid]
-
-        [latest, published]
-        |> Enum.reject(&is_nil/1)
-        |> Enum.uniq_by(& &1.uuid)
-        |> Enum.map(& &1.uuid)
-      end)
+      active_by_post
+      |> Map.values()
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(& &1.uuid)
 
     all_contents_by_version = batch_load_contents(version_uuids_needed)
 
-    Enum.map(posts, fn post ->
+    posts
+    |> Enum.filter(fn post -> active_by_post[post.uuid] != nil end)
+    |> Enum.map(fn post ->
       all_versions = Map.get(all_versions_by_post, post.uuid, [])
-      version = latest_by_post[post.uuid]
+      version = active_by_post[post.uuid]
+      contents = Map.get(all_contents_by_version, version.uuid, [])
 
-      if version do
-        contents = Map.get(all_contents_by_version, version.uuid, [])
-        published_version = published_by_post[post.uuid]
-
-        published_statuses =
-          build_published_statuses(published_version, version, all_contents_by_version)
-
-        Mapper.to_listing_map(post, version, contents, all_versions,
-          published_language_statuses: published_statuses
-        )
-      else
-        Mapper.to_listing_map(post, nil, [], [])
-      end
+      Mapper.to_listing_map(post, version, contents, all_versions)
     end)
   end
 
@@ -787,36 +740,54 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   # Private Helpers
   # ===========================================================================
 
-  defp resolve_version(post, nil), do: get_latest_version(post.uuid)
+  defp resolve_version(post, nil) do
+    # Prefer the active (published) version; fall back to latest for unpublished posts
+    get_active_version(post) || get_latest_version(post.uuid)
+  end
+
   defp resolve_version(post, version_number), do: get_version(post.uuid, version_number)
 
   defp build_published_statuses(published_version, latest_version, all_contents_by_version) do
     if published_version && published_version.uuid != latest_version.uuid do
+      # Status is version-level — all languages in the published version share its status
       Map.get(all_contents_by_version, published_version.uuid, [])
-      |> Map.new(fn c -> {c.language, c.status} end)
+      |> Map.new(fn c -> {c.language, published_version.status} end)
     else
       %{}
     end
   end
 
-  defp resolve_content(contents, nil, post) do
-    # No language specified — use primary language, then any available
-    Enum.find(contents, fn c -> c.language == post.primary_language end) ||
+  @doc """
+  Resolves content for a language from a list of content rows.
+
+  Fallback chain: exact language match → site default language → first available.
+  """
+  def resolve_content(contents, nil) do
+    site_default = site_default_language()
+
+    Enum.find(contents, fn c -> c.language == site_default end) ||
       List.first(contents)
   end
 
-  defp resolve_content(contents, language, post) do
-    # Try exact language match first, fall back to primary language, then any available.
-    # This handles cases where the DB has partial content (e.g., only 3 of 39 languages
-    # were imported) but the editor requests the primary language.
+  def resolve_content(contents, language) do
+    site_default = site_default_language()
+
     Enum.find(contents, fn c -> c.language == language end) ||
-      Enum.find(contents, fn c -> c.language == post.primary_language end) ||
+      Enum.find(contents, fn c -> c.language == site_default end) ||
       List.first(contents)
+  end
+
+  defp site_default_language do
+    if Code.ensure_loaded?(PhoenixKit.Modules.Publishing.LanguageHelpers) do
+      PhoenixKit.Modules.Publishing.LanguageHelpers.get_primary_language()
+    else
+      "en"
+    end
   end
 
   defp order_by_mode(query) do
-    # Default ordering: published_at desc, then inserted_at desc
-    order_by(query, [p], desc: p.published_at, desc: p.inserted_at)
+    # Order by post_date/time desc for timestamp mode posts, inserted_at desc as fallback
+    order_by(query, [p], desc: p.post_date, desc: p.post_time, desc: p.inserted_at)
   end
 
   @doc false

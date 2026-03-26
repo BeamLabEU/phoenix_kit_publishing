@@ -96,12 +96,10 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate list_posts(group_slug, preferred_language \\ nil), to: Posts
   defdelegate list_posts_by_status(group_slug, status), to: Posts
   defdelegate list_raw_posts(group_slug, status \\ nil), to: Posts
-  defdelegate count_primary_language_status(posts, primary_language), to: Posts
   defdelegate create_post(group_slug, opts \\ %{}), to: Posts
   defdelegate read_post(group_slug, identifier, language \\ nil, version \\ nil), to: Posts
   defdelegate read_post_by_uuid(post_uuid, language \\ nil, version \\ nil), to: Posts
   defdelegate update_post(group_slug, post, params, opts \\ %{}), to: Posts
-  defdelegate change_post_status(group_slug, post_uuid, new_status, opts \\ []), to: Posts
   defdelegate trash_post(group_slug, post_uuid), to: Posts
   defdelegate restore_post(group_slug, post_uuid), to: Posts
   defdelegate count_posts_on_date(group_slug, date), to: Posts
@@ -143,6 +141,7 @@ defmodule PhoenixKit.Modules.Publishing do
               ),
               to: Versions
 
+  defdelegate unpublish_post(group_slug, post_uuid, opts \\ []), to: Versions
   defdelegate delete_version(group_slug, post_uuid, version), to: Versions
   @doc false
   defdelegate broadcast_version_created(group_slug, broadcast_id, new_version), to: Versions
@@ -152,17 +151,6 @@ defmodule PhoenixKit.Modules.Publishing do
   # ============================================================================
 
   alias PhoenixKit.Modules.Publishing.TranslationManager
-
-  defdelegate get_post_primary_language(group_slug, post_slug, version \\ nil),
-    to: TranslationManager
-
-  defdelegate check_primary_language_status(group_slug, post_slug), to: TranslationManager
-
-  defdelegate update_post_primary_language(group_slug, post_uuid, new_primary_language),
-    to: TranslationManager
-
-  defdelegate update_posts_primary_language(group_slug), to: TranslationManager
-  defdelegate count_posts_needing_language_update(group_slug), to: TranslationManager
 
   defdelegate add_language_to_post(group_slug, post_uuid, language_code, version \\ nil),
     to: TranslationManager

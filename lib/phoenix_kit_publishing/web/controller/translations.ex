@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
   alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
@@ -74,17 +75,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
     |> Enum.uniq_by(& &1.code)
   end
 
-  # Check if a specific enabled language has published content in the group
-  # ONLY checks for EXACT matches - no base code fallback
-  # This ensures only languages with actual content show in the public switcher
-  # Uses passed posts to avoid redundant list_posts calls
+  # Check if a specific enabled language has published content in the group.
+  # Requires the language to exist, be published, and have actual content (non-empty title).
   defp has_published_content_for_language?(posts, language) do
     Enum.any?(posts, fn post ->
-      # Check if there's published content for this EXACT language only
-      # Use preloaded language_statuses map
       language in (post.available_languages || []) and
-        Map.get(post.language_statuses, language) == "published"
+        Map.get(post.language_statuses, language) == "published" and
+        has_content?(post, language)
     end)
+  end
+
+  defp has_content?(post, language) do
+    title = get_in(post, [:language_titles, language])
+    title != nil and title != "" and title != "Untitled"
   end
 
   # ============================================================================
@@ -109,7 +112,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
     current_base = DialectMapper.extract_base(current_language)
 
     # Use the post's primary language so it appears first in the switcher
-    primary_language = post[:primary_language] || List.first(enabled_languages) || "en"
+    primary_language = LanguageHelpers.get_primary_language()
 
     # Fetch language_slugs from cache for per-language URL slugs
     # Falls back to using post.slug for all languages if cache miss
@@ -184,20 +187,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
 
   # Remove legacy base codes when dialect content of the same language exists
   # This prevents showing both "en" and "en-CA" in the switcher
-  defp deduplicate_base_and_dialect_codes(languages, _enabled_languages) do
+  defp deduplicate_base_and_dialect_codes(languages, enabled_languages) do
     # Separate base codes and dialect codes
     {base_codes, dialect_codes} = Enum.split_with(languages, &Language.base_code?/1)
 
-    # For each base code, check if any dialect content exists for it
-    # If so, exclude the base code
+    # Only remove a base code if it's NOT an enabled language AND a dialect exists.
+    # If both "en" and "en-US" are enabled with content, show both.
     filtered_base_codes =
       Enum.reject(base_codes, fn base ->
-        Enum.any?(dialect_codes, fn dialect ->
-          DialectMapper.extract_base(dialect) == base
-        end)
+        base not in enabled_languages and
+          Enum.any?(dialect_codes, fn dialect ->
+            DialectMapper.extract_base(dialect) == base
+          end)
       end)
 
-    # Return dialect codes plus any base codes that don't have dialect alternatives
     dialect_codes ++ filtered_base_codes
   end
 
@@ -242,6 +245,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
 
   # Translation is visible if it exists — status comes from the post level
   defp translation_published_exact?(_group_slug, post, language) do
-    language in (post.available_languages || [])
+    language in (post.available_languages || []) and
+      post_has_content_for_language?(post, language)
+  end
+
+  # Check if a post has actual content for a language (not just an empty content row)
+  defp post_has_content_for_language?(post, language) do
+    # On post pages, language_titles may not be available — check the current content
+    cond do
+      # Listing maps have language_titles
+      is_map(post[:language_titles]) ->
+        title = Map.get(post.language_titles, language)
+        title != nil and title != "" and title != "Untitled"
+
+      # Post maps: if we're checking the current language, check metadata title
+      language == post[:language] ->
+        title = get_in(post, [:metadata, :title])
+        title != nil and title != "" and title != "Untitled"
+
+      # For other languages on post maps, assume content exists if in available_languages
+      # (the content row was created intentionally)
+      true ->
+        true
+    end
   end
 end

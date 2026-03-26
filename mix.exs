@@ -15,7 +15,8 @@ defmodule PhoenixKitPublishing.MixProject do
       aliases: aliases(),
 
       # Hex
-      description: "Publishing module for PhoenixKit — database-backed CMS with multi-language support",
+      description:
+        "Publishing module for PhoenixKit — database-backed CMS with multi-language support",
       package: package(),
 
       # Dialyzer

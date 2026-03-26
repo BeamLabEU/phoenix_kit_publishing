@@ -69,7 +69,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       |> assign(:endpoint_url, "")
       |> assign(:date_time_settings, date_time_settings)
       |> assign(
-        :primary_language_name,
+        :default_language_name,
         Helpers.get_language_name(Publishing.get_primary_language())
       )
       |> assign(:dashboard_refresh_timer, nil)
@@ -129,50 +129,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   def handle_info(:debounced_dashboard_refresh, socket),
     do: {:noreply, socket |> assign(:dashboard_refresh_timer, nil) |> refresh_dashboard()}
 
-  # Primary language update completed (from this page or elsewhere)
-  def handle_info(
-        {:primary_language_migration_completed, _group_slug, count, _errors, primary_language},
-        socket
-      ) do
-    {:noreply,
-     socket
-     |> refresh_dashboard()
-     |> put_flash(
-       :info,
-       gettext("Updated %{count} posts to primary language: %{lang}",
-         count: count,
-         lang: Helpers.get_language_name(primary_language)
-       )
-     )}
-  end
-
   # Catch-all for other PubSub messages (translation progress, cache changes, etc.)
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("update_primary_language", %{"slug" => group_slug}, socket) do
-    case Publishing.update_posts_primary_language(group_slug) do
-      {:ok, 0} ->
-        {:noreply, put_flash(socket, :info, gettext("All posts already up to date"))}
-
-      {:ok, count} ->
-        {:noreply,
-         socket
-         |> refresh_dashboard()
-         |> put_flash(
-           :info,
-           gettext("Updated %{count} posts to primary language: %{lang}",
-             count: count,
-             lang: Helpers.get_language_name(Publishing.get_primary_language())
-           )
-         )}
-    end
-  rescue
-    e ->
-      Logger.error("[Publishing.Index] Primary language update failed: #{Exception.message(e)}")
-      {:noreply, put_flash(socket, :error, gettext("Failed to update primary language"))}
-  end
-
   def handle_event("switch_view", %{"mode" => mode}, socket) when mode in @group_statuses do
     send(self(), {:deferred_view_switch, mode})
 
@@ -296,17 +256,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
     latest_published_at = find_latest_published_at(posts)
 
-    # Reuse already-loaded posts for primary language check (avoids redundant DB query)
-    global_primary = Publishing.get_primary_language()
-
-    primary_lang_status =
-      Publishing.count_primary_language_status(posts, global_primary)
-
-    lang_migration_count =
-      if primary_lang_status,
-        do: primary_lang_status.needs_backfill + primary_lang_status.needs_migration,
-        else: 0
-
     %{
       name: db_group["name"],
       slug: group_slug,
@@ -318,10 +267,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       languages: languages,
       last_published_at: latest_published_at,
       last_published_at_text:
-        format_datetime(latest_published_at, current_user, date_time_settings),
-      primary_language_status: primary_lang_status,
-      needs_primary_language_migration: lang_migration_count > 0,
-      needs_migration_count: lang_migration_count
+        format_datetime(latest_published_at, current_user, date_time_settings)
     }
   end
 
@@ -595,35 +541,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                       <% end %>
                     </details>
                   </div>
-
-                  <%!-- Primary Language Update Warning --%>
-                  <%= if insight.needs_primary_language_migration do %>
-                    <div class="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20">
-                      <.icon name="hero-language" class="w-4 h-4 text-warning shrink-0" />
-                      <span class="text-xs text-warning flex-1 min-w-0">
-                        {ngettext(
-                          "%{count} post needs primary language update",
-                          "%{count} posts need primary language update",
-                          insight.needs_migration_count,
-                          count: insight.needs_migration_count
-                        )}
-                      </span>
-                      <button
-                        type="button"
-                        class="btn btn-warning btn-xs"
-                        phx-click="update_primary_language"
-                        phx-value-slug={insight.slug}
-                        data-confirm={
-                          gettext(
-                            "Update %{count} posts to use the current primary language?",
-                            count: insight.needs_migration_count
-                          )
-                        }
-                      >
-                        {gettext("Update")}
-                      </button>
-                    </div>
-                  <% end %>
 
                   <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-auto">
                     <%= if @view_mode == "active" do %>

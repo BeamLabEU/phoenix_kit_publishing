@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.Web.Editor.Translation
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Storage.URLSigner
@@ -23,37 +24,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   def assign_current_language(socket, language_code) do
     enabled_languages = socket.assigns[:all_enabled_languages] || []
     lang_info = Publishing.get_language_info(language_code)
-    post_primary = socket.assigns[:post] && socket.assigns.post[:primary_language]
-    primary_language = post_primary || Publishing.get_primary_language()
-    is_primary = language_code == primary_language
-
-    # Check if this post's primary language matches the global setting
-    global_primary = Publishing.get_primary_language()
-
-    primary_lang_status =
-      cond do
-        post_primary == nil -> {:needs_update, :backfill}
-        post_primary != global_primary -> {:needs_update, :migration}
-        true -> {:ok, :current}
-      end
+    default_language = LanguageHelpers.get_primary_language()
 
     # Get language names for display
     current_language_name = if lang_info, do: lang_info.name, else: String.upcase(language_code)
-    primary_language_name = get_language_name(primary_language)
-    global_primary_language_name = get_language_name(global_primary)
+    default_language_name = get_language_name(default_language)
 
     socket
     |> Phoenix.Component.assign(:current_language, language_code)
     |> Phoenix.Component.assign(:current_language_name, current_language_name)
-    |> Phoenix.Component.assign(:primary_language_name, primary_language_name)
-    |> Phoenix.Component.assign(:global_primary_language_name, global_primary_language_name)
+    |> Phoenix.Component.assign(:default_language, default_language)
+    |> Phoenix.Component.assign(:default_language_name, default_language_name)
     |> Phoenix.Component.assign(
       :current_language_enabled,
       Publishing.language_enabled?(language_code, enabled_languages)
     )
     |> Phoenix.Component.assign(:current_language_known, lang_info != nil)
-    |> Phoenix.Component.assign(:is_primary_language, is_primary)
-    |> Phoenix.Component.assign(:post_primary_language_status, primary_lang_status)
     |> Translation.maybe_clear_completed_translation_status()
   end
 
@@ -100,7 +86,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   Builds language data for the publishing_language_switcher component.
   """
   def build_editor_languages(post, enabled_languages, current_language) do
-    post_primary = post[:primary_language] || Publishing.get_primary_language()
+    post_primary = LanguageHelpers.get_primary_language()
 
     all_languages =
       Publishing.order_languages_for_display(
@@ -117,8 +103,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
       is_current = lang_code == current_language
       is_enabled = Publishing.language_enabled?(lang_code, enabled_languages)
       is_known = lang_info != nil
-      is_primary = lang_code == post_primary
-
       status = Map.get(language_statuses, lang_code)
       display_code = Publishing.get_display_code(lang_code, enabled_languages)
 
@@ -132,7 +116,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
         is_current: is_current,
         enabled: is_enabled,
         known: is_known,
-        is_primary: is_primary,
+        # is_default is used for ordering only, not for special UI treatment
+        is_default: lang_code == post_primary,
         uuid: post[:uuid]
       }
     end)

@@ -114,10 +114,9 @@ defmodule PhoenixKit.Integration.Publishing.VersionsTest do
       {group, post} = create_group_and_post(title: "Check Published")
       :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
 
-      status =
-        Versions.get_version_status(group["slug"], post[:slug] || post[:uuid], 1, "en")
-
-      assert status == "published"
+      {:ok, post_map} = Posts.read_post(group["slug"], post[:uuid], nil, 1)
+      assert post_map[:version_statuses][1] == "published"
+      assert post_map[:metadata][:status] == "published"
     end
 
     test "archives previously published version" do
@@ -128,10 +127,8 @@ defmodule PhoenixKit.Integration.Publishing.VersionsTest do
       Posts.update_post(group["slug"], v2, %{"title" => "V2 Title"}, %{})
       :ok = Versions.publish_version(group["slug"], post[:uuid], 2)
 
-      v1_status =
-        Versions.get_version_status(group["slug"], post[:slug] || post[:uuid], 1, "en")
-
-      assert v1_status == "archived"
+      {:ok, post_map} = Posts.read_post(group["slug"], post[:uuid], nil, 1)
+      assert post_map[:version_statuses][1] == "archived"
     end
 
     test "only one version published at a time" do
@@ -142,11 +139,9 @@ defmodule PhoenixKit.Integration.Publishing.VersionsTest do
       Posts.update_post(group["slug"], v2, %{"title" => "V2"}, %{})
       :ok = Versions.publish_version(group["slug"], post[:uuid], 2)
 
-      v1 = Versions.get_version_status(group["slug"], post[:slug] || post[:uuid], 1, "en")
-      v2_status = Versions.get_version_status(group["slug"], post[:slug] || post[:uuid], 2, "en")
-
-      assert v1 == "archived"
-      assert v2_status == "published"
+      {:ok, post_map} = Posts.read_post(group["slug"], post[:uuid], nil, nil)
+      assert post_map[:version_statuses][1] == "archived"
+      assert post_map[:version_statuses][2] == "published"
     end
 
     test "rejects publishing version without title" do
@@ -212,10 +207,8 @@ defmodule PhoenixKit.Integration.Publishing.VersionsTest do
       {group, post} = create_group_and_post(title: "Pub Status")
       :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
 
-      status =
-        Versions.get_version_status(group["slug"], post[:slug] || post[:uuid], 1, "en")
-
-      assert status == "published"
+      {:ok, post_map} = Posts.read_post(group["slug"], post[:uuid], nil, 1)
+      assert post_map[:version_statuses][1] == "published"
     end
   end
 
@@ -285,17 +278,14 @@ defmodule PhoenixKit.Integration.Publishing.VersionsTest do
       # Publish v2
       :ok = Versions.publish_version(group["slug"], post[:uuid], 2)
 
-      # V1 should now be archived (was published, got superseded)
-      v1_status =
-        Versions.get_version_status(group["slug"], post[:slug] || post[:uuid], 1, "en")
+      # Check version statuses via post map
+      {:ok, post_map} = Posts.read_post(group["slug"], post[:uuid], nil, nil)
 
-      assert v1_status == "archived"
+      # V1 should now be archived (was published, got superseded)
+      assert post_map[:version_statuses][1] == "archived"
 
       # V2 should be published
-      v2_status =
-        Versions.get_version_status(group["slug"], post[:slug] || post[:uuid], 2, "en")
-
-      assert v2_status == "published"
+      assert post_map[:version_statuses][2] == "published"
 
       # Reading without version gives v2 (latest)
       {:ok, latest} = Posts.read_post(group["slug"], post[:uuid], nil, nil)

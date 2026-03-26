@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
 
   alias PhoenixKitAI, as: AI
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PresenceHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker
@@ -98,7 +99,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Checks if the default translation prompt already exists.
   """
   def default_translation_prompt_exists? do
-    ai_module_available?() and AI.enabled?() and AI.get_prompt_by_slug(@translation_prompt_slug) != nil
+    ai_module_available?() and AI.enabled?() and
+      AI.get_prompt_by_slug(@translation_prompt_slug) != nil
   end
 
   @doc """
@@ -158,7 +160,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   def get_target_languages_for_translation(socket) do
     post = socket.assigns.post
     # Use post's stored primary language for translation source
-    primary_language = post[:primary_language] || Publishing.get_primary_language()
+    primary_language = LanguageHelpers.get_primary_language()
     available_languages = post.available_languages || []
 
     Publishing.enabled_language_codes()
@@ -168,10 +170,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   @doc """
   Gets all target languages for translation (all except primary).
   """
-  def get_all_target_languages(socket) do
-    post = socket.assigns.post
-    # Use post's stored primary language to exclude from targets
-    primary_language = post[:primary_language] || Publishing.get_primary_language()
+  def get_all_target_languages(_socket) do
+    primary_language = LanguageHelpers.get_primary_language()
 
     Publishing.enabled_language_codes()
     |> Enum.reject(&(&1 == primary_language))
@@ -232,11 +232,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
     user_uuid = if user, do: user.user.uuid, else: nil
     post = socket.assigns.post
 
-    # Get the source language from the post's stored primary_language
     source_language =
-      post[:primary_language] ||
-        socket.assigns[:current_language] ||
-        Publishing.get_primary_language()
+      socket.assigns[:current_language] ||
+        LanguageHelpers.get_primary_language()
 
     case TranslatePostWorker.enqueue(
            socket.assigns.group_slug,
@@ -383,9 +381,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Returns the source language for translation based on the post's primary language
   or the system default.
   """
-  def source_language_for_translation(socket) do
-    post = socket.assigns[:post]
-    (post && post[:primary_language]) || Publishing.get_primary_language()
+  def source_language_for_translation(_socket) do
+    LanguageHelpers.get_primary_language()
   end
 
   defp check_source_language_editor(socket, warnings) do
@@ -459,9 +456,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
     post = socket.assigns.post
 
     source_language =
-      post[:primary_language] ||
-        socket.assigns[:current_language] ||
-        Publishing.get_primary_language()
+      socket.assigns[:current_language] ||
+        LanguageHelpers.get_primary_language()
 
     current_version = socket.assigns[:current_version]
 
