@@ -740,7 +740,11 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   # Private Helpers
   # ===========================================================================
 
-  defp resolve_version(post, nil), do: get_latest_version(post.uuid)
+  defp resolve_version(post, nil) do
+    # Prefer the active (published) version; fall back to latest for unpublished posts
+    get_active_version(post) || get_latest_version(post.uuid)
+  end
+
   defp resolve_version(post, version_number), do: get_version(post.uuid, version_number)
 
   defp build_published_statuses(published_version, latest_version, all_contents_by_version) do

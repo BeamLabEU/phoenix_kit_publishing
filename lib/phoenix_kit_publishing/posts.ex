@@ -497,13 +497,21 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # Content rows store full dialect codes, but URL paths use base codes.
   defp resolve_language_to_dialect(nil), do: nil
 
+  # Only resolve base codes (e.g. "en") to dialects (e.g. "en-US") if the base
+  # code doesn't exist as an enabled language. If "en" is enabled, use "en" directly.
   defp resolve_language_to_dialect(language) do
-    base = DialectMapper.extract_base(language)
+    enabled = LanguageHelpers.enabled_language_codes()
 
-    if base == language do
-      DialectMapper.base_to_dialect(language)
-    else
+    if language in enabled do
       language
+    else
+      base = DialectMapper.extract_base(language)
+
+      if base == language do
+        DialectMapper.base_to_dialect(language)
+      else
+        language
+      end
     end
   end
 

@@ -187,20 +187,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
 
   # Remove legacy base codes when dialect content of the same language exists
   # This prevents showing both "en" and "en-CA" in the switcher
-  defp deduplicate_base_and_dialect_codes(languages, _enabled_languages) do
+  defp deduplicate_base_and_dialect_codes(languages, enabled_languages) do
     # Separate base codes and dialect codes
     {base_codes, dialect_codes} = Enum.split_with(languages, &Language.base_code?/1)
 
-    # For each base code, check if any dialect content exists for it
-    # If so, exclude the base code
+    # Only remove a base code if it's NOT an enabled language AND a dialect exists.
+    # If both "en" and "en-US" are enabled with content, show both.
     filtered_base_codes =
       Enum.reject(base_codes, fn base ->
-        Enum.any?(dialect_codes, fn dialect ->
-          DialectMapper.extract_base(dialect) == base
-        end)
+        base not in enabled_languages and
+          Enum.any?(dialect_codes, fn dialect ->
+            DialectMapper.extract_base(dialect) == base
+          end)
       end)
 
-    # Return dialect codes plus any base codes that don't have dialect alternatives
     dialect_codes ++ filtered_base_codes
   end
 
