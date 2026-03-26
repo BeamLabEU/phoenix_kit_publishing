@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   use Gettext, backend: PhoenixKitWeb.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
@@ -22,8 +23,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   def read_version_post(socket, version) do
     post = socket.assigns.post
     language = socket.assigns.current_language
-    # Use the post's stored primary language for fallback, not global
-    primary_language = post[:primary_language] || Publishing.get_primary_language()
+    primary_language = LanguageHelpers.get_primary_language()
 
     read_fn = fn lang -> Publishing.read_post_by_uuid(post.uuid, lang, version) end
 

@@ -64,12 +64,36 @@ This is a **library** (not a standalone Phoenix app) that provides publishing/CM
 
 ### Database Tables
 
-All 4 tables use UUIDv7 primary keys and JSONB `data` columns for extensibility. **Migrations live in this package** (`lib/phoenix_kit_publishing/migrations/publishing_tables.ex`) **but are run by the parent app** — this module has no local Ecto repos or migrations to run independently.
+All 4 tables use UUIDv7 primary keys. **Migrations live in phoenix_kit core** (versioned system, currently V88). The publishing package includes a consolidated standalone migration (`lib/phoenix_kit_publishing/migrations/publishing_tables.ex`) for reference/independent installs.
 
-- `phoenix_kit_publishing_groups` — Content groups (blog, faq, docs, …)
-- `phoenix_kit_publishing_posts` — Posts within groups
-- `phoenix_kit_publishing_versions` — Version history per post
-- `phoenix_kit_publishing_contents` — Per-language content per version
+```
+Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many) Content
+```
+
+**`phoenix_kit_publishing_groups`** — Content containers (blog, faq, docs)
+- `name`, `slug` (unique), `mode` ("timestamp"/"slug"), `status` ("active"/"trashed"), `position`
+- `data` JSONB: type, item names, icon, feature flags (comments/likes/views)
+- `title_i18n` JSONB: translatable title keyed by language code (for future use)
+- `description_i18n` JSONB: translatable description keyed by language code (for future use)
+
+**`phoenix_kit_publishing_posts`** — Routing shell only
+- `slug`, `mode`, `post_date`, `post_time` — URL identity
+- `active_version_uuid` FK → versions — points to the live version (null = unpublished)
+- `trashed_at` — soft delete timestamp (null = active)
+- `created_by_uuid`, `updated_by_uuid` — audit
+- **No content, status, or metadata** — all of that lives on versions
+
+**`phoenix_kit_publishing_versions`** — Source of truth for published state
+- `post_uuid`, `version_number` (unique per post), `status` (draft/published/archived)
+- `published_at` — when first published
+- `data` JSONB: featured_image_uuid, tags, seo, description, allow_version_access, notes, created_from
+- **Status is version-level** — all languages in a version share the same status
+
+**`phoenix_kit_publishing_contents`** — Per-language title + body
+- `version_uuid`, `language` (unique per version), `title`, `content` (markdown body)
+- `url_slug` — per-language URL slug for localized routing
+- `status`, `data` JSONB — reserved columns for future per-language overrides (unused by UI currently)
+- **Language fallback**: requested language → site default → first available
 
 ## Critical Conventions
 

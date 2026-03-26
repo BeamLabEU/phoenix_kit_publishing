@@ -57,12 +57,7 @@ defmodule PhoenixKit.Modules.Publishing.FacadeTest do
 
   describe "translation delegations" do
     test "all translation functions are exported from facade" do
-      assert function_exported?(Publishing, :get_post_primary_language, 2)
-      assert function_exported?(Publishing, :get_post_primary_language, 3)
-      assert function_exported?(Publishing, :check_primary_language_status, 2)
-      assert function_exported?(Publishing, :update_post_primary_language, 3)
-      assert function_exported?(Publishing, :update_posts_primary_language, 1)
-      assert function_exported?(Publishing, :count_posts_needing_language_update, 1)
+      assert function_exported?(Publishing, :unpublish_post, 3)
       assert function_exported?(Publishing, :add_language_to_post, 3)
       assert function_exported?(Publishing, :add_language_to_post, 4)
       assert function_exported?(Publishing, :add_language_to_db, 4)

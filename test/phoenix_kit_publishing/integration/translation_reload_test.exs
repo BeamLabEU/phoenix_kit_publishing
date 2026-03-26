@@ -56,7 +56,7 @@ defmodule PhoenixKit.Integration.Publishing.TranslationReloadTest do
       {:ok, translated} = Publishing.read_post_by_uuid(uuid, "uk")
 
       # Primary should return English
-      assert primary.language == "en-US"
+      assert primary.language == "en"
       assert primary.metadata.title == "English Title"
 
       # Translated should return Ukrainian

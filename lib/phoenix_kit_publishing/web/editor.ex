@@ -28,6 +28,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   alias Phoenix.LiveView.JS
   alias PhoenixKitAI, as: AI
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
@@ -114,8 +115,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:current_language, nil)
       |> assign(:current_language_enabled, true)
       |> assign(:current_language_known, true)
-      |> assign(:is_primary_language, true)
-      |> assign(:post_primary_language_status, {:ok, :current})
+      |> assign(:default_language, nil)
+      |> assign(:default_language_name, nil)
       |> assign(:available_languages, [])
       |> assign(:all_enabled_languages, [])
       |> assign(:has_pending_changes, false)
@@ -612,7 +613,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
     case result do
       :ok ->
-        primary_lang = post[:primary_language] || Publishing.get_primary_language()
+        primary_lang = LanguageHelpers.get_primary_language()
         url = Helpers.build_edit_url(group_slug, post, lang: primary_lang)
 
         {:noreply,
@@ -902,50 +903,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
-  def handle_event("update_primary_language", _params, socket) do
-    group_slug = socket.assigns.group_slug
-    post = socket.assigns.post
-
-    if post do
-      primary_language = Publishing.get_primary_language()
-      language_name = Helpers.get_language_name(primary_language)
-
-      case Publishing.update_post_primary_language(group_slug, post.uuid, primary_language) do
-        :ok ->
-          Persistence.regenerate_listing_cache(group_slug)
-
-          updated_post = Map.put(post, :primary_language, primary_language)
-          enabled_languages = socket.assigns[:all_enabled_languages] || []
-
-          editor_languages =
-            Helpers.build_editor_languages(
-              updated_post,
-              enabled_languages,
-              socket.assigns.current_language
-            )
-
-          socket =
-            socket
-            |> assign(:post, updated_post)
-            |> assign(:editor_languages, editor_languages)
-            |> assign(:post_primary_language_status, {:ok, :current})
-            |> put_flash(:info, gettext("Primary language updated: %{lang}", lang: language_name))
-
-          {:noreply, socket}
-
-        {:error, reason} ->
-          {:noreply,
-           put_flash(
-             socket,
-             :error,
-             gettext("Failed to update primary language: %{reason}", reason: inspect(reason))
-           )}
-      end
-    else
-      {:noreply, socket}
-    end
-  end
-
   # ============================================================================
   # Handle Events - Navigation
   # ============================================================================
@@ -997,9 +954,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   # Update post struct with current form values for accurate public URL and status display
   defp update_post_from_form(post, form, language) do
+    # Status is version-level — all languages share the same status
     new_status = form["status"]
-    current_language_statuses = Map.get(post, :language_statuses, %{})
-    updated_language_statuses = Map.put(current_language_statuses, language, new_status)
+    available_langs = Map.get(post, :available_languages, [language])
+    updated_language_statuses = Map.new(available_langs, fn lang -> {lang, new_status} end)
 
     form_slug = form["slug"]
     form_url_slug = form["url_slug"]
@@ -1873,95 +1831,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       </div>
     </div>
 
-    <%!-- Language and Version Switchers --%>
+    <%!-- Version Switcher and Actions --%>
     <div class="flex flex-col gap-2">
-      <%!-- Language Switcher --%>
-      <%= if length(@all_enabled_languages) > 1 or not @current_language_enabled or not @current_language_known do %>
-        <% all_languages =
-          build_editor_languages(
-            @post,
-            @all_enabled_languages,
-            @current_language
-          ) %>
-        <% primary_lang = Enum.find(all_languages, & &1.is_primary) %>
-        <% other_languages = Enum.reject(all_languages, & &1.is_primary) %>
-
-        <%!-- Other translations --%>
-        <div class="flex items-start gap-2">
-          <span class="text-xs font-medium text-base-content/60 shrink-0 pt-1">
-            {gettext("Language:")}
-          </span>
-          <.language_switcher
-            languages={other_languages}
-            current_language={@current_language}
-            show_status={true}
-            show_add={true}
-            on_click_js={&switch_lang_js(&1, @current_language)}
-            size={:sm}
-          />
-        </div>
-
-        <%!-- Primary language --%>
-        <%= if primary_lang do %>
-          <div class="flex items-center gap-2 flex-wrap">
-            <span
-              class="text-xs font-medium text-base-content/60 tooltip tooltip-bottom cursor-help z-50"
-              data-tip={
-                gettext(
-                  "Other languages inherit publication status and defaults from this version."
-                )
-              }
-            >
-              {gettext("Primary:")}
-            </span>
-            <button
-              type="button"
-              phx-click={
-                switch_lang_js(
-                  primary_lang.code,
-                  @current_language
-                )
-              }
-              class={[
-                "inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors",
-                if(primary_lang.is_current,
-                  do: "bg-primary/20 border border-primary/40 ring-2 ring-primary/30",
-                  else: "hover:bg-base-200"
-                )
-              ]}
-              title={primary_lang.name}
-            >
-              <span class={[
-                "rounded-full inline-block w-2.5 h-2.5",
-                cond do
-                  not primary_lang.exists -> "bg-base-content/20"
-                  primary_lang.status == "published" -> "bg-success"
-                  primary_lang.status == "draft" -> "bg-warning"
-                  primary_lang.status == "archived" -> "bg-base-content/40"
-                  true -> "bg-base-content/20"
-                end
-              ]}>
-              </span>
-              <span class={[
-                "text-sm font-bold uppercase",
-                cond do
-                  not primary_lang.exists -> "text-base-content/20"
-                  primary_lang.status == "published" -> "text-success"
-                  primary_lang.status == "draft" -> "text-warning"
-                  primary_lang.status == "archived" -> "text-base-content/40"
-                  true -> "text-base-content/20"
-                end
-              ]}>
-                {String.upcase(primary_lang.display_code)}
-              </span>
-              <span class="text-sm text-base-content/70">
-                {primary_lang.name}
-              </span>
-            </button>
-          </div>
-        <% end %>
-      <% end %>
-
       <%!-- Version Switcher (for versioned posts in both slug and timestamp modes) --%>
       <%= if !@is_new_post && @post do %>
         <div class="flex items-center gap-1.5 flex-wrap">
@@ -2066,38 +1937,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       </div>
     <% end %>
 
-    <%!-- Primary Language Needs Update Warning (shown on ALL languages when update needed) --%>
-    <% needs_update =
-      not @is_new_post and length(@all_enabled_languages) > 1 and
-        @post_primary_language_status != {:ok, :current} %>
-    <%= if needs_update do %>
-      <div class="flex items-center gap-3 px-4 py-2.5 rounded-lg border bg-gradient-to-r from-warning/10 to-amber-500/10 border-warning/30">
-        <div class="flex items-center justify-center w-8 h-8 rounded-full text-white shadow-sm bg-gradient-to-br from-warning to-amber-500">
-          <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
-        </div>
-        <div class="flex-1">
-          <span class="text-sm font-medium text-warning">
-            {gettext("Primary Language Needs Update")}
-          </span>
-          <p class="text-xs text-base-content/60">
-            {gettext(
-              "The global primary language setting has changed to %{language}. Update this post or create a new version.",
-              language: @global_primary_language_name
-            )}
-          </p>
-        </div>
-        <button
-          type="button"
-          class="btn btn-warning btn-sm"
-          phx-click="update_primary_language"
-          phx-disable-with={gettext("Updating...")}
-        >
-          <.icon name="hero-arrow-path" class="w-4 h-4" />
-          {gettext("Update")}
-        </button>
-      </div>
-    <% end %>
-
     <%!-- Translation in progress lock banner --%>
     <%= if @translation_locked? do %>
       <div class="alert shadow-sm border border-primary/30 bg-primary/5">
@@ -2133,14 +1972,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
           <div class="space-y-4">
             <p class="text-sm text-base-content/70">
-              <%= if @is_primary_language do %>
+              <%= if @current_language == @default_language do %>
                 {gettext(
                   "Automatically translate this post to other languages using AI. The translation will be queued as a background job."
                 )}
               <% else %>
                 {gettext(
                   "Translate the %{source} post to %{target} using AI. The translation will be queued as a background job.",
-                  source: @primary_language_name,
+                  source: @default_language_name,
                   target: @current_language_name
                 )}
               <% end %>
@@ -2250,7 +2089,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
             <%!-- Action Buttons --%>
             <div class="flex flex-wrap gap-3">
-              <%= if @is_primary_language do %>
+              <%= if @current_language == @default_language do %>
                 <button
                   type="button"
                   class={"btn btn-primary btn-sm #{if @ai_selected_endpoint_uuid == nil or @ai_selected_prompt_uuid == nil or @ai_translation_status in [:enqueued, :in_progress], do: "btn-disabled"}"}
@@ -2297,7 +2136,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
             <%!-- Info --%>
             <div class="text-xs text-base-content/50 space-y-1">
-              <%= if @is_primary_language do %>
+              <%= if @current_language == @default_language do %>
                 <p>
                   <.icon name="hero-information-circle" class="w-3 h-3 inline" />
                   {gettext(
@@ -2315,7 +2154,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <.icon name="hero-information-circle" class="w-3 h-3 inline" />
                   {gettext(
                     "This will translate the %{source} content to %{target}, overwriting any existing content.",
-                    source: @primary_language_name,
+                    source: @default_language_name,
                     target: @current_language_name
                   )}
                 </p>
@@ -2377,8 +2216,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     >
       <.form for={@form} id="publishing-meta" phx-change="update_meta" phx-submit="noop">
         <div class="flex flex-col lg:flex-row gap-6">
-          <%!-- Left column: Title + Content (primary editing area) --%>
+          <%!-- Left column: Language switcher + Title + Content --%>
           <div class="flex-1 space-y-4">
+            <%!-- Language Switcher (inside content area) --%>
+            <%= if length(@all_enabled_languages) > 1 or not @current_language_enabled or not @current_language_known do %>
+              <% all_languages =
+                build_editor_languages(
+                  @post,
+                  @all_enabled_languages,
+                  @current_language
+                ) %>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-medium text-base-content/60 shrink-0">
+                  {gettext("Language:")}
+                </span>
+                <.language_switcher
+                  languages={all_languages}
+                  current_language={@current_language}
+                  show_status={true}
+                  show_add={true}
+                  on_click_js={&switch_lang_js(&1, @current_language)}
+                  size={:sm}
+                />
+              </div>
+            <% end %>
+
             <div class="card bg-base-100 shadow-xl border border-base-200">
               <div class="card-body space-y-4">
                 <%!-- Save status and button --%>
@@ -2466,84 +2328,41 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             </div>
           </div>
 
-          <%!-- Right column: Metadata sidebar --%>
+          <%!-- Right column: Version Settings (global, shared across all languages) --%>
           <div class="lg:w-80 space-y-4">
             <div class="card bg-base-100 shadow-xl border border-base-200">
               <div class="card-body space-y-4">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
+                  {gettext("Version Settings")}
+                </h3>
+
+                <%!-- Slug (slug-mode groups only) --%>
                 <%= if @group_mode == "slug" do %>
-                  <%= if @is_primary_language do %>
-                    <%!-- Primary language: editable slug used in the post URL --%>
-                    <div>
-                      <label class="label">
-                        <span class="label-text text-sm font-semibold text-base-content">
-                          {gettext("Slug")}
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        name="slug"
-                        id="slug-input"
-                        value={@form["slug"]}
-                        pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                        class={"input input-bordered w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
-                        placeholder={gettext("auto-generated from title")}
-                        title={
-                          gettext(
-                            "Use lowercase letters, numbers, and hyphens only. No spaces or special characters."
-                          )
-                        }
-                        readonly={edit_disabled? or @viewing_older_version}
-                      />
-                      <p class="text-xs text-base-content/60 mt-1">
-                        {gettext("Use lowercase letters, numbers, and hyphens only.")}
-                        {gettext("This will be the default URL for all languages.")}
-                      </p>
-                    </div>
-                  <% else %>
-                    <%!-- Translation: URL Slug field for per-language SEO-friendly URLs --%>
-                    <div>
-                      <label class="label">
-                        <span class="label-text text-sm font-semibold text-base-content">
-                          {gettext("URL Slug")}
-                          <span class="text-base-content/60 font-normal ml-1">
-                            ({gettext("optional")})
-                          </span>
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        name="url_slug"
-                        id="url-slug-input"
-                        value={@form["url_slug"] || ""}
-                        pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                        class={"input input-bordered w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
-                        placeholder={@form["slug"] || ""}
-                        title={
-                          gettext(
-                            "Use lowercase letters, numbers, and hyphens only. Leave empty to use the default slug."
-                          )
-                        }
-                        readonly={edit_disabled? or @viewing_older_version}
-                      />
-                      <p class="text-xs text-base-content/60 mt-1">
-                        {gettext(
-                          "Custom URL for this language. Leave empty to use default: %{slug}",
-                          slug: @form["slug"]
-                        )}
-                      </p>
-                      <p class="text-xs text-base-content/50 mt-0.5">
-                        {gettext("Preview: /%{language}/%{group}/%{slug}",
-                          language: @current_language,
-                          group: @group_slug,
-                          slug:
-                            if(@form["url_slug"] != "",
-                              do: @form["url_slug"],
-                              else: @form["slug"]
-                            )
-                        )}
-                      </p>
-                    </div>
-                  <% end %>
+                  <div>
+                    <label class="label">
+                      <span class="label-text text-sm font-semibold text-base-content">
+                        {gettext("Slug")}
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      name="slug"
+                      id="slug-input"
+                      value={@form["slug"]}
+                      pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                      class={"input input-bordered w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                      placeholder={gettext("auto-generated from title")}
+                      title={
+                        gettext(
+                          "Use lowercase letters, numbers, and hyphens only. No spaces or special characters."
+                        )
+                      }
+                      readonly={edit_disabled? or @viewing_older_version}
+                    />
+                    <p class="text-xs text-base-content/60 mt-1">
+                      {gettext("Use lowercase letters, numbers, and hyphens only.")}
+                    </p>
+                  </div>
                 <% end %>
 
                 <div>
@@ -2665,105 +2484,78 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </details>
                 </div>
 
-                <%!-- Status: editable for primary language, visibility info for translations --%>
-                <%= if @is_primary_language do %>
-                  <div>
-                    <label class="label">
-                      <span class="label-text text-sm font-semibold text-base-content">
-                        {gettext("Status")}
-                      </span>
-                    </label>
-                    <select
-                      class={"select select-bordered w-full #{if edit_disabled?, do: "select-disabled bg-base-200"}"}
-                      name="status"
-                      disabled={edit_disabled?}
-                    >
-                      <%= if @viewing_older_version do %>
-                        <option
-                          value="published"
-                          selected={@form["status"] in ["draft", "published"]}
-                        >
-                          {gettext("Published")}
-                        </option>
-                        <option value="archived" selected={@form["status"] == "archived"}>
-                          {gettext("Archived")}
-                        </option>
-                      <% else %>
-                        <option value="draft" selected={@form["status"] == "draft"}>
-                          {gettext("Draft")}
-                        </option>
-                        <option value="published" selected={@form["status"] == "published"}>
-                          {gettext("Published")}
-                        </option>
-                        <option value="archived" selected={@form["status"] == "archived"}>
-                          {gettext("Archived")}
-                        </option>
-                      <% end %>
-                    </select>
-                    <p class="text-xs text-base-content/50 mt-1">
-                      {gettext("Translations with content will share this status.")}
-                    </p>
-                  </div>
-                <% else %>
-                  <% translation_exists = @current_language in (@post[:available_languages] || []) %>
-                  <%= if @form["status"] == "published" do %>
-                    <%= if (@content || "") != "" do %>
-                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20 text-sm text-success">
-                        <.icon name="hero-globe-alt" class="w-4 h-4 shrink-0" />
-                        {gettext("Visible to the public")}
-                      </div>
+                <%!-- Status (version-level, applies to all languages) --%>
+                <div>
+                  <label class="label">
+                    <span class="label-text text-sm font-semibold text-base-content">
+                      {gettext("Status")}
+                    </span>
+                  </label>
+                  <select
+                    class={"select select-bordered w-full #{if edit_disabled?, do: "select-disabled bg-base-200"}"}
+                    name="status"
+                    disabled={edit_disabled?}
+                  >
+                    <%= if @viewing_older_version do %>
+                      <option
+                        value="published"
+                        selected={@form["status"] in ["draft", "published"]}
+                      >
+                        {gettext("Published")}
+                      </option>
+                      <option value="archived" selected={@form["status"] == "archived"}>
+                        {gettext("Archived")}
+                      </option>
                     <% else %>
-                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-info/10 border border-info/20 text-sm text-info">
-                        <.icon name="hero-pencil" class="w-4 h-4 shrink-0" />
-                        {gettext("Add content to make this translation visible to the public")}
-                      </div>
+                      <option value="draft" selected={@form["status"] == "draft"}>
+                        {gettext("Draft")}
+                      </option>
+                      <option value="published" selected={@form["status"] == "published"}>
+                        {gettext("Published")}
+                      </option>
+                      <option value="archived" selected={@form["status"] == "archived"}>
+                        {gettext("Archived")}
+                      </option>
                     <% end %>
-                  <% else %>
-                    <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-base-200 border border-base-300 text-sm text-base-content/60">
-                      <.icon name="hero-eye-slash" class="w-4 h-4 shrink-0" />
-                      {gettext("Not visible — publish the primary language first")}
-                    </div>
-                  <% end %>
-                  <%!-- Clear translation button --%>
-                  <%= if translation_exists do %>
-                    <button
-                      type="button"
-                      phx-click="clear_translation"
-                      class="btn btn-outline btn-error btn-sm w-full gap-2 mt-2"
-                      data-confirm={
-                        gettext(
-                          "Clear the %{language} translation content? You can always add a new translation for this language later.",
-                          language: @current_language_name
-                        )
-                      }
-                    >
-                      <.icon name="hero-trash" class="w-4 h-4" />
-                      {gettext("Clear translation")}
-                    </button>
-                  <% end %>
-                <% end %>
+                  </select>
+                  <p class="text-xs text-base-content/50 mt-1">
+                    {gettext("Applies to all languages in this version.")}
+                  </p>
+                </div>
 
-                <%!-- Publication date: only editable by primary language --%>
-                <%= if @is_primary_language do %>
-                  <div>
-                    <label class="label">
-                      <span class="label-text text-sm font-semibold text-base-content">
-                        {gettext("Publication Date & Time (UTC)")}
-                      </span>
-                    </label>
-                    <input
-                      type="datetime-local"
-                      name="published_at"
-                      value={datetime_local_value(@form["published_at"])}
-                      class={"input input-bordered w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
-                      readonly={edit_disabled? or @viewing_older_version}
-                    />
-                    <p class="text-xs text-base-content/60 mt-1">
-                      {gettext(
-                        "Updating the publication time changes the post URL to match the new date."
-                      )}
-                    </p>
-                  </div>
+                <%!-- Publication date (version-level) --%>
+                <div>
+                  <label class="label">
+                    <span class="label-text text-sm font-semibold text-base-content">
+                      {gettext("Publication Date & Time (UTC)")}
+                    </span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="published_at"
+                    value={datetime_local_value(@form["published_at"])}
+                    class={"input input-bordered w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                    readonly={edit_disabled? or @viewing_older_version}
+                  />
+                </div>
+
+                <%!-- Clear translation button (for any language with existing content) --%>
+                <% translation_exists = @current_language in (@post[:available_languages] || []) %>
+                <%= if translation_exists do %>
+                  <button
+                    type="button"
+                    phx-click="clear_translation"
+                    class="btn btn-outline btn-error btn-sm w-full gap-2"
+                    data-confirm={
+                      gettext(
+                        "Clear the %{language} translation content? You can always add a new translation for this language later.",
+                        language: @current_language_name
+                      )
+                    }
+                  >
+                    <.icon name="hero-trash" class="w-4 h-4" />
+                    {gettext("Clear translation")}
+                  </button>
                 <% end %>
               </div>
             </div>

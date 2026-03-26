@@ -61,8 +61,34 @@ repo_available =
       $$ LANGUAGE plpgsql VOLATILE;
       """)
 
-      # Run the publishing migration to set up tables
-      PhoenixKit.Modules.Publishing.Migrations.PublishingTables.up(%{prefix: nil})
+      # Create minimal phoenix_kit_settings table (needed by LanguageHelpers)
+      TestRepo.query!("""
+      CREATE TABLE IF NOT EXISTS phoenix_kit_settings (
+        uuid UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+        key VARCHAR(255) NOT NULL UNIQUE,
+        value VARCHAR(255),
+        value_json JSONB,
+        module VARCHAR(255),
+        date_added TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        date_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+      """)
+
+      # Run the publishing migration to set up tables.
+      # The migration module has up/1 (takes opts), so wrap it for Ecto.Migrator.
+      defmodule PhoenixKitPublishing.Test.SetupMigration do
+        use Ecto.Migration
+
+        def up do
+          PhoenixKit.Modules.Publishing.Migrations.PublishingTables.up(%{prefix: nil})
+        end
+
+        def down do
+          PhoenixKit.Modules.Publishing.Migrations.PublishingTables.down(%{prefix: nil})
+        end
+      end
+
+      Ecto.Migrator.up(TestRepo, 1, PhoenixKitPublishing.Test.SetupMigration, log: false)
 
       Ecto.Adapters.SQL.Sandbox.mode(TestRepo, :manual)
       true

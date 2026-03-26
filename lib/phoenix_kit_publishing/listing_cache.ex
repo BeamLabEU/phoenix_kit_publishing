@@ -40,7 +40,6 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   alias PhoenixKit.Modules.Publishing.DBStorage
 
   @timestamp_modes Constants.timestamp_modes()
-  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Date, as: UtilsDate
@@ -635,94 +634,4 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     Settings.get_setting_cached(@memory_cache_key, "true") == "true"
   end
 
-  @doc """
-  Returns a list of posts that need primary_language migration.
-
-  This checks all posts in a group and returns those that either:
-  1. Have no `primary_language` stored (need backfill)
-  2. Have `primary_language` different from global setting (need migration decision)
-  """
-  @spec posts_needing_primary_language_migration(String.t()) :: [map()]
-  def posts_needing_primary_language_migration(group_slug) do
-    case read(group_slug) do
-      {:ok, posts} ->
-        global_primary = LanguageHelpers.get_primary_language()
-
-        Enum.filter(posts, fn post ->
-          # Use atom key since normalized posts use atoms
-          stored_primary = post[:primary_language]
-          stored_primary == nil or stored_primary != global_primary
-        end)
-
-      {:error, _} ->
-        # If cache doesn't exist, query DB directly
-        scan_posts_needing_migration(group_slug)
-    end
-  end
-
-  defp scan_posts_needing_migration(group_slug) do
-    global_primary = LanguageHelpers.get_primary_language()
-
-    DBStorage.list_posts_for_listing(group_slug)
-    |> Enum.filter(fn post ->
-      stored_primary = post[:primary_language]
-      stored_primary == nil or stored_primary != global_primary
-    end)
-  end
-
-  @doc """
-  Counts posts by primary_language status in a group.
-
-  Returns `%{current: n, needs_migration: n, needs_backfill: n}` where:
-  - `current` - posts with primary_language matching global setting
-  - `needs_migration` - posts with different primary_language (were created under old setting)
-  - `needs_backfill` - posts with no primary_language stored
-  """
-  @spec count_primary_language_status(String.t()) :: map()
-  def count_primary_language_status(group_slug) do
-    case read(group_slug) do
-      {:ok, posts} ->
-        global_primary = LanguageHelpers.get_primary_language()
-
-        Enum.reduce(posts, %{current: 0, needs_migration: 0, needs_backfill: 0}, fn post, acc ->
-          # Use atom key since normalized posts use atoms
-          stored_primary = post[:primary_language]
-
-          cond do
-            stored_primary == nil ->
-              %{acc | needs_backfill: acc.needs_backfill + 1}
-
-            stored_primary == global_primary ->
-              %{acc | current: acc.current + 1}
-
-            true ->
-              %{acc | needs_migration: acc.needs_migration + 1}
-          end
-        end)
-
-      {:error, _} ->
-        # If cache doesn't exist, query DB directly
-        scan_primary_language_status(group_slug)
-    end
-  end
-
-  defp scan_primary_language_status(group_slug) do
-    global_primary = LanguageHelpers.get_primary_language()
-
-    DBStorage.list_posts_for_listing(group_slug)
-    |> Enum.reduce(%{current: 0, needs_migration: 0, needs_backfill: 0}, fn post, acc ->
-      stored_primary = post[:primary_language]
-
-      cond do
-        stored_primary == nil ->
-          %{acc | needs_backfill: acc.needs_backfill + 1}
-
-        stored_primary == global_primary ->
-          %{acc | current: acc.current + 1}
-
-        true ->
-          %{acc | needs_migration: acc.needs_migration + 1}
-      end
-    end)
-  end
 end

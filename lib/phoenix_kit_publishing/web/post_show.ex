@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   use Gettext, backend: PhoenixKitWeb.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Date, as: UtilsDate
@@ -193,22 +194,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
             <div class="flex flex-wrap gap-2 mt-2">
               <%= for lang <- @post.available_languages do %>
                 <% status = Map.get(@post.language_statuses || %{}, lang) %>
-                <% is_primary = lang == @post.primary_language %>
                 <.pk_link
                   navigate={"/admin/publishing/#{@group_slug}/#{@post_uuid}/edit?lang=#{lang}"}
-                  class={
-                    if is_primary,
-                      do:
-                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors bg-primary/10 border border-primary/20 hover:bg-primary/20",
-                      else:
-                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors bg-base-200 hover:bg-base-300"
-                  }
+                  class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors bg-base-200 hover:bg-base-300"
                 >
                   <span class={"rounded-full inline-block w-2 h-2 #{language_status_color(status)}"} />
                   <span class="text-sm font-medium">{lang}</span>
-                  <%= if is_primary do %>
-                    <span class="text-xs text-primary/70">{gettext("Primary")}</span>
-                  <% end %>
                 </.pk_link>
               <% end %>
             </div>
@@ -231,8 +222,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
                 </div>
               <% end %>
               <div class="flex justify-between">
-                <dt class="text-base-content/60">{gettext("Primary Language")}</dt>
-                <dd class="font-medium">{@post.primary_language}</dd>
+                <dt class="text-base-content/60">{gettext("Default Language")}</dt>
+                <dd class="font-medium">{LanguageHelpers.get_primary_language()}</dd>
               </div>
               <%= if @post.metadata[:description] do %>
                 <div>

@@ -2,21 +2,21 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
   @moduledoc """
   Consolidated migration for the Publishing module.
 
-  Creates all 4 publishing tables in their final state. Every statement uses
+  Creates all 4 publishing tables in their V2 state. Every statement uses
   IF NOT EXISTS / IF NOT NULL guards so it is safe to run even when the tables
   already exist (e.g. created by PhoenixKit core migrations).
 
   ## Tables
 
   - `phoenix_kit_publishing_groups`   — content groups (blog, faq, docs, …)
-  - `phoenix_kit_publishing_posts`    — posts within groups
-  - `phoenix_kit_publishing_versions` — version history per post
-  - `phoenix_kit_publishing_contents` — per-language content per version
+  - `phoenix_kit_publishing_posts`    — routing shell (slug/date identity + active version pointer)
+  - `phoenix_kit_publishing_versions` — source of truth (status, published_at, metadata)
+  - `phoenix_kit_publishing_contents` — per-language content (title + body, with override columns for future use)
 
   ## Design
 
   - UUID v7 primary keys (`uuid_generate_v7()` default)
-  - JSONB `data` column on every table for extensibility
+  - JSONB `data` column on versions and contents for extensibility
   - All timestamps use `timestamptz`
   - Slug is nullable (timestamp-mode posts use date/time instead)
   - User FK columns (`created_by_uuid`, `updated_by_uuid`) reference
@@ -42,6 +42,8 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
       status VARCHAR(20) NOT NULL DEFAULT 'active',
       position INTEGER NOT NULL DEFAULT 0,
       data JSONB NOT NULL DEFAULT '{}',
+      title_i18n JSONB NOT NULL DEFAULT '{}',
+      description_i18n JSONB NOT NULL DEFAULT '{}',
       inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -58,7 +60,7 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
     """)
 
     # =========================================================================
-    # Table 2: phoenix_kit_publishing_posts
+    # Table 2: phoenix_kit_publishing_posts (routing shell)
     # =========================================================================
 
     execute("""
@@ -66,16 +68,13 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
       uuid UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
       group_uuid UUID NOT NULL,
       slug VARCHAR(500),
-      status VARCHAR(20) NOT NULL DEFAULT 'draft',
       mode VARCHAR(20) NOT NULL DEFAULT 'timestamp',
-      primary_language VARCHAR(10) NOT NULL DEFAULT 'en',
-      published_at TIMESTAMPTZ,
-      scheduled_at TIMESTAMPTZ,
       post_date DATE,
       post_time TIME,
+      active_version_uuid UUID,
+      trashed_at TIMESTAMPTZ,
       created_by_uuid UUID,
       updated_by_uuid UUID,
-      data JSONB NOT NULL DEFAULT '{}',
       inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       CONSTRAINT fk_publishing_posts_group
@@ -122,25 +121,21 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
     """)
 
     execute("""
-    CREATE INDEX IF NOT EXISTS idx_publishing_posts_group_status
-    ON #{prefix_str}phoenix_kit_publishing_posts (group_uuid, status)
-    """)
-
-    execute("""
-    CREATE INDEX IF NOT EXISTS idx_publishing_posts_group_published_at
-    ON #{prefix_str}phoenix_kit_publishing_posts (group_uuid, published_at DESC)
-    """)
-
-    execute("""
     CREATE INDEX IF NOT EXISTS idx_publishing_posts_group_date_time
     ON #{prefix_str}phoenix_kit_publishing_posts (group_uuid, post_date DESC, post_time DESC)
     WHERE post_date IS NOT NULL
     """)
 
     execute("""
-    CREATE INDEX IF NOT EXISTS idx_publishing_posts_scheduled
-    ON #{prefix_str}phoenix_kit_publishing_posts (scheduled_at)
-    WHERE status = 'scheduled'
+    CREATE INDEX IF NOT EXISTS idx_publishing_posts_active_version
+    ON #{prefix_str}phoenix_kit_publishing_posts (active_version_uuid)
+    WHERE active_version_uuid IS NOT NULL
+    """)
+
+    execute("""
+    CREATE INDEX IF NOT EXISTS idx_publishing_posts_trashed_at
+    ON #{prefix_str}phoenix_kit_publishing_posts (trashed_at)
+    WHERE trashed_at IS NULL
     """)
 
     execute("""
@@ -154,7 +149,7 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
     """)
 
     # =========================================================================
-    # Table 3: phoenix_kit_publishing_versions
+    # Table 3: phoenix_kit_publishing_versions (source of truth)
     # =========================================================================
 
     execute("""
@@ -163,6 +158,7 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
       post_uuid UUID NOT NULL,
       version_number INTEGER NOT NULL,
       status VARCHAR(20) NOT NULL DEFAULT 'draft',
+      published_at TIMESTAMPTZ,
       created_by_uuid UUID,
       data JSONB NOT NULL DEFAULT '{}',
       inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -172,6 +168,25 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
         REFERENCES #{prefix_str}phoenix_kit_publishing_posts(uuid)
         ON DELETE CASCADE
     )
+    """)
+
+    # active_version FK — added after versions table exists
+    execute("""
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_schema = '#{schema_name}'
+        AND table_name = 'phoenix_kit_publishing_posts'
+        AND constraint_name = 'fk_publishing_posts_active_version'
+      ) THEN
+        ALTER TABLE #{prefix_str}phoenix_kit_publishing_posts
+          ADD CONSTRAINT fk_publishing_posts_active_version
+          FOREIGN KEY (active_version_uuid)
+          REFERENCES #{prefix_str}phoenix_kit_publishing_versions(uuid)
+          ON DELETE SET NULL;
+      END IF;
+    END $$;
     """)
 
     maybe_add_user_fk(
@@ -198,12 +213,18 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
     """)
 
     execute("""
+    CREATE INDEX IF NOT EXISTS idx_publishing_versions_published_at
+    ON #{prefix_str}phoenix_kit_publishing_versions (published_at DESC)
+    WHERE published_at IS NOT NULL
+    """)
+
+    execute("""
     CREATE INDEX IF NOT EXISTS idx_publishing_versions_created_by
     ON #{prefix_str}phoenix_kit_publishing_versions (created_by_uuid)
     """)
 
     # =========================================================================
-    # Table 4: phoenix_kit_publishing_contents
+    # Table 4: phoenix_kit_publishing_contents (per-language title + body)
     # =========================================================================
 
     execute("""

@@ -2,16 +2,15 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   @moduledoc """
   Fixes stale or invalid values on publishing records.
 
-  Validates and corrects fields like mode, type, status, language, and
+  Validates and corrects fields like mode, type, language, and
   timestamps across groups, posts, versions, and content. Also reconciles
-  status consistency between posts, versions, and content rows.
+  active_version_uuid consistency between posts and versions.
   """
 
   require Logger
 
   import Ecto.Query, only: [from: 2]
 
-  alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingGroup
@@ -24,7 +23,6 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
   @valid_types Constants.valid_types()
   @valid_group_modes Constants.valid_modes()
-  @valid_post_statuses Constants.post_statuses()
   @valid_group_statuses Constants.group_statuses()
   @valid_version_statuses Constants.content_statuses()
   @default_group_mode Constants.default_mode()
@@ -89,16 +87,11 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   Fixes stale or invalid values on a publishing post record.
 
   Checks and corrects:
-  - `primary_language` — must be a recognized language code. Resolution order:
-    1. Tries to resolve a dialect (e.g., "en" → "en-US")
-    2. Falls back to the first available language on the post
-    3. Falls back to the system primary language
-  - `status` — must be a valid post status (defaults to "draft")
   - `mode` — must be "timestamp" or "slug" (defaults to "timestamp")
   - `post_date`/`post_time` — must be present for timestamp mode posts
+  - `active_version_uuid` — must point to a valid, published version
 
-  Only fixes languages not in the master predefined list — languages that were
-  added, used, then removed from enabled are left untouched.
+  Deletes empty posts (no content in any version) that are past the grace period.
   """
   @spec fix_stale_post(PublishingPost.t()) :: PublishingPost.t()
   def fix_stale_post(%PublishingPost{} = post) do
@@ -126,10 +119,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     else
       post = apply_stale_fix(post, build_post_fixes(post, ctx), &DBStorage.update_post/2)
 
-      # Fix version/content-level issues, also fix stale versions and contents
-      fix_missing_primary_content(post, ctx)
+      # Fix version/content-level issues
       fix_multiple_published_versions(post, ctx)
-      fix_translation_status_consistency(post, ctx)
 
       for version <- ctx.versions do
         fix_stale_version(version)
@@ -165,27 +156,10 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
   defp build_post_fixes(post, ctx) do
     %{}
-    |> maybe_fix_post_language(post, ctx)
-    |> maybe_fix_post_status(post)
     |> maybe_fix_post_mode(post)
     |> maybe_fix_post_slug(post, ctx)
     |> maybe_fix_post_timestamp(post)
-  end
-
-  defp maybe_fix_post_language(attrs, post, ctx) do
-    case fix_stale_language(post, ctx) do
-      nil -> attrs
-      fixed_lang -> Map.put(attrs, :primary_language, fixed_lang)
-    end
-  end
-
-  defp maybe_fix_post_status(attrs, post) do
-    cond do
-      post.status in @valid_post_statuses -> attrs
-      # Convert removed "scheduled" status to "draft"
-      post.status == "scheduled" -> Map.put(attrs, :status, "draft")
-      true -> Map.put(attrs, :status, "draft")
-    end
+    |> maybe_fix_active_version(post, ctx)
   end
 
   defp maybe_fix_post_mode(attrs, post) do
@@ -254,6 +228,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
   defp generate_slug_for_post(post, ctx) do
     # Try to get title from the latest version's primary content
+    primary_lang = LanguageHelpers.get_primary_language()
+
     title =
       case ctx.versions do
         [] ->
@@ -263,7 +239,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
           latest = List.last(versions)
           contents = Map.get(ctx.contents_by_version, latest.uuid, [])
 
-          case Enum.find(contents, &(&1.language == post.primary_language)) do
+          case Enum.find(contents, &(&1.language == primary_lang)) do
             nil -> nil
             content -> content.title
           end
@@ -305,44 +281,25 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
-  # Returns the fixed language or nil if no fix needed.
-  defp fix_stale_language(post, ctx) do
-    lang = post.primary_language
+  # If active_version_uuid points to a non-existent or non-published version, clear it
+  defp maybe_fix_active_version(attrs, post, ctx) do
+    case post.active_version_uuid do
+      nil ->
+        attrs
 
-    if lang && Languages.get_predefined_language(lang) do
-      nil
-    else
-      fixed = resolve_stale_language(lang, ctx)
-      if fixed != lang, do: fixed, else: nil
-    end
-  end
+      active_uuid ->
+        version = Enum.find(ctx.versions, &(&1.uuid == active_uuid))
 
-  defp resolve_stale_language(lang, ctx) do
-    dialect = if lang, do: Languages.DialectMapper.base_to_dialect(lang), else: nil
+        if is_nil(version) or version.status != "published" do
+          Logger.info(
+            "[Publishing] Clearing stale active_version_uuid for post #{post.uuid}: " <>
+              "version #{inspect(active_uuid)} is #{if version, do: version.status, else: "missing"}"
+          )
 
-    if dialect && Languages.get_predefined_language(dialect) do
-      dialect
-    else
-      available = post_available_languages(ctx)
-
-      if available != [] do
-        Enum.find(available, hd(available), fn code ->
-          Languages.get_predefined_language(code) != nil
-        end)
-      else
-        LanguageHelpers.get_primary_language()
-      end
-    end
-  end
-
-  defp post_available_languages(ctx) do
-    case ctx.versions do
-      [] ->
-        []
-
-      [first | _] ->
-        contents = Map.get(ctx.contents_by_version, first.uuid, [])
-        Enum.map(contents, & &1.language)
+          Map.put(attrs, :active_version_uuid, nil)
+        else
+          attrs
+        end
     end
   end
 
@@ -374,8 +331,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
   @doc """
   Fixes stale values across all groups, posts, versions, and content.
-  Also reconciles status consistency between posts, versions, and content,
-  fixes missing primary language content, and ensures single published version.
+  Also reconciles active_version_uuid consistency and ensures single published version.
   Callable via internal API or IEx.
   """
   @spec fix_all_stale_values() :: :ok
@@ -432,93 +388,6 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   end
 
   @doc """
-  Fixes missing primary language content.
-
-  If the primary language has no content (or empty content) but a translation
-  exists with content, copies the best translation to the primary language
-  and inherits its status.
-  """
-  def fix_missing_primary_content(%PublishingPost{} = post) do
-    ctx = build_post_context(post)
-    fix_missing_primary_content(post, ctx)
-  end
-
-  defp fix_missing_primary_content(post, ctx) do
-    primary_lang = post.primary_language
-
-    for version <- ctx.versions do
-      contents = Map.get(ctx.contents_by_version, version.uuid, [])
-      primary_content = Enum.find(contents, &(&1.language == primary_lang))
-
-      if primary_content_missing?(primary_content) and contents != [] do
-        fix_version_primary_content(post, version, primary_lang, primary_content, contents)
-      end
-    end
-  end
-
-  defp primary_content_missing?(nil), do: true
-
-  defp primary_content_missing?(content) do
-    content.content in [nil, ""] and content.title in [nil, "", Constants.default_title()]
-  end
-
-  defp fix_version_primary_content(post, version, primary_lang, primary_content, contents) do
-    source = find_best_translation(contents, primary_lang)
-
-    if source do
-      Logger.info(
-        "[Publishing] Fixing missing primary content for post #{post.uuid}/v#{version.version_number}: " <>
-          "copying from #{source.language} to #{primary_lang}"
-      )
-
-      copy_translation_to_primary(version, primary_lang, primary_content, source)
-      maybe_promote_post_to_published(post, source)
-    end
-  end
-
-  defp find_best_translation(contents, primary_lang) do
-    Enum.find(contents, fn c ->
-      c.language != primary_lang and c.status == "published" and c.content not in [nil, ""]
-    end) ||
-      Enum.find(contents, fn c ->
-        c.language != primary_lang and c.content not in [nil, ""]
-      end)
-  end
-
-  defp copy_translation_to_primary(version, primary_lang, nil, source) do
-    DBStorage.create_content(%{
-      version_uuid: version.uuid,
-      language: primary_lang,
-      title: source.title,
-      content: source.content,
-      status: source.status,
-      url_slug: source.url_slug
-    })
-  end
-
-  defp copy_translation_to_primary(_version, _primary_lang, primary_content, source) do
-    DBStorage.update_content(primary_content, %{
-      title: source.title,
-      content: source.content,
-      status: source.status,
-      url_slug: primary_content.url_slug || source.url_slug
-    })
-  end
-
-  defp maybe_promote_post_to_published(post, source) do
-    if source.status == "published" and post.status != "published" do
-      Logger.info(
-        "[Publishing] Promoting post #{post.uuid} to published (primary content now has published content)"
-      )
-
-      DBStorage.update_post(post, %{
-        status: "published",
-        published_at: post.published_at || DateTime.utc_now()
-      })
-    end
-  end
-
-  @doc """
   Ensures only one version is published per post.
 
   If multiple versions have status "published", keeps the highest version
@@ -549,83 +418,43 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
-  @doc """
-  Ensures translation statuses follow the primary language's status.
-
-  If the primary language content is not published (draft/archived/trashed)
-  but a translation is published, demotes the translation to match the
-  primary's status. Translations should never be published when the primary isn't.
-  """
-  def fix_translation_status_consistency(%PublishingPost{} = post) do
-    ctx = build_post_context(post)
-    fix_translation_status_consistency(post, ctx)
-  end
-
-  defp fix_translation_status_consistency(post, ctx) do
-    primary_lang = post.primary_language
-
-    for version <- ctx.versions do
-      contents = Map.get(ctx.contents_by_version, version.uuid, [])
-      primary_content = Enum.find(contents, &(&1.language == primary_lang))
-
-      primary_status = if primary_content, do: primary_content.status, else: post.status
-
-      if primary_status != "published" do
-        # Demote any translations that are published when primary isn't
-        for content <- contents,
-            content.language != primary_lang,
-            content.status == "published" do
-          Logger.info(
-            "[Publishing] Demoting translation #{content.language} from published to #{primary_status} " <>
-              "for post #{post.uuid}/v#{version.version_number} (primary is #{primary_status})"
-          )
-
-          DBStorage.update_content(content, %{status: primary_status})
-        end
-      end
-    end
-  end
-
-  # Reconciles status consistency between a post, its versions, and content.
+  # Reconciles active_version_uuid consistency for a post.
   #
-  # Rules enforced:
-  # 1. Post "published" requires at least one "published" version → else demote to "draft"
-  # 2. Version "published" requires its post to be "published" → else archive the version
-  # 3. Content "published" requires its version to be "published" → else demote to "draft"
-  # 4. Non-published versions cannot have "published" content → demote content to "draft"
-  #
-  # Note: individual translations CAN be "draft" while the version is "published" —
-  # this is the normal state for untranslated languages. We only fix content that
-  # claims to be "published" when it shouldn't be.
+  # If active_version_uuid points to a non-existent or non-published version,
+  # clears it. Also ensures non-published versions don't have "published" content.
   def reconcile_post_status(%PublishingPost{} = post) do
     # Re-read to get current state after individual fixes
     post = DBStorage.get_post_by_uuid(post.uuid) || post
     versions = DBStorage.list_versions(post.uuid)
 
-    published_versions = Enum.filter(versions, &(&1.status == "published"))
+    # If active_version_uuid points to a missing or non-published version, clear it
+    if post.active_version_uuid do
+      active_version = Enum.find(versions, &(&1.uuid == post.active_version_uuid))
 
-    cond do
-      # Post says published but no version backs it up
-      post.status == "published" and published_versions == [] ->
+      if is_nil(active_version) or active_version.status != "published" do
         Logger.info(
-          "[Publishing] Reconcile: post #{post.uuid} is published but has no published versions, demoting to draft"
+          "[Publishing] Reconcile: post #{post.uuid} active_version_uuid points to " <>
+            "#{if active_version, do: "#{active_version.status} version", else: "non-existent version"}, clearing"
         )
 
-        DBStorage.update_post(post, %{status: "draft"})
+        DBStorage.update_post(post, %{active_version_uuid: nil})
+      end
+    end
 
-      # Post is not published but a version claims to be — archive the version
-      post.status in ["draft", "archived", "trashed"] and published_versions != [] ->
+    # If post is trashed, archive any published versions
+    if post.trashed_at do
+      published_versions = Enum.filter(versions, &(&1.status == "published"))
+
+      if published_versions != [] do
         Logger.info(
-          "[Publishing] Reconcile: post #{post.uuid} is #{inspect(post.status)} but has #{length(published_versions)} published versions, archiving"
+          "[Publishing] Reconcile: post #{post.uuid} is trashed but has #{length(published_versions)} published versions, archiving"
         )
 
         for v <- published_versions do
           DBStorage.update_version(v, %{status: "archived"})
           demote_published_content(v.uuid)
         end
-
-      true ->
-        :ok
+      end
     end
 
     # For ALL non-published versions, no content should be "published"

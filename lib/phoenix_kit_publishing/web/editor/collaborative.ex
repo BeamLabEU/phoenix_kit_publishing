@@ -394,13 +394,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   Apply remote form changes (for spectators receiving updates).
   """
   def apply_remote_form_change(socket, %{type: :meta, data: new_form}) do
-    # Update language_statuses for current language when status changes
-    # This ensures the language switcher reflects the editor's changes
-    language = Helpers.editor_language(socket.assigns)
+    # Status is version-level — all languages share the same status
     new_status = new_form["status"]
-
-    current_language_statuses = Map.get(socket.assigns.post, :language_statuses, %{})
-    updated_language_statuses = Map.put(current_language_statuses, language, new_status)
+    available_langs = Map.get(socket.assigns.post, :available_languages, [])
+    updated_language_statuses = Map.new(available_langs, fn lang -> {lang, new_status} end)
 
     updated_post =
       socket.assigns.post

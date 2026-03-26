@@ -2,17 +2,26 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   @moduledoc """
   Schema for publishing post versions.
 
+  Versions are the source of truth for published state and metadata.
   Each post can have multiple versions (v1, v2, etc.). Each version contains
   per-language content rows in `PublishingContent`.
 
   ## Status Flow
 
   - `draft` - Version is being edited
-  - `published` - Version is live
+  - `published` - Version is live (post.active_version_uuid points here)
   - `archived` - Version replaced by newer one
 
   ## Data JSONB Keys
 
+  ### Version metadata (defaults for all languages)
+  - `featured_image_uuid` - Featured image reference (media UUID)
+  - `tags` - List of tag strings
+  - `seo` - SEO metadata map (og_title, og_description, og_image, etc.)
+  - `description` - SEO meta description
+  - `allow_version_access` - Whether older versions are publicly accessible
+
+  ### Version history
   - `created_from` - Source version number this was created from
   - `notes` - Version notes/changelog
   """
@@ -30,6 +39,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
           post_uuid: UUIDv7.t(),
           version_number: integer(),
           status: String.t(),
+          published_at: DateTime.t() | nil,
           created_by_uuid: UUIDv7.t() | nil,
           data: map(),
           inserted_at: DateTime.t() | nil,
@@ -39,6 +49,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   schema "phoenix_kit_publishing_versions" do
     field :version_number, :integer
     field :status, :string, default: "draft"
+    field :published_at, :utc_datetime
     field :data, :map, default: %{}
 
     belongs_to :post, PhoenixKit.Modules.Publishing.PublishingPost,
@@ -66,6 +77,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
       :post_uuid,
       :version_number,
       :status,
+      :published_at,
       :created_by_uuid,
       :data
     ])
@@ -79,7 +91,26 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
     |> foreign_key_constraint(:created_by_uuid, name: :fk_publishing_versions_created_by)
   end
 
-  # Data JSONB accessors
+  # ── Data JSONB accessors (version-level defaults) ──────────────
+
+  @doc "Returns the featured image UUID."
+  def get_featured_image_uuid(%__MODULE__{data: data}),
+    do: Map.get(data, "featured_image_uuid")
+
+  @doc "Returns the post tags."
+  def get_tags(%__MODULE__{data: data}), do: Map.get(data, "tags", [])
+
+  @doc "Returns SEO metadata."
+  def get_seo(%__MODULE__{data: data}), do: Map.get(data, "seo", %{})
+
+  @doc "Returns the SEO description."
+  def get_description(%__MODULE__{data: data}), do: Map.get(data, "description")
+
+  @doc "Returns whether older versions are publicly accessible."
+  def get_allow_version_access(%__MODULE__{data: data}),
+    do: Map.get(data, "allow_version_access", false)
+
+  # ── Version history accessors ──────────────────────────────────
 
   @doc "Returns the source version number this was created from."
   def get_created_from(%__MODULE__{data: data}), do: Map.get(data, "created_from")

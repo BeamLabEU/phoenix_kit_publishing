@@ -13,6 +13,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
 
   @timestamp_modes Constants.timestamp_modes()
@@ -291,10 +292,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
         # Cache miss - fall back to DB reads
         post_identifier = get_post_identifier(current_post)
 
-        # Use post's stored primary language, not global
-        primary_language =
-          current_post[:primary_language] ||
-            Publishing.get_post_primary_language(group_slug, post_identifier)
+        primary_language = LanguageHelpers.get_primary_language()
 
         allow_access = get_allow_access_from_db(group_slug, current_post, primary_language)
         live_version = get_live_version_from_db(group_slug, post_identifier)
@@ -333,8 +331,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   Always reads from the primary language's live version to ensure consistency.
   """
   def post_allows_version_access?(group_slug, post_slug, _language) do
-    # Always read from post's stored primary language to ensure per-post behavior
-    primary_language = Publishing.get_post_primary_language(group_slug, post_slug)
+    primary_language = LanguageHelpers.get_primary_language()
 
     # Read the live version (version: nil means get latest/live)
     case Publishing.read_post(group_slug, post_slug, primary_language, nil) do

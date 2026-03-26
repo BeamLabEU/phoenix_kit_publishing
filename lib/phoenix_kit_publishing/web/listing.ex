@@ -40,16 +40,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       |> assign(:current_group, current_group)
       |> assign(:group_slug, group_slug)
       |> assign(:enabled_languages, Publishing.enabled_language_codes())
-      |> assign(:primary_language, Publishing.get_primary_language())
+      |> assign(:default_language, Publishing.get_primary_language())
       |> assign(
-        :primary_language_name,
+        :default_language_name,
         Helpers.get_language_name(Publishing.get_primary_language())
       )
       |> assign(:posts, filtered_posts)
       |> assign(:loading, false)
       |> assign(:endpoint_url, "")
       |> assign(:date_time_settings, load_date_time_settings())
-      |> assign(:primary_language_status, primary_language_status_from_posts(all_posts))
       |> assign(:active_editors, %{})
       |> assign(:translating_posts, %{})
       |> assign(:pending_post_updates, %{})
@@ -206,34 +205,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       end
 
     do_update_post_status(socket, post_uuid, new_status)
-  end
-
-  def handle_event("update_primary_language", _params, socket) do
-    group_slug = socket.assigns.group_slug
-
-    case Publishing.update_posts_primary_language(group_slug) do
-      {:ok, 0} ->
-        {:noreply, put_flash(socket, :info, gettext("All posts already up to date"))}
-
-      {:ok, count} ->
-        {:noreply,
-         socket
-         |> refresh_posts()
-         |> put_flash(
-           :info,
-           gettext("Updated %{count} posts to primary language: %{lang}",
-             count: count,
-             lang: Helpers.get_language_name(Publishing.get_primary_language())
-           )
-         )}
-    end
-  rescue
-    e ->
-      Logger.warning(
-        "[Publishing.Listing] Primary language update failed: #{Exception.message(e)}"
-      )
-
-      {:noreply, put_flash(socket, :error, gettext("Failed to update primary language"))}
   end
 
   # ============================================================================
@@ -428,27 +399,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     {:noreply, socket}
   end
 
-  # Primary language update completed (from this page or elsewhere)
-  def handle_info(
-        {:primary_language_migration_completed, group_slug, count, _errors, primary_language},
-        socket
-      ) do
-    if group_slug == socket.assigns.group_slug do
-      {:noreply,
-       socket
-       |> refresh_posts()
-       |> put_flash(
-         :info,
-         gettext("Updated %{count} posts to primary language: %{lang}",
-           count: count,
-           lang: Helpers.get_language_name(primary_language)
-         )
-       )}
-    else
-      {:noreply, socket}
-    end
-  end
-
   # Group change handlers - keep sidebar in sync
   def handle_info({:group_created, _group}, socket) do
     {:noreply, assign(socket, :groups, load_db_groups())}
@@ -496,7 +446,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
         socket
         |> assign(:posts, filtered_posts)
-        |> assign(:primary_language_status, primary_language_status_from_posts(all_posts))
         |> assign(:post_status_counts, build_status_counts(all_posts, trashed_count))
     end
   end
@@ -702,7 +651,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     |> assign(:post_view_mode, default_mode)
     |> assign(:visible_count, 20)
     |> assign(:endpoint_url, extract_endpoint_url(uri))
-    |> assign(:primary_language_status, primary_language_status_from_posts(all_posts))
     |> assign(:post_status_counts, status_counts)
     |> assign(:loading, false)
   end
@@ -852,7 +800,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
     # Get primary language - prefer passed param, then post's stored value, then global
     primary_lang =
-      primary_language || post[:primary_language] || Publishing.get_primary_language()
+      primary_language || Publishing.get_primary_language()
 
     # Use shared ordering function for consistent display
     all_languages =
@@ -867,8 +815,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       content_exists = lang_code in available_languages
       is_enabled = Publishing.language_enabled?(lang_code, enabled_languages)
       is_known = lang_info != nil
-      is_primary = lang_code == primary_lang
-
       # Status matches the version's status
       lang_status = if content_exists, do: status, else: nil
 
@@ -884,7 +830,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         exists: content_exists,
         enabled: is_enabled,
         known: is_known,
-        is_primary: is_primary,
+        # is_default is used for ordering only, not for special UI treatment
+        is_default: lang_code == primary_lang,
         uuid: post[:uuid]
       }
     end)
@@ -905,11 +852,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   defp extract_endpoint_url(_), do: ""
 
   defp do_update_post_status(socket, post_uuid, new_status) do
-    scope = socket.assigns[:phoenix_kit_current_scope]
     group_slug = socket.assigns.group_slug
 
-    case Publishing.change_post_status(group_slug, post_uuid, new_status, scope: scope) do
-      {:ok, _updated_post} ->
+    result =
+      case new_status do
+        "published" ->
+          # Publish the latest version
+          case Publishing.read_post_by_uuid(post_uuid) do
+            {:ok, post} ->
+              version = post[:version] || 1
+              Publishing.publish_version(group_slug, post_uuid, version)
+
+            error ->
+              error
+          end
+
+        status when status in ["draft", "archived"] ->
+          Publishing.unpublish_post(group_slug, post_uuid)
+
+        _ ->
+          {:error, :invalid_status}
+      end
+
+    case result do
+      :ok ->
+        {:noreply,
+         socket
+         |> put_flash(:info, gettext("Status updated to %{status}", status: new_status))
+         |> reload_current_view()}
+
+      {:ok, _} ->
         {:noreply,
          socket
          |> put_flash(:info, gettext("Status updated to %{status}", status: new_status))
@@ -926,7 +898,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   The `enabled` field indicates if the language is currently active in the Languages module.
   The `known` field indicates if the language code is recognized.
-  The `is_primary` field indicates if this is the primary language for versioning.
+  The `is_default` field indicates if this is the site default language (used for ordering only).
   """
   def build_post_languages(
         post,
@@ -938,12 +910,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     LanguageHelpers.build_post_languages(post, enabled_languages, primary_language)
   end
 
-  defp primary_language_status_from_posts([]), do: nil
-
-  defp primary_language_status_from_posts(posts) do
-    global_primary = Publishing.get_primary_language()
-    Publishing.count_primary_language_status(posts, global_primary)
-  end
 
   @impl true
   def render(assigns) do
@@ -962,7 +928,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       if length(@enabled_languages) == 1 do
         @endpoint_url <> url_prefix <> "/" <> group_slug
       else
-        @endpoint_url <> url_prefix <> "/#{@primary_language}/" <> group_slug
+        @endpoint_url <> url_prefix <> "/#{@default_language}/" <> group_slug
       end %>
     <.admin_page_header back={Routes.path("/admin/publishing")}>
       <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content">
@@ -984,46 +950,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         </div>
       <% end %>
     </.admin_page_header>
-
-    <%!-- Primary Language Update Banner --%>
-    <%= if @primary_language_status && (@primary_language_status.needs_backfill > 0 or @primary_language_status.needs_migration > 0) do %>
-      <% total_needing =
-        @primary_language_status.needs_backfill + @primary_language_status.needs_migration %>
-      <div class="flex items-center gap-3 px-4 py-3 rounded-lg bg-gradient-to-r from-warning/10 to-amber-500/10 border border-warning/30 mb-6">
-        <div class="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-warning to-amber-500 text-white shadow-sm">
-          <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
-        </div>
-        <div class="flex-1">
-          <span class="text-sm font-medium text-warning">
-            {ngettext(
-              "1 post needs primary language update",
-              "%{count} posts need primary language update",
-              total_needing,
-              count: total_needing
-            )}
-          </span>
-          <p class="text-xs text-base-content/60">
-            {gettext(
-              "Save the current language setting (%{lang}) to these posts to ensure they remain accessible if the global setting changes.",
-              lang: @primary_language_name
-            )}
-          </p>
-        </div>
-        <button
-          type="button"
-          class="btn btn-warning btn-sm"
-          phx-click="update_primary_language"
-          data-confirm={
-            gettext("Update %{count} posts to use the current primary language?",
-              count: total_needing
-            )
-          }
-        >
-          <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
-          {gettext("Update All")}
-        </button>
-      </div>
-    <% end %>
 
     <div class="space-y-4">
       <div class="flex-1">
@@ -1111,8 +1037,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                 <% group_slug =
                   post.group || (@current_group && @current_group["slug"]) || @group_slug ||
                     "group" %>
-                <%!-- Use post's stored primary language, falling back to global only if not stored --%>
-                <% post_primary_lang = post[:primary_language] || @primary_language %>
+                <%!-- Use site default primary language --%>
+                <% post_primary_lang = @default_language %>
                 <%!-- Use post's primary language for the public URL --%>
                 <% public_url =
                   PublishingHTML.build_post_url(
@@ -1186,7 +1112,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                     </div>
                     <%!-- Languages section --%>
                     <div class="border-t border-base-200 pt-3 mt-3 space-y-2">
-                      <%!-- Build all languages and separate primary from others --%>
+                      <%!-- Build all languages for display --%>
                       <% all_languages =
                         build_post_languages(
                           post,
@@ -1194,141 +1120,76 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                           @enabled_languages,
                           @current_locale
                         ) %>
-                      <% primary_lang = Enum.find(all_languages, & &1.is_primary) %>
-                      <% other_languages = Enum.reject(all_languages, & &1.is_primary) %>
 
-                      <%!-- Primary language + status control --%>
-                      <%= if primary_lang do %>
-                        <div class="flex items-center gap-2">
-                          <%= if @post_view_mode == "trashed" do %>
-                            <span
-                              class="inline-flex items-center gap-2 px-2.5 h-[2.5em] rounded-lg bg-base-200/60 border border-base-300 opacity-60"
-                              title={primary_lang.name}
-                            >
-                              <span class="text-xs text-base-content/50 font-medium">
-                                {gettext("Primary")}
-                              </span>
-                              <span class={[
-                                "rounded-full inline-block w-2.5 h-2.5",
-                                cond do
-                                  not primary_lang.exists -> "bg-base-content/20"
-                                  post_status == "published" -> "bg-success"
-                                  post_status == "draft" -> "bg-warning"
-                                  post_status == "archived" -> "bg-base-content/40"
-                                  true -> "bg-base-content/20"
-                                end
-                              ]}>
-                              </span>
-                              <span class="text-sm font-bold uppercase text-base-content/40">
-                                {String.upcase(primary_lang.display_code)}
-                              </span>
-                            </span>
-                          <% else %>
-                            <button
-                              type="button"
-                              phx-click="language_action"
-                              phx-value-language={primary_lang.code}
-                              phx-value-uuid={post[:uuid]}
-                              phx-value-status={primary_lang.status}
-                              class="inline-flex items-center gap-2 px-2.5 h-[2.5em] rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/20 cursor-pointer transition-colors"
-                              title={primary_lang.name}
-                            >
-                              <span class="text-xs text-primary/70 font-medium">
-                                {gettext("Primary")}
-                              </span>
-                              <span class={[
-                                "rounded-full inline-block w-2.5 h-2.5",
-                                cond do
-                                  not primary_lang.exists -> "bg-base-content/20"
-                                  post_status == "published" -> "bg-success"
-                                  post_status == "draft" -> "bg-warning"
-                                  post_status == "archived" -> "bg-base-content/40"
-                                  true -> "bg-base-content/20"
-                                end
-                              ]}>
-                              </span>
-                              <span class={[
-                                "text-sm font-bold uppercase",
-                                cond do
-                                  not primary_lang.exists -> "text-base-content/20"
-                                  post_status == "published" -> "text-success"
-                                  post_status == "draft" -> "text-warning"
-                                  post_status == "archived" -> "text-base-content/40"
-                                  true -> "text-base-content/20"
-                                end
-                              ]}>
-                                {String.upcase(primary_lang.display_code)}
-                              </span>
-                            </button>
-                          <% end %>
-                          <%= if @post_view_mode != "trashed" do %>
-                            <form
-                              id={"status-#{post[:uuid]}-#{post_status}"}
-                              phx-change="change_status"
-                            >
-                              <input type="hidden" name="uuid" value={post[:uuid]} />
-                              <div class={[
-                                "inline-flex items-center h-[2.5em] rounded-lg border transition-colors",
-                                post_status == "published" &&
-                                  "bg-success/10 border-success/20 hover:bg-success/20",
-                                post_status == "draft" &&
-                                  "bg-warning/10 border-warning/20 hover:bg-warning/20",
-                                post_status == "archived" &&
-                                  "bg-base-200/60 border-base-300 hover:bg-base-200"
-                              ]}>
-                                <select
-                                  name="status"
-                                  class={[
-                                    "select text-xs font-medium min-h-0 h-full pl-2.5 pr-7 bg-transparent border-none focus:outline-none cursor-pointer w-auto",
-                                    post_status == "published" && "text-success",
-                                    post_status == "draft" && "text-warning",
-                                    post_status == "archived" && "text-base-content/60"
-                                  ]}
-                                >
-                                  <option value="draft" selected={post_status == "draft"}>
-                                    {gettext("Draft")}
-                                  </option>
-                                  <option value="published" selected={post_status == "published"}>
-                                    {gettext("Published")}
-                                  </option>
-                                  <option value="archived" selected={post_status == "archived"}>
-                                    {gettext("Archived")}
-                                  </option>
-                                </select>
-                              </div>
-                            </form>
-                          <% end %>
-                          <%= if @post_view_mode != "trashed" do %>
-                            <button
-                              type="button"
-                              phx-click="trash_post"
-                              phx-value-uuid={post[:uuid]}
-                              class="inline-flex items-center gap-1.5 px-2.5 h-[2.5em] rounded-lg border border-error/20 bg-error/5 hover:bg-error/15 text-error/60 hover:text-error transition-colors cursor-pointer"
-                              data-confirm={gettext("Move this post to trash?")}
-                              title={gettext("Move to trash")}
-                            >
-                              <.icon name="hero-trash" class="w-3.5 h-3.5" />
-                            </button>
-                          <% else %>
-                            <button
-                              type="button"
-                              phx-click="restore_post"
-                              phx-value-uuid={post[:uuid]}
-                              class="inline-flex items-center gap-1.5 px-2.5 h-[2.5em] rounded-lg border border-success/30 bg-success/10 hover:bg-success/20 text-success font-medium transition-colors cursor-pointer"
-                              title={gettext("Restore")}
-                            >
-                              <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
-                              <span class="text-xs font-medium">{gettext("Restore")}</span>
-                            </button>
-                          <% end %>
-                        </div>
-                      <% end %>
+                      <%!-- Status control + actions --%>
+                      <div class="flex items-center gap-2">
+                        <%= if @post_view_mode != "trashed" do %>
+                          <form
+                            id={"status-#{post[:uuid]}-#{post_status}"}
+                            phx-change="change_status"
+                          >
+                            <input type="hidden" name="uuid" value={post[:uuid]} />
+                            <div class={[
+                              "inline-flex items-center h-[2.5em] rounded-lg border transition-colors",
+                              post_status == "published" &&
+                                "bg-success/10 border-success/20 hover:bg-success/20",
+                              post_status == "draft" &&
+                                "bg-warning/10 border-warning/20 hover:bg-warning/20",
+                              post_status == "archived" &&
+                                "bg-base-200/60 border-base-300 hover:bg-base-200"
+                            ]}>
+                              <select
+                                name="status"
+                                class={[
+                                  "select text-xs font-medium min-h-0 h-full pl-2.5 pr-7 bg-transparent border-none focus:outline-none cursor-pointer w-auto",
+                                  post_status == "published" && "text-success",
+                                  post_status == "draft" && "text-warning",
+                                  post_status == "archived" && "text-base-content/60"
+                                ]}
+                              >
+                                <option value="draft" selected={post_status == "draft"}>
+                                  {gettext("Draft")}
+                                </option>
+                                <option value="published" selected={post_status == "published"}>
+                                  {gettext("Published")}
+                                </option>
+                                <option value="archived" selected={post_status == "archived"}>
+                                  {gettext("Archived")}
+                                </option>
+                              </select>
+                            </div>
+                          </form>
+                        <% end %>
+                        <%= if @post_view_mode != "trashed" do %>
+                          <button
+                            type="button"
+                            phx-click="trash_post"
+                            phx-value-uuid={post[:uuid]}
+                            class="inline-flex items-center gap-1.5 px-2.5 h-[2.5em] rounded-lg border border-error/20 bg-error/5 hover:bg-error/15 text-error/60 hover:text-error transition-colors cursor-pointer"
+                            data-confirm={gettext("Move this post to trash?")}
+                            title={gettext("Move to trash")}
+                          >
+                            <.icon name="hero-trash" class="w-3.5 h-3.5" />
+                          </button>
+                        <% else %>
+                          <button
+                            type="button"
+                            phx-click="restore_post"
+                            phx-value-uuid={post[:uuid]}
+                            class="inline-flex items-center gap-1.5 px-2.5 h-[2.5em] rounded-lg border border-success/30 bg-success/10 hover:bg-success/20 text-success font-medium transition-colors cursor-pointer"
+                            title={gettext("Restore")}
+                          >
+                            <.icon name="hero-arrow-uturn-left" class="w-3.5 h-3.5" />
+                            <span class="text-xs font-medium">{gettext("Restore")}</span>
+                          </button>
+                        <% end %>
+                      </div>
 
-                      <%!-- Other translations (excluding primary) --%>
+                      <%!-- All languages shown equally --%>
                       <%= if @post_view_mode == "trashed" do %>
                         <div class="opacity-60 pointer-events-none">
                           <.language_switcher
-                            languages={other_languages}
+                            languages={all_languages}
                             show_status={true}
                             show_add={false}
                             size={:sm}
@@ -1336,7 +1197,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                         </div>
                       <% else %>
                         <.language_switcher
-                          languages={other_languages}
+                          languages={all_languages}
                           show_status={true}
                           show_add={true}
                           on_click="language_action"

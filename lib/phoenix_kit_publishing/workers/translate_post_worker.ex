@@ -89,7 +89,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
     # Use post's stored primary language as default source, not global
     source_language =
       Map.get(args, "source_language") ||
-        Publishing.get_post_primary_language(group_slug, post_uuid, version)
+        LanguageHelpers.get_primary_language()
 
     target_languages = Map.get(args, "target_languages") || get_target_languages(source_language)
     user_uuid = Map.get(args, "user_uuid")
@@ -477,7 +477,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
         # Update existing translation - verify it's actually the right language
         if existing_post.language == language do
           Logger.info("[TranslatePostWorker] Updating existing #{language} translation")
-          # Don't override status - translations inherit status from primary via propagation
+          # Don't override status - all languages share the version-derived status
           update_translation(group_slug, existing_post, opts)
         else
           # Fallback returned wrong language, create new translation instead
@@ -528,8 +528,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
     # Add url_slug if provided
     params = if url_slug, do: Map.put(params, "url_slug", url_slug), else: params
 
-    # Mark as non-primary language for consistency (translations shouldn't trigger propagation)
-    update_opts = %{scope: build_scope(user_uuid), is_primary_language: false}
+    update_opts = %{scope: build_scope(user_uuid)}
 
     case Publishing.update_post(group_slug, existing_post, params, update_opts) do
       {:ok, _} -> :ok
@@ -591,7 +590,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
     } = opts
 
     params = build_translation_params(title, content, url_slug, source_status)
-    update_opts = %{scope: build_scope(user_uuid), is_primary_language: false}
+    update_opts = %{scope: build_scope(user_uuid)}
 
     Logger.debug("[TranslatePostWorker] Calling update_post for #{language}...")
 
@@ -824,14 +823,14 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
       # => {:ok, %{title: "Primeros Pasos", url_slug: "primeros-pasos", content: "..."}}
 
   """
-  def translate_content(group_slug, post_uuid, target_language, opts \\ []) do
+  def translate_content(_group_slug, post_uuid, target_language, opts \\ []) do
     endpoint_uuid = Keyword.get(opts, :endpoint_uuid) || get_default_endpoint_uuid()
     prompt_uuid = Keyword.get(opts, :prompt_uuid)
     version = Keyword.get(opts, :version)
 
     source_language =
       Keyword.get(opts, :source_language) ||
-        Publishing.get_post_primary_language(group_slug, post_uuid, version)
+        LanguageHelpers.get_primary_language()
 
     cond do
       not (Code.ensure_loaded?(PhoenixKitAI) and AI.enabled?()) ->
@@ -928,7 +927,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
       :ok = TranslatePostWorker.translate_now("docs", "019cce93-...", "es", endpoint_uuid: "endpoint-uuid")
 
   """
-  def translate_now(group_slug, post_uuid, target_language, opts \\ []) do
+  def translate_now(_group_slug, post_uuid, target_language, opts \\ []) do
     endpoint_uuid = Keyword.get(opts, :endpoint_uuid) || get_default_endpoint_uuid()
     prompt_uuid = Keyword.get(opts, :prompt_uuid)
     version = Keyword.get(opts, :version)
@@ -936,7 +935,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
 
     source_language =
       Keyword.get(opts, :source_language) ||
-        Publishing.get_post_primary_language(group_slug, post_uuid, version)
+        LanguageHelpers.get_primary_language()
 
     cond do
       not (Code.ensure_loaded?(PhoenixKitAI) and AI.enabled?()) ->

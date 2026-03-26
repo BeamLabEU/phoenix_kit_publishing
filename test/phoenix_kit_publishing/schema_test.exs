@@ -112,15 +112,14 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       refute changeset.valid?
 
       assert "can't be blank" in errors_on(changeset, :group_uuid)
-      # status, mode, primary_language have schema defaults so they won't be blank
+      # mode has schema default so it won't be blank
     end
 
     test "changeset requires slug for slug-mode posts" do
       changeset =
         PublishingPost.changeset(%PublishingPost{}, %{
           group_uuid: UUIDv7.generate(),
-          mode: "slug",
-          primary_language: "en"
+          mode: "slug"
         })
 
       assert "can't be blank" in errors_on(changeset, :slug)
@@ -130,8 +129,7 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       changeset =
         PublishingPost.changeset(%PublishingPost{}, %{
           group_uuid: UUIDv7.generate(),
-          mode: "timestamp",
-          primary_language: "en"
+          mode: "timestamp"
         })
 
       assert "can't be blank" in errors_on(changeset, :post_date)
@@ -139,86 +137,36 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       assert errors_on(changeset, :slug) == []
     end
 
-    test "changeset validates status inclusion" do
+    test "changeset does not validate status (V2 — status derived from active_version_uuid)" do
+      # In V2, status is not cast/validated in the changeset.
+      # Passing status: "invalid" should not cause a validation error.
       changeset =
         PublishingPost.changeset(%PublishingPost{}, %{
           group_uuid: UUIDv7.generate(),
           slug: "test",
-          status: "invalid",
-          mode: "slug",
-          primary_language: "en"
+          mode: "slug"
         })
 
-      refute changeset.valid?
-      assert "is invalid" in errors_on(changeset, :status)
+      assert changeset.valid?
+      assert errors_on(changeset, :status) == []
     end
 
-    test "changeset accepts valid statuses" do
-      for status <- ["draft", "published", "archived", "trashed"] do
-        attrs = %{
-          group_uuid: UUIDv7.generate(),
-          slug: "test",
-          status: status,
-          mode: "slug",
-          primary_language: "en"
-        }
-
-        changeset = PublishingPost.changeset(%PublishingPost{}, attrs)
-
-        assert changeset.valid?,
-               "Expected status '#{status}' to be valid, got: #{inspect(changeset.errors)}"
-      end
-    end
-
-    test "changeset rejects invalid status" do
-      changeset =
-        PublishingPost.changeset(%PublishingPost{}, %{
-          group_uuid: UUIDv7.generate(),
-          slug: "test",
-          status: "invalid",
-          mode: "slug",
-          primary_language: "en"
-        })
-
-      refute changeset.valid?
-    end
-
-    test "status helpers" do
-      published = %PublishingPost{status: "published"}
-      draft = %PublishingPost{status: "draft"}
-      archived = %PublishingPost{status: "archived"}
+    test "status helpers use active_version_uuid and trashed_at" do
+      version_uuid = UUIDv7.generate()
+      published = %PublishingPost{active_version_uuid: version_uuid, trashed_at: nil}
+      draft = %PublishingPost{active_version_uuid: nil, trashed_at: nil}
+      trashed = %PublishingPost{active_version_uuid: nil, trashed_at: ~U[2025-06-15 14:30:00Z]}
 
       assert PublishingPost.published?(published)
       refute PublishingPost.published?(draft)
 
       assert PublishingPost.draft?(draft)
       refute PublishingPost.draft?(published)
-      refute PublishingPost.draft?(archived)
-    end
+      refute PublishingPost.draft?(trashed)
 
-    test "data JSONB accessors return defaults" do
-      post = %PublishingPost{data: %{}}
-
-      assert PublishingPost.allow_version_access?(post) == false
-      assert PublishingPost.get_featured_image(post) == nil
-      assert PublishingPost.get_tags(post) == []
-      assert PublishingPost.get_seo(post) == %{}
-    end
-
-    test "data JSONB accessors return custom values" do
-      post = %PublishingPost{
-        data: %{
-          "allow_version_access" => true,
-          "featured_image" => "img-uuid-123",
-          "tags" => ["elixir", "phoenix"],
-          "seo" => %{"og_title" => "My Post"}
-        }
-      }
-
-      assert PublishingPost.allow_version_access?(post) == true
-      assert PublishingPost.get_featured_image(post) == "img-uuid-123"
-      assert PublishingPost.get_tags(post) == ["elixir", "phoenix"]
-      assert PublishingPost.get_seo(post) == %{"og_title" => "My Post"}
+      assert PublishingPost.trashed?(trashed)
+      refute PublishingPost.trashed?(draft)
+      refute PublishingPost.trashed?(published)
     end
   end
 
@@ -276,6 +224,34 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
 
       assert PublishingVersion.get_created_from(version) == nil
       assert PublishingVersion.get_notes(version) == nil
+    end
+
+    test "V2 data JSONB accessors return defaults" do
+      version = %PublishingVersion{data: %{}}
+
+      assert PublishingVersion.get_allow_version_access(version) == false
+      assert PublishingVersion.get_featured_image_uuid(version) == nil
+      assert PublishingVersion.get_tags(version) == []
+      assert PublishingVersion.get_seo(version) == %{}
+      assert PublishingVersion.get_description(version) == nil
+    end
+
+    test "V2 data JSONB accessors return custom values" do
+      version = %PublishingVersion{
+        data: %{
+          "allow_version_access" => true,
+          "featured_image_uuid" => "img-uuid-123",
+          "tags" => ["elixir", "phoenix"],
+          "seo" => %{"og_title" => "My Post"},
+          "description" => "A test description"
+        }
+      }
+
+      assert PublishingVersion.get_allow_version_access(version) == true
+      assert PublishingVersion.get_featured_image_uuid(version) == "img-uuid-123"
+      assert PublishingVersion.get_tags(version) == ["elixir", "phoenix"]
+      assert PublishingVersion.get_seo(version) == %{"og_title" => "My Post"}
+      assert PublishingVersion.get_description(version) == "A test description"
     end
   end
 

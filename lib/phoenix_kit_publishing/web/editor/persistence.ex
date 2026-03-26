@@ -266,8 +266,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
          ) do
       {:ok, new_post} ->
         case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
-               scope: scope,
-               is_primary_language: false
+               scope: scope
              }) do
           {:ok, _updated_post} = result ->
             handle_post_update_result(
@@ -370,26 +369,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     current_version = socket.assigns[:current_version]
     # Use saved_status (stored status) not post.metadata.status (form-updated status)
     saved_status = socket.assigns[:saved_status] || Map.get(post.metadata, :status, "draft")
-    is_primary_language = socket.assigns[:is_primary_language] == true
-
-    # For translations: if primary is not published, force status to match primary
-    params = enforce_translation_status(params, socket, is_primary_language)
     new_status = Map.get(params, "status")
 
     # Check if this is a status change TO published for a versioned post
     is_publishing =
       should_publish_version?(
-        is_primary_language,
         new_status,
         saved_status,
-        current_version,
-        post
+        current_version
       )
 
-    case Publishing.update_post(group_slug, post, params, %{
-           scope: scope,
-           is_primary_language: is_primary_language
-         }) do
+    case Publishing.update_post(group_slug, post, params, %{scope: scope}) do
       {:ok, updated_post} ->
         handle_successful_update(
           socket,
@@ -404,23 +394,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     end
   end
 
-  defp enforce_translation_status(params, _socket, true = _is_primary), do: params
-
-  defp enforce_translation_status(params, socket, false = _is_primary) do
-    primary_status = socket.assigns.form["status"]
-
-    if primary_status == "published" do
-      # When primary is published, auto-publish translations so they
-      # appear on the public site immediately after saving
-      Map.put(params, "status", "published")
-    else
-      Map.put(params, "status", primary_status)
-    end
-  end
-
-  defp should_publish_version?(is_primary, new_status, current_status, current_version, _post) do
-    is_primary and
-      new_status == "published" and
+  # All languages are equal — status is version-level, no per-language enforcement needed
+  defp should_publish_version?(new_status, current_status, current_version) do
+    new_status == "published" and
       current_status != "published" and
       current_version != nil
   end
@@ -502,9 +478,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
             "Failed to re-read post after save: #{inspect(reason)}, post: #{post[:slug] || post[:uuid]}"
           )
 
-          current_language_statuses = Map.get(post, :language_statuses, %{})
+          # Status is version-level — all languages share the same status
           new_status = Map.get(post.metadata, :status, "draft")
-          updated_statuses = Map.put(current_language_statuses, current_language, new_status)
+          available_langs = Map.get(post, :available_languages, [current_language])
+          updated_statuses = Map.new(available_langs, fn lang -> {lang, new_status} end)
           Map.put(post, :language_statuses, updated_statuses)
       end
 

@@ -2,21 +2,21 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
   @moduledoc """
   Schema for publishing posts within a group.
 
+  Posts are a minimal routing shell — they hold the URL identity (slug or
+  date/time) and point to the currently live version via `active_version_uuid`.
+
   Each post belongs to a group and has versions with per-language content.
   Supports both slug-mode and timestamp-mode URL structures.
 
-  ## Status Flow
+  ## Publishing
 
-  - `draft` - Not visible to public
-  - `published` - Live and visible
-  - `archived` - Hidden but preserved
+  A post is published when `active_version_uuid` is set (points to a published
+  version). It is unpublished when `active_version_uuid` is nil.
 
-  ## Data JSONB Keys
+  ## Soft Delete
 
-  - `allow_version_access` - Whether older versions are publicly accessible
-  - `featured_image` - Featured image reference (media UUID or URL)
-  - `tags` - List of tag strings
-  - `seo` - SEO metadata map (og_title, og_description, og_image, etc.)
+  Posts use `trashed_at` (timestamp) for soft delete instead of a status field.
+  `trashed_at` being nil means the post is active.
   """
 
   use Ecto.Schema
@@ -31,31 +31,31 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
           uuid: UUIDv7.t() | nil,
           group_uuid: UUIDv7.t(),
           slug: String.t(),
-          status: String.t(),
           mode: String.t(),
-          primary_language: String.t(),
-          published_at: DateTime.t() | nil,
           post_date: Date.t() | nil,
           post_time: Time.t() | nil,
+          active_version_uuid: UUIDv7.t() | nil,
+          trashed_at: DateTime.t() | nil,
           created_by_uuid: UUIDv7.t() | nil,
           updated_by_uuid: UUIDv7.t() | nil,
-          data: map(),
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
 
   schema "phoenix_kit_publishing_posts" do
     field :slug, :string
-    field :status, :string, default: "draft"
     field :mode, :string, default: "timestamp"
-    field :primary_language, :string, default: "en"
-    field :published_at, :utc_datetime
     field :post_date, :date
     field :post_time, :time
-    field :data, :map, default: %{}
+    field :trashed_at, :utc_datetime
 
     belongs_to :group, PhoenixKit.Modules.Publishing.PublishingGroup,
       foreign_key: :group_uuid,
+      references: :uuid,
+      type: UUIDv7
+
+    belongs_to :active_version, PhoenixKit.Modules.Publishing.PublishingVersion,
+      foreign_key: :active_version_uuid,
       references: :uuid,
       type: UUIDv7
 
@@ -82,22 +82,18 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
     |> cast(attrs, [
       :group_uuid,
       :slug,
-      :status,
       :mode,
-      :primary_language,
-      :published_at,
       :post_date,
       :post_time,
+      :active_version_uuid,
+      :trashed_at,
       :created_by_uuid,
-      :updated_by_uuid,
-      :data
+      :updated_by_uuid
     ])
-    |> validate_required([:group_uuid, :status, :mode, :primary_language])
-    |> validate_inclusion(:status, Publishing.Constants.post_statuses())
+    |> validate_required([:group_uuid, :mode])
     |> validate_inclusion(:mode, Publishing.Constants.valid_modes())
     |> maybe_require_slug()
     |> validate_length(:slug, max: Publishing.Constants.max_slug_length())
-    |> validate_length(:primary_language, max: Publishing.Constants.max_language_code_length())
     |> maybe_require_timestamp_fields()
     |> unique_constraint([:group_uuid, :slug], name: :idx_publishing_posts_group_slug)
     |> unique_constraint([:group_uuid, :post_date, :post_time],
@@ -105,32 +101,21 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
       message: "a post already exists at this date and time"
     )
     |> foreign_key_constraint(:group_uuid, name: :fk_publishing_posts_group)
+    |> foreign_key_constraint(:active_version_uuid, name: :fk_publishing_posts_active_version)
     |> foreign_key_constraint(:created_by_uuid, name: :fk_publishing_posts_created_by)
     |> foreign_key_constraint(:updated_by_uuid, name: :fk_publishing_posts_updated_by)
   end
 
-  @doc "Check if post is published."
-  def published?(%__MODULE__{status: "published"}), do: true
+  @doc "Check if post is published (has an active version)."
+  def published?(%__MODULE__{active_version_uuid: uuid}) when not is_nil(uuid), do: true
   def published?(_), do: false
 
-  @doc "Check if post is a draft."
-  def draft?(%__MODULE__{status: "draft"}), do: true
-  def draft?(_), do: false
+  @doc "Check if post is trashed."
+  def trashed?(%__MODULE__{trashed_at: t}) when not is_nil(t), do: true
+  def trashed?(_), do: false
 
-  # Data JSONB accessors
-
-  @doc "Returns whether older versions are publicly accessible."
-  def allow_version_access?(%__MODULE__{data: data}),
-    do: Map.get(data, "allow_version_access", false)
-
-  @doc "Returns the featured image reference."
-  def get_featured_image(%__MODULE__{data: data}), do: Map.get(data, "featured_image")
-
-  @doc "Returns the post tags."
-  def get_tags(%__MODULE__{data: data}), do: Map.get(data, "tags", [])
-
-  @doc "Returns SEO metadata."
-  def get_seo(%__MODULE__{data: data}), do: Map.get(data, "seo", %{})
+  @doc "Check if post is a draft (not published and not trashed)."
+  def draft?(%__MODULE__{} = post), do: not published?(post) and not trashed?(post)
 
   defp maybe_require_slug(changeset) do
     if get_field(changeset, :mode) == "slug" do

@@ -528,23 +528,4 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
     "#{group_slug}:unknown"
   end
 
-  # ============================================================================
-  # Primary Language Migration Progress
-  # ============================================================================
-
-  @doc """
-  Broadcasts that primary language migration has completed.
-  """
-  def broadcast_primary_language_migration_completed(
-        group_slug,
-        success_count,
-        error_count,
-        primary_language
-      ) do
-    Manager.broadcast(
-      posts_topic(group_slug),
-      {:primary_language_migration_completed, group_slug, success_count, error_count,
-       primary_language}
-    )
-  end
 end

@@ -13,7 +13,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.FormsTest do
       post: %{slug: "", uuid: nil, metadata: %{status: "draft"}},
       group_slug: "blog",
       group_mode: "slug",
-      is_primary_language: true,
+      default_language: "en",
+      current_language: "en",
       slug_manually_set: false,
       last_auto_slug: "",
       url_slug_manually_set: false,
@@ -38,7 +39,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.FormsTest do
 
   describe "maybe_update_slug_from_title/3" do
     test "generates slug from title for primary language" do
-      socket = build_socket(%{group_mode: "slug", is_primary_language: true})
+      socket = build_socket(%{group_mode: "slug", default_language: "en", current_language: "en"})
       {_socket, form, events} = Forms.maybe_update_slug_from_title(socket, "Hello World")
 
       assert form["slug"] == "hello-world"
@@ -86,7 +87,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.FormsTest do
     end
 
     test "generates url_slug for translation language" do
-      socket = build_socket(%{is_primary_language: false, form: %{"url_slug" => ""}})
+      socket = build_socket(%{default_language: "en", current_language: "fr", form: %{"url_slug" => ""}})
       {_socket, form, events} = Forms.maybe_update_slug_from_title(socket, "Translated Title")
 
       assert form["url_slug"] == "translated-title"
@@ -96,7 +97,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.FormsTest do
     test "respects url_slug_manually_set for translations" do
       socket =
         build_socket(%{
-          is_primary_language: false,
+          default_language: "en",
+          current_language: "fr",
           url_slug_manually_set: true,
           form: %{"url_slug" => "custom-url"}
         })

@@ -29,13 +29,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
       group_uuid: group.uuid,
       group: group,
       slug: "hello-world",
-      status: "published",
+      active_version_uuid: nil,
       mode: "slug",
-      primary_language: "en",
-      published_at: ~U[2025-06-15 14:30:00Z],
       post_date: nil,
-      post_time: nil,
-      data: %{}
+      post_time: nil
     }
     |> Map.merge(attrs)
   end
@@ -46,6 +43,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
       post_uuid: post.uuid,
       version_number: 1,
       status: "published",
+      published_at: ~U[2025-06-15 14:30:00Z],
       data: %{},
       inserted_at: ~U[2025-06-15 14:30:00Z]
     }
@@ -86,7 +84,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
       assert result.language == "en"
       assert result.version == 1
       assert result.content == content.content
-      assert result.primary_language == "en"
     end
 
     test "builds available_languages from all contents" do
@@ -100,7 +97,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
         Mapper.to_post_map(post, version, en_content, [en_content, es_content], [version])
 
       assert result.available_languages == ["en", "es"]
-      assert result.language_statuses == %{"en" => "published", "es" => "draft"}
+      # Status is version-level — all languages share the version's derived status
+      assert result.language_statuses == %{"en" => "published", "es" => "published"}
     end
 
     test "builds version_statuses from all versions" do
@@ -161,13 +159,18 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
     test "metadata includes expected fields" do
       group = build_group()
       post = build_post(group)
-      version = build_version(post)
+
+      version =
+        build_version(post, %{
+          data: %{
+            "description" => "A test post",
+            "featured_image_uuid" => "img-123"
+          }
+        })
 
       content =
         build_content(version, %{
           data: %{
-            "description" => "A test post",
-            "featured_image_uuid" => "img-123",
             "previous_url_slugs" => ["old-url"]
           }
         })
@@ -182,7 +185,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
       assert result.metadata.featured_image_uuid == "img-123"
       assert result.metadata.previous_url_slugs == ["old-url"]
       assert result.metadata.published_at == "2025-06-15T14:30:00Z"
-      assert result.metadata.primary_language == "en"
     end
 
     test "builds language_slugs map" do
@@ -234,16 +236,19 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
     test "merges published_language_statuses via opts" do
       group = build_group()
       post = build_post(group)
-      version = build_version(post)
-      en = build_content(version, %{language: "en", status: "draft"})
-      es = build_content(version, %{language: "es", status: "draft"})
+      # Use a draft version so derive_status returns "draft"
+      version = build_version(post, %{status: "draft"})
+      en = build_content(version, %{language: "en"})
+      es = build_content(version, %{language: "es"})
 
       result =
         Mapper.to_post_map(post, version, en, [en, es], [version],
           published_language_statuses: %{"en" => "published"}
         )
 
+      # The merge overrides en's "draft" with "published" from the older published version
       assert result.language_statuses["en"] == "published"
+      # es stays at the version's derived status ("draft")
       assert result.language_statuses["es"] == "draft"
     end
 
@@ -298,9 +303,9 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
       assert result.mode == :slug
     end
 
-    test "uses primary language content for listing" do
+    test "uses site default language content for listing" do
       group = build_group()
-      post = build_post(group, %{primary_language: "en"})
+      post = build_post(group)
       version = build_version(post)
       en = build_content(version, %{language: "en", title: "English Title"})
       es = build_content(version, %{language: "es", title: "Titulo"})
@@ -344,7 +349,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
 
     test "handles nil content gracefully" do
       group = build_group()
-      post = build_post(group, %{primary_language: "en"})
+      post = build_post(group)
       version = build_version(post)
 
       result = Mapper.to_listing_map(post, version, [], [version])
@@ -353,9 +358,9 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
       assert result.content == nil
     end
 
-    test "falls back to first content when primary language not found" do
+    test "falls back to first content when site default language not found" do
       group = build_group()
-      post = build_post(group, %{primary_language: "en"})
+      post = build_post(group)
       version = build_version(post)
       es = build_content(version, %{language: "es", title: "Titulo Espanol"})
 

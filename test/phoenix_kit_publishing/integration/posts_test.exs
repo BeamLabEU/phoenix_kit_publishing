@@ -25,7 +25,6 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
       assert post[:date]
       assert post[:time]
       assert post[:version] == 1
-      assert post[:primary_language] == "en"
       assert post[:mode] in ["timestamp", :timestamp]
     end
 
@@ -127,7 +126,6 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
       assert post[:uuid]
       assert post[:version]
       assert post[:language]
-      assert post[:primary_language]
       assert post[:metadata]
       assert post[:available_versions]
       assert is_list(post[:available_versions])
@@ -259,7 +257,7 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
       group = create_group("slug")
       {:ok, draft} = Posts.create_post(group["slug"], %{title: "Draft"})
       {:ok, pub} = Posts.create_post(group["slug"], %{title: "Published"})
-      Posts.change_post_status(group["slug"], pub[:uuid], "published")
+      :ok = Versions.publish_version(group["slug"], pub[:uuid], 1)
 
       published = Posts.list_posts_by_status(group["slug"], "published")
       uuids = Enum.map(published, &(&1[:uuid] || &1.uuid))
@@ -316,36 +314,32 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
   end
 
   # ============================================================================
-  # change_post_status/4
+  # Publishing via Versions.publish_version/3
   # ============================================================================
 
-  describe "change_post_status/4" do
+  describe "publish via Versions.publish_version/3" do
     test "publishes a post with title" do
       group = create_group("slug")
       {:ok, post} = Posts.create_post(group["slug"], %{title: "Publishable"})
-      assert {:ok, _} = Posts.change_post_status(group["slug"], post[:uuid], "published")
+      assert :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
     end
 
-    test "archives a published post" do
+    test "unpublishes a published post" do
       group = create_group("slug")
-      {:ok, post} = Posts.create_post(group["slug"], %{title: "Archive Me"})
-      {:ok, _} = Posts.change_post_status(group["slug"], post[:uuid], "published")
-      assert {:ok, _} = Posts.change_post_status(group["slug"], post[:uuid], "archived")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Unpublish Me"})
+      :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
+      assert :ok = Versions.unpublish_post(group["slug"], post[:uuid])
     end
 
-    test "publishing post without title still succeeds via change_post_status" do
-      # change_post_status delegates to update_post which allows empty title publish
-      # The title_required validation is on Versions.publish_version, not here
+    test "publishing post without title returns error" do
       group = create_group("slug")
       {:ok, post} = Posts.create_post(group["slug"], %{})
-      result = Posts.change_post_status(group["slug"], post[:uuid], "published")
-      # This may succeed or fail depending on validation path
-      assert match?({:ok, _}, result) or match?({:error, _}, result)
+      assert {:error, :title_required} = Versions.publish_version(group["slug"], post[:uuid], 1)
     end
 
     test "nonexistent post returns error" do
       group = create_group("slug")
-      result = Posts.change_post_status(group["slug"], UUIDv7.generate(), "published")
+      result = Versions.publish_version(group["slug"], UUIDv7.generate(), 1)
       assert match?({:error, _}, result)
     end
   end
@@ -373,12 +367,13 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
 
       assert edited[:content] == "<p>Final content</p>"
 
-      # Publish
-      {:ok, _} = Posts.change_post_status(group["slug"], post[:uuid], "published")
+      # Publish via version
+      :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
 
-      # Read published
+      # Read published — post should have active_version_uuid set
       {:ok, published} = Posts.read_post(group["slug"], post[:uuid], nil, nil)
       assert published[:uuid] == post[:uuid]
+      assert published[:metadata][:status] == "published"
     end
 
     test "create → trash → restore → publish" do
@@ -391,8 +386,76 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
       # Restore
       {:ok, _} = Posts.restore_post(group["slug"], post[:uuid])
 
-      # Publish
-      assert {:ok, _} = Posts.change_post_status(group["slug"], post[:uuid], "published")
+      # Publish via version
+      assert :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
+    end
+  end
+
+  # ============================================================================
+  # V2 schema behavior
+  # ============================================================================
+
+  describe "V2 schema behavior" do
+    alias PhoenixKit.Modules.Publishing.DBStorage
+
+    test "active_version_uuid is set when version is published" do
+      group = create_group("slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Active Version"})
+      :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
+
+      db_post = DBStorage.get_post_by_uuid(post[:uuid])
+      assert db_post.active_version_uuid != nil
+    end
+
+    test "active_version_uuid is cleared when post is unpublished" do
+      group = create_group("slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Unpublish Me"})
+      :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
+      :ok = Versions.unpublish_post(group["slug"], post[:uuid])
+
+      db_post = DBStorage.get_post_by_uuid(post[:uuid])
+      assert db_post.active_version_uuid == nil
+    end
+
+    test "trashed_at is set when post is trashed" do
+      group = create_group("slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Trash Me"})
+      {:ok, _} = Posts.trash_post(group["slug"], post[:uuid])
+
+      db_post = DBStorage.get_post_by_uuid(post[:uuid])
+      assert db_post.trashed_at != nil
+    end
+
+    test "trashed_at is cleared when post is restored" do
+      group = create_group("slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Restore Me"})
+      {:ok, _} = Posts.trash_post(group["slug"], post[:uuid])
+      {:ok, _} = Posts.restore_post(group["slug"], post[:uuid])
+
+      db_post = DBStorage.get_post_by_uuid(post[:uuid])
+      assert db_post.trashed_at == nil
+    end
+
+    test "trashed posts are excluded from listings" do
+      group = create_group("slug")
+      {:ok, post1} = Posts.create_post(group["slug"], %{title: "Visible"})
+      {:ok, post2} = Posts.create_post(group["slug"], %{title: "Trashed"})
+      {:ok, _} = Posts.trash_post(group["slug"], post2[:uuid])
+
+      posts = Posts.list_posts(group["slug"], nil)
+      uuids = Enum.map(posts, & &1[:uuid])
+
+      assert post1[:uuid] in uuids
+      refute post2[:uuid] in uuids
+    end
+
+    test "version published_at is set on first publish" do
+      group = create_group("slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Publish Date"})
+      :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
+
+      version = DBStorage.get_version(post[:uuid], 1)
+      assert version.published_at != nil
     end
   end
 end

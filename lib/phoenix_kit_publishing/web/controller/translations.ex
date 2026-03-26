@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
   alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
@@ -109,7 +110,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
     current_base = DialectMapper.extract_base(current_language)
 
     # Use the post's primary language so it appears first in the switcher
-    primary_language = post[:primary_language] || List.first(enabled_languages) || "en"
+    primary_language = LanguageHelpers.get_primary_language()
 
     # Fetch language_slugs from cache for per-language URL slugs
     # Falls back to using post.slug for all languages if cache miss

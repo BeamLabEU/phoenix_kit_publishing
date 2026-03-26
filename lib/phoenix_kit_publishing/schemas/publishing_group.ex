@@ -45,6 +45,8 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
     field :status, :string, default: "active"
     field :position, :integer, default: 0
     field :data, :map, default: %{}
+    field :title_i18n, :map, default: %{}
+    field :description_i18n, :map, default: %{}
 
     has_many :posts, PhoenixKit.Modules.Publishing.PublishingPost, foreign_key: :group_uuid
 
