@@ -62,6 +62,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       language_statuses: language_statuses,
       language_slugs: build_language_slugs(all_contents, post.slug),
       language_previous_slugs: build_language_previous_slugs(all_contents),
+      language_titles: Map.new(all_contents, fn c -> {c.language, c.title} end),
       version: version.version_number,
       available_versions: available_versions,
       version_statuses: version_statuses,
