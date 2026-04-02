@@ -1136,25 +1136,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                               post_status == "archived" &&
                                 "bg-base-200/60 border-base-300 hover:bg-base-200"
                             ]}>
-                              <select
-                                name="status"
-                                class={[
-                                  "select text-xs font-medium min-h-0 h-full pl-2.5 pr-7 bg-transparent border-none focus:outline-none cursor-pointer w-auto",
-                                  post_status == "published" && "text-success",
-                                  post_status == "draft" && "text-warning",
-                                  post_status == "archived" && "text-base-content/60"
-                                ]}
-                              >
-                                <option value="draft" selected={post_status == "draft"}>
-                                  {gettext("Draft")}
-                                </option>
-                                <option value="published" selected={post_status == "published"}>
-                                  {gettext("Published")}
-                                </option>
-                                <option value="archived" selected={post_status == "archived"}>
-                                  {gettext("Archived")}
-                                </option>
-                              </select>
+                              <label class={[
+                                "select text-xs font-medium min-h-0 h-full pl-2.5 pr-7 bg-transparent border-none focus:outline-none cursor-pointer w-auto",
+                                post_status == "published" && "text-success",
+                                post_status == "draft" && "text-warning",
+                                post_status == "archived" && "text-base-content/60"
+                              ]}>
+                                <select name="status">
+                                  <option value="draft" selected={post_status == "draft"}>
+                                    {gettext("Draft")}
+                                  </option>
+                                  <option value="published" selected={post_status == "published"}>
+                                    {gettext("Published")}
+                                  </option>
+                                  <option value="archived" selected={post_status == "archived"}>
+                                    {gettext("Archived")}
+                                  </option>
+                                </select>
+                              </label>
                             </div>
                           </form>
                         <% end %>

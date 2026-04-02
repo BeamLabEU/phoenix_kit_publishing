@@ -1993,17 +1993,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             <%!-- Endpoint Selection --%>
             <div class="space-y-1">
               <form phx-change="select_ai_endpoint">
-                <select
-                  class="select select-bordered select-sm w-full"
-                  name="endpoint_uuid"
-                >
-                  <option value="">{gettext("Select an endpoint...")}</option>
-                  <%= for {id, name} <- @ai_endpoints do %>
-                    <option value={id} selected={@ai_selected_endpoint_uuid == id}>
-                      {name}
-                    </option>
-                  <% end %>
-                </select>
+                <label class="select select-sm w-full">
+                  <select name="endpoint_uuid">
+                    <option value="">{gettext("Select an endpoint...")}</option>
+                    <%= for {id, name} <- @ai_endpoints do %>
+                      <option value={id} selected={@ai_selected_endpoint_uuid == id}>
+                        {name}
+                      </option>
+                    <% end %>
+                  </select>
+                </label>
               </form>
               <.link
                 navigate={PhoenixKit.Utils.Routes.path("/admin/ai/endpoints")}
@@ -2016,17 +2015,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             <%!-- Prompt Selection --%>
             <div class="space-y-1">
               <form phx-change="select_ai_prompt">
-                <select
-                  class="select select-bordered select-sm w-full"
-                  name="prompt_uuid"
-                >
-                  <option value="">{gettext("Select a prompt...")}</option>
-                  <%= for {id, name} <- @ai_prompts do %>
-                    <option value={id} selected={@ai_selected_prompt_uuid == id}>
-                      {name}
-                    </option>
-                  <% end %>
-                </select>
+                <label class="select select-sm w-full">
+                  <select name="prompt_uuid">
+                    <option value="">{gettext("Select a prompt...")}</option>
+                    <%= for {id, name} <- @ai_prompts do %>
+                      <option value={id} selected={@ai_selected_prompt_uuid == id}>
+                        {name}
+                      </option>
+                    <% end %>
+                  </select>
+                </label>
               </form>
               <div class="flex items-center gap-2">
                 <.link
@@ -2496,33 +2494,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       {gettext("Status")}
                     </span>
                   </label>
-                  <select
-                    class={"select select-bordered w-full #{if edit_disabled?, do: "select-disabled bg-base-200"}"}
-                    name="status"
-                    disabled={edit_disabled?}
-                  >
-                    <%= if @viewing_older_version do %>
-                      <option
-                        value="published"
-                        selected={@form["status"] in ["draft", "published"]}
-                      >
-                        {gettext("Published")}
-                      </option>
-                      <option value="archived" selected={@form["status"] == "archived"}>
-                        {gettext("Archived")}
-                      </option>
-                    <% else %>
-                      <option value="draft" selected={@form["status"] == "draft"}>
-                        {gettext("Draft")}
-                      </option>
-                      <option value="published" selected={@form["status"] == "published"}>
-                        {gettext("Published")}
-                      </option>
-                      <option value="archived" selected={@form["status"] == "archived"}>
-                        {gettext("Archived")}
-                      </option>
-                    <% end %>
-                  </select>
+                  <label class={"select w-full #{if edit_disabled?, do: "select-disabled bg-base-200"}"}>
+                    <select
+                      name="status"
+                      disabled={edit_disabled?}
+                    >
+                      <%= if @viewing_older_version do %>
+                        <option
+                          value="published"
+                          selected={@form["status"] in ["draft", "published"]}
+                        >
+                          {gettext("Published")}
+                        </option>
+                        <option value="archived" selected={@form["status"] == "archived"}>
+                          {gettext("Archived")}
+                        </option>
+                      <% else %>
+                        <option value="draft" selected={@form["status"] == "draft"}>
+                          {gettext("Draft")}
+                        </option>
+                        <option value="published" selected={@form["status"] == "published"}>
+                          {gettext("Published")}
+                        </option>
+                        <option value="archived" selected={@form["status"] == "archived"}>
+                          {gettext("Archived")}
+                        </option>
+                      <% end %>
+                    </select>
+                  </label>
                   <p class="text-xs text-base-content/50 mt-1">
                     {gettext("Applies to all languages in this version.")}
                   </p>
