@@ -107,6 +107,7 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **LiveView assigns** available in admin pages: `@phoenix_kit_current_scope`, `@current_locale`, `@url_path`
 - **Dual URL modes**: `"timestamp"` or `"slug"` — locked at group creation, never changed
 - **Content format**: Markdown with inline PHK XML components (Image, Hero, CTA, Video, Headline, Subheadline, EntityForm)
+- **Admin routing** — plugin LiveView routes are auto-discovered by PhoenixKit and compiled into `live_session :phoenix_kit_admin`. Never hand-register them in a parent app's `router.ex`; use `live_view:` on a tab or a route module. See `phoenix_kit/guides/custom-admin-pages.md` for the authoritative reference
 
 ## Tailwind CSS Scanning
 
