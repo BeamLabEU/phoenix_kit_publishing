@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.4 - 2026-04-24
+
+PR #9 — closes issues #6, #7, #8 plus related content-normalization and admin URL consistency work.
+
+### Added
+- `publishing_default_language_no_prefix` setting (Issue #7) — opt-in URL convention where the default language is served prefixless (`/blog` instead of `/en/blog`); prefixed URLs 301-redirect to the canonical. `Language.request_matches_canonical_url?/2` prevents redirect loops.
+- `LanguageHelpers.get_primary_language_base/0`, `url_language_code/1`, `use_language_prefix?/1` — normalize dialect codes (`"en-GB"`) to URL base codes (`"en"`) for public routing. (Issue #6)
+- `StaleFixer.normalize_content_language/1` — self-healing for legacy base-only content rows (`"en"`) when a dialect (`"en-GB"`) becomes the default. Paired with `TranslationManager` legacy-base promotion and `Posts.read_post` lazy retry-on-miss.
+- Activity-log events for self-healing mutations: `publishing.content.language_normalized`, `.merged`, `.promoted`.
+- `PhoenixKit.Modules.Publishing.ActivityLog` wrapper — guarded with `Code.ensure_loaded?/1` + `try/rescue` so audit failures never crash the primary mutation.
+- Controller test-endpoint infrastructure (`Test.Endpoint`, `Test.Router`, `Test.Layouts`, `PhoenixKitPublishing.ConnCase`).
+
+### Changed
+- Public URL builders (`group_listing_path/3`, `build_post_url/4`, `build_public_path_with_time/4`) normalize dialect codes via `url_language_code/1`.
+- Admin preview URLs (`Web.Index`, `Web.Listing`, `Web.New`) now route through `PublishingHTML` builders instead of hand-rolling prefix logic. (Follow-up to #6)
+- Public language switcher deduplicates base + dialect entries and highlights the active language exactly.
+
+### Fixed
+- Forward `phoenix_kit_current_scope` from `Web.HTML.all_groups/1` and `Web.HTML.index/1` into `LayoutWrapper.app_layout` so the parent app header sees authenticated users on public Publishing pages. (Issue #8)
+- Translation bug in cache-toggle flashes.
+- Dialyzer warning on a statically-true `is_binary/1` guard introduced in PR #3.
+
+### Docs
+- `AGENTS.md` and `README.md` updated with the new setting, scope-forwarding convention for public templates, controller-test infrastructure pointer, and activity-log event table.
+
 ## 0.1.3 - 2026-04-11
 
 ### Fixed
