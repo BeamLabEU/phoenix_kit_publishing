@@ -22,6 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     flash={@flash}
     page_title={@page_title}
     current_path={@conn.request_path}
+    phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
     >
     <div class="groups-overview-container max-w-6xl mx-auto px-6 py-8">
     <%!-- Page Header --%>
@@ -92,6 +93,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     flash={@flash}
     page_title={@page_title}
     current_path={@conn.request_path}
+    phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
     >
     <div class="group-index-container max-w-6xl mx-auto px-6 py-8">
     <%!-- Breadcrumb Navigation --%>
