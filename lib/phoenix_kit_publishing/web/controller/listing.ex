@@ -36,12 +36,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
         # Check if we need to redirect to canonical URL
         canonical_language = Language.get_canonical_url_language(language)
 
-        if canonical_language != language do
-          # Redirect to canonical URL
-          canonical_url =
-            PublishingHTML.group_listing_path(canonical_language, group_slug, pagination_params)
+        canonical_url =
+          PublishingHTML.group_listing_path(canonical_language, group_slug, pagination_params)
 
-          {:redirect, canonical_url}
+        if canonical_redirect?(conn, language, canonical_language, canonical_url) do
+          {:redirect_301, canonical_url}
         else
           page = get_page_param(params)
           per_page = get_per_page_setting()
@@ -99,7 +98,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
             ctx.pagination_params
           )
 
-        {:redirect, fallback_url}
+        {:redirect_301, fallback_url}
 
       :not_found ->
         # Group exists but no published posts — render empty listing instead of 404
@@ -121,6 +120,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     else
       :not_found
     end
+  end
+
+  defp canonical_redirect?(conn, language, canonical_language, canonical_url) do
+    (canonical_language != language or
+       Language.prefixed_default_language_request?(conn, canonical_language)) and
+      not Language.request_matches_canonical_url?(conn, canonical_url)
   end
 
   # ============================================================================

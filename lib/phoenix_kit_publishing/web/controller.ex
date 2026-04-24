@@ -193,8 +193,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         )
         |> render(:index)
 
-      {:redirect, url} ->
-        redirect(conn, to: url)
+      {:redirect_301, url} ->
+        conn
+        |> put_status(301)
+        |> redirect(to: url)
 
       {:error, reason} ->
         handle_not_found(conn, reason)
@@ -226,9 +228,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           "Edit Post"
         )
         |> render(:show)
-
-      {:redirect, url} ->
-        redirect(conn, to: url)
 
       {:redirect_301, url} ->
         conn

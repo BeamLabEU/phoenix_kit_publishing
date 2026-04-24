@@ -13,6 +13,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   alias PhoenixKit.Utils.Routes
 
   # Settings keys
+  @default_language_no_prefix_key "publishing_default_language_no_prefix"
   @memory_cache_key "publishing_memory_cache_enabled"
   @render_cache_key "publishing_render_cache_enabled"
 
@@ -34,6 +35,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       )
       |> assign(:module_enabled, Publishing.enabled?())
       |> assign(:cache_groups, cache_groups)
+      |> assign(
+        :default_language_no_prefix,
+        Settings.get_boolean_setting(@default_language_no_prefix_key, false)
+      )
       |> assign(
         :memory_cache_enabled,
         Settings.get_setting(@memory_cache_key, "true") == "true"
@@ -107,6 +112,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      |> assign(:memory_cache_enabled, new_value)
      |> assign(:cache_status, build_cache_status(socket.assigns.cache_groups))
      |> put_flash(:info, cache_toggle_message("Memory cache", new_value))}
+  end
+
+  def handle_event("toggle_default_language_no_prefix", _params, socket) do
+    new_value = !socket.assigns.default_language_no_prefix
+    Settings.update_boolean_setting(@default_language_no_prefix_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:default_language_no_prefix, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do: gettext("Default language public URLs now omit the locale prefix"),
+         else: gettext("Default language public URLs now include the locale prefix")
+       )
+     )}
   end
 
   def handle_event("clear_render_cache", _params, socket) do
@@ -252,6 +273,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     />
 
     <div class="max-w-2xl mx-auto space-y-6">
+      <div class="card bg-base-100 shadow-xl border border-base-200">
+        <div class="card-body space-y-4">
+          <div>
+            <h2 class="text-2xl font-semibold text-base-content">
+              <.icon name="hero-language" class="w-6 h-6 inline-block mr-2" />
+              {gettext("Public URL Language")}
+            </h2>
+            <p class="text-sm text-base-content/70">
+              {gettext(
+                "Control whether the default language keeps its locale segment in public URLs."
+              )}
+            </p>
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-link" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("Default Language Without Prefix")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext("Use /group/post instead of /en/group/post for the default language")}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@default_language_no_prefix}
+              phx-click="toggle_default_language_no_prefix"
+            />
+          </div>
+
+          <div class="text-xs text-base-content/50">
+            <p>
+              <.icon name="hero-information-circle" class="w-3 h-3 inline" />
+              {gettext(
+                "When enabled, default-language public URLs become prefixless and prefixed default-language URLs redirect to the canonical prefixless version."
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <%!-- Cache Management Section --%>
       <div class="card bg-base-100 shadow-xl border border-base-200">
         <div class="card-body space-y-6">

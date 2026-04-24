@@ -58,7 +58,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     case PostFetching.fetch_post(group_slug, identifier, language) do
       {:ok, post} ->
         if post.metadata.status == "published" and not future_post?(post) do
-          render_published_post(group_slug, post, language)
+          render_published_post(conn, group_slug, post, language)
         else
           log_404(conn, group_slug, identifier, language, :unpublished)
           {:error, :unpublished}
@@ -70,12 +70,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     end
   end
 
-  defp render_published_post(group_slug, post, language) do
+  defp render_published_post(conn, group_slug, post, language) do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
+    canonical_url = PublishingHTML.build_post_url(group_slug, post, canonical_language)
 
-    if canonical_language != language do
-      canonical_url = PublishingHTML.build_post_url(group_slug, post, canonical_language)
-      {:redirect, canonical_url}
+    if canonical_redirect?(conn, language, canonical_language, canonical_url) do
+      {:redirect_301, canonical_url}
     else
       html_content = render_post_content(post)
       translations = Translations.build_translation_links(group_slug, post, canonical_language)
@@ -388,5 +388,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   defp future_post?(post) do
     post[:mode] in @timestamp_modes and post[:date] != nil and
       Date.compare(post[:date], Date.utc_today()) == :gt
+  end
+
+  defp canonical_redirect?(conn, language, canonical_language, canonical_url) do
+    (canonical_language != language or
+       Language.prefixed_default_language_request?(conn, canonical_language)) and
+      not Language.request_matches_canonical_url?(conn, canonical_url)
   end
 end

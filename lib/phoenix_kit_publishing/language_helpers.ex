@@ -10,6 +10,8 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Settings
 
+  @default_language_no_prefix_key "publishing_default_language_no_prefix"
+
   @doc """
   Returns all enabled language codes for multi-language support.
   Falls back to content language if Languages module is disabled.
@@ -52,6 +54,40 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
 
   def url_language_code(language_code) when is_binary(language_code) do
     DialectMapper.extract_base(language_code)
+  end
+
+  @doc """
+  Returns true when public URLs should omit the prefix for the default language.
+  """
+  @spec default_language_no_prefix?() :: boolean()
+  def default_language_no_prefix? do
+    Settings.get_boolean_setting(@default_language_no_prefix_key, false)
+  end
+
+  @doc """
+  Returns true when public URLs should include a language prefix.
+
+  Prefixes are omitted when:
+  - the site is effectively single-language, or
+  - the caller requested the default language and the
+    `publishing_default_language_no_prefix` setting is enabled.
+  """
+  @spec use_language_prefix?(String.t() | nil) :: boolean()
+  def use_language_prefix?(language_code) do
+    language_code = url_language_code(language_code) || get_primary_language_base()
+
+    not single_language_mode?() and
+      not (default_language_no_prefix?() and language_code == get_primary_language_base())
+  end
+
+  @doc """
+  Returns true when the site should behave as single-language for public URLs.
+  """
+  @spec single_language_mode?() :: boolean()
+  def single_language_mode? do
+    not Languages.enabled?() or length(enabled_language_codes()) <= 1
+  rescue
+    _ -> true
   end
 
   @doc """

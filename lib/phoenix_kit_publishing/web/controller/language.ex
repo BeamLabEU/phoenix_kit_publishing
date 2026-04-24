@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
 
   # ============================================================================
@@ -205,6 +206,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
     Publishing.get_display_code(post_language, enabled_languages)
   end
 
+  @doc """
+  Returns true when the current request URL already matches the canonical URL.
+  """
+  def request_matches_canonical_url?(conn, canonical_url) do
+    request_url =
+      case conn.query_string do
+        nil -> conn.request_path
+        "" -> conn.request_path
+        query -> conn.request_path <> "?" <> query
+      end
+
+    request_url == canonical_url
+  end
+
+  @doc """
+  Returns true when the request is using an explicit prefix for the default language
+  even though the default language should be prefixless.
+  """
+  def prefixed_default_language_request?(conn, language) do
+    Map.has_key?(conn.params, "language") and
+      LanguageHelpers.default_language_no_prefix?() and
+      LanguageHelpers.url_language_code(language) == LanguageHelpers.get_primary_language_base()
+  end
+
   # ============================================================================
   # Helper Functions
   # ============================================================================
@@ -213,7 +238,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Gets the list of enabled language codes.
   """
   def get_enabled_languages do
-    Languages.enabled_locale_codes()
+    Publishing.enabled_language_codes()
   rescue
     _ -> ["en"]
   end
@@ -242,9 +267,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Gets the default language.
   """
   def get_default_language do
-    case Languages.get_default_language() do
-      %{"code" => code} -> code
-      _ -> "en"
+    case Publishing.get_primary_language() do
+      code when is_binary(code) and code != "" ->
+        code
+
+      _ ->
+        case Languages.get_default_language() do
+          %{"code" => code} -> code
+          _ -> "en"
+        end
     end
   end
 
