@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
   require Logger
 
   alias PhoenixKit.Modules.Languages.DialectMapper
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.ListingCache
@@ -111,7 +112,25 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
             "for version #{version_uuid}"
         )
 
-        DBStorage.update_content(legacy_content, %{language: language_code})
+        case DBStorage.update_content(legacy_content, %{language: language_code}) do
+          {:ok, updated} = ok ->
+            ActivityLog.log(%{
+              action: "publishing.content.promoted",
+              mode: "auto",
+              resource_type: "publishing_content",
+              resource_uuid: updated.uuid,
+              metadata: %{
+                "from_language" => base_language,
+                "to_language" => language_code,
+                "version_uuid" => version_uuid
+              }
+            })
+
+            ok
+
+          error ->
+            error
+        end
 
       true ->
         create_language_content(version_uuid, language_code)

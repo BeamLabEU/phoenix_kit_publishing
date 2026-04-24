@@ -112,6 +112,20 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **Public URL building** — always go through `PublishingHTML.group_listing_path/3` / `build_post_url/4` / `build_public_path_with_time/4`; never hand-roll prefix logic in admin templates (see Issue #7)
 - **Language normalization on read** — `Posts.read_post/4` and the slug finders retry through the legacy base language on `:not_found` and fix stale content in place via `StaleFixer`. Don't pre-check for staleness on the hot path — the retry-on-miss pattern keeps healthy reads at one query
 
+## Activity Logging
+
+Self-healing mutations (not initiated by a user click) are logged via `PhoenixKit.Modules.Publishing.ActivityLog.log/1` — a thin wrapper around `PhoenixKit.Activity.log/1` guarded with `Code.ensure_loaded?/1` so the module stays usable without the Activity context.
+
+Current auto-events:
+
+| action | when | resource_type |
+|--------|------|---------------|
+| `publishing.content.language_normalized` | Legacy base-code content (e.g. `"en"`) rewritten to the enabled dialect (`"en-US"`) by `StaleFixer` | `publishing_content` |
+| `publishing.content.merged` | Legacy and dialect rows for the same version merged by `StaleFixer` | `publishing_content` |
+| `publishing.content.promoted` | Legacy base-code row promoted in place when the admin adds the corresponding dialect translation | `publishing_content` |
+
+All three run with `mode: "auto"` and no `actor_uuid` — they're system-triggered, not user-initiated. Metadata includes `from_language`/`to_language`/`version_uuid`.
+
 ## Settings Keys
 
 | Key | Default | Description |

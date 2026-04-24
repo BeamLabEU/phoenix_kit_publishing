@@ -111,7 +111,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      socket
      |> assign(:memory_cache_enabled, new_value)
      |> assign(:cache_status, build_cache_status(socket.assigns.cache_groups))
-     |> put_flash(:info, cache_toggle_message("Memory cache", new_value))}
+     |> put_flash(:info, memory_cache_toggle_message(new_value))}
   end
 
   def handle_event("toggle_default_language_no_prefix", _params, socket) do
@@ -162,7 +162,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     {:noreply,
      socket
      |> assign(:render_cache_enabled, new_value)
-     |> put_flash(:info, cache_toggle_message("Render cache", new_value))}
+     |> put_flash(:info, render_cache_toggle_message(new_value))}
   end
 
   def handle_event("toggle_group_render_cache", %{"slug" => slug}, socket) do
@@ -175,7 +175,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     {:noreply,
      socket
      |> assign(:render_cache_per_group, build_render_cache_per_group(socket.assigns.cache_groups))
-     |> put_flash(:info, cache_toggle_message("Render cache for #{slug}", new_value))}
+     |> put_flash(:info, render_cache_group_toggle_message(slug, new_value))}
   end
 
   # ============================================================================
@@ -194,6 +194,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     {:noreply, refresh_groups(socket)}
   end
 
+  def handle_info(_msg, socket), do: {:noreply, socket}
+
   defp refresh_groups(socket) do
     groups = db_groups_to_maps()
 
@@ -207,13 +209,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     Publishing.list_groups()
   end
 
-  defp cache_toggle_message(cache_type, enabled) do
-    if enabled do
-      gettext("%{type} enabled", type: cache_type)
-    else
-      gettext("%{type} disabled", type: cache_type)
-    end
-  end
+  defp memory_cache_toggle_message(true), do: gettext("Memory cache enabled")
+  defp memory_cache_toggle_message(false), do: gettext("Memory cache disabled")
+
+  defp render_cache_toggle_message(true), do: gettext("Render cache enabled")
+  defp render_cache_toggle_message(false), do: gettext("Render cache disabled")
+
+  defp render_cache_group_toggle_message(slug, true),
+    do: gettext("Render cache for %{group} enabled", group: slug)
+
+  defp render_cache_group_toggle_message(slug, false),
+    do: gettext("Render cache for %{group} disabled", group: slug)
 
   # Build cache status for all groups
   defp build_cache_status(groups) do

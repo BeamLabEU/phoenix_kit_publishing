@@ -12,6 +12,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   import Ecto.Query, only: [from: 2]
 
   alias PhoenixKit.Modules.Languages.DialectMapper
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
@@ -426,6 +427,18 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
         case DBStorage.update_content(content, %{language: target_language}) do
           {:ok, updated} ->
+            ActivityLog.log(%{
+              action: "publishing.content.language_normalized",
+              mode: "auto",
+              resource_type: "publishing_content",
+              resource_uuid: updated.uuid,
+              metadata: %{
+                "from_language" => content.language,
+                "to_language" => target_language,
+                "version_uuid" => content.version_uuid
+              }
+            })
+
             {:ok, updated}
 
           {:error, reason} ->
@@ -494,6 +507,19 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
         Logger.info(
           "[Publishing] Merged duplicate legacy content #{legacy.uuid} into #{target.uuid}"
         )
+
+        ActivityLog.log(%{
+          action: "publishing.content.merged",
+          mode: "auto",
+          resource_type: "publishing_content",
+          resource_uuid: target.uuid,
+          metadata: %{
+            "merged_from_uuid" => legacy.uuid,
+            "from_language" => legacy.language,
+            "to_language" => target.language,
+            "version_uuid" => target.version_uuid
+          }
+        })
 
         {:ok, target}
 

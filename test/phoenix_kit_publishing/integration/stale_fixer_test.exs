@@ -156,4 +156,24 @@ defmodule PhoenixKit.Integration.Publishing.StaleFixerTest do
     [normalized] = DBStorage.list_contents(version.uuid)
     assert normalized.language == "en-US"
   end
+
+  test "timestamp-mode post reads lazily normalize legacy base-language content" do
+    {:ok, _} = Settings.update_setting("content_language", "en")
+    {:ok, group} = Groups.add_group(unique_name(), mode: "timestamp")
+
+    {:ok, post} = Posts.create_post(group["slug"], %{title: "Timestamp Normalize"})
+
+    {:ok, _} = Settings.update_setting("content_language", "en-US")
+
+    date_str = Date.to_iso8601(post.date)
+    time_str = post.time |> Time.to_string() |> String.slice(0, 5)
+
+    assert {:ok, read_post} =
+             Posts.read_post(group["slug"], "#{date_str}/#{time_str}", "en-US", nil)
+
+    assert read_post.language == "en-US"
+
+    [version] = DBStorage.list_versions(post.uuid)
+    assert Enum.map(DBStorage.list_contents(version.uuid), & &1.language) == ["en-US"]
+  end
 end
