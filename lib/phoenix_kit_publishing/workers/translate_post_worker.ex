@@ -70,6 +70,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Settings
@@ -132,11 +133,11 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
     cond do
       not (Code.ensure_loaded?(PhoenixKitAI) and AI.enabled?()) ->
         Logger.error("[TranslatePostWorker] AI module is not enabled")
-        {:error, "AI module is not enabled"}
+        {:error, :ai_disabled}
 
       is_nil(prompt_uuid) ->
         Logger.error("[TranslatePostWorker] No prompt_uuid provided")
-        {:error, "No prompt selected"}
+        {:error, :ai_no_prompt}
 
       true ->
         :ok
@@ -156,11 +157,11 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
     case AI.get_endpoint(endpoint_uuid) do
       nil ->
         Logger.error("[TranslatePostWorker] AI endpoint #{endpoint_uuid} not found")
-        {:error, "AI endpoint not found"}
+        {:error, :ai_endpoint_not_found}
 
       %{enabled: false} ->
         Logger.error("[TranslatePostWorker] AI endpoint #{endpoint_uuid} is disabled")
-        {:error, "AI endpoint is disabled"}
+        {:error, :ai_endpoint_disabled}
 
       endpoint ->
         # Read the source post by UUID
@@ -176,14 +177,16 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
             )
 
           {:error, reason} ->
+            # Truncated inspect for the log so a verbose error tuple
+            # doesn't flood Oban logs (an AI HTTP error can carry the
+            # whole response body otherwise).
             Logger.error(
-              "[TranslatePostWorker] Failed to read source post: #{inspect(reason)}. " <>
+              "[TranslatePostWorker] Failed to read source post: #{Errors.truncate_for_log(reason)}. " <>
                 "Details: group=#{group_slug}, post_uuid=#{post_uuid}, " <>
                 "language=#{source_language}, version=#{inspect(version)}"
             )
 
-            {:error,
-             "Failed to read source post (#{group_slug}/#{post_uuid}/#{source_language}): #{inspect(reason)}"}
+            {:error, {:source_post_read_failed, reason}}
         end
     end
   end
@@ -363,7 +366,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
       })
     else
       {:error, reason} ->
-        {:error, "AI translation failed: #{inspect(reason)}"}
+        {:error, {:ai_translation_failed, reason}}
     end
   end
 
@@ -863,11 +866,11 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
             {:ok, %{title: title, url_slug: url_slug, content: content}}
 
           {:error, reason} ->
-            {:error, "Failed to extract AI response: #{inspect(reason)}"}
+            {:error, {:ai_extract_failed, reason}}
         end
 
       {:error, reason} ->
-        {:error, "AI request failed: #{inspect(reason)}"}
+        {:error, {:ai_request_failed, reason}}
     end
   end
 
@@ -925,10 +928,10 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
   defp validate_ai_available(prompt_uuid) do
     cond do
       not (Code.ensure_loaded?(PhoenixKitAI) and AI.enabled?()) ->
-        {:error, "AI module is not enabled"}
+        {:error, :ai_disabled}
 
       is_nil(prompt_uuid) ->
-        {:error, "No prompt selected"}
+        {:error, :ai_no_prompt}
 
       true ->
         :ok
@@ -937,8 +940,8 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
 
   defp fetch_ai_endpoint(endpoint_uuid) do
     case AI.get_endpoint(endpoint_uuid) do
-      nil -> {:error, "AI endpoint not found: #{endpoint_uuid}"}
-      %{enabled: false} -> {:error, "AI endpoint is disabled"}
+      nil -> {:error, :ai_endpoint_not_found}
+      %{enabled: false} -> {:error, :ai_endpoint_disabled}
       endpoint -> {:ok, endpoint}
     end
   end
@@ -946,7 +949,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
   defp read_source_post(post_uuid, source_language, version) do
     case Publishing.read_post_by_uuid(post_uuid, source_language, version) do
       {:ok, _} = ok -> ok
-      {:error, reason} -> {:error, "Failed to read source post: #{inspect(reason)}"}
+      {:error, reason} -> {:error, {:source_post_read_failed, reason}}
     end
   end
 end

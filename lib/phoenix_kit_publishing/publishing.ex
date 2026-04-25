@@ -202,13 +202,37 @@ defmodule PhoenixKit.Modules.Publishing do
   @impl PhoenixKit.Module
   @spec enable_system() :: {:ok, any()} | {:error, any()}
   def enable_system do
-    settings_call(:update_boolean_setting, [@publishing_enabled_key, true])
+    result = settings_call(:update_boolean_setting, [@publishing_enabled_key, true])
+
+    with {:ok, _} <- result do
+      PhoenixKit.Modules.Publishing.ActivityLog.log_manual(
+        "publishing.module.enabled",
+        nil,
+        "publishing_module",
+        nil,
+        %{}
+      )
+    end
+
+    result
   end
 
   @impl PhoenixKit.Module
   @spec disable_system() :: {:ok, any()} | {:error, any()}
   def disable_system do
-    settings_call(:update_boolean_setting, [@publishing_enabled_key, false])
+    result = settings_call(:update_boolean_setting, [@publishing_enabled_key, false])
+
+    with {:ok, _} <- result do
+      PhoenixKit.Modules.Publishing.ActivityLog.log_manual(
+        "publishing.module.disabled",
+        nil,
+        "publishing_module",
+        nil,
+        %{}
+      )
+    end
+
+    result
   end
 
   @impl PhoenixKit.Module

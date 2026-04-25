@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
 
   @timestamp_modes Constants.timestamp_modes()
@@ -157,7 +158,25 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   """
   @spec create_post(String.t(), map() | keyword()) :: {:ok, map()} | {:error, any()}
   def create_post(group_slug, opts \\ %{}) do
-    create_post_in_db(group_slug, opts)
+    case create_post_in_db(group_slug, opts) do
+      {:ok, post} = result ->
+        ActivityLog.log_manual(
+          "publishing.post.created",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post[:uuid] || post[:db_uuid],
+          %{
+            "group_slug" => group_slug,
+            "slug" => post[:slug],
+            "mode" => to_string(post[:mode] || "")
+          }
+        )
+
+        result
+
+      other ->
+        other
+    end
   end
 
   @doc """
@@ -231,9 +250,28 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       unless Map.get(opts_map, :skip_broadcast, false) do
         PublishingPubSub.broadcast_post_updated(group_slug, updated_post)
       end
+
+      ActivityLog.log_manual(
+        "publishing.post.updated",
+        actor_uuid_for_log(opts_map, audit_meta),
+        "publishing_post",
+        updated_post[:uuid] || post[:uuid],
+        %{
+          "group_slug" => group_slug,
+          "slug" => updated_post[:slug] || post[:slug],
+          "language" => updated_post[:language] || post[:language]
+        }
+      )
     end
 
     result
+  end
+
+  # Activity-log actor preference: explicit opts > scope-derived audit
+  # metadata. The audit_meta path keeps backwards compatibility with LV
+  # callers that only pass scope today (C10 will switch them to opts).
+  defp actor_uuid_for_log(opts_map, audit_meta) do
+    ActivityLog.actor_uuid(opts_map) || audit_meta[:updated_by_uuid]
   end
 
   @doc """
@@ -242,8 +280,9 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   Regenerates the group cache and broadcasts the update.
   Returns {:ok, post_uuid} on success or {:error, reason} on failure.
   """
-  @spec restore_post(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
-  def restore_post(group_slug, post_uuid) do
+  @spec restore_post(String.t(), String.t(), keyword() | map()) ::
+          {:ok, String.t()} | {:error, term()}
+  def restore_post(group_slug, post_uuid, opts \\ []) do
     case DBStorage.get_post_by_uuid(post_uuid) do
       nil ->
         {:error, :not_found}
@@ -253,6 +292,15 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
           {:ok, _} ->
             ListingCache.regenerate(group_slug)
             PublishingPubSub.broadcast_post_updated(group_slug, %{uuid: db_post.uuid})
+
+            ActivityLog.log_manual(
+              "publishing.post.restored",
+              ActivityLog.actor_uuid(opts),
+              "publishing_post",
+              db_post.uuid,
+              %{"group_slug" => group_slug, "slug" => db_post.slug}
+            )
+
             {:ok, post_uuid}
 
           {:error, reason} ->
@@ -266,8 +314,9 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   Returns {:ok, post_uuid} on success or {:error, reason} on failure.
   """
-  @spec trash_post(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
-  def trash_post(group_slug, post_uuid) do
+  @spec trash_post(String.t(), String.t(), keyword() | map()) ::
+          {:ok, String.t()} | {:error, term()}
+  def trash_post(group_slug, post_uuid, opts \\ []) do
     case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
       nil ->
         {:error, :not_found}
@@ -278,6 +327,15 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
             broadcast_id = db_post.uuid
             ListingCache.regenerate(group_slug)
             PublishingPubSub.broadcast_post_deleted(group_slug, broadcast_id)
+
+            ActivityLog.log_manual(
+              "publishing.post.trashed",
+              ActivityLog.actor_uuid(opts),
+              "publishing_post",
+              db_post.uuid,
+              %{"group_slug" => group_slug, "slug" => db_post.slug}
+            )
+
             {:ok, post_uuid}
 
           {:error, reason} ->

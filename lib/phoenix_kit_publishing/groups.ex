@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -141,7 +142,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
             }
           }
 
-          create_and_broadcast_group(db_attrs)
+          create_and_broadcast_group(db_attrs, opts)
         end
     end
   end
@@ -173,7 +174,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
         if post_count > 0 and not force do
           {:error, {:has_posts, post_count}}
         else
-          delete_and_broadcast_group(db_group, slug)
+          delete_and_broadcast_group(db_group, slug, opts)
         end
     end
   end
@@ -181,8 +182,9 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @doc """
   Updates a publishing group's display name and slug.
   """
-  @spec update_group(String.t(), map() | keyword()) :: {:ok, group()} | {:error, atom()}
-  def update_group(slug, params) when is_binary(slug) do
+  @spec update_group(String.t(), map() | keyword(), keyword() | map()) ::
+          {:ok, group()} | {:error, atom()}
+  def update_group(slug, params, opts \\ []) when is_binary(slug) do
     case DBStorage.get_group_by_slug(slug) do
       nil ->
         {:error, :not_found}
@@ -194,6 +196,15 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
                DBStorage.update_group(db_group, %{name: name, slug: sanitized_slug}) do
           group = db_group_to_map(updated)
           PublishingPubSub.broadcast_group_updated(group)
+
+          ActivityLog.log_manual(
+            "publishing.group.updated",
+            ActivityLog.actor_uuid(opts),
+            "publishing_group",
+            updated.uuid,
+            %{"slug" => updated.slug, "previous_slug" => db_group.slug}
+          )
+
           {:ok, group}
         end
     end
@@ -205,8 +216,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   Sets the group status to "trashed". The group and its posts remain in the
   database and can be restored. Trashed groups are hidden from list_groups/0.
   """
-  @spec trash_group(String.t()) :: {:ok, String.t()} | {:error, any()}
-  def trash_group(slug) when is_binary(slug) do
+  @spec trash_group(String.t(), keyword() | map()) :: {:ok, String.t()} | {:error, any()}
+  def trash_group(slug, opts \\ []) when is_binary(slug) do
     case DBStorage.get_group_by_slug(slug) do
       nil ->
         {:error, :not_found}
@@ -216,6 +227,15 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           {:ok, _} ->
             ListingCache.invalidate(slug)
             PublishingPubSub.broadcast_group_deleted(slug)
+
+            ActivityLog.log_manual(
+              "publishing.group.trashed",
+              ActivityLog.actor_uuid(opts),
+              "publishing_group",
+              db_group.uuid,
+              %{"slug" => slug}
+            )
+
             {:ok, slug}
 
           {:error, reason} ->
@@ -227,8 +247,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @doc """
   Restores a trashed publishing group.
   """
-  @spec restore_group(String.t()) :: {:ok, String.t()} | {:error, any()}
-  def restore_group(slug) when is_binary(slug) do
+  @spec restore_group(String.t(), keyword() | map()) :: {:ok, String.t()} | {:error, any()}
+  def restore_group(slug, opts \\ []) when is_binary(slug) do
     case DBStorage.get_group_by_slug(slug) do
       nil ->
         {:error, :not_found}
@@ -242,7 +262,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
         if active_conflict do
           {:error, :slug_taken}
         else
-          restore_and_broadcast_group(db_group, slug)
+          restore_and_broadcast_group(db_group, slug, opts)
         end
     end
   end
@@ -300,11 +320,20 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # Private Helpers
   # ============================================================================
 
-  defp create_and_broadcast_group(db_attrs) do
+  defp create_and_broadcast_group(db_attrs, opts) do
     case DBStorage.create_group(db_attrs) do
       {:ok, db_group} ->
         group = db_group_to_map(db_group)
         PublishingPubSub.broadcast_group_created(group)
+
+        ActivityLog.log_manual(
+          "publishing.group.created",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          db_group.uuid,
+          %{"slug" => db_group.slug, "name" => db_group.name, "mode" => db_group.mode}
+        )
+
         {:ok, group}
 
       {:error, _changeset} ->
@@ -312,11 +341,20 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     end
   end
 
-  defp delete_and_broadcast_group(db_group, slug) do
+  defp delete_and_broadcast_group(db_group, slug, opts) do
     case DBStorage.delete_group(db_group) do
       {:ok, _} ->
         ListingCache.invalidate(slug)
         PublishingPubSub.broadcast_group_deleted(slug)
+
+        ActivityLog.log_manual(
+          "publishing.group.deleted",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          db_group.uuid,
+          %{"slug" => slug}
+        )
+
         {:ok, slug}
 
       error ->
@@ -324,11 +362,20 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     end
   end
 
-  defp restore_and_broadcast_group(db_group, slug) do
+  defp restore_and_broadcast_group(db_group, slug, opts) do
     case DBStorage.restore_group(db_group) do
       {:ok, _} ->
         ListingCache.regenerate(slug)
         PublishingPubSub.broadcast_group_created(%{"slug" => slug, "name" => db_group.name})
+
+        ActivityLog.log_manual(
+          "publishing.group.restored",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          db_group.uuid,
+          %{"slug" => slug}
+        )
+
         {:ok, slug}
 
       {:error, reason} ->

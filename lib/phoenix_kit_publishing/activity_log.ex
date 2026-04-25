@@ -19,6 +19,12 @@ defmodule PhoenixKit.Modules.Publishing.ActivityLog do
       try do
         PhoenixKit.Activity.log(Map.put(attrs, :module, @module_key))
       rescue
+        Postgrex.Error ->
+          # phoenix_kit_activities table may be missing in test sandboxes
+          # or hosts that haven't run the Activity migration. Silent —
+          # we don't want to spam Logger on every mutation.
+          :ok
+
         error ->
           Logger.warning(
             "PhoenixKit.Modules.Publishing activity log failed: " <>
@@ -30,4 +36,31 @@ defmodule PhoenixKit.Modules.Publishing.ActivityLog do
 
     :ok
   end
+
+  @doc """
+  Convenience for the standard "user-driven mutation" shape — wraps `log/1`
+  with `mode: "manual"` and the canonical key set so context functions only
+  pass the bits that vary.
+  """
+  @spec log_manual(String.t(), String.t() | nil, String.t(), String.t() | nil, map()) :: :ok
+  def log_manual(action, actor_uuid, resource_type, resource_uuid, metadata \\ %{}) do
+    log(%{
+      action: action,
+      mode: "manual",
+      actor_uuid: actor_uuid,
+      resource_type: resource_type,
+      resource_uuid: resource_uuid,
+      metadata: metadata
+    })
+  end
+
+  @doc """
+  Extracts `:actor_uuid` from an opts keyword list or map. Returns `nil` for
+  anything else. Designed to be the single point where context functions
+  read the caller's user identity — keeps the call sites short.
+  """
+  @spec actor_uuid(keyword() | map() | nil) :: String.t() | nil
+  def actor_uuid(opts) when is_list(opts), do: Keyword.get(opts, :actor_uuid)
+  def actor_uuid(opts) when is_map(opts), do: Map.get(opts, :actor_uuid)
+  def actor_uuid(_), do: nil
 end

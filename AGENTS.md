@@ -8,15 +8,33 @@ PhoenixKit Publishing module — a database-backed CMS providing content groups,
 
 ## Common Commands
 
+### Setup & Dependencies
+
 ```bash
-mix deps.get          # Install dependencies
-mix test              # Run all tests
-mix test test/phoenix_kit_publishing/unit_test.exs  # Run specific test file
-mix test --only tag   # Run tests matching a tag
-mix format            # Format code (imports Phoenix LiveView rules)
-mix credo             # Static analysis / linting
-mix dialyzer          # Type checking
-mix docs              # Generate documentation
+mix deps.get                                  # Install dependencies
+createdb phoenix_kit_publishing_test          # First-time integration-test DB
+```
+
+### Testing
+
+```bash
+mix test                                      # All tests (excludes :integration if DB absent)
+mix test test/phoenix_kit_publishing/posts_test.exs   # Specific file
+mix test test/phoenix_kit_publishing/posts_test.exs:42 # Specific line
+mix test --only integration                   # DB-backed tests only
+for i in $(seq 1 10); do mix test; done       # Stability check (sandbox/activity-log flakes)
+```
+
+### Code Quality
+
+```bash
+mix format                                    # Format code (imports Phoenix LiveView rules)
+mix credo --strict                            # Lint
+mix dialyzer                                  # Type checking
+mix precommit                                 # compile + format + credo --strict + dialyzer
+mix quality                                   # format + credo --strict + dialyzer
+mix quality.ci                                # format --check-formatted + credo --strict + dialyzer
+mix docs                                      # Generate documentation
 ```
 
 ## Architecture
@@ -61,6 +79,39 @@ This is a **library** (not a standalone Phoenix app) that provides publishing/CM
 4. `route_module/0` provides additional admin and public routes
 5. Settings are persisted via `PhoenixKit.Settings` API (DB-backed in parent app)
 6. Permissions are declared via `permission_metadata/0` and checked via `Scope.has_module_access?/2`
+
+### File Layout
+
+```
+lib/phoenix_kit_publishing/
+├── publishing.ex              # Main facade (PhoenixKit.Module behaviour)
+├── activity_log.ex            # Thin wrapper around PhoenixKit.Activity.log/1
+├── constants.ex               # @valid_modes, default_title, max lengths, etc.
+├── db_storage.ex              # Direct Ecto CRUD layer (RepoHelper)
+├── db_storage/
+│   └── mapper.ex              # struct → map projections (post + listing payloads)
+├── groups.ex                  # Group CRUD context (delegates to DBStorage)
+├── posts.ex                   # Post CRUD + save pipeline (legacy promotion, audit batching)
+├── versions.ex                # Version create/publish/archive
+├── translation_manager.ex     # Add/delete languages + AI translate dispatch
+├── language_helpers.ex        # Dialect resolution, enabled-language gating
+├── slug_helpers.ex            # Slug generation + URL-safe sanitisation
+├── presence.ex                # Phoenix.Presence for the editor
+├── presence_helpers.ex        # Owner/spectator locking helpers
+├── pubsub.ex                  # Real-time broadcast helpers (groups/posts/editor forms)
+├── routes.ex                  # admin_locale_routes/0, admin_routes/0, public routes
+├── shared.ex                  # Cross-module helpers (audit_metadata, parse_timestamp_path)
+├── stale_fixer.ex             # Self-healing: language normalize, slug uniqueness, active version
+├── listing_cache.ex           # :persistent_term cache (~0.1us reads)
+├── renderer.ex                # Earmark + ETS render cache (6h TTL)
+├── page_builder.ex            # Saxy XML parser for PHK components
+├── page_builder/              # Per-component renderers (Image, Hero, CTA, ...)
+├── metadata.ex                # YAML frontmatter parsing helpers
+├── schemas/                   # 4 Ecto schemas (group, post, version, content)
+├── web/                       # 8 admin LiveViews + Controller + HTML templates
+├── workers/                   # Oban background jobs (translate worker)
+└── migrations/                # Standalone consolidated migration (reference)
+```
 
 ### Database Tables
 
@@ -112,9 +163,34 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **Public URL building** — always go through `PublishingHTML.group_listing_path/3` / `build_post_url/4` / `build_public_path_with_time/4`; never hand-roll prefix logic in admin templates (see Issue #7)
 - **Language normalization on read** — `Posts.read_post/4` and the slug finders retry through the legacy base language on `:not_found` and fix stale content in place via `StaleFixer`. Don't pre-check for staleness on the hot path — the retry-on-miss pattern keeps healthy reads at one query
 
+## Routing: Single Page vs Multi-Page
+
+> ⚠️ **Never hand-register plugin LiveView routes in the parent app's `router.ex`.** PhoenixKit injects module routes into its own `live_session :phoenix_kit_admin` automatically. A hand-written route sits outside that session, which (a) loses the admin layout — `:phoenix_kit_ensure_admin` only applies it inside the session — and (b) crashes the socket on navigation between admin pages (`navigate event failed because you are redirecting across live_sessions`).
+
+Publishing uses the **route module** pattern via `Publishing.Routes`. Both `admin_locale_routes/0` and `admin_routes/0` declare every admin LiveView path (the localized variant gets `:locale` segment + `_localized` `:as` aliases). Tabs in `admin_tabs/0` carry only the parent-level Publishing entry; per-page routes come from the route module so we can express the full Listing/Editor/Preview/PostShow tree (including dynamic `:group` / `:post_uuid` segments) without enumerating each as a `Tab` struct.
+
+Public routes (the Controller's `show/2`, `index/2`, `all_groups/2`) live in `Publishing.Routes.public_routes/1` — NOT in `generate/1`. Catch-all paths must go in `public_routes/1` because routes in `generate/1` are placed early and would intercept `/admin/*` paths.
+
+The `regex` constraint on `:group` (`~r/^(?!admin$|assets$|images$|fonts$|js$|css$|favicon)/`) prevents the `/:group/*path` catch-all from swallowing assets and admin URLs.
+
 ## Activity Logging
 
-Self-healing mutations (not initiated by a user click) are logged via `PhoenixKit.Modules.Publishing.ActivityLog.log/1` — a thin wrapper around `PhoenixKit.Activity.log/1` guarded with `Code.ensure_loaded?/1` so the module stays usable without the Activity context.
+Mutations route through `PhoenixKit.Modules.Publishing.ActivityLog.log/1` — a thin wrapper around `PhoenixKit.Activity.log/1` that injects `module: "publishing"`, guards with `Code.ensure_loaded?/1`, and rescues exceptions inside (audit failures must never crash the primary mutation). The wrapper lives at `lib/phoenix_kit_publishing/activity_log.ex`.
+
+Pattern for new call sites:
+
+```elixir
+ActivityLog.log(%{
+  action: "publishing.<resource>.<verb>",  # e.g. "publishing.post.created"
+  mode: "manual",                          # "manual" for user-driven, "auto" for self-healing
+  actor_uuid: actor_uuid,                  # nil for "auto" rows
+  resource_type: "publishing_post",
+  resource_uuid: post.uuid,
+  metadata: %{ ... PII-safe keys only ... }
+})
+```
+
+Currently auto-logged self-healing events:
 
 Current auto-events:
 
@@ -126,6 +202,48 @@ Current auto-events:
 | `publishing.content.metadata_promoted` | Legacy V1 content.data keys (`description`, `featured_image_uuid`, `seo_title`, `excerpt`) promoted to `version.data` on first edit so the V2 whitelist (`previous_url_slugs`, `updated_by_uuid`, `custom_css`) can wipe content.data without losing the value. Metadata: `language`, `version_uuid`, `promoted_keys`. Self-healing — runs at most once per legacy row | `publishing_content` |
 
 All four run with `mode: "auto"` and no `actor_uuid` — they're system-triggered, not user-initiated. Metadata includes `from_language`/`to_language`/`version_uuid`.
+
+### User-driven CRUD events
+
+Every mutating context function in Posts / Groups / Versions / TranslationManager logs a corresponding `mode: "manual"` row via `ActivityLog.log_manual/5`. The full list:
+
+| action | resource_type |
+|--------|---------------|
+| `publishing.post.created` | `publishing_post` |
+| `publishing.post.updated` | `publishing_post` |
+| `publishing.post.trashed` | `publishing_post` |
+| `publishing.post.restored` | `publishing_post` |
+| `publishing.post.unpublished` | `publishing_post` |
+| `publishing.group.created` | `publishing_group` |
+| `publishing.group.updated` | `publishing_group` |
+| `publishing.group.trashed` | `publishing_group` |
+| `publishing.group.restored` | `publishing_group` |
+| `publishing.group.deleted` | `publishing_group` |
+| `publishing.version.created` | `publishing_version` |
+| `publishing.version.published` | `publishing_version` |
+| `publishing.version.deleted` | `publishing_version` |
+| `publishing.translation.added` | `publishing_content` |
+| `publishing.translation.deleted` | `publishing_content` |
+| `publishing.module.enabled` | `publishing_module` |
+| `publishing.module.disabled` | `publishing_module` |
+
+Mutating context fns accept `opts \\ []` (or already accept it) and pull `actor_uuid` out via `ActivityLog.actor_uuid/1`. `update_post/4` additionally falls back to the audit-metadata path's `:updated_by_uuid` when no explicit `actor_uuid` opt is present, so legacy LV callers that only thread `:scope` continue to attribute correctly.
+
+Caller pattern from a LiveView (admin pages):
+
+```elixir
+defp actor_opts(socket) do
+  case socket.assigns[:phoenix_kit_current_scope] do
+    %{user: %{uuid: uuid}} -> [actor_uuid: uuid]
+    _ -> []
+  end
+end
+
+# in handle_event/3:
+Posts.trash_post(group_slug, post_uuid, actor_opts(socket))
+```
+
+Module enable/disable runs without an actor (`actor_uuid: nil`) since it can be triggered from IEx as well as the UI; if you need attribution add it from the admin LV before calling `enable_system/0`.
 
 ## Settings Keys
 
@@ -216,9 +334,14 @@ PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` direct
 ## External Dependencies
 
 - **PhoenixKit** (`~> 1.7`) — Module behaviour, Settings API, shared components, RepoHelper
+- **PhoenixKitAI** (`~> 0.1`) — AI translation dispatch (OpenRouter via core's `AI.ask_with_prompt/4`)
 - **Phoenix LiveView** (`~> 1.0`) — Admin LiveViews
 - **Earmark** (`~> 1.4`) — Markdown rendering (GFM)
 - **Saxy** (`~> 1.5`) — XML parsing for PHK page builder components
 - **Oban** (`~> 2.18`) — Background translation and migration workers
 - **Req** (via PhoenixKit) — HTTP client for AI translation
 - **Jason** (via PhoenixKit) — JSON encoding/decoding
+
+## Two Module Types
+
+Publishing is a **full-featured** module: admin tabs, route module, DB-backed schemas, settings, public Controller, Oban workers, real-time Presence/PubSub, multi-layer caching. The contrasting **headless** type (functions/API only, no UI) still gets auto-discovery, toggles, and permissions — see `phoenix_kit_ai` for that shape.

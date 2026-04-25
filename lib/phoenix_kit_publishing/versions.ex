@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
 
   require Logger
 
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
@@ -207,6 +208,19 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     case tx_result do
       {:ok, _} ->
         broadcast_publish(group_slug, db_post.uuid, version, opts)
+
+        ActivityLog.log_manual(
+          "publishing.version.published",
+          ActivityLog.actor_uuid(opts),
+          "publishing_version",
+          db_post.uuid,
+          %{
+            "group_slug" => group_slug,
+            "post_uuid" => db_post.uuid,
+            "version_number" => version
+          }
+        )
+
         :ok
 
       {:error, reason} ->
@@ -281,6 +295,14 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           source_id
         )
 
+        ActivityLog.log_manual(
+          "publishing.post.unpublished",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          db_post.uuid,
+          %{"group_slug" => group_slug}
+        )
+
         :ok
 
       {:error, reason} ->
@@ -323,8 +345,9 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
 
   Returns :ok on success or {:error, reason} on failure.
   """
-  @spec delete_version(String.t(), String.t(), integer()) :: :ok | {:error, term()}
-  def delete_version(group_slug, post_uuid, version) do
+  @spec delete_version(String.t(), String.t(), integer(), keyword() | map()) ::
+          :ok | {:error, term()}
+  def delete_version(group_slug, post_uuid, version, opts \\ []) do
     with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
          db_version when not is_nil(db_version) <- DBStorage.get_version(db_post.uuid, version),
          :ok <- validate_version_deletable(db_post, db_version) do
@@ -335,6 +358,19 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           ListingCache.regenerate(group_slug)
           PublishingPubSub.broadcast_version_deleted(group_slug, broadcast_id, version)
           PublishingPubSub.broadcast_post_version_deleted(group_slug, broadcast_id, version)
+
+          ActivityLog.log_manual(
+            "publishing.version.deleted",
+            ActivityLog.actor_uuid(opts),
+            "publishing_version",
+            db_version.uuid,
+            %{
+              "group_slug" => group_slug,
+              "post_uuid" => db_post.uuid,
+              "version_number" => version
+            }
+          )
+
           :ok
 
         {:error, reason} ->
@@ -419,6 +455,20 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
            Shared.read_back_post(group_slug, post_uuid, db_post, nil, db_version.version_number) do
       ListingCache.regenerate(group_slug)
       broadcast_version_created(group_slug, db_post.uuid, post)
+
+      ActivityLog.log_manual(
+        "publishing.version.created",
+        ActivityLog.actor_uuid(opts) || created_by_uuid,
+        "publishing_version",
+        db_version.uuid,
+        %{
+          "group_slug" => group_slug,
+          "post_uuid" => db_post.uuid,
+          "version_number" => db_version.version_number,
+          "source_version" => source_version
+        }
+      )
+
       {:ok, post}
     end
   end
