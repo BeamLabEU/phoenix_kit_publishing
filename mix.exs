@@ -67,7 +67,10 @@ defmodule PhoenixKitPublishing.MixProject do
       # Code quality (dev/test only)
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+
+      # LiveView test parser (test only)
+      {:lazy_html, "~> 0.1", only: :test}
     ]
   end
 

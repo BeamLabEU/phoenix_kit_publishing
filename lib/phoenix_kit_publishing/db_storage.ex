@@ -17,6 +17,9 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   require Logger
 
+  @typep changeset_or_struct(struct) ::
+           {:ok, struct} | {:error, Ecto.Changeset.t()}
+
   defp repo, do: PhoenixKit.RepoHelper.repo()
 
   # ===========================================================================
@@ -24,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   # ===========================================================================
 
   @doc "Creates a publishing group."
+  @spec create_group(map()) :: changeset_or_struct(PublishingGroup.t())
   def create_group(attrs) do
     %PublishingGroup{}
     |> PublishingGroup.changeset(attrs)
@@ -31,6 +35,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Updates a publishing group."
+  @spec update_group(PublishingGroup.t(), map()) :: changeset_or_struct(PublishingGroup.t())
   def update_group(%PublishingGroup{} = group, attrs) do
     group
     |> PublishingGroup.changeset(attrs)
@@ -38,16 +43,19 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Gets a group by slug."
+  @spec get_group_by_slug(String.t()) :: PublishingGroup.t() | nil
   def get_group_by_slug(slug) do
     repo().get_by(PublishingGroup, slug: slug)
   end
 
   @doc "Gets a group by UUID."
+  @spec get_group(String.t()) :: PublishingGroup.t() | nil
   def get_group(uuid) do
     repo().get(PublishingGroup, uuid)
   end
 
   @doc "Lists groups ordered by position. Filters by status (default: active only)."
+  @spec list_groups(String.t() | nil) :: [PublishingGroup.t()]
   def list_groups(status \\ "active") do
     query = from(g in PublishingGroup, order_by: [asc: g.position, asc: g.name])
 
@@ -60,16 +68,19 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Trashes a group by setting status to 'trashed'."
+  @spec trash_group(PublishingGroup.t()) :: changeset_or_struct(PublishingGroup.t())
   def trash_group(%PublishingGroup{} = group) do
     update_group(group, %{status: "trashed"})
   end
 
   @doc "Restores a trashed group by setting status to 'active'."
+  @spec restore_group(PublishingGroup.t()) :: changeset_or_struct(PublishingGroup.t())
   def restore_group(%PublishingGroup{} = group) do
     update_group(group, %{status: "active"})
   end
 
   @doc "Upserts a group by slug."
+  @spec upsert_group(map()) :: changeset_or_struct(PublishingGroup.t())
   def upsert_group(attrs) do
     slug = Map.get(attrs, :slug) || Map.get(attrs, "slug")
 
@@ -80,6 +91,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Deletes a group and all its posts (cascade)."
+  @spec delete_group(PublishingGroup.t()) :: changeset_or_struct(PublishingGroup.t())
   def delete_group(%PublishingGroup{} = group) do
     repo().delete(group)
   end
@@ -89,6 +101,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   # ===========================================================================
 
   @doc "Creates a post within a group."
+  @spec create_post(map()) :: changeset_or_struct(PublishingPost.t())
   def create_post(attrs) do
     %PublishingPost{}
     |> PublishingPost.changeset(attrs)
@@ -96,6 +109,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Updates a post."
+  @spec update_post(PublishingPost.t(), map()) :: changeset_or_struct(PublishingPost.t())
   def update_post(%PublishingPost{} = post, attrs) do
     post
     |> PublishingPost.changeset(attrs)
@@ -109,6 +123,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   read from the in-memory association instead of issuing a second query — the
   read-then-resolve hot path becomes a single round trip.
   """
+  @spec get_post(String.t(), String.t()) :: PublishingPost.t() | nil
   def get_post(group_slug, post_slug) do
     from(p in PublishingPost,
       join: g in assoc(p, :group),
@@ -125,6 +140,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   and new posts are stored with seconds zeroed. For older posts with non-zero
   seconds, falls back to hour:minute matching.
   """
+  @spec get_post_by_datetime(String.t(), Date.t(), Time.t() | nil) :: PublishingPost.t() | nil
   def get_post_by_datetime(group_slug, %Date{} = date, nil) do
     # Date-only lookup — return the first post on this date (by time asc)
     # Preload :active_version (see get_post/2 docstring).
@@ -181,6 +197,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Gets a post by UUID with preloads."
+  @spec get_post_by_uuid(String.t(), list(atom() | tuple())) :: PublishingPost.t() | nil
   def get_post_by_uuid(uuid, preloads \\ []) do
     PublishingPost
     |> repo().get(uuid)
@@ -188,6 +205,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Lists posts in a group, optionally filtered by status. Excludes trashed by default."
+  @spec list_posts(String.t(), String.t() | nil) :: [PublishingPost.t()]
   def list_posts(group_slug, status \\ nil) do
     # Base query has no trashed_at filter — each status branch adds its own.
     # Composing additively means future base-query refinements (e.g. extra
@@ -218,6 +236,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   defp filter_by_status(query, _), do: where(query, [p], is_nil(p.trashed_at))
 
   @doc "Counts non-trashed posts in a group."
+  @spec count_posts(String.t()) :: non_neg_integer()
   def count_posts(group_slug) do
     from(p in PublishingPost,
       join: g in assoc(p, :group),
@@ -236,6 +255,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   `%PublishingPost{}` structs with `:group` preloaded; no version/content
   metadata (callers re-read what they need).
   """
+  @spec stream_posts(String.t()) :: Enumerable.t()
   def stream_posts(group_slug) do
     from(p in PublishingPost,
       join: g in assoc(p, :group),
@@ -251,6 +271,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   Options:
     * `:date` - Filter to a specific date (Date struct or ISO 8601 string)
   """
+  @spec list_posts_timestamp_mode(String.t(), String.t() | nil, keyword()) :: [PublishingPost.t()]
   def list_posts_timestamp_mode(group_slug, status \\ nil, opts \\ []) do
     query =
       from(p in PublishingPost,
@@ -283,6 +304,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Lists posts in slug mode (ordered by slug asc)."
+  @spec list_posts_slug_mode(String.t(), String.t() | nil) :: [PublishingPost.t()]
   def list_posts_slug_mode(group_slug, status \\ nil) do
     query =
       from(p in PublishingPost,
@@ -301,11 +323,13 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Finds a post by date and time (timestamp mode, matches hour:minute only)."
+  @spec find_post_by_date_time(String.t(), Date.t(), Time.t() | nil) :: PublishingPost.t() | nil
   def find_post_by_date_time(group_slug, date, time) do
     get_post_by_datetime(group_slug, date, time)
   end
 
   @doc "Trashes a post by setting trashed_at timestamp."
+  @spec trash_post(PublishingPost.t()) :: changeset_or_struct(PublishingPost.t())
   def trash_post(%PublishingPost{} = post) do
     post
     |> Ecto.Changeset.change(trashed_at: DateTime.utc_now() |> DateTime.truncate(:second))
@@ -313,6 +337,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Restores a trashed post by clearing trashed_at."
+  @spec restore_post(PublishingPost.t()) :: changeset_or_struct(PublishingPost.t())
   def restore_post(%PublishingPost{} = post) do
     post
     |> Ecto.Changeset.change(trashed_at: nil)
@@ -320,6 +345,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Hard-deletes a post and all its versions/contents (cascade)."
+  @spec delete_post(PublishingPost.t()) :: changeset_or_struct(PublishingPost.t())
   def delete_post(%PublishingPost{} = post) do
     repo().delete(post)
   end
@@ -329,6 +355,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   # ===========================================================================
 
   @doc "Creates a new version for a post."
+  @spec create_version(map()) :: changeset_or_struct(PublishingVersion.t())
   def create_version(attrs) do
     %PublishingVersion{}
     |> PublishingVersion.changeset(attrs)
@@ -336,6 +363,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Updates a version."
+  @spec update_version(PublishingVersion.t(), map()) :: changeset_or_struct(PublishingVersion.t())
   def update_version(%PublishingVersion{} = version, attrs) do
     version
     |> PublishingVersion.changeset(attrs)
@@ -343,6 +371,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Gets the latest version for a post."
+  @spec get_latest_version(String.t()) :: PublishingVersion.t() | nil
   def get_latest_version(post_uuid) do
     from(v in PublishingVersion,
       where: v.post_uuid == ^post_uuid,
@@ -360,6 +389,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   that received a hand-built struct working while letting the read paths
   short-circuit the second round trip.
   """
+  @spec get_active_version(PublishingPost.t()) :: PublishingVersion.t() | nil
   def get_active_version(%PublishingPost{} = post) do
     case post do
       %PublishingPost{active_version_uuid: nil} ->
@@ -374,6 +404,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Gets a specific version by post and version number."
+  @spec get_version(String.t(), pos_integer()) :: PublishingVersion.t() | nil
   def get_version(post_uuid, version_number) do
     repo().get_by(PublishingVersion,
       post_uuid: post_uuid,
@@ -382,6 +413,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Lists all versions for a post, ordered by version number."
+  @spec list_versions(String.t()) :: [PublishingVersion.t()]
   def list_versions(post_uuid) do
     from(v in PublishingVersion,
       where: v.post_uuid == ^post_uuid,
@@ -396,6 +428,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   Uses SELECT ... FOR UPDATE to lock the row and prevent concurrent reads
   from getting the same number.
   """
+  @spec next_version_number(String.t()) :: pos_integer()
   def next_version_number(post_uuid) do
     versions =
       from(v in PublishingVersion,
@@ -417,6 +450,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   Returns `{:ok, %PublishingVersion{}}` or `{:error, reason}`.
   """
+  @spec create_version_from(String.t(), pos_integer(), map() | keyword()) ::
+          {:ok, PublishingVersion.t()} | {:error, term()}
   def create_version_from(post_uuid, source_version_number, opts \\ %{}) do
     repo().transaction(fn ->
       source_version = get_version(post_uuid, source_version_number)
@@ -482,6 +517,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   # ===========================================================================
 
   @doc "Creates content for a version/language."
+  @spec create_content(map()) :: changeset_or_struct(PublishingContent.t())
   def create_content(attrs) do
     %PublishingContent{}
     |> PublishingContent.changeset(attrs)
@@ -489,6 +525,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Updates content."
+  @spec update_content(PublishingContent.t(), map()) :: changeset_or_struct(PublishingContent.t())
   def update_content(%PublishingContent{} = content, attrs) do
     content
     |> PublishingContent.changeset(attrs)
@@ -496,17 +533,21 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Deletes content."
+  @spec delete_content(PublishingContent.t()) :: changeset_or_struct(PublishingContent.t())
   def delete_content(%PublishingContent{} = content) do
     repo().delete(content)
   end
 
   @doc "Bulk-updates the status of all content rows for a version."
+  @spec update_content_status(String.t(), String.t()) :: {non_neg_integer(), nil}
   def update_content_status(version_uuid, new_status) do
     from(c in PublishingContent, where: c.version_uuid == ^version_uuid)
     |> repo().update_all(set: [status: new_status, updated_at: DateTime.utc_now()])
   end
 
   @doc "Bulk-updates the status of all content rows for a version, excluding a specific language."
+  @spec update_content_status_except(String.t(), String.t(), String.t()) ::
+          {non_neg_integer(), nil}
   def update_content_status_except(version_uuid, exclude_language, new_status) do
     from(c in PublishingContent,
       where: c.version_uuid == ^version_uuid and c.language != ^exclude_language
@@ -515,6 +556,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Gets content for a specific version and language."
+  @spec get_content(String.t(), String.t()) :: PublishingContent.t() | nil
   def get_content(version_uuid, language) do
     repo().get_by(PublishingContent,
       version_uuid: version_uuid,
@@ -523,6 +565,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Lists all content rows for a version."
+  @spec list_contents(String.t()) :: [PublishingContent.t()]
   def list_contents(version_uuid) do
     from(c in PublishingContent,
       where: c.version_uuid == ^version_uuid,
@@ -532,6 +575,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Lists available languages for a version."
+  @spec list_languages(String.t()) :: [String.t()]
   def list_languages(version_uuid) do
     from(c in PublishingContent,
       where: c.version_uuid == ^version_uuid,
@@ -542,6 +586,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Finds content by URL slug across all versions in a group. Excludes trashed posts."
+  @spec find_by_url_slug(String.t(), String.t(), String.t()) :: PublishingContent.t() | nil
   def find_by_url_slug(group_slug, language, url_slug) do
     find_by_custom_url_slug(group_slug, language, url_slug) ||
       find_by_post_slug_fallback(group_slug, language, url_slug)
@@ -575,6 +620,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Finds content by a previous URL slug (stored in data.previous_url_slugs JSONB array). Excludes trashed posts."
+  @spec find_by_previous_url_slug(String.t(), String.t(), String.t()) ::
+          PublishingContent.t() | nil
   def find_by_previous_url_slug(group_slug, language, url_slug) do
     from(c in PublishingContent,
       join: v in assoc(c, :version),
@@ -591,6 +638,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Clears a specific url_slug from all content rows of a post. Returns cleared language codes."
+  @spec clear_url_slug_from_post(String.t(), String.t(), String.t()) :: [String.t()]
   def clear_url_slug_from_post(group_slug, post_slug, url_slug_to_clear) do
     case get_post(group_slug, post_slug) do
       nil ->
@@ -616,6 +664,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc "Upserts content by version_id + language using ON CONFLICT."
+  @spec upsert_content(map()) :: changeset_or_struct(PublishingContent.t())
   def upsert_content(attrs) do
     changeset = PublishingContent.changeset(%PublishingContent{}, attrs)
 
@@ -635,6 +684,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   Returns a post map or nil if not found.
   """
+  @spec read_post(String.t(), String.t(), String.t() | nil, pos_integer() | nil) ::
+          {:ok, map()} | {:error, :not_found}
   def read_post(group_slug, post_slug, language \\ nil, version_number \\ nil) do
     with post when not is_nil(post) <- get_post(group_slug, post_slug),
          version when not is_nil(version) <- resolve_version(post, version_number),
@@ -651,6 +702,13 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   @doc """
   Reads a timestamp-mode post by date and time instead of slug.
   """
+  @spec read_post_by_datetime(
+          String.t(),
+          Date.t(),
+          Time.t() | nil,
+          String.t() | nil,
+          pos_integer() | nil
+        ) :: {:ok, map()} | {:error, :not_found}
   def read_post_by_datetime(group_slug, date, time, language \\ nil, version_number \\ nil) do
     with post when not is_nil(post) <- get_post_by_datetime(group_slug, date, time),
          version when not is_nil(version) <- resolve_version(post, version_number),
@@ -669,6 +727,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   Returns a list of post maps suitable for listing pages.
   """
+  @spec list_posts_with_metadata(String.t(), String.t() | nil) :: [map()]
   def list_posts_with_metadata(group_slug, status \\ nil) do
     posts = if status, do: list_posts(group_slug, status), else: list_posts(group_slug)
     post_uuids = Enum.map(posts, & &1.uuid)
@@ -724,6 +783,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   only excerpts. Designed for caching in `:persistent_term` where data is copied
   to the reading process heap — keeping entries small matters.
   """
+  @spec list_posts_for_listing(String.t()) :: [map()]
   def list_posts_for_listing(group_slug) do
     posts = list_posts(group_slug)
     post_uuids = Enum.map(posts, & &1.uuid)
@@ -813,6 +873,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   Fallback chain: exact language match → site default language → first available.
   """
+  @spec resolve_content([PublishingContent.t()], String.t() | nil) :: PublishingContent.t() | nil
   def resolve_content(contents, nil) do
     default = LanguageHelpers.get_primary_language()
 
@@ -852,6 +913,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc false
+  @spec batch_load_versions([String.t()]) :: %{optional(String.t()) => [PublishingVersion.t()]}
   def batch_load_versions([]), do: %{}
 
   def batch_load_versions(post_uuids) do
@@ -864,6 +926,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc false
+  @spec batch_load_contents([String.t()]) :: %{optional(String.t()) => [PublishingContent.t()]}
   def batch_load_contents([]), do: %{}
 
   def batch_load_contents(version_uuids) do

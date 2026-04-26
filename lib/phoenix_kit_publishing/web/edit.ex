@@ -63,12 +63,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          |> put_flash(:info, gettext("Group updated"))
          |> push_navigate(to: Routes.path("/admin/publishing/#{updated_group["slug"]}"))}
 
-      {:error, :already_exists} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("Another group already uses that slug."))
-         |> assign(:form, Component.to_form(params, as: :group))}
-
       {:error, :invalid_name} ->
         {:noreply,
          socket
@@ -86,20 +80,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          )
          |> assign(:form, Component.to_form(params, as: :group))}
 
-      {:error, :destination_exists} ->
+      {:error, :not_found} ->
         {:noreply,
          socket
-         |> put_flash(:error, gettext("Another group already uses that slug."))
-         |> assign(:form, Component.to_form(params, as: :group))}
-
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           gettext("Failed to update group: %{reason}", reason: inspect(reason))
-         )
-         |> assign(:form, Component.to_form(params, as: :group))}
+         |> put_flash(:error, gettext("Group not found"))
+         |> push_navigate(to: Routes.path("/admin/publishing"))}
     end
   rescue
     # Narrow to the realistic failure classes (DB errors, optimistic-lock

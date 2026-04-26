@@ -566,9 +566,6 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
         Logger.debug("[TranslatePostWorker] add_language_to_post succeeded for #{language}")
         update_translation_post(new_post, opts)
 
-      {:error, :already_exists} ->
-        handle_existing_translation(opts)
-
       {:error, reason} ->
         Logger.error(
           "[TranslatePostWorker] Failed to create #{language} translation: #{inspect(reason)}"
@@ -605,28 +602,6 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
       {:error, reason} ->
         Logger.error(
           "[TranslatePostWorker] Failed to update #{language} translation: #{inspect(reason)}"
-        )
-
-        {:error, reason}
-    end
-  end
-
-  defp handle_existing_translation(opts) do
-    %{
-      post_uuid: post_uuid,
-      language: language,
-      version: version
-    } = opts
-
-    Logger.info("[TranslatePostWorker] Translation already exists for #{language}, updating...")
-
-    case Publishing.read_post_by_uuid(post_uuid, language, version) do
-      {:ok, existing_post} ->
-        update_translation_post(existing_post, opts)
-
-      {:error, reason} ->
-        Logger.error(
-          "[TranslatePostWorker] Failed to read existing #{language} translation: #{inspect(reason)}"
         )
 
         {:error, reason}

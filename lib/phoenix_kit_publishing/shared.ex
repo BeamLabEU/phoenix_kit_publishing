@@ -18,6 +18,7 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   @uuid_regex ~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
   @doc false
+  @spec uuid_format?(term()) :: boolean()
   def uuid_format?(str) when is_binary(str), do: Regex.match?(@uuid_regex, str)
   def uuid_format?(_), do: false
 
@@ -26,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   # ============================================================================
 
   @doc false
+  @spec fetch_option(map() | keyword() | nil, atom()) :: term()
   def fetch_option(opts, key) when is_map(opts) do
     Map.get(opts, key) || Map.get(opts, Atom.to_string(key))
   end
@@ -37,6 +39,7 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   def fetch_option(_, _), do: nil
 
   @doc false
+  @spec audit_metadata(term() | nil, :create | :update) :: map()
   def audit_metadata(nil, _action), do: %{}
 
   def audit_metadata(scope, action) do
@@ -80,6 +83,7 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   # ============================================================================
 
   @doc false
+  @spec resolve_scope_user_uuids(term() | nil) :: String.t() | nil
   def resolve_scope_user_uuids(nil), do: nil
 
   def resolve_scope_user_uuids(scope) do
@@ -97,6 +101,8 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
 
   Used after create/update operations to return a consistent post map.
   """
+  @spec read_back_post(String.t(), term(), term() | nil, String.t() | nil, pos_integer() | nil) ::
+          {:ok, map()} | {:error, :not_found}
   def read_back_post(group_slug, identifier, db_post, language, version_number) do
     case resolve_read_strategy(db_post, identifier) do
       {:timestamp, date, time} ->
@@ -137,6 +143,8 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   # ============================================================================
 
   @doc false
+  @spec parse_timestamp_path(String.t()) ::
+          {:ok, Date.t(), Time.t() | nil, pos_integer() | nil, String.t() | nil} | nil
   def parse_timestamp_path(identifier) do
     parts =
       identifier
@@ -171,9 +179,9 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   defp extract_lang_from_parts([]), do: nil
   defp extract_lang_from_parts([<<>> | _]), do: nil
   defp extract_lang_from_parts([lang_code | _]), do: lang_code
-  defp extract_lang_from_parts(_), do: nil
 
   @doc false
+  @spec parse_time(term()) :: {:ok, Time.t()} | :error
   def parse_time(time_str) when is_binary(time_str) do
     case String.split(time_str, ":") do
       [h, m] ->
@@ -192,6 +200,7 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   def parse_time(_), do: :error
 
   @doc false
+  @spec extract_version_from_parts([String.t()]) :: {pos_integer() | nil, [String.t()]}
   def extract_version_from_parts([]), do: {nil, []}
 
   def extract_version_from_parts([first | rest] = parts) do
@@ -202,6 +211,7 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   end
 
   @doc false
+  @spec parse_version_segment(term()) :: {:ok, pos_integer()} | :error
   def parse_version_segment(segment) when is_binary(segment) do
     case Regex.run(~r/^v(\d+)$/, segment) do
       [_, num_str] -> {:ok, String.to_integer(num_str)}
@@ -216,6 +226,8 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   # ============================================================================
 
   @doc false
+  @spec resolve_db_version(map(), pos_integer() | nil) ::
+          PhoenixKit.Modules.Publishing.PublishingVersion.t() | nil
   def resolve_db_version(db_post, nil), do: DBStorage.get_latest_version(db_post.uuid)
 
   def resolve_db_version(db_post, version_number),

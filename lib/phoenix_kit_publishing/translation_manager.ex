@@ -81,11 +81,6 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       nil ->
         {:error, :not_found}
 
-      %PhoenixKit.Modules.Publishing.PublishingContent{} = _existing ->
-        db_post = DBStorage.get_post_by_uuid(post_uuid, [:group])
-        resolved_version = resolve_version_number(db_post, version_number)
-        Shared.read_back_post(group_slug, post_uuid, db_post, language_code, resolved_version)
-
       {:error, reason} ->
         {:error, reason}
     end
@@ -96,18 +91,6 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       )
 
       {:error, :not_found}
-  end
-
-  defp resolve_version_number(_db_post, version_number) when not is_nil(version_number),
-    do: version_number
-
-  defp resolve_version_number(nil, _), do: nil
-
-  defp resolve_version_number(db_post, _) do
-    case DBStorage.get_latest_version(db_post.uuid) do
-      nil -> nil
-      v -> v.version_number
-    end
   end
 
   defp ensure_language_content(version_uuid, language_code) do

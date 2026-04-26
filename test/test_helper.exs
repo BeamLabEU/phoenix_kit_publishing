@@ -74,6 +74,25 @@ repo_available =
       )
       """)
 
+      # Create minimal phoenix_kit_activities table — schema mirrors core's
+      # V90 migration so PhoenixKit.Activity.log/1 INSERTs land cleanly
+      # instead of crashing the sandbox transaction with `relation does
+      # not exist`. ActivityLogAssertions queries this table directly.
+      TestRepo.query!("""
+      CREATE TABLE IF NOT EXISTS phoenix_kit_activities (
+        uuid UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+        action VARCHAR(100) NOT NULL,
+        module VARCHAR(50),
+        mode VARCHAR(20),
+        actor_uuid UUID,
+        resource_type VARCHAR(50),
+        resource_uuid UUID,
+        target_uuid UUID,
+        metadata JSONB DEFAULT '{}',
+        inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+      """)
+
       # Run the publishing migration to set up tables.
       # The migration module has up/1 (takes opts), so wrap it for Ecto.Migrator.
       defmodule PhoenixKitPublishing.Test.SetupMigration do

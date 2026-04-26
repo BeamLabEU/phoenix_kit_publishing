@@ -40,6 +40,9 @@ defmodule PhoenixKitPublishing.Test.Layouts do
 
     ~H"""
     <main data-current-user-email={@current_user_email}>
+      <div :if={msg = Phoenix.Flash.get(@flash || %{}, :info)} id="flash-info">{msg}</div>
+      <div :if={msg = Phoenix.Flash.get(@flash || %{}, :error)} id="flash-error">{msg}</div>
+      <div :if={msg = Phoenix.Flash.get(@flash || %{}, :warning)} id="flash-warning">{msg}</div>
       {@inner_content}
     </main>
     """

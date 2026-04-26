@@ -294,7 +294,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   def get_group_mode(group_slug) do
     case DBStorage.get_group_by_slug(group_slug) do
       nil -> @default_group_mode
-      db_group -> db_group.mode || @default_group_mode
+      db_group -> db_group.mode
     end
   end
 

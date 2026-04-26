@@ -539,17 +539,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
      )}
   end
 
-  defp handle_post_in_place_error(socket, :invalid_slug) do
-    {:noreply,
-     Phoenix.LiveView.put_flash(
-       socket,
-       :error,
-       gettext(
-         "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
-       )
-     )}
-  end
-
   defp handle_post_in_place_error(socket, :slug_already_exists) do
     {:noreply,
      Phoenix.LiveView.put_flash(
@@ -637,17 +626,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
        :error,
        gettext(
          "This slug is reserved because it's a language code (like 'en', 'es', 'fr'). Please choose a different slug to avoid routing conflicts."
-       )
-     )}
-  end
-
-  defp handle_post_update_error(socket, :invalid_slug) do
-    {:noreply,
-     Phoenix.LiveView.put_flash(
-       socket,
-       :error,
-       gettext(
-         "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
        )
      )}
   end
