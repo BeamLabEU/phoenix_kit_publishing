@@ -915,23 +915,25 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     content_data = (existing_content && existing_content.data) || %{}
     version_data = version.data || %{}
 
-    @legacy_promotable_keys
-    |> Enum.reduce(%{}, fn key, acc ->
-      case Map.fetch(content_data, key) do
-        {:ok, value} ->
-          if Map.has_key?(version_data, key), do: acc, else: Map.put(acc, key, value)
-
-        :error ->
-          acc
-      end
+    Enum.reduce(@legacy_promotable_keys, %{}, fn key, acc ->
+      maybe_promote_key(acc, key, content_data, version_data)
     end)
+  end
+
+  defp maybe_promote_key(acc, key, content_data, version_data) do
+    with {:ok, value} <- Map.fetch(content_data, key),
+         false <- Map.has_key?(version_data, key) do
+      Map.put(acc, key, value)
+    else
+      _ -> acc
+    end
   end
 
   defp log_legacy_metadata_promoted(promotions, _version, _language) when promotions == %{},
     do: :ok
 
   defp log_legacy_metadata_promoted(promotions, version, language) do
-    PhoenixKit.Modules.Publishing.ActivityLog.log(%{
+    ActivityLog.log(%{
       action: "publishing.content.metadata_promoted",
       mode: "auto",
       resource_type: "publishing_content",

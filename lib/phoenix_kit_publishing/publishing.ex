@@ -20,6 +20,7 @@ defmodule PhoenixKit.Modules.Publishing do
 
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Modules.Languages
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.SlugHelpers
@@ -217,7 +218,7 @@ defmodule PhoenixKit.Modules.Publishing do
     result = settings_call(:update_boolean_setting, [@publishing_enabled_key, true])
 
     with {:ok, _} <- result do
-      PhoenixKit.Modules.Publishing.ActivityLog.log_manual(
+      ActivityLog.log_manual(
         "publishing.module.enabled",
         nil,
         "publishing_module",
@@ -235,7 +236,7 @@ defmodule PhoenixKit.Modules.Publishing do
     result = settings_call(:update_boolean_setting, [@publishing_enabled_key, false])
 
     with {:ok, _} <- result do
-      PhoenixKit.Modules.Publishing.ActivityLog.log_manual(
+      ActivityLog.log_manual(
         "publishing.module.disabled",
         nil,
         "publishing_module",

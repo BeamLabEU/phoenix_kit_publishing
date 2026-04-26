@@ -169,11 +169,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   """
   @spec truncate_for_log(term(), pos_integer()) :: String.t()
   def truncate_for_log(reason, max \\ @max_log_chars) when is_integer(max) and max > 0 do
-    string =
-      cond do
-        is_binary(reason) -> reason
-        true -> inspect(reason)
-      end
+    string = if is_binary(reason), do: reason, else: inspect(reason)
 
     if byte_size(string) > max do
       String.slice(string, 0, max) <>

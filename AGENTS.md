@@ -175,20 +175,57 @@ The `regex` constraint on `:group` (`~r/^(?!admin$|assets$|images$|fonts$|js$|cs
 
 ## Activity Logging
 
-Mutations route through `PhoenixKit.Modules.Publishing.ActivityLog.log/1` — a thin wrapper around `PhoenixKit.Activity.log/1` that injects `module: "publishing"`, guards with `Code.ensure_loaded?/1`, and rescues exceptions inside (audit failures must never crash the primary mutation). The wrapper lives at `lib/phoenix_kit_publishing/activity_log.ex`.
+Mutations route through `PhoenixKit.Modules.Publishing.ActivityLog` — a thin wrapper around `PhoenixKit.Activity.log/1` that injects `module: "publishing"`, guards with `Code.ensure_loaded?/1`, and rescues `Postgrex.Error` (the missing-`phoenix_kit_activities`-table case) silently plus all other exceptions with a `Logger.warning`. Audit failures must never crash the primary mutation.
+
+The wrapper exposes three call shapes:
+
+```elixir
+# Standard "user-driven mutation" — used by every CRUD context fn.
+ActivityLog.log_manual(action, actor_uuid, resource_type, resource_uuid, metadata)
+
+# Extracts `:actor_uuid` from opts (keyword or map). Returns nil when the
+# key isn't present — context fns thread this through every mutation.
+ActivityLog.actor_uuid(opts)
+
+# Raw map shape (used by the self-healing auto-events).
+ActivityLog.log(%{action: …, mode: "auto", resource_type: …, resource_uuid: …, metadata: …})
+```
 
 Pattern for new call sites:
 
 ```elixir
-ActivityLog.log(%{
-  action: "publishing.<resource>.<verb>",  # e.g. "publishing.post.created"
-  mode: "manual",                          # "manual" for user-driven, "auto" for self-healing
-  actor_uuid: actor_uuid,                  # nil for "auto" rows
-  resource_type: "publishing_post",
-  resource_uuid: post.uuid,
-  metadata: %{ ... PII-safe keys only ... }
-})
+def my_mutation(arg, opts \\ []) do
+  case do_mutation(arg) do
+    {:ok, record} = result ->
+      ActivityLog.log_manual(
+        "publishing.<resource>.<verb>",
+        ActivityLog.actor_uuid(opts),
+        "publishing_<resource>",
+        record.uuid,
+        %{... PII-safe keys only ...}
+      )
+
+      result
+
+    other ->
+      other
+  end
+end
 ```
+
+LiveView callers thread the actor UUID via `Shared.actor_uuid_from_socket/1`:
+
+```elixir
+def handle_event("trash_post", %{"uuid" => post_uuid}, socket) do
+  case Publishing.trash_post(group_slug, post_uuid,
+         actor_uuid: Shared.actor_uuid_from_socket(socket)
+       ) do
+    ...
+  end
+end
+```
+
+Reading the actor in one place keeps `socket.assigns.phoenix_kit_current_scope.user.uuid` from being copy-pasted into every event handler.
 
 Currently auto-logged self-healing events:
 
@@ -245,6 +282,21 @@ Posts.trash_post(group_slug, post_uuid, actor_opts(socket))
 
 Module enable/disable runs without an actor (`actor_uuid: nil`) since it can be triggered from IEx as well as the UI; if you need attribution add it from the admin LV before calling `enable_system/0`.
 
+## Errors module
+
+`PhoenixKit.Modules.Publishing.Errors` is the central atom→user-facing-string dispatcher. Every public-API error tuple in the module either returns one of the documented atoms (`@type error_atom` lists 36 of them) or one of four tagged tuples (`{:ai_translation_failed, _}`, `{:ai_extract_failed, _}`, `{:ai_request_failed, _}`, `{:source_post_read_failed, _}`). UI flash messages call `Errors.message/1` to translate via `gettext/1` from the `PhoenixKitWeb.Gettext` backend — keep the API layer locale-agnostic; let the UI decide presentation.
+
+`Errors.truncate_for_log/2` is the canonical way to render an opaque error reason inside `Logger.*` calls that target external HTTP responses or large AI payloads. Default budget 500 chars; appends `(truncated, N bytes)` so the log line is still grep-able.
+
+```elixir
+case AI.extract_content(response) do
+  {:ok, text} -> {:ok, text}
+  {:error, reason} -> {:error, {:ai_extract_failed, reason}}  # Errors.message/1 turns this into "Failed to extract AI response: …"
+end
+```
+
+Add new error atoms by extending `@type error_atom`, the doctest example, and adding a `def message(:new_atom), do: gettext(...)` clause. The per-atom test in `test/phoenix_kit_publishing/errors_test.exs` enforces that every atom has a documented English string.
+
 ## Settings Keys
 
 | Key | Default | Description |
@@ -271,12 +323,20 @@ mix test --only integration               # DB-backed tests only
 
 `phoenix_kit_publishing` has no endpoint of its own in production — the host app provides one. For controller tests we ship a tiny test endpoint + router + layouts under `test/support/`:
 
-- `PhoenixKitPublishing.Test.Endpoint` — minimal `Phoenix.Endpoint`
-- `PhoenixKitPublishing.Test.Router` — routes matching `Web.Controller.show/2`, plus an `:assign_test_scope` plug that mirrors the parent-app's `fetch_phoenix_kit_current_scope`
-- `PhoenixKitPublishing.Test.Layouts` — minimal root + parent layout stand-in (the test layout emits assign-derived markers so tests can verify forwarding)
-- `PhoenixKitPublishing.ConnCase` — ExUnit case template with sandbox checkout and a `with_scope/1` helper
+- `PhoenixKitPublishing.Test.Endpoint` — minimal `Phoenix.Endpoint` with a `Phoenix.LiveView.Socket` so LV tests work too
+- `PhoenixKitPublishing.Test.Router` — routes matching `Web.Controller.show/2`, plus admin LV routes wrapped in `live_session :admin_publishing` (and `:admin_publishing_settings`) with the `:assign_scope` on_mount hook
+- `PhoenixKitPublishing.Test.Layouts` — minimal root + parent layout stand-in. **`Layouts.app/1` renders flash divs** (`#flash-info`, `#flash-error`, `#flash-warning`) so LV tests can assert flash content via `render(view) =~ "..."`
+- `PhoenixKitPublishing.Test.Hooks` — `:assign_scope` `on_mount` hook that pulls `phoenix_kit_test_scope` out of the session (set via `LiveCase.put_test_scope/2`) and assigns `:phoenix_kit_current_scope` / `:phoenix_kit_current_user` / `:current_locale_base` / `:current_locale` / `:url_path` onto the socket — mirrors what core's auth hook does in production
+- `PhoenixKitPublishing.ConnCase` — ExUnit case template for controller tests; sandbox checkout + `with_scope/1` helper
+- `PhoenixKitPublishing.LiveCase` — ExUnit case template for LV smoke tests; sandbox in shared mode, `put_test_scope/2`, `fake_scope/1` helper
+- `PhoenixKitPublishing.ActivityLogAssertions` — `assert_activity_logged/2`, `refute_activity_logged/2`, `list_activities/0`. Imported into both DataCase and LiveCase. Queries `phoenix_kit_activities` directly via raw SQL; normalises Postgres's 16-byte UUIDs against the string UUIDs callers pass
 
-`config/test.exs` points `PhoenixKit.Config :layout` at the test layouts so `LayoutWrapper.app_layout` doesn't fall back to `PhoenixKitWeb.Layouts.root` (which requires `PhoenixKitWeb.Endpoint`). Reference test: `test/phoenix_kit_publishing/web/controller/show_layout_test.exs`.
+`config/test.exs` points `PhoenixKit.Config :layout` at the test layouts so `LayoutWrapper.app_layout` doesn't fall back to `PhoenixKitWeb.Layouts.root` (which requires `PhoenixKitWeb.Endpoint`). Reference tests:
+- Controller: `test/phoenix_kit_publishing/web/controller/show_layout_test.exs`
+- LiveView smoke: `test/phoenix_kit_publishing/web/settings_live_test.exs`
+- Activity log assertions: `test/phoenix_kit_publishing/integration/activity_logging_test.exs`
+
+`test_helper.exs` creates a minimal `phoenix_kit_activities` table that mirrors core's V90 migration so `PhoenixKit.Activity.log/1` INSERTs land cleanly instead of poisoning the sandbox transaction with `relation does not exist`.
 
 ## Pre-commit Commands
 
