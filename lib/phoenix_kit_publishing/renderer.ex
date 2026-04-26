@@ -198,6 +198,15 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   defp render_earmark_markdown(content) do
     content = normalize_markdown(content)
 
+    # Trust model: admin-authored Markdown can include inline HTML
+    # (`<div class="grid">…</div>` is a common authoring affordance).
+    # Earmark's `escape: true` would only cover literal-text HTML, not
+    # block-level passthrough — true XSS protection requires a sanitiser
+    # like html_sanitize_ex on the output. We keep `escape: false`
+    # explicitly so an admin who pastes a `<script>` tag would see it
+    # render as live HTML; this is the documented trust boundary.
+    # Re-evaluate if any non-admin-authored input reaches this path
+    # (API import, AI-translation prompt-injection on rotating roles).
     case Earmark.as_html(content, %Earmark.Options{
            code_class_prefix: "language-",
            smartypants: true,

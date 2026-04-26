@@ -154,7 +154,7 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
     test "single blank line is a normal paragraph break" do
       html = Renderer.render_markdown("Para 1\n\nPara 2")
       # Should produce exactly 2 paragraphs, no spacers
-      refute html =~ "&nbsp;"
+      refute html =~ " "
       assert html =~ "Para 1"
       assert html =~ "Para 2"
     end
