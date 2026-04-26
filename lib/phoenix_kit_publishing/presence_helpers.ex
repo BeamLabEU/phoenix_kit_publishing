@@ -8,6 +8,10 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
 
   alias PhoenixKit.Modules.Publishing.Presence
 
+  # Presence topic prefix — kept in one place so an audit can grep
+  # `@editing_topic_prefix` to find every editor-form topic site.
+  @editing_topic_prefix "publishing_edit"
+
   @doc """
   Tracks the current LiveView process in a Presence topic.
 
@@ -181,5 +185,5 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
       editing_topic("docs:my-post:en")
       # => "publishing_edit:docs:my-post:en"
   """
-  def editing_topic(form_key), do: "publishing_edit:#{form_key}"
+  def editing_topic(form_key), do: "#{@editing_topic_prefix}:#{form_key}"
 end

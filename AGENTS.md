@@ -405,3 +405,15 @@ PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` direct
 ## Two Module Types
 
 Publishing is a **full-featured** module: admin tabs, route module, DB-backed schemas, settings, public Controller, Oban workers, real-time Presence/PubSub, multi-layer caching. The contrasting **headless** type (functions/API only, no UI) still gets auto-discovery, toggles, and permissions — see `phoenix_kit_ai` for that shape.
+
+## What This Module Does NOT Have
+
+Deliberate non-features — surfacing here so future contributors don't try to add them under the assumption they were missed:
+
+- **No HTML sanitiser on Markdown output.** `Renderer` calls Earmark with `escape: false` so admin-authored `<div class="grid">` / inline HTML / `<script>` tags pass through. The trust boundary is "only admins author content"; if untrusted input ever reaches `render_markdown/1` (API import, AI prompt-injection on rotating roles), wire `html_sanitize_ex` in front of it. See `renderer.ex:201-209`.
+- **No outbound HTTP from this module.** AI translation dispatches via `phoenix_kit_ai` which owns the `Req` boundary (and its SSRF allowlist). If a future feature adds direct HTTP calls, the Req.Test-via-app-config pattern (see workspace AGENTS.md "Coverage push pattern #6") is the canonical retrofit.
+- **No per-language Mailer or webhook delivery.** Publishing exposes posts via the public Controller; subscriptions / notifications are Newsletters / Emails territory.
+- **No retry layer on AI translation failures.** `TranslationManager` returns `{:error, {:ai_translation_failed, reason}}` on the first failure; the user retries from the UI. Oban-backed retries would need backoff + actor attribution — out of scope.
+- **No editor-side conflict resolution beyond owner/spectator locking.** Two admins editing the same post in different tabs see Presence-driven indicators and the spectator's writes are blocked at the form level. There is no merge-on-conflict UX.
+- **No client-side undo stack.** Versions are the undo mechanism — every save creates an audit trail in `phoenix_kit_publishing_versions`.
+- **No frontend bundle.** Tailwind/daisyUI classes are emitted by the renderer; the host app's `app.css` includes `@source` for `phoenix_kit_publishing` via the installer.

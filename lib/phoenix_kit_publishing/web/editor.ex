@@ -2419,6 +2419,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                             <button
                               type="button"
                               phx-click="clear_featured_image"
+                              phx-disable-with={gettext("Removing…")}
                               class="btn btn-error btn-sm shadow-lg"
                             >
                               <.icon name="hero-trash" class="w-4 h-4 mr-1" />
@@ -2441,6 +2442,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           <button
                             type="button"
                             phx-click="clear_featured_image"
+                            phx-disable-with={gettext("Removing…")}
                             class="btn btn-error btn-sm flex-1"
                           >
                             <.icon name="hero-trash" class="w-4 h-4 mr-1" />

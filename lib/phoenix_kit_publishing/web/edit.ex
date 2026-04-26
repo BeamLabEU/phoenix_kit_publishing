@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
 
+  @impl true
   def mount(%{"group" => group_slug} = _params, _session, socket) do
     case find_group(group_slug) do
       nil ->
@@ -39,8 +40,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     end
   end
 
+  @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
+  @impl true
   def handle_event("validate", %{"group" => params}, socket) do
     {:noreply, assign(socket, :form, Component.to_form(params, as: :group))}
   end
@@ -111,11 +114,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, push_navigate(socket, to: Routes.path("/admin/publishing"))}
   end
 
+  @impl true
+  def handle_info(msg, socket) do
+    Logger.debug("[Publishing.Web.Edit] unhandled message: #{inspect(msg)}")
+    {:noreply, socket}
+  end
+
   defp find_group(slug) do
     Publishing.list_groups()
     |> Enum.find(&(&1["slug"] == slug))
   end
 
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">

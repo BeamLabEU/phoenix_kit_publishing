@@ -7,6 +7,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   use PhoenixKitWeb, :live_view
   use Gettext, backend: PhoenixKitWeb.Gettext
 
+  require Logger
+
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -82,7 +84,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
     end
   end
 
-  def handle_info(_msg, socket), do: {:noreply, socket}
+  def handle_info(msg, socket) do
+    Logger.debug("[Publishing.Web.PostShow] unhandled message: #{inspect(msg)}")
+    {:noreply, socket}
+  end
 
   # Helper functions available to template
   def format_datetime(post) do
@@ -108,6 +113,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   def language_status_color("draft"), do: "bg-warning"
   def language_status_color("archived"), do: "bg-base-content/20"
   def language_status_color(_), do: "bg-base-content/20"
+
+  # Translated status labels — literal-arg gettext clauses so the extractor
+  # can pick them up. Variable args (e.g. `gettext(status)`) would be invisible
+  # to `mix gettext.extract`.
+  def status_label("published"), do: gettext("Published")
+  def status_label("draft"), do: gettext("Draft")
+  def status_label("archived"), do: gettext("Archived")
+  def status_label("trashed"), do: gettext("Trashed")
+  def status_label(other) when is_binary(other), do: other
+  def status_label(_), do: ""
 
   @impl true
   def render(assigns) do
@@ -135,7 +150,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
           </h1>
           <div class="flex items-center gap-2 mt-1">
             <span class={"badge #{version_status_badge_class(@post.metadata[:status] || "draft")}"}>
-              {@post.metadata[:status] || "draft"}
+              {status_label(@post.metadata[:status] || "draft")}
             </span>
             <span class="text-sm text-base-content/60">
               {gettext("Slug")}: <code class="font-mono">{@post.slug}</code>
@@ -175,7 +190,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
                   <div class="flex items-center gap-2">
                     <span class="font-mono text-sm">v{version}</span>
                     <span class={"badge badge-xs #{version_status_badge_class(status)}"}>
-                      {status}
+                      {status_label(status)}
                     </span>
                   </div>
                   <%= if date do %>

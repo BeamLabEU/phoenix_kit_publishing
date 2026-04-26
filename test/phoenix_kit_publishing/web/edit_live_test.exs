@@ -52,4 +52,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
 
     assert html =~ "Please provide a valid group name"
   end
+
+  test "handle_info catch-all swallows unexpected messages without crashing",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    # Send a stray message — without the catch-all, this would crash with
+    # FunctionClauseError. The render after-the-fact proves the LV survived.
+    send(view.pid, {:bogus_pubsub_message, "ignored"})
+    send(view.pid, :unexpected_atom)
+    assert is_binary(render(view))
+  end
 end

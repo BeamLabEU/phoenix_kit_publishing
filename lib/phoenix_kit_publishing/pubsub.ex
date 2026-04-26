@@ -151,19 +151,25 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   end
 
   @doc """
-  Broadcasts a post status changed event.
+  Broadcasts a post status changed event with a minimal payload (uuid + slug).
+
+  Receivers refresh the post by slug/uuid; the full record never crosses
+  PubSub. See `broadcast_post_created/2` for the trust rationale.
   """
   @spec broadcast_post_status_changed(String.t(), map()) :: broadcast_result
   def broadcast_post_status_changed(group_slug, post) do
-    Manager.broadcast(posts_topic(group_slug), {:post_status_changed, post})
+    Manager.broadcast(posts_topic(group_slug), {:post_status_changed, minimal_payload(post)})
   end
 
   @doc """
   Broadcasts that a new version was created for a post.
+
+  Payload is trimmed to `%{uuid:, slug:}` — receivers re-fetch the post
+  to get the new `available_versions`/`version_statuses`/etc.
   """
   @spec broadcast_version_created(String.t(), map()) :: broadcast_result
   def broadcast_version_created(group_slug, post) do
-    Manager.broadcast(posts_topic(group_slug), {:version_created, post})
+    Manager.broadcast(posts_topic(group_slug), {:version_created, minimal_payload(post)})
   end
 
   @doc """

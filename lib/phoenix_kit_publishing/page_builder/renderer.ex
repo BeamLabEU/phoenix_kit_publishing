@@ -76,7 +76,9 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
     Map.merge(parent_assigns, base_assigns)
   end
 
-  # Fallback renderer for unknown components
+  # Fallback renderer for unknown components. Builds the wrapper `<div>` as
+  # a safe iolist so the literal class attribute never gets interpolated
+  # from data — only the AST-derived `content` (admin-trusted) is raw'd.
   defp render_unknown(ast, assigns) do
     content =
       cond do
@@ -90,7 +92,12 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
           ""
       end
 
-    {:ok, Phoenix.HTML.raw("<div class=\"unknown-component\">#{content}</div>")}
+    {:ok,
+     Phoenix.HTML.raw([
+       ~s(<div class="unknown-component">),
+       content,
+       "</div>"
+     ])}
   end
 
   defp render_child_to_string(child, assigns) do

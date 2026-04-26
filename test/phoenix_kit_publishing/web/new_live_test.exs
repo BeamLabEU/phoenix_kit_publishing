@@ -24,4 +24,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.NewLiveTest do
     assert html =~ "Create a New Publishing Group"
     assert html =~ ~s|phx-disable-with="Creating…"|
   end
+
+  test "handle_info catch-all swallows unexpected messages without crashing",
+       %{conn: conn} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/new-group")
+
+    send(view.pid, {:bogus_pubsub_message, "ignored"})
+    send(view.pid, :unexpected_atom)
+    assert is_binary(render(view))
+  end
 end

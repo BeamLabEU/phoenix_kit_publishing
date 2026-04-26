@@ -736,6 +736,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   #
   # If active_version_uuid points to a non-existent or non-published version,
   # clears it. Also ensures non-published versions don't have "published" content.
+  @spec reconcile_post_status(PublishingPost.t()) :: [any()]
   def reconcile_post_status(%PublishingPost{} = post) do
     # Re-read to get current state after individual fixes
     post = DBStorage.get_post_by_uuid(post.uuid) || post

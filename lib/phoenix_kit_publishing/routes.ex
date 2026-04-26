@@ -24,6 +24,7 @@ defmodule PhoenixKitPublishing.Routes do
   Includes `:phoenix_kit_optional_scope` pipeline so `AdminEditHelper` can show
   edit buttons for logged-in admins/owners on public pages.
   """
+  @spec public_routes(String.t()) :: Macro.t()
   def public_routes(url_prefix) do
     quote do
       blog_scope_multi =
@@ -79,6 +80,7 @@ defmodule PhoenixKitPublishing.Routes do
   @doc """
   Returns quoted admin LiveView route declarations for the shared admin live_session (localized).
   """
+  @spec admin_locale_routes() :: Macro.t()
   def admin_locale_routes do
     quote do
       live "/admin/publishing", PhoenixKit.Modules.Publishing.Web.Index, :index,
@@ -131,6 +133,7 @@ defmodule PhoenixKitPublishing.Routes do
   @doc """
   Returns quoted admin LiveView route declarations for the shared admin live_session (non-localized).
   """
+  @spec admin_routes() :: Macro.t()
   def admin_routes do
     quote do
       live "/admin/publishing", PhoenixKit.Modules.Publishing.Web.Index, :index,

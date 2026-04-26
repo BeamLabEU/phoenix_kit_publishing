@@ -127,6 +127,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
     {:noreply, push_navigate(socket, to: destination)}
   end
 
+  @impl true
+  def handle_info(msg, socket) do
+    Logger.debug("[Publishing.Web.Preview] unhandled message: #{inspect(msg)}")
+    {:noreply, socket}
+  end
+
   # Delegate to PublishingHTML helpers used in the template
   defdelegate has_publication_date?(post), to: PublishingHTML
   defdelegate format_post_date(post, group_slug), to: PublishingHTML

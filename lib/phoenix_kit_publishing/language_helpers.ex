@@ -347,6 +347,7 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
   @doc """
   Builds a single language entry map for a post.
   """
+  @spec build_language_entry(String.t(), map(), [String.t()], String.t() | nil) :: map()
   def build_language_entry(lang_code, post, enabled_languages, primary_lang) do
     lang_info = get_language_info(lang_code)
     available = post.available_languages || []

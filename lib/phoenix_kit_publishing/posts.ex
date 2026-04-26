@@ -39,6 +39,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   def db_post?(post), do: not is_nil(post[:uuid])
 
   @doc "Counts posts on a specific date for a group."
+  @spec count_posts_on_date(String.t(), Date.t() | String.t()) :: non_neg_integer()
   def count_posts_on_date(group_slug, date) do
     group_slug
     |> list_times_on_date(date)
@@ -46,6 +47,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc "Lists time values for posts on a specific date."
+  @spec list_times_on_date(String.t(), Date.t() | String.t()) :: [Time.t()]
   def list_times_on_date(group_slug, date) do
     date = if is_binary(date), do: Date.from_iso8601!(date), else: date
 
@@ -175,6 +177,14 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         result
 
       other ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.created",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          nil,
+          %{"group_slug" => group_slug}
+        )
+
         other
     end
   end
@@ -185,6 +195,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   Resolves the UUID to a group slug and post slug, then delegates to `read_post/4`.
   Invalid version/language params gracefully fall back to latest/primary.
   """
+  @spec read_post_by_uuid(String.t(), String.t() | nil, integer() | nil) ::
+          {:ok, map()} | {:error, any()}
   def read_post_by_uuid(post_uuid, language \\ nil, version \\ nil) do
     case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
       nil ->
@@ -244,24 +256,38 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
     result = update_post_in_db(group_slug, post, params, audit_meta)
 
-    with {:ok, updated_post} <- result do
-      ListingCache.regenerate(group_slug)
+    case result do
+      {:ok, updated_post} ->
+        ListingCache.regenerate(group_slug)
 
-      unless Map.get(opts_map, :skip_broadcast, false) do
-        PublishingPubSub.broadcast_post_updated(group_slug, updated_post)
-      end
+        unless Map.get(opts_map, :skip_broadcast, false) do
+          PublishingPubSub.broadcast_post_updated(group_slug, updated_post)
+        end
 
-      ActivityLog.log_manual(
-        "publishing.post.updated",
-        actor_uuid_for_log(opts_map, audit_meta),
-        "publishing_post",
-        updated_post[:uuid] || post[:uuid],
-        %{
-          "group_slug" => group_slug,
-          "slug" => updated_post[:slug] || post[:slug],
-          "language" => updated_post[:language] || post[:language]
-        }
-      )
+        ActivityLog.log_manual(
+          "publishing.post.updated",
+          actor_uuid_for_log(opts_map, audit_meta),
+          "publishing_post",
+          updated_post[:uuid] || post[:uuid],
+          %{
+            "group_slug" => group_slug,
+            "slug" => updated_post[:slug] || post[:slug],
+            "language" => updated_post[:language] || post[:language]
+          }
+        )
+
+      _ ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.updated",
+          actor_uuid_for_log(opts_map, audit_meta),
+          "publishing_post",
+          post[:uuid],
+          %{
+            "group_slug" => group_slug,
+            "slug" => post[:slug],
+            "language" => post[:language]
+          }
+        )
     end
 
     result
@@ -285,6 +311,14 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   def restore_post(group_slug, post_uuid, opts \\ []) do
     case DBStorage.get_post_by_uuid(post_uuid) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.restored",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post_uuid,
+          %{"group_slug" => group_slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
       db_post ->
@@ -304,6 +338,14 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
             {:ok, post_uuid}
 
           {:error, reason} ->
+            ActivityLog.log_failed_mutation(
+              "publishing.post.restored",
+              ActivityLog.actor_uuid(opts),
+              "publishing_post",
+              db_post.uuid,
+              %{"group_slug" => group_slug, "slug" => db_post.slug}
+            )
+
             {:error, reason}
         end
     end
@@ -319,6 +361,14 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   def trash_post(group_slug, post_uuid, opts \\ []) do
     case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.trashed",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post_uuid,
+          %{"group_slug" => group_slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
       db_post ->
@@ -339,6 +389,14 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
             {:ok, post_uuid}
 
           {:error, reason} ->
+            ActivityLog.log_failed_mutation(
+              "publishing.post.trashed",
+              ActivityLog.actor_uuid(opts),
+              "publishing_post",
+              db_post.uuid,
+              %{"group_slug" => group_slug, "slug" => db_post.slug}
+            )
+
             {:error, reason}
         end
     end
@@ -350,6 +408,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   #   - "post-slug/en" → {"post-slug", nil, "en"}
   #   - "post-slug/v1/en" → {"post-slug", 1, "en"}
   #   - "group/post-slug/v2/am" → {"post-slug", 2, "am"}
+  @spec extract_slug_version_and_language(String.t(), String.t() | nil) ::
+          {String.t(), integer() | nil, String.t() | nil}
   def extract_slug_version_and_language(_group_slug, nil), do: {"", nil, nil}
 
   def extract_slug_version_and_language(group_slug, identifier) do
@@ -387,6 +447,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc false
+  @spec read_back_post(String.t(), String.t(), map() | nil, String.t() | nil, integer() | nil) ::
+          {:ok, map()} | {:error, any()}
   def read_back_post(group_slug, identifier, db_post, language, version_number) do
     Shared.read_back_post(group_slug, identifier, db_post, language, version_number)
   end

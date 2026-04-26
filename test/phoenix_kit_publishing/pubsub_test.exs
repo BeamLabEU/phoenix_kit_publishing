@@ -77,4 +77,83 @@ defmodule PhoenixKit.Modules.Publishing.PubSubTest do
       assert key == "blog:new"
     end
   end
+
+  # ============================================================================
+  # Minimal-payload broadcasts — pinning that broadcast_post_status_changed and
+  # broadcast_version_created strip post maps to %{uuid:, slug:} so post titles,
+  # body content, and version metadata don't leak into PubSub trace logs.
+  # ============================================================================
+
+  describe "minimal payload broadcasts" do
+    setup do
+      group_slug = "test-group-#{System.unique_integer([:positive])}"
+      :ok = PublishingPubSub.subscribe_to_posts(group_slug)
+      on_exit(fn -> PublishingPubSub.unsubscribe_from_posts(group_slug) end)
+      %{group_slug: group_slug}
+    end
+
+    test "broadcast_post_status_changed sends only :uuid and :slug",
+         %{group_slug: group_slug} do
+      full_post = %{
+        uuid: "post-uuid",
+        slug: "my-post",
+        title: "secret title",
+        content: "<script>alert('xss')</script>",
+        author_email: "leak@example.com"
+      }
+
+      :ok = PublishingPubSub.broadcast_post_status_changed(group_slug, full_post)
+
+      assert_receive {:post_status_changed, %{uuid: "post-uuid", slug: "my-post"} = payload},
+                     500
+
+      refute Map.has_key?(payload, :title)
+      refute Map.has_key?(payload, :content)
+      refute Map.has_key?(payload, :author_email)
+    end
+
+    test "broadcast_version_created sends only :uuid and :slug",
+         %{group_slug: group_slug} do
+      full_post = %{
+        uuid: "post-uuid",
+        slug: "my-post",
+        version_data: %{notes: "private build notes"},
+        decrypted_token: "secret"
+      }
+
+      :ok = PublishingPubSub.broadcast_version_created(group_slug, full_post)
+
+      assert_receive {:version_created, %{uuid: "post-uuid", slug: "my-post"} = payload},
+                     500
+
+      refute Map.has_key?(payload, :version_data)
+      refute Map.has_key?(payload, :decrypted_token)
+    end
+
+    test "broadcast_post_created strips full record",
+         %{group_slug: group_slug} do
+      :ok =
+        PublishingPubSub.broadcast_post_created(group_slug, %{
+          uuid: "u",
+          slug: "s",
+          email: "leak@x.com"
+        })
+
+      assert_receive {:post_created, %{uuid: "u", slug: "s"} = payload}, 500
+      refute Map.has_key?(payload, :email)
+    end
+
+    test "broadcast_post_updated strips full record",
+         %{group_slug: group_slug} do
+      :ok =
+        PublishingPubSub.broadcast_post_updated(group_slug, %{
+          uuid: "u",
+          slug: "s",
+          body: "private"
+        })
+
+      assert_receive {:post_updated, %{uuid: "u", slug: "s"} = payload}, 500
+      refute Map.has_key?(payload, :body)
+    end
+  end
 end

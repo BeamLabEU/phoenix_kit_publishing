@@ -6,6 +6,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   Cache keys include content hashes for automatic invalidation.
   """
 
+  use Gettext, backend: PhoenixKitWeb.Gettext
+
   require Logger
 
   alias Phoenix.HTML.Safe
@@ -213,8 +215,16 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
            gfm: true,
            escape: false
          }) do
-      {:ok, html, _warnings} -> add_tailwind_classes(html)
-      {:error, _html, _errors} -> ~s(<p class="text-error">Error rendering markdown</p>)
+      {:ok, html, _warnings} ->
+        add_tailwind_classes(html)
+
+      {:error, _html, _errors} ->
+        escaped =
+          gettext("Error rendering markdown")
+          |> Phoenix.HTML.html_escape()
+          |> Phoenix.HTML.safe_to_string()
+
+        ~s(<p class="text-error">) <> escaped <> ~s(</p>)
     end
   end
 
@@ -526,6 +536,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   Useful for testing or when doing bulk updates.
   """
+  @spec clear_all_cache() :: :ok
   def clear_all_cache do
     PhoenixKit.Cache.clear(@cache_name)
     Logger.info("Cleared all publishing post caches")

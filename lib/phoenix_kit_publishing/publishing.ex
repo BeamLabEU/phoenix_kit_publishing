@@ -391,7 +391,7 @@ defmodule PhoenixKit.Modules.Publishing do
 
   Group slugs cannot be language codes (like 'en', 'es', 'fr') to prevent routing ambiguity.
   """
-  @spec valid_slug?(String.t()) :: boolean()
+  @spec valid_slug?(any()) :: boolean()
   def valid_slug?(slug) when is_binary(slug) do
     slug != "" and Regex.match?(@slug_regex, slug) and not reserved_language_code?(slug)
   end

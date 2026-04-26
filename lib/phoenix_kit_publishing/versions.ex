@@ -145,10 +145,34 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   def publish_version(group_slug, post_uuid, version, opts \\ []) do
     case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.version.published",
+          ActivityLog.actor_uuid(opts),
+          "publishing_version",
+          post_uuid,
+          %{
+            "group_slug" => group_slug,
+            "version_number" => version,
+            "reason" => "not_found"
+          }
+        )
+
         {:error, :not_found}
 
       db_post ->
         if db_post.trashed_at do
+          ActivityLog.log_failed_mutation(
+            "publishing.version.published",
+            ActivityLog.actor_uuid(opts),
+            "publishing_version",
+            db_post.uuid,
+            %{
+              "group_slug" => group_slug,
+              "version_number" => version,
+              "reason" => "post_trashed"
+            }
+          )
+
           {:error, :post_trashed}
         else
           do_publish_version(group_slug, db_post, version, opts)
@@ -178,9 +202,25 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   def unpublish_post(group_slug, post_uuid, opts \\ []) do
     case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.unpublished",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post_uuid,
+          %{"group_slug" => group_slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
-      %{active_version_uuid: nil} ->
+      %{active_version_uuid: nil} = db_post ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.unpublished",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          db_post.uuid,
+          %{"group_slug" => group_slug, "reason" => "not_published"}
+        )
+
         {:error, :not_published}
 
       db_post ->
@@ -224,6 +264,18 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
         :ok
 
       {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.version.published",
+          ActivityLog.actor_uuid(opts),
+          "publishing_version",
+          db_post.uuid,
+          %{
+            "group_slug" => group_slug,
+            "post_uuid" => db_post.uuid,
+            "version_number" => version
+          }
+        )
+
         {:error, reason}
     end
   end
@@ -306,6 +358,14 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
         :ok
 
       {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.unpublished",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          db_post.uuid,
+          %{"group_slug" => group_slug}
+        )
+
         {:error, reason}
     end
   end
@@ -374,11 +434,50 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           :ok
 
         {:error, reason} ->
+          ActivityLog.log_failed_mutation(
+            "publishing.version.deleted",
+            ActivityLog.actor_uuid(opts),
+            "publishing_version",
+            db_version.uuid,
+            %{
+              "group_slug" => group_slug,
+              "post_uuid" => db_post.uuid,
+              "version_number" => version
+            }
+          )
+
           {:error, reason}
       end
     else
-      nil -> {:error, :not_found}
-      {:error, _} = err -> err
+      nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.version.deleted",
+          ActivityLog.actor_uuid(opts),
+          "publishing_version",
+          post_uuid,
+          %{
+            "group_slug" => group_slug,
+            "version_number" => version,
+            "reason" => "not_found"
+          }
+        )
+
+        {:error, :not_found}
+
+      {:error, reason} = err ->
+        ActivityLog.log_failed_mutation(
+          "publishing.version.deleted",
+          ActivityLog.actor_uuid(opts),
+          "publishing_version",
+          post_uuid,
+          %{
+            "group_slug" => group_slug,
+            "version_number" => version,
+            "reason" => to_string(reason)
+          }
+        )
+
+        err
     end
   end
 
@@ -396,6 +495,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   end
 
   @doc false
+  @spec broadcast_version_created(String.t(), String.t(), map()) :: :ok
   def broadcast_version_created(group_slug, broadcast_id, new_version) do
     PublishingPubSub.broadcast_version_created(group_slug, new_version)
 

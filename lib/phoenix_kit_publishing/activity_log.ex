@@ -63,4 +63,32 @@ defmodule PhoenixKit.Modules.Publishing.ActivityLog do
   def actor_uuid(opts) when is_list(opts), do: Keyword.get(opts, :actor_uuid)
   def actor_uuid(opts) when is_map(opts), do: Map.get(opts, :actor_uuid)
   def actor_uuid(_), do: nil
+
+  @doc """
+  Logs a failed user-driven mutation with `db_pending: true` so the audit
+  trail still captures the user-initiated action when the primary write
+  failed (DB constraint, sandbox crash, etc).
+
+  `resource_uuid` is `nil` when the failure happened before a row was
+  assigned a UUID — that's expected for create paths. Metadata callers
+  pass should still be PII-safe (slugs / names / status, never email or
+  free-text body).
+  """
+  @spec log_failed_mutation(
+          String.t(),
+          String.t() | nil,
+          String.t(),
+          String.t() | nil,
+          map()
+        ) :: :ok
+  def log_failed_mutation(action, actor_uuid, resource_type, resource_uuid, metadata \\ %{}) do
+    log(%{
+      action: action,
+      mode: "manual",
+      actor_uuid: actor_uuid,
+      resource_type: resource_type,
+      resource_uuid: resource_uuid,
+      metadata: Map.put(metadata, "db_pending", true)
+    })
+  end
 end

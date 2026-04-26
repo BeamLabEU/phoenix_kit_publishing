@@ -321,4 +321,203 @@ defmodule PhoenixKit.Integration.Publishing.ActivityLoggingTest do
       assert_activity_logged("publishing.module.disabled", actor_uuid: nil)
     end
   end
+
+  # ============================================================================
+  # Error-branch coverage — every user-driven mutation logs an audit row on
+  # both `:ok` AND `:error` so a Drive outage / DB constraint / not-found
+  # can't erase admin clicks from the activity feed. Pinned by `db_pending: true`.
+  # ============================================================================
+
+  describe "error-branch logging" do
+    test "add_group invalid_name logs db_pending row with reason" do
+      assert {:error, :invalid_name} = Groups.add_group("   ", actor_uuid: @actor_uuid)
+
+      assert_activity_logged("publishing.group.created",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "invalid_name"}
+      )
+    end
+
+    test "add_group invalid_type logs db_pending row" do
+      # Use a non-binary/atom value so `normalize_type/1` returns nil and
+      # the cond branch fires (binary inputs always coerce to a default).
+      assert {:error, :invalid_type} =
+               Groups.add_group(unique_name(),
+                 mode: "slug",
+                 type: 123,
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.group.created",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "invalid_type"}
+      )
+    end
+
+    test "remove_group not_found logs db_pending row" do
+      assert {:error, :not_found} =
+               Groups.remove_group("non-existent-slug-#{System.unique_integer()}",
+                 force: true,
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.group.deleted",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_found"}
+      )
+    end
+
+    test "remove_group has_posts logs db_pending row with post_count" do
+      {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
+      {:ok, _post} = Posts.create_post(group["slug"], %{title: "Block deletion"})
+
+      assert {:error, {:has_posts, _}} =
+               Groups.remove_group(group["slug"], actor_uuid: @actor_uuid)
+
+      assert_activity_logged("publishing.group.deleted",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "has_posts"}
+      )
+    end
+
+    test "update_group not_found logs db_pending row" do
+      assert {:error, :not_found} =
+               Groups.update_group("non-existent-#{System.unique_integer()}", %{name: "x"},
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.group.updated",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_found"}
+      )
+    end
+
+    test "trash_group not_found logs db_pending row" do
+      assert {:error, :not_found} =
+               Groups.trash_group("non-existent-#{System.unique_integer()}",
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.group.trashed",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_found"}
+      )
+    end
+
+    test "restore_group not_found logs db_pending row" do
+      assert {:error, :not_found} =
+               Groups.restore_group("non-existent-#{System.unique_integer()}",
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.group.restored",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_found"}
+      )
+    end
+
+    test "trash_post not_found logs db_pending row" do
+      assert {:error, :not_found} =
+               Posts.trash_post("any-group", "019cce93-bbbb-7000-8000-000000000fff",
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.post.trashed",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_found"}
+      )
+    end
+
+    test "restore_post not_found logs db_pending row" do
+      assert {:error, :not_found} =
+               Posts.restore_post("any-group", "019cce93-bbbb-7000-8000-000000000ee0",
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.post.restored",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_found"}
+      )
+    end
+
+    test "publish_version not_found logs db_pending row with version_number" do
+      assert {:error, :not_found} =
+               Versions.publish_version("any-group", "019cce93-bbbb-7000-8000-000000000ee1", 7,
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.version.published",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{
+          "db_pending" => true,
+          "reason" => "not_found",
+          "version_number" => 7
+        }
+      )
+    end
+
+    test "publish_version on trashed post logs db_pending with reason post_trashed" do
+      {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Doomed"})
+      {:ok, _} = Posts.trash_post(group["slug"], post[:uuid])
+
+      assert {:error, :post_trashed} =
+               Versions.publish_version(group["slug"], post[:uuid], 1, actor_uuid: @actor_uuid)
+
+      assert_activity_logged("publishing.version.published",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "post_trashed"}
+      )
+    end
+
+    test "unpublish_post not_found logs db_pending row" do
+      assert {:error, :not_found} =
+               Versions.unpublish_post("any-group", "019cce93-bbbb-7000-8000-000000000ee2",
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.post.unpublished",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_found"}
+      )
+    end
+
+    test "unpublish_post not_published logs db_pending row" do
+      {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Never published"})
+
+      assert {:error, :not_published} =
+               Versions.unpublish_post(group["slug"], post[:uuid], actor_uuid: @actor_uuid)
+
+      assert_activity_logged("publishing.post.unpublished",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_published"}
+      )
+    end
+
+    test "delete_version not_found logs db_pending row" do
+      assert {:error, :not_found} =
+               Versions.delete_version("any-group", "019cce93-bbbb-7000-8000-000000000ee3", 1,
+                 actor_uuid: @actor_uuid
+               )
+
+      assert_activity_logged("publishing.version.deleted",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "not_found"}
+      )
+    end
+
+    test "delete_version refuses last version with db_pending row" do
+      {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "OnlyVersion"})
+
+      assert {:error, :last_version} =
+               Versions.delete_version(group["slug"], post[:uuid], 1, actor_uuid: @actor_uuid)
+
+      assert_activity_logged("publishing.version.deleted",
+        actor_uuid: @actor_uuid,
+        metadata_has: %{"db_pending" => true, "reason" => "last_version"}
+      )
+    end
+  end
 end

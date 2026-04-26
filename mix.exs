@@ -22,6 +22,20 @@ defmodule PhoenixKitPublishing.MixProject do
       # Dialyzer
       dialyzer: [plt_add_apps: [:phoenix_kit]],
 
+      # Test coverage — filter test-support modules out of `mix test --cover`
+      # so the percentage reflects production code only.
+      test_coverage: [
+        ignore_modules: [
+          ~r/^PhoenixKitPublishing\.Test\./,
+          PhoenixKitPublishing.ConnCase,
+          PhoenixKitPublishing.LiveCase,
+          PhoenixKitPublishing.DataCase,
+          PhoenixKitPublishing.PhoenixKitDataCase,
+          PhoenixKitPublishing.ActivityLogAssertions,
+          PhoenixKitPublishing.TestRepo
+        ]
+      ],
+
       # Docs
       name: "PhoenixKitPublishing",
       source_url: @source_url,

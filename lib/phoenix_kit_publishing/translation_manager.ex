@@ -65,6 +65,8 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
   # success so legacy base-code content can be promoted in place (for example
   # "en" -> "en-US") without surfacing a false duplicate-language error.
   @doc false
+  @spec add_language_to_db(String.t(), String.t(), String.t(), integer() | nil) ::
+          {:ok, any()} | {:error, any()}
   def add_language_to_db(group_slug, post_uuid, language_code, version_number) do
     with raw_db_post when not is_nil(raw_db_post) <-
            DBStorage.get_post_by_uuid(post_uuid, [:group]),
