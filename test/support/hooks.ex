@@ -23,6 +23,14 @@ defmodule PhoenixKitPublishing.Test.Hooks do
   with the same nil-scope state production sees for logged-out users).
   """
   def on_mount(:assign_scope, _params, session, socket) do
+    socket =
+      socket
+      # Mirror what core's auth on_mount adds in production. Without these,
+      # admin LVs that read `current_locale_base` / `url_path` crash on mount.
+      |> assign(:current_locale_base, "en")
+      |> assign(:current_locale, "en-US")
+      |> assign(:url_path, "/")
+
     case Map.get(session, "phoenix_kit_test_scope") do
       nil ->
         {:cont, socket}

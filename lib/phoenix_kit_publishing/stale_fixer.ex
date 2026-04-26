@@ -319,9 +319,14 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
-  defp apply_stale_fix(record, attrs, _update_fn) when attrs == %{}, do: record
+  @doc false
+  # Exposed (with @doc false) for the slug-conflict-retry test. Production
+  # callers always go through `fix_stale_post/1` / `fix_stale_group/1`.
+  def apply_stale_fix(record, attrs, update_fn \\ &DBStorage.update_post/2)
 
-  defp apply_stale_fix(record, attrs, update_fn) do
+  def apply_stale_fix(record, attrs, _update_fn) when attrs == %{}, do: record
+
+  def apply_stale_fix(record, attrs, update_fn) do
     identifier = Map.get(record, :uuid) || Map.get(record, :slug) || "unknown"
 
     Logger.info(
@@ -378,14 +383,21 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
+  # PublishingPost's unique_constraint is declared on [:group_uuid, :slug]
+  # which puts the error on the FIRST key (`:group_uuid`). Look at both
+  # plus match the constraint name so we don't confuse a real
+  # foreign-key error on group_uuid with the slug-uniqueness path.
   defp slug_conflict?(%Ecto.Changeset{errors: errors}) do
-    case Keyword.get(errors, :slug) do
-      {_msg, opts} ->
-        Keyword.get(opts, :constraint) == :unique
+    Enum.any?([:slug, :group_uuid], fn key ->
+      case Keyword.get(errors, key) do
+        {_msg, opts} ->
+          Keyword.get(opts, :constraint) == :unique and
+            Keyword.get(opts, :constraint_name) == "idx_publishing_posts_group_slug"
 
-      _ ->
-        false
-    end
+        _ ->
+          false
+      end
+    end)
   end
 
   defp maybe_update(data, key, old_val, new_val) do
