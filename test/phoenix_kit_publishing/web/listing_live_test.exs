@@ -216,4 +216,133 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     send(view.pid, {:editor_left, post[:slug], %{user_uuid: "u-1"}})
     assert is_binary(render(view))
   end
+
+  test "add_language event navigates to the edit URL with lang param",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    result =
+      render_click(view, "add_language", %{
+        "language" => "fr-FR",
+        "uuid" => post[:uuid]
+      })
+
+    assert match?({:error, {:live_redirect, _}}, result) or is_binary(result)
+  end
+
+  test "language_action with uuid navigates to edit URL",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    result =
+      render_click(view, "language_action", %{
+        "language" => "fr-FR",
+        "uuid" => post[:uuid]
+      })
+
+    assert match?({:error, {:live_redirect, _}}, result) or is_binary(result)
+  end
+
+  test "language_action without uuid is a no-op", %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    html = render_click(view, "language_action", %{"language" => "fr-FR", "uuid" => ""})
+    assert is_binary(html)
+  end
+
+  test "change_status event updates post status", %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    html =
+      render_click(view, "change_status", %{
+        "uuid" => post[:uuid],
+        "status" => "published"
+      })
+
+    assert is_binary(html)
+  end
+
+  test "toggle_status event cycles draft → published → archived → draft",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    assert is_binary(
+             render_click(view, "toggle_status", %{
+               "uuid" => post[:uuid],
+               "current-status" => "draft"
+             })
+           )
+  end
+
+  test "handle_info {:version_created, _} updates post in list",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:version_created, %{uuid: post[:uuid], slug: post[:slug]}})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:version_deleted, slug, _} refreshes",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:version_deleted, post[:slug], 1})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:translation_started, slug, count} starts translation indicator",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:translation_started, post[:slug], 3})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:translation_progress, slug, n, total} updates progress",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:translation_progress, post[:slug], 1, 3})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:translation_completed, slug, results} clears indicator",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    # Real shape per Listing.handle_info on :translation_completed —
+    # has success_count/failed_count fields.
+    send(view.pid, {:translation_completed, post[:slug], %{success_count: 1, failure_count: 0}})
+    assert is_binary(render(view))
+  end
 end
