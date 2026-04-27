@@ -217,6 +217,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(render_click(view, "set_new_version_source", %{"source" => "1"}))
     end
 
+    test "set_new_version_source with non-integer source short-circuits",
+         %{conn: conn, group: group, post: post} do
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      _ = render_click(view, "open_new_version_modal", %{})
+      # Integer.parse("not-a-number") returns :error → handler returns
+      # {:noreply, socket} unchanged. Pins the catch-all branch in
+      # set_new_version_source/2.
+      html =
+        render_click(view, "set_new_version_source", %{"source" => "not-a-number"})
+
+      assert is_binary(html)
+    end
+
     test "save event persists changes through the Persistence submodule",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =

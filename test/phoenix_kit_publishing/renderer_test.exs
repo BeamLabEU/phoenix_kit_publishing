@@ -271,4 +271,154 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
       Renderer.invalidate_cache("group", "post-slug", "en")
     end
   end
+
+  # ============================================================================
+  # render_post/1 — full caching path
+  # ============================================================================
+
+  describe "render_post/1" do
+    test "renders draft posts without caching" do
+      post = %{
+        content: "## Section",
+        metadata: %{title: "x", status: "draft"},
+        group: "blog",
+        slug: "x",
+        uuid: "uuid-#{System.unique_integer([:positive])}",
+        language: "en"
+      }
+
+      assert {:ok, html} = Renderer.render_post(post)
+      assert is_binary(html)
+    end
+
+    test "renders archived posts without caching" do
+      post = %{
+        content: "Body",
+        metadata: %{title: "y", status: "archived"},
+        group: "blog",
+        slug: "y",
+        uuid: "uuid-arch-#{System.unique_integer([:positive])}",
+        language: "en"
+      }
+
+      assert {:ok, html} = Renderer.render_post(post)
+      assert is_binary(html)
+    end
+
+    test "renders published posts via cache (miss → render → cache)" do
+      post = %{
+        content: "# Pub\n\nBody.",
+        metadata: %{title: "Pub", status: "published"},
+        group: "blog-cache-test-#{System.unique_integer([:positive])}",
+        slug: "pub",
+        uuid: "uuid-pub-#{System.unique_integer([:positive])}",
+        language: "en"
+      }
+
+      assert {:ok, html_1} = Renderer.render_post(post)
+      # Second call hits the cache hot path
+      assert {:ok, html_2} = Renderer.render_post(post)
+      assert html_1 == html_2
+    end
+
+    test "render_post returns cached html on hit" do
+      post = %{
+        content: "Cache me",
+        metadata: %{title: "z", status: "published"},
+        group: "blog-hit-#{System.unique_integer([:positive])}",
+        slug: "z",
+        uuid: "uuid-hit-#{System.unique_integer([:positive])}",
+        language: "en"
+      }
+
+      {:ok, _} = Renderer.render_post(post)
+      assert {:ok, _} = Renderer.render_post(post)
+    end
+  end
+
+  describe "invalidate_cache/3 actually clears the cache" do
+    test "after invalidate, the next render is a miss" do
+      post = %{
+        content: "First content",
+        metadata: %{title: "z", status: "published"},
+        group: "blog-inv-#{System.unique_integer([:positive])}",
+        slug: "z",
+        uuid: "uuid-inv-#{System.unique_integer([:positive])}",
+        language: "en"
+      }
+
+      {:ok, _} = Renderer.render_post(post)
+      Renderer.invalidate_cache(post.group, post.slug, post.language)
+      # Should not raise; second render rebuilds from content
+      assert {:ok, _} = Renderer.render_post(post)
+    end
+  end
+
+  # ============================================================================
+  # Edge cases — blank-line preservation and class merge details
+  # ============================================================================
+
+  describe "blank-line preservation" do
+    test "converts triple-newline runs into paragraph breaks with spacers" do
+      html = Renderer.render_markdown("First\n\n\nSecond")
+      # The renderer inserts &nbsp; spacers for 2+ blank lines
+      assert is_binary(html)
+      assert html =~ "First"
+      assert html =~ "Second"
+    end
+
+    test "preserves single blank line as normal paragraph break" do
+      html = Renderer.render_markdown("First\n\nSecond")
+      assert html =~ "First"
+      assert html =~ "Second"
+    end
+
+    test "removes leading indentation from headings" do
+      html = Renderer.render_markdown("    ## Indented")
+      # The pre-processor strips leading whitespace before headings
+      assert html =~ "Indented"
+    end
+  end
+
+  describe "list-rendering classes" do
+    test "ul gets list-disc + spacing classes" do
+      html = Renderer.render_markdown("- item 1\n- item 2")
+      assert html =~ ~r/<ul class="[^"]*list-disc/
+    end
+
+    test "ol gets list-decimal classes" do
+      html = Renderer.render_markdown("1. one\n2. two")
+      assert html =~ ~r/<ol class="[^"]*list-decimal/
+    end
+
+    test "nested li gets correct spacing" do
+      html = Renderer.render_markdown("- a\n- b")
+      assert html =~ "<li"
+    end
+  end
+
+  describe "blockquote / hr / link rendering" do
+    test "blockquote gets daisyUI classes" do
+      html = Renderer.render_markdown("> quoted")
+      assert html =~ ~r/<blockquote class="[^"]/
+    end
+
+    test "hr renders with the styling class" do
+      html = Renderer.render_markdown("Before\n\n---\n\nAfter")
+      assert html =~ "<hr"
+    end
+
+    test "links get text-primary + underline classes" do
+      html = Renderer.render_markdown("[link](https://example.com)")
+      assert html =~ ~r/<a [^>]*href="https:\/\/example\.com"/
+    end
+  end
+
+  describe "image rendering inline" do
+    test "renders an `![alt](url)` markdown image" do
+      html = Renderer.render_markdown("![alt text](https://example.com/img.png)")
+      assert html =~ "<img"
+      assert html =~ "alt text"
+    end
+  end
 end

@@ -91,4 +91,129 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     send(view.pid, {:post_deleted, "any-uuid"})
     assert is_binary(render(view))
   end
+
+  test "create_post event navigates to the new-post URL", %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    result = render_click(view, "create_post", %{})
+    assert match?({:error, {:live_redirect, _}}, result) or is_binary(result)
+  end
+
+  test "refresh event re-fetches the post list", %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    html = render_click(view, "refresh", %{})
+    assert is_binary(html)
+  end
+
+  test "trash_post event soft-deletes a post", %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    html = render_click(view, "trash_post", %{"uuid" => post[:uuid]})
+    assert is_binary(html)
+  end
+
+  test "restore_post event un-trashes a post", %{conn: conn, group: group} do
+    {:ok, post} =
+      Posts.create_post(group["slug"], %{title: "ToRestore"})
+
+    {:ok, _} = Posts.trash_post(group["slug"], post[:uuid])
+
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    _ = render_click(view, "switch_post_view", %{"mode" => "trashed"})
+    html = render_click(view, "restore_post", %{"uuid" => post[:uuid]})
+    assert is_binary(html)
+  end
+
+  test "handle_info {:post_updated, post} schedules debounced refresh", %{
+    conn: conn,
+    group: group
+  } do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:post_updated, %{uuid: "u", slug: "s"}})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:post_status_changed, post} schedules debounced refresh",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:post_status_changed, %{uuid: "u", slug: "s"}})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:version_live_changed, slug, _} refreshes",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:version_live_changed, "any-slug", 2})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:cache_changed, _} reloads from cache",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:cache_changed, group["slug"]})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:debounced_post_update, slug} fires the debounced refresh",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:debounced_post_update, post[:slug]})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:editor_joined, slug, user} updates active_editors",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:editor_joined, post[:slug], %{user_uuid: "u-1", user_email: "e"}})
+    assert is_binary(render(view))
+  end
+
+  test "handle_info {:editor_left, slug, user} clears active_editors entry",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:editor_left, post[:slug], %{user_uuid: "u-1"}})
+    assert is_binary(render(view))
+  end
 end

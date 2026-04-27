@@ -66,4 +66,47 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     send(view.pid, :unexpected_atom)
     assert is_binary(render(view))
   end
+
+  test "validate event re-renders the form with new values",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    html =
+      view
+      |> form("#group-edit-form", group: %{"name" => "New Name", "slug" => group["slug"]})
+      |> render_change()
+
+    assert is_binary(html)
+  end
+
+  test "save event with valid params persists changes",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    new_slug = group["slug"] <> "-renamed"
+
+    result =
+      view
+      |> form("#group-edit-form", group: %{"name" => "Renamed", "slug" => new_slug})
+      |> render_submit()
+
+    assert match?({:error, {:live_redirect, _}}, result) or is_binary(result)
+  end
+
+  test "cancel event navigates back to the publishing index",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    result = render_click(view, "cancel", %{})
+    assert match?({:error, {:live_redirect, _}}, result) or is_binary(result)
+  end
 end

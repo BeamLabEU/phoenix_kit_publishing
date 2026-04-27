@@ -250,6 +250,11 @@ Application.put_env(:phoenix_kit_publishing, :test_repo_available, repo_availabl
 {:ok, _pid} = PhoenixKit.PubSub.Manager.start_link([])
 {:ok, _pid} = PhoenixKit.ModuleRegistry.start_link([])
 
+# PhoenixKit.Cache.Registry — Renderer.render_post calls PhoenixKit.Cache.get
+# which needs the registry. Without this the cache hit/miss paths bail out
+# via rescue clauses without exercising the actual cache logic.
+{:ok, _pid} = PhoenixKit.Cache.Registry.start_link()
+
 # Web.Listing's `handle_params/3` spawns a stale-fixer task via
 # Task.Supervisor.start_child(PhoenixKit.TaskSupervisor, …) — start that
 # supervisor under a tiny task supervisor so LV mount tests don't crash

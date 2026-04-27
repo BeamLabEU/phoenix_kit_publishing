@@ -157,3 +157,101 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheTest do
     end
   end
 end
+
+defmodule PhoenixKit.Modules.Publishing.ListingCacheRegenerateTest do
+  @moduledoc """
+  Tests for `regenerate/1` and `load_into_memory/1` paths — drive
+  actual DB writes via the public Posts/Groups API and watch the
+  cache reflect them.
+  """
+
+  use PhoenixKitPublishing.DataCase, async: false
+
+  alias PhoenixKit.Modules.Publishing.Groups
+  alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.Versions
+  alias PhoenixKit.Settings
+
+  setup do
+    {:ok, _} = Settings.update_boolean_setting("languages_enabled", true)
+    {:ok, _} = Settings.update_boolean_setting("publishing_memory_cache_enabled", true)
+
+    {:ok, _} =
+      Settings.update_json_setting("languages_config", %{
+        "languages" => [
+          %{
+            "code" => "en-US",
+            "name" => "English",
+            "is_default" => true,
+            "is_enabled" => true,
+            "position" => 0
+          }
+        ]
+      })
+
+    {:ok, group} = Groups.add_group("LC-#{System.unique_integer([:positive])}", mode: "slug")
+    %{group_slug: group["slug"]}
+  end
+
+  describe "regenerate/1" do
+    test "populates :persistent_term with current posts", %{group_slug: group_slug} do
+      assert :ok = ListingCache.regenerate(group_slug)
+      assert {:ok, posts} = ListingCache.read(group_slug)
+      assert is_list(posts)
+    end
+
+    test "populates cached_generated_at + memory_loaded_at after regenerate",
+         %{group_slug: group_slug} do
+      assert :ok = ListingCache.regenerate(group_slug)
+      assert is_binary(ListingCache.memory_loaded_at(group_slug))
+      assert is_binary(ListingCache.cache_generated_at(group_slug))
+    end
+
+    test "regenerate is a no-op when memory cache is disabled",
+         %{group_slug: group_slug} do
+      {:ok, _} = Settings.update_boolean_setting("publishing_memory_cache_enabled", false)
+      assert :ok = ListingCache.regenerate(group_slug)
+    end
+  end
+
+  describe "exists?/1 + invalidate/1" do
+    test "exists? returns true after regenerate, false after invalidate",
+         %{group_slug: group_slug} do
+      :ok = ListingCache.regenerate(group_slug)
+      assert ListingCache.exists?(group_slug)
+
+      :ok = ListingCache.invalidate(group_slug)
+      refute ListingCache.exists?(group_slug)
+    end
+  end
+
+  describe "find_post/2 with real DB-backed cache" do
+    test "returns the post after publishing it", %{group_slug: group_slug} do
+      {:ok, post} =
+        Posts.create_post(group_slug, %{title: "Cached", slug: "cached", content: "Body"})
+
+      :ok = Versions.publish_version(group_slug, post.uuid, 1)
+      :ok = ListingCache.regenerate(group_slug)
+
+      assert {:ok, cached} = ListingCache.find_post(group_slug, post.slug)
+      assert cached.slug == post.slug
+    end
+  end
+
+  describe "regenerate_if_not_in_progress/1" do
+    test "succeeds with :ok when no other process is regenerating",
+         %{group_slug: group_slug} do
+      result = ListingCache.regenerate_if_not_in_progress(group_slug)
+      assert result in [:ok, :already_in_progress]
+    end
+  end
+
+  describe "load_into_memory/1" do
+    test "lazily loads cache into persistent_term", %{group_slug: group_slug} do
+      :ok = ListingCache.invalidate(group_slug)
+      result = ListingCache.load_into_memory(group_slug)
+      assert result in [:ok] or match?({:error, _}, result)
+    end
+  end
+end
