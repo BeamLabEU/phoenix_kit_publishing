@@ -12,6 +12,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
@@ -227,6 +228,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   defp create_new_post(socket, params) do
     scope = socket.assigns[:phoenix_kit_current_scope]
 
+    actor_uuid = Shared.actor_uuid_from_socket(socket)
+
     create_opts =
       if socket.assigns.group_mode == "slug" do
         %{
@@ -237,13 +240,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         %{}
       end
       |> Map.put(:scope, scope)
+      |> Map.put(:actor_uuid, actor_uuid)
 
     case Publishing.create_post(socket.assigns.group_slug, create_opts) do
       {:ok, new_post} ->
         uuid = new_post[:uuid]
 
         result =
-          case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{scope: scope}) do
+          case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
+                 scope: scope,
+                 actor_uuid: actor_uuid
+               }) do
             {:ok, updated_post} ->
               # Preserve UUID from create_post (update_post may not include it)
               {:ok, if(uuid, do: Map.put(updated_post, :uuid, uuid), else: updated_post)}
@@ -263,6 +270,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
 
   defp create_new_translation(socket, params) do
     scope = socket.assigns[:phoenix_kit_current_scope]
+    actor_uuid = Shared.actor_uuid_from_socket(socket)
 
     current_version = socket.assigns[:current_version]
 
@@ -270,11 +278,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
            socket.assigns.group_slug,
            socket.assigns.post.uuid,
            socket.assigns.current_language,
-           current_version
+           current_version,
+           actor_uuid: actor_uuid
          ) do
       {:ok, new_post} ->
         case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
-               scope: scope
+               scope: scope,
+               actor_uuid: actor_uuid
              }) do
           {:ok, _updated_post} = result ->
             handle_post_update_result(
@@ -326,7 +336,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     group_slug = socket.assigns.group_slug
     post = socket.assigns.post
 
-    case Publishing.create_new_version(group_slug, post, params, %{scope: scope}) do
+    case Publishing.create_new_version(group_slug, post, params, %{
+           scope: scope,
+           actor_uuid: Shared.actor_uuid_from_socket(socket)
+         }) do
       {:ok, new_version_post} ->
         invalidate_post_cache(group_slug, new_version_post)
 
@@ -387,7 +400,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         current_version
       )
 
-    case Publishing.update_post(group_slug, post, params, %{scope: scope}) do
+    case Publishing.update_post(group_slug, post, params, %{
+           scope: scope,
+           actor_uuid: Shared.actor_uuid_from_socket(socket)
+         }) do
       {:ok, updated_post} ->
         handle_successful_update(
           socket,
@@ -436,7 +452,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     user_uuid =
       get_in(socket.assigns, [:phoenix_kit_current_scope, Access.key(:user), Access.key(:uuid)])
 
-    case Publishing.publish_version(group_slug, post.uuid, current_version, source_id: user_uuid) do
+    case Publishing.publish_version(group_slug, post.uuid, current_version,
+           source_id: user_uuid,
+           actor_uuid: user_uuid
+         ) do
       :ok ->
         handle_post_save_success(socket, updated_post)
 
@@ -539,17 +558,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
      )}
   end
 
-  defp handle_post_in_place_error(socket, :invalid_slug) do
-    {:noreply,
-     Phoenix.LiveView.put_flash(
-       socket,
-       :error,
-       gettext(
-         "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
-       )
-     )}
-  end
-
   defp handle_post_in_place_error(socket, :slug_already_exists) do
     {:noreply,
      Phoenix.LiveView.put_flash(
@@ -637,17 +645,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
        :error,
        gettext(
          "This slug is reserved because it's a language code (like 'en', 'es', 'fr'). Please choose a different slug to avoid routing conflicts."
-       )
-     )}
-  end
-
-  defp handle_post_update_error(socket, :invalid_slug) do
-    {:noreply,
-     Phoenix.LiveView.put_flash(
-       socket,
-       :error,
-       gettext(
-         "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
        )
      )}
   end

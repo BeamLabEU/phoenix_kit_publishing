@@ -29,6 +29,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
   alias PhoenixKitAI, as: AI
@@ -941,7 +942,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     scope = socket.assigns[:phoenix_kit_current_scope]
     params = %{"allow_version_access" => enabled}
 
-    case Publishing.update_post(group_slug, updated_post, params, %{scope: scope}) do
+    case Publishing.update_post(group_slug, updated_post, params, %{
+           scope: scope,
+           actor_uuid: Shared.actor_uuid_from_socket(socket)
+         }) do
       {:ok, saved_post} ->
         flash_msg = version_access_flash(enabled)
 
@@ -1424,6 +1428,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       socket = Collaborative.check_lock_expiration(socket)
       {:noreply, socket}
     end
+  end
+
+  # Catch-all — log unknown PubSub messages at :debug instead of crashing
+  # the LV. Matches the workspace precedent
+  # (`phoenix_kit_sync/lib/phoenix_kit_sync/web/connections_live.ex:1042`).
+  def handle_info(msg, socket) do
+    require Logger
+    Logger.debug("[Publishing.Editor] unhandled handle_info: #{inspect(msg)}")
+    {:noreply, socket}
   end
 
   # ============================================================================
@@ -2097,6 +2110,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   type="button"
                   class={"btn btn-primary btn-sm #{if @ai_selected_endpoint_uuid == nil or @ai_selected_prompt_uuid == nil or @ai_translation_status in [:enqueued, :in_progress], do: "btn-disabled"}"}
                   phx-click="translate_to_all_languages"
+                  phx-disable-with={gettext("Enqueueing…")}
                   disabled={
                     @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
@@ -2111,6 +2125,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   type="button"
                   class={"btn btn-outline btn-sm #{if @ai_selected_endpoint_uuid == nil or @ai_selected_prompt_uuid == nil or @ai_translation_status in [:enqueued, :in_progress], do: "btn-disabled"}"}
                   phx-click="translate_missing_languages"
+                  phx-disable-with={gettext("Enqueueing…")}
                   disabled={
                     @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
@@ -2125,6 +2140,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   type="button"
                   class={"btn btn-primary btn-sm #{if @ai_selected_endpoint_uuid == nil or @ai_selected_prompt_uuid == nil or @ai_translation_status in [:enqueued, :in_progress], do: "btn-disabled"}"}
                   phx-click="translate_to_this_language"
+                  phx-disable-with={gettext("Translating…")}
                   disabled={
                     @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
@@ -2403,6 +2419,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                             <button
                               type="button"
                               phx-click="clear_featured_image"
+                              phx-disable-with={gettext("Removing…")}
                               class="btn btn-error btn-sm shadow-lg"
                             >
                               <.icon name="hero-trash" class="w-4 h-4 mr-1" />
@@ -2425,6 +2442,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           <button
                             type="button"
                             phx-click="clear_featured_image"
+                            phx-disable-with={gettext("Removing…")}
                             class="btn btn-error btn-sm flex-1"
                           >
                             <.icon name="hero-trash" class="w-4 h-4 mr-1" />
@@ -2549,6 +2567,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <button
                     type="button"
                     phx-click="clear_translation"
+                    phx-disable-with={gettext("Clearing…")}
                     class="btn btn-outline btn-error btn-sm w-full gap-2"
                     data-confirm={
                       gettext(
@@ -2646,6 +2665,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             type="button"
             class="btn btn-primary"
             phx-click="create_version_from_source"
+            phx-disable-with={gettext("Creating…")}
           >
             <.icon name="hero-plus" class="w-4 h-4" />
             {gettext("Create Version")}

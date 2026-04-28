@@ -6,6 +6,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   Cache keys include content hashes for automatic invalidation.
   """
 
+  use Gettext, backend: PhoenixKitWeb.Gettext
+
   require Logger
 
   alias Phoenix.HTML.Safe
@@ -198,14 +200,31 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   defp render_earmark_markdown(content) do
     content = normalize_markdown(content)
 
+    # Trust model: admin-authored Markdown can include inline HTML
+    # (`<div class="grid">…</div>` is a common authoring affordance).
+    # Earmark's `escape: true` would only cover literal-text HTML, not
+    # block-level passthrough — true XSS protection requires a sanitiser
+    # like html_sanitize_ex on the output. We keep `escape: false`
+    # explicitly so an admin who pastes a `<script>` tag would see it
+    # render as live HTML; this is the documented trust boundary.
+    # Re-evaluate if any non-admin-authored input reaches this path
+    # (API import, AI-translation prompt-injection on rotating roles).
     case Earmark.as_html(content, %Earmark.Options{
            code_class_prefix: "language-",
            smartypants: true,
            gfm: true,
            escape: false
          }) do
-      {:ok, html, _warnings} -> add_tailwind_classes(html)
-      {:error, _html, _errors} -> ~s(<p class="text-error">Error rendering markdown</p>)
+      {:ok, html, _warnings} ->
+        add_tailwind_classes(html)
+
+      {:error, _html, _errors} ->
+        escaped =
+          gettext("Error rendering markdown")
+          |> Phoenix.HTML.html_escape()
+          |> Phoenix.HTML.safe_to_string()
+
+        ~s(<p class="text-error">) <> escaped <> ~s(</p>)
     end
   end
 
@@ -517,6 +536,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   Useful for testing or when doing bulk updates.
   """
+  @spec clear_all_cache() :: :ok
   def clear_all_cache do
     PhoenixKit.Cache.clear(@cache_name)
     Logger.info("Cleared all publishing post caches")

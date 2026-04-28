@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -102,12 +103,15 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
 
     cond do
       trimmed == "" ->
+        log_failed_group_create(opts, "", "invalid_name")
         {:error, :invalid_name}
 
       is_nil(mode) ->
+        log_failed_group_create(opts, trimmed, "invalid_mode")
         {:error, :invalid_mode}
 
       is_nil(normalized_type) ->
+        log_failed_group_create(opts, trimmed, "invalid_type")
         {:error, :invalid_type}
 
       true ->
@@ -141,7 +145,11 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
             }
           }
 
-          create_and_broadcast_group(db_attrs)
+          create_and_broadcast_group(db_attrs, opts)
+        else
+          {:error, reason} = err ->
+            log_failed_group_create(opts, trimmed, to_string(reason))
+            err
         end
     end
   end
@@ -160,20 +168,37 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   By default, refuses to delete groups that contain posts.
   Pass `force: true` to cascade-delete the group and all its posts.
   """
+  @spec remove_group(String.t(), keyword()) :: {:ok, any()} | {:error, any()}
   def remove_group(slug, opts) when is_binary(slug) do
     force = Keyword.get(opts, :force, false)
 
     case DBStorage.get_group_by_slug(slug) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.group.deleted",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          nil,
+          %{"slug" => slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
       db_group ->
         post_count = DBStorage.count_posts(db_group.slug)
 
         if post_count > 0 and not force do
+          ActivityLog.log_failed_mutation(
+            "publishing.group.deleted",
+            ActivityLog.actor_uuid(opts),
+            "publishing_group",
+            db_group.uuid,
+            %{"slug" => slug, "reason" => "has_posts", "post_count" => post_count}
+          )
+
           {:error, {:has_posts, post_count}}
         else
-          delete_and_broadcast_group(db_group, slug)
+          delete_and_broadcast_group(db_group, slug, opts)
         end
     end
   end
@@ -181,10 +206,19 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @doc """
   Updates a publishing group's display name and slug.
   """
-  @spec update_group(String.t(), map() | keyword()) :: {:ok, group()} | {:error, atom()}
-  def update_group(slug, params) when is_binary(slug) do
+  @spec update_group(String.t(), map() | keyword(), keyword() | map()) ::
+          {:ok, group()} | {:error, atom()}
+  def update_group(slug, params, opts \\ []) when is_binary(slug) do
     case DBStorage.get_group_by_slug(slug) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.group.updated",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          nil,
+          %{"slug" => slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
       db_group ->
@@ -194,10 +228,38 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
                DBStorage.update_group(db_group, %{name: name, slug: sanitized_slug}) do
           group = db_group_to_map(updated)
           PublishingPubSub.broadcast_group_updated(group)
+
+          ActivityLog.log_manual(
+            "publishing.group.updated",
+            ActivityLog.actor_uuid(opts),
+            "publishing_group",
+            updated.uuid,
+            %{"slug" => updated.slug, "previous_slug" => db_group.slug}
+          )
+
           {:ok, group}
+        else
+          {:error, reason} = err ->
+            ActivityLog.log_failed_mutation(
+              "publishing.group.updated",
+              ActivityLog.actor_uuid(opts),
+              "publishing_group",
+              db_group.uuid,
+              %{"slug" => slug, "reason" => to_string_reason(reason)}
+            )
+
+            err
         end
     end
   end
+
+  # Converts an error reason from `update_group`'s with-chain into a
+  # short grep-able tag for activity-log metadata. Only atoms (from the
+  # validation helpers) and changesets (from `DBStorage.update_group`)
+  # reach this — keep the matching tight so a future error shape gets
+  # noticed via FunctionClauseError instead of a silent "error" tag.
+  defp to_string_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp to_string_reason(%Ecto.Changeset{}), do: "changeset_error"
 
   @doc """
   Moves a publishing group to trash (soft-delete).
@@ -205,10 +267,18 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   Sets the group status to "trashed". The group and its posts remain in the
   database and can be restored. Trashed groups are hidden from list_groups/0.
   """
-  @spec trash_group(String.t()) :: {:ok, String.t()} | {:error, any()}
-  def trash_group(slug) when is_binary(slug) do
+  @spec trash_group(String.t(), keyword() | map()) :: {:ok, String.t()} | {:error, any()}
+  def trash_group(slug, opts \\ []) when is_binary(slug) do
     case DBStorage.get_group_by_slug(slug) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.group.trashed",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          nil,
+          %{"slug" => slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
       db_group ->
@@ -216,9 +286,26 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           {:ok, _} ->
             ListingCache.invalidate(slug)
             PublishingPubSub.broadcast_group_deleted(slug)
+
+            ActivityLog.log_manual(
+              "publishing.group.trashed",
+              ActivityLog.actor_uuid(opts),
+              "publishing_group",
+              db_group.uuid,
+              %{"slug" => slug}
+            )
+
             {:ok, slug}
 
           {:error, reason} ->
+            ActivityLog.log_failed_mutation(
+              "publishing.group.trashed",
+              ActivityLog.actor_uuid(opts),
+              "publishing_group",
+              db_group.uuid,
+              %{"slug" => slug}
+            )
+
             {:error, reason}
         end
     end
@@ -227,10 +314,18 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @doc """
   Restores a trashed publishing group.
   """
-  @spec restore_group(String.t()) :: {:ok, String.t()} | {:error, any()}
-  def restore_group(slug) when is_binary(slug) do
+  @spec restore_group(String.t(), keyword() | map()) :: {:ok, String.t()} | {:error, any()}
+  def restore_group(slug, opts \\ []) when is_binary(slug) do
     case DBStorage.get_group_by_slug(slug) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.group.restored",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          nil,
+          %{"slug" => slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
       db_group ->
@@ -240,9 +335,17 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           |> Enum.any?(fn g -> g.slug == slug and g.uuid != db_group.uuid end)
 
         if active_conflict do
+          ActivityLog.log_failed_mutation(
+            "publishing.group.restored",
+            ActivityLog.actor_uuid(opts),
+            "publishing_group",
+            db_group.uuid,
+            %{"slug" => slug, "reason" => "slug_taken"}
+          )
+
           {:error, :slug_taken}
         else
-          restore_and_broadcast_group(db_group, slug)
+          restore_and_broadcast_group(db_group, slug, opts)
         end
     end
   end
@@ -274,7 +377,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   def get_group_mode(group_slug) do
     case DBStorage.get_group_by_slug(group_slug) do
       nil -> @default_group_mode
-      db_group -> db_group.mode || @default_group_mode
+      db_group -> db_group.mode
     end
   end
 
@@ -300,40 +403,98 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # Private Helpers
   # ============================================================================
 
-  defp create_and_broadcast_group(db_attrs) do
+  defp create_and_broadcast_group(db_attrs, opts) do
     case DBStorage.create_group(db_attrs) do
       {:ok, db_group} ->
         group = db_group_to_map(db_group)
         PublishingPubSub.broadcast_group_created(group)
+
+        ActivityLog.log_manual(
+          "publishing.group.created",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          db_group.uuid,
+          %{"slug" => db_group.slug, "name" => db_group.name, "mode" => db_group.mode}
+        )
+
         {:ok, group}
 
       {:error, _changeset} ->
+        log_failed_group_create(opts, db_attrs[:name] || "", "already_exists")
         {:error, :already_exists}
     end
   end
 
-  defp delete_and_broadcast_group(db_group, slug) do
+  defp delete_and_broadcast_group(db_group, slug, opts) do
     case DBStorage.delete_group(db_group) do
       {:ok, _} ->
         ListingCache.invalidate(slug)
         PublishingPubSub.broadcast_group_deleted(slug)
+
+        ActivityLog.log_manual(
+          "publishing.group.deleted",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          db_group.uuid,
+          %{"slug" => slug}
+        )
+
         {:ok, slug}
 
       error ->
+        ActivityLog.log_failed_mutation(
+          "publishing.group.deleted",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          db_group.uuid,
+          %{"slug" => slug}
+        )
+
         error
     end
   end
 
-  defp restore_and_broadcast_group(db_group, slug) do
+  defp restore_and_broadcast_group(db_group, slug, opts) do
     case DBStorage.restore_group(db_group) do
       {:ok, _} ->
         ListingCache.regenerate(slug)
         PublishingPubSub.broadcast_group_created(%{"slug" => slug, "name" => db_group.name})
+
+        ActivityLog.log_manual(
+          "publishing.group.restored",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          db_group.uuid,
+          %{"slug" => slug}
+        )
+
         {:ok, slug}
 
       {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.group.restored",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          db_group.uuid,
+          %{"slug" => slug}
+        )
+
         {:error, reason}
     end
+  end
+
+  # `add_group` validates inputs synchronously before reaching the DB —
+  # all four early-return branches log a `db_pending: true` audit row so
+  # the audit trail captures the user-initiated action even when the
+  # input never made it to a row.
+  defp log_failed_group_create(opts, name_attempt, reason) do
+    ActivityLog.log_failed_mutation(
+      "publishing.group.created",
+      ActivityLog.actor_uuid(opts),
+      "publishing_group",
+      nil,
+      %{"name_attempted" => name_attempt, "reason" => reason}
+    )
   end
 
   defp extract_and_validate_name(db_group, params) do

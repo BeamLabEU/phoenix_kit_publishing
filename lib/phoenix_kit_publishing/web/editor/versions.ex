@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
   # ============================================================================
@@ -96,7 +97,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
     socket = Phoenix.Component.assign(socket, :just_created_version, true)
 
     case Publishing.create_version_from(group_slug, post_identifier, source_version, %{},
-           scope: scope
+           scope: scope,
+           actor_uuid: Shared.actor_uuid_from_socket(socket)
          ) do
       {:ok, new_version_post} ->
         flash_msg =

@@ -126,7 +126,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
         false
     end
   rescue
-    _ -> false
+    # Languages may not be loaded / configured in this host — return
+    # `false` (not a valid language) rather than crashing the request.
+    # Other exception classes propagate so genuine bugs aren't masked.
+    UndefinedFunctionError -> false
+    ArgumentError -> false
   end
 
   def valid_language?(_), do: false

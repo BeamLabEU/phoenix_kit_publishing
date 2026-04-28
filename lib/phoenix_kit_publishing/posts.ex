@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
 
   @timestamp_modes Constants.timestamp_modes()
@@ -38,6 +39,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   def db_post?(post), do: not is_nil(post[:uuid])
 
   @doc "Counts posts on a specific date for a group."
+  @spec count_posts_on_date(String.t(), Date.t() | String.t()) :: non_neg_integer()
   def count_posts_on_date(group_slug, date) do
     group_slug
     |> list_times_on_date(date)
@@ -45,6 +47,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc "Lists time values for posts on a specific date."
+  @spec list_times_on_date(String.t(), Date.t() | String.t()) :: [Time.t()]
   def list_times_on_date(group_slug, date) do
     date = if is_binary(date), do: Date.from_iso8601!(date), else: date
 
@@ -157,7 +160,33 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   """
   @spec create_post(String.t(), map() | keyword()) :: {:ok, map()} | {:error, any()}
   def create_post(group_slug, opts \\ %{}) do
-    create_post_in_db(group_slug, opts)
+    case create_post_in_db(group_slug, opts) do
+      {:ok, post} = result ->
+        ActivityLog.log_manual(
+          "publishing.post.created",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post[:uuid] || post[:db_uuid],
+          %{
+            "group_slug" => group_slug,
+            "slug" => post[:slug],
+            "mode" => to_string(post[:mode] || "")
+          }
+        )
+
+        result
+
+      other ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.created",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          nil,
+          %{"group_slug" => group_slug}
+        )
+
+        other
+    end
   end
 
   @doc """
@@ -166,6 +195,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   Resolves the UUID to a group slug and post slug, then delegates to `read_post/4`.
   Invalid version/language params gracefully fall back to latest/primary.
   """
+  @spec read_post_by_uuid(String.t(), String.t() | nil, integer() | nil) ::
+          {:ok, map()} | {:error, any()}
   def read_post_by_uuid(post_uuid, language \\ nil, version \\ nil) do
     case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
       nil ->
@@ -225,15 +256,48 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
     result = update_post_in_db(group_slug, post, params, audit_meta)
 
-    with {:ok, updated_post} <- result do
-      ListingCache.regenerate(group_slug)
+    case result do
+      {:ok, updated_post} ->
+        ListingCache.regenerate(group_slug)
 
-      unless Map.get(opts_map, :skip_broadcast, false) do
-        PublishingPubSub.broadcast_post_updated(group_slug, updated_post)
-      end
+        unless Map.get(opts_map, :skip_broadcast, false) do
+          PublishingPubSub.broadcast_post_updated(group_slug, updated_post)
+        end
+
+        ActivityLog.log_manual(
+          "publishing.post.updated",
+          actor_uuid_for_log(opts_map, audit_meta),
+          "publishing_post",
+          updated_post[:uuid] || post[:uuid],
+          %{
+            "group_slug" => group_slug,
+            "slug" => updated_post[:slug] || post[:slug],
+            "language" => updated_post[:language] || post[:language]
+          }
+        )
+
+      _ ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.updated",
+          actor_uuid_for_log(opts_map, audit_meta),
+          "publishing_post",
+          post[:uuid],
+          %{
+            "group_slug" => group_slug,
+            "slug" => post[:slug],
+            "language" => post[:language]
+          }
+        )
     end
 
     result
+  end
+
+  # Activity-log actor preference: explicit opts > scope-derived audit
+  # metadata. The audit_meta path keeps backwards compatibility with LV
+  # callers that only pass scope today (C10 will switch them to opts).
+  defp actor_uuid_for_log(opts_map, audit_meta) do
+    ActivityLog.actor_uuid(opts_map) || audit_meta[:updated_by_uuid]
   end
 
   @doc """
@@ -242,10 +306,19 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   Regenerates the group cache and broadcasts the update.
   Returns {:ok, post_uuid} on success or {:error, reason} on failure.
   """
-  @spec restore_post(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
-  def restore_post(group_slug, post_uuid) do
+  @spec restore_post(String.t(), String.t(), keyword() | map()) ::
+          {:ok, String.t()} | {:error, term()}
+  def restore_post(group_slug, post_uuid, opts \\ []) do
     case DBStorage.get_post_by_uuid(post_uuid) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.restored",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post_uuid,
+          %{"group_slug" => group_slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
       db_post ->
@@ -253,9 +326,26 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
           {:ok, _} ->
             ListingCache.regenerate(group_slug)
             PublishingPubSub.broadcast_post_updated(group_slug, %{uuid: db_post.uuid})
+
+            ActivityLog.log_manual(
+              "publishing.post.restored",
+              ActivityLog.actor_uuid(opts),
+              "publishing_post",
+              db_post.uuid,
+              %{"group_slug" => group_slug, "slug" => db_post.slug}
+            )
+
             {:ok, post_uuid}
 
           {:error, reason} ->
+            ActivityLog.log_failed_mutation(
+              "publishing.post.restored",
+              ActivityLog.actor_uuid(opts),
+              "publishing_post",
+              db_post.uuid,
+              %{"group_slug" => group_slug, "slug" => db_post.slug}
+            )
+
             {:error, reason}
         end
     end
@@ -266,10 +356,19 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   Returns {:ok, post_uuid} on success or {:error, reason} on failure.
   """
-  @spec trash_post(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
-  def trash_post(group_slug, post_uuid) do
+  @spec trash_post(String.t(), String.t(), keyword() | map()) ::
+          {:ok, String.t()} | {:error, term()}
+  def trash_post(group_slug, post_uuid, opts \\ []) do
     case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
       nil ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.trashed",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post_uuid,
+          %{"group_slug" => group_slug, "reason" => "not_found"}
+        )
+
         {:error, :not_found}
 
       db_post ->
@@ -278,9 +377,26 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
             broadcast_id = db_post.uuid
             ListingCache.regenerate(group_slug)
             PublishingPubSub.broadcast_post_deleted(group_slug, broadcast_id)
+
+            ActivityLog.log_manual(
+              "publishing.post.trashed",
+              ActivityLog.actor_uuid(opts),
+              "publishing_post",
+              db_post.uuid,
+              %{"group_slug" => group_slug, "slug" => db_post.slug}
+            )
+
             {:ok, post_uuid}
 
           {:error, reason} ->
+            ActivityLog.log_failed_mutation(
+              "publishing.post.trashed",
+              ActivityLog.actor_uuid(opts),
+              "publishing_post",
+              db_post.uuid,
+              %{"group_slug" => group_slug, "slug" => db_post.slug}
+            )
+
             {:error, reason}
         end
     end
@@ -292,6 +408,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   #   - "post-slug/en" → {"post-slug", nil, "en"}
   #   - "post-slug/v1/en" → {"post-slug", 1, "en"}
   #   - "group/post-slug/v2/am" → {"post-slug", 2, "am"}
+  @spec extract_slug_version_and_language(String.t(), String.t() | nil) ::
+          {String.t(), integer() | nil, String.t() | nil}
   def extract_slug_version_and_language(_group_slug, nil), do: {"", nil, nil}
 
   def extract_slug_version_and_language(group_slug, identifier) do
@@ -329,6 +447,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc false
+  @spec read_back_post(String.t(), String.t(), map() | nil, String.t() | nil, integer() | nil) ::
+          {:ok, map()} | {:error, any()}
   def read_back_post(group_slug, identifier, db_post, language, version_number) do
     Shared.read_back_post(group_slug, identifier, db_post, language, version_number)
   end
@@ -743,11 +863,17 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       new_title = resolve_post_title(params, post, content)
       new_status = Map.get(params, "status", post_metadata[:status] || "draft")
 
+      # Promote any legacy content.data keys that V2 stores at the version
+      # level (description / featured_image_uuid / seo_title / excerpt). The
+      # whitelist in `preserve_content_data` would otherwise wipe them on this
+      # save; promotion runs once per legacy row and is logged via Activity.
+      legacy_promotions = collect_legacy_content_promotions(version, language)
+
       with :ok <- validate_title_for_publish(language, new_status, new_title),
            :ok <- upsert_post_content(version, language, new_title, content, params, post),
-           :ok <- update_version_defaults(version, params, post),
-           {:ok, db_post} <- maybe_sync_post_datetime(db_post, params),
-           :ok <- maybe_update_audit_fields(db_post, audit_meta) do
+           :ok <- update_version_defaults(version, params, post, legacy_promotions),
+           {:ok, db_post} <- maybe_sync_datetime_and_audit(db_post, params, audit_meta) do
+        log_legacy_metadata_promoted(legacy_promotions, version, language)
         read_updated_post(db_post, group_slug, final_slug, language, version_number)
       end
     else
@@ -822,26 +948,86 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  # Preserve content-row-specific data (e.g. previous_url_slugs).
-  # Version-level metadata (featured_image, description, seo, tags) is handled by update_version_defaults.
+  @content_only_data_keys ~w(previous_url_slugs updated_by_uuid custom_css)
+  @legacy_promotable_keys ~w(description featured_image_uuid seo_title excerpt)
+
+  # Preserve content-row-specific data on save.
+  #
+  # Three keys are genuinely per-language and stay on the content row:
+  #   * `previous_url_slugs` — old slugs for 301 redirects
+  #   * `updated_by_uuid`    — last-editor audit per language
+  #   * `custom_css`         — per-language custom CSS
+  #
+  # Four V1 keys (`description`, `featured_image_uuid`, `seo_title`,
+  # `excerpt`) are now version-level in V2; they're promoted up to
+  # `version.data` by `collect_legacy_content_promotions/2` BEFORE this
+  # function runs and then dropped here. The promotion happens once per
+  # legacy row and is logged via `ActivityLog.log/1`.
   defp preserve_content_data(existing_data, _params, _post) do
-    # Keep only content-specific keys from existing data
-    Map.take(existing_data, ["previous_url_slugs"])
+    Map.take(existing_data, @content_only_data_keys)
+  end
+
+  # Reads the current content row and returns a map of legacy V1 keys that
+  # are present on `content.data` but absent from `version.data`. The caller
+  # merges this into the version update so the values land at the version
+  # level on the same save the content row gets wiped clean. Returns `%{}`
+  # when there's nothing to promote (the steady-state path).
+  defp collect_legacy_content_promotions(version, language) do
+    existing_content = DBStorage.get_content(version.uuid, language)
+    content_data = (existing_content && existing_content.data) || %{}
+    version_data = version.data || %{}
+
+    Enum.reduce(@legacy_promotable_keys, %{}, fn key, acc ->
+      maybe_promote_key(acc, key, content_data, version_data)
+    end)
+  end
+
+  defp maybe_promote_key(acc, key, content_data, version_data) do
+    with {:ok, value} <- Map.fetch(content_data, key),
+         false <- Map.has_key?(version_data, key) do
+      Map.put(acc, key, value)
+    else
+      _ -> acc
+    end
+  end
+
+  defp log_legacy_metadata_promoted(promotions, _version, _language) when promotions == %{},
+    do: :ok
+
+  defp log_legacy_metadata_promoted(promotions, version, language) do
+    ActivityLog.log(%{
+      action: "publishing.content.metadata_promoted",
+      mode: "auto",
+      resource_type: "publishing_content",
+      resource_uuid: version.uuid,
+      metadata: %{
+        "language" => language,
+        "version_uuid" => version.uuid,
+        "promoted_keys" => Map.keys(promotions)
+      }
+    })
+
+    :ok
   end
 
   @doc """
   Updates version.data with metadata like featured_image_uuid, description, seo_title, tags, etc.
 
   Version is the source of truth for all post metadata beyond title and body.
-  Merges new values into existing version.data, preserving keys not present in the update.
+  Merges new values into existing version.data, preserving keys not present in
+  the update. The optional `legacy_promotions` map is merged in BEFORE the
+  user updates so legacy content.data values fall through unchanged when the
+  user didn't touch them — the promotion path that pairs with
+  `preserve_content_data`'s whitelist (see posts.ex `do_update_post_in_db`).
   """
-  @spec update_version_defaults(struct(), map(), map()) :: :ok | {:error, term()}
-  def update_version_defaults(version, params, post) do
+  @spec update_version_defaults(struct(), map(), map(), map()) :: :ok | {:error, term()}
+  def update_version_defaults(version, params, post, legacy_promotions \\ %{}) do
     existing_data = version.data || %{}
     post_metadata = post[:metadata] || %{}
 
     new_data =
       existing_data
+      |> Map.merge(legacy_promotions)
       |> maybe_put_version_field("featured_image_uuid", Map.get(params, "featured_image_uuid"))
       |> maybe_put_version_field(
         "description",
@@ -886,43 +1072,48 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  # For timestamp-mode posts, syncs post_date/post_time when published_at changes.
-  # This ensures the public URL path matches the publication date shown in the editor.
-  defp maybe_sync_post_datetime(%{mode: "timestamp"} = db_post, params) do
+  # Combined post-row update: timestamp-mode date/time sync (when
+  # `published_at` changed) + audit metadata (`updated_by_uuid`,
+  # `updated_by_email`). Issuing both as a single `update_post/2` halves
+  # the number of round-trips per save (PR #2 review #6) and keeps the
+  # post row's `updated_at` consistent across the two concerns.
+  defp maybe_sync_datetime_and_audit(db_post, params, audit_meta) do
+    attrs =
+      %{}
+      |> add_datetime_sync_attrs(db_post, params)
+      |> maybe_put(:updated_by_uuid, audit_meta[:updated_by_uuid])
+      |> maybe_put(:updated_by_email, audit_meta[:updated_by_email])
+
+    if map_size(attrs) == 0 do
+      {:ok, db_post}
+    else
+      case DBStorage.update_post(db_post, attrs) do
+        {:ok, updated} -> {:ok, updated}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp add_datetime_sync_attrs(attrs, %{mode: "timestamp"} = db_post, params) do
     case parse_published_at_from_params(params) do
       nil ->
-        {:ok, db_post}
+        attrs
 
       %DateTime{} = dt ->
         new_date = DateTime.to_date(dt)
         new_time = %Time{hour: dt.hour, minute: dt.minute, second: 0, microsecond: {0, 0}}
 
         if new_date != db_post.post_date or new_time != db_post.post_time do
-          DBStorage.update_post(db_post, %{post_date: new_date, post_time: new_time})
+          attrs
+          |> Map.put(:post_date, new_date)
+          |> Map.put(:post_time, new_time)
         else
-          {:ok, db_post}
+          attrs
         end
     end
   end
 
-  defp maybe_sync_post_datetime(db_post, _params), do: {:ok, db_post}
-
-  # Updates audit fields (updated_by_uuid, updated_by_email) on the post record
-  defp maybe_update_audit_fields(db_post, audit_meta) do
-    audit_attrs =
-      %{}
-      |> maybe_put(:updated_by_uuid, audit_meta[:updated_by_uuid])
-      |> maybe_put(:updated_by_email, audit_meta[:updated_by_email])
-
-    if map_size(audit_attrs) > 0 do
-      case DBStorage.update_post(db_post, audit_attrs) do
-        {:ok, _} -> :ok
-        {:error, reason} -> {:error, reason}
-      end
-    else
-      :ok
-    end
-  end
+  defp add_datetime_sync_attrs(attrs, _db_post, _params), do: attrs
 
   # Only drop group prefix if there are more elements after it
   # This prevents dropping the post slug when it matches the group slug

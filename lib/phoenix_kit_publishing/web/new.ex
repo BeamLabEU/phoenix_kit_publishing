@@ -5,7 +5,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
   use PhoenixKitWeb, :live_view
   use Gettext, backend: PhoenixKitWeb.Gettext
 
+  require Logger
+
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
@@ -13,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
   # Preset types with their default item names
   @preset_types Publishing.preset_types()
 
+  @impl true
   def mount(_params, _session, socket) do
     {initial_params, auto_slug?, last_generated_slug, auto_item_names?} =
       normalize_form_params(%{}, true, "", true)
@@ -38,11 +42,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
     {:ok, socket}
   end
 
+  @impl true
   def handle_params(_params, uri, socket) do
     endpoint_url = extract_endpoint_url(uri)
     {:noreply, assign(socket, :endpoint_url, endpoint_url)}
   end
 
+  @impl true
   def handle_event("update_new_group", %{"group" => params}, socket) do
     {normalized_params, auto_slug?, last_generated_slug, auto_item_names?} =
       normalize_form_params(
@@ -136,7 +142,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
 
     # Build options for add_group
     opts =
-      [mode: mode, slug: slug_to_validate, type: type]
+      [
+        mode: mode,
+        slug: slug_to_validate,
+        type: type,
+        actor_uuid: Shared.actor_uuid_from_socket(socket)
+      ]
       |> maybe_add_opt(:item_singular, item_singular)
       |> maybe_add_opt(:item_plural, item_plural)
 
@@ -239,6 +250,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
 
   def handle_event("cancel", _params, socket) do
     {:noreply, push_navigate(socket, to: Routes.path("/admin/publishing"))}
+  end
+
+  @impl true
+  def handle_info(msg, socket) do
+    Logger.debug("[Publishing.Web.New] unhandled message: #{inspect(msg)}")
+    {:noreply, socket}
   end
 
   # Helper to assign form state after an error
@@ -379,6 +396,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
 
   defp extract_endpoint_url(_), do: ""
 
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">
@@ -651,7 +669,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
             </div>
 
             <div class="flex flex-wrap gap-3 justify-end">
-              <button type="submit" class="btn btn-primary btn-sm">
+              <button
+                type="submit"
+                class="btn btn-primary btn-sm"
+                phx-disable-with={gettext("Creating…")}
+              >
                 <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext(
                   "Create Publishing Group"
                 )}

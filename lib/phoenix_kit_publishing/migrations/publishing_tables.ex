@@ -132,8 +132,10 @@ defmodule PhoenixKit.Modules.Publishing.Migrations.PublishingTables do
     WHERE active_version_uuid IS NOT NULL
     """)
 
+    # Partial index — covers the hot path "list active (non-trashed) posts" only.
+    # Name encodes the WHERE clause so future readers know it's not the full column.
     execute("""
-    CREATE INDEX IF NOT EXISTS idx_publishing_posts_trashed_at
+    CREATE INDEX IF NOT EXISTS idx_publishing_posts_active_where_trashed_null
     ON #{prefix_str}phoenix_kit_publishing_posts (trashed_at)
     WHERE trashed_at IS NULL
     """)

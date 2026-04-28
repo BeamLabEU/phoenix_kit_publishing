@@ -18,10 +18,9 @@ defmodule PhoenixKit.Integration.Publishing.TranslateRetryTest do
   # Retry skip logic — languages translated by a previous attempt are skipped
   # ============================================================================
 
-  describe "skip_already_translated/5" do
+  describe "skip_already_translated/4" do
     test "skips languages with content updated after job insertion" do
-      {group, post} = create_group_and_post()
-      group_slug = group["slug"]
+      {_group, post} = create_group_and_post()
 
       # Record a time BEFORE we add translations
       job_inserted_at = DateTime.add(DateTime.utc_now(), -60, :second)
@@ -54,7 +53,6 @@ defmodule PhoenixKit.Integration.Publishing.TranslateRetryTest do
       remaining =
         TranslatePostWorker.skip_already_translated(
           target_languages,
-          group_slug,
           post[:uuid],
           nil,
           job_inserted_at
@@ -68,8 +66,7 @@ defmodule PhoenixKit.Integration.Publishing.TranslateRetryTest do
     end
 
     test "does not skip languages with content from before job insertion" do
-      {group, post} = create_group_and_post()
-      group_slug = group["slug"]
+      {_group, post} = create_group_and_post()
 
       # Create "de" content BEFORE the job was "inserted"
       version = DBStorage.get_latest_version(post[:uuid])
@@ -89,7 +86,6 @@ defmodule PhoenixKit.Integration.Publishing.TranslateRetryTest do
       remaining =
         TranslatePostWorker.skip_already_translated(
           ["de"],
-          group_slug,
           post[:uuid],
           nil,
           job_inserted_at
@@ -100,8 +96,7 @@ defmodule PhoenixKit.Integration.Publishing.TranslateRetryTest do
     end
 
     test "processes all languages when none were previously translated" do
-      {group, post} = create_group_and_post()
-      group_slug = group["slug"]
+      {_group, post} = create_group_and_post()
 
       job_inserted_at = DateTime.add(DateTime.utc_now(), -60, :second)
       target_languages = ["de", "fr", "es"]
@@ -109,7 +104,6 @@ defmodule PhoenixKit.Integration.Publishing.TranslateRetryTest do
       remaining =
         TranslatePostWorker.skip_already_translated(
           target_languages,
-          group_slug,
           post[:uuid],
           nil,
           job_inserted_at

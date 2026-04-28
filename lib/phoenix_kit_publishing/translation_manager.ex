@@ -24,9 +24,14 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
   Accepts an optional version parameter to specify which version to add
   the translation to. If not specified, defaults to the latest version.
   """
-  @spec add_language_to_post(String.t(), String.t(), String.t(), integer() | nil) ::
-          {:ok, map()} | {:error, any()}
-  def add_language_to_post(group_slug, post_uuid, language_code, version \\ nil) do
+  @spec add_language_to_post(
+          String.t(),
+          String.t(),
+          String.t(),
+          integer() | nil,
+          keyword() | map()
+        ) :: {:ok, map()} | {:error, any()}
+  def add_language_to_post(group_slug, post_uuid, language_code, version \\ nil, opts \\ []) do
     result = add_language_to_db(group_slug, post_uuid, language_code, version)
 
     with {:ok, new_post} <- result do
@@ -37,6 +42,19 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       if broadcast_id do
         PublishingPubSub.broadcast_translation_created(group_slug, broadcast_id, language_code)
       end
+
+      ActivityLog.log_manual(
+        "publishing.translation.added",
+        ActivityLog.actor_uuid(opts),
+        "publishing_content",
+        new_post.uuid,
+        %{
+          "group_slug" => group_slug,
+          "post_uuid" => post_uuid,
+          "language" => language_code,
+          "version" => version
+        }
+      )
     end
 
     result
@@ -47,6 +65,8 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
   # success so legacy base-code content can be promoted in place (for example
   # "en" -> "en-US") without surfacing a false duplicate-language error.
   @doc false
+  @spec add_language_to_db(String.t(), String.t(), String.t(), integer() | nil) ::
+          {:ok, any()} | {:error, any()}
   def add_language_to_db(group_slug, post_uuid, language_code, version_number) do
     with raw_db_post when not is_nil(raw_db_post) <-
            DBStorage.get_post_by_uuid(post_uuid, [:group]),
@@ -63,11 +83,6 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       nil ->
         {:error, :not_found}
 
-      %PhoenixKit.Modules.Publishing.PublishingContent{} = _existing ->
-        db_post = DBStorage.get_post_by_uuid(post_uuid, [:group])
-        resolved_version = resolve_version_number(db_post, version_number)
-        Shared.read_back_post(group_slug, post_uuid, db_post, language_code, resolved_version)
-
       {:error, reason} ->
         {:error, reason}
     end
@@ -78,18 +93,6 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       )
 
       {:error, :not_found}
-  end
-
-  defp resolve_version_number(_db_post, version_number) when not is_nil(version_number),
-    do: version_number
-
-  defp resolve_version_number(nil, _), do: nil
-
-  defp resolve_version_number(db_post, _) do
-    case DBStorage.get_latest_version(db_post.uuid) do
-      nil -> nil
-      v -> v.version_number
-    end
   end
 
   defp ensure_language_content(version_uuid, language_code) do
@@ -187,9 +190,9 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
 
   Returns :ok on success or {:error, reason} on failure.
   """
-  @spec delete_language(String.t(), String.t(), String.t(), integer() | nil) ::
+  @spec delete_language(String.t(), String.t(), String.t(), integer() | nil, keyword() | map()) ::
           :ok | {:error, term()}
-  def delete_language(group_slug, post_uuid, language_code, version \\ nil) do
+  def delete_language(group_slug, post_uuid, language_code, version \\ nil, opts \\ []) do
     with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
          db_version when not is_nil(db_version) <- Shared.resolve_db_version(db_post, version),
          content when not is_nil(content) <-
@@ -198,6 +201,20 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
          {:ok, _} <- DBStorage.update_content(content, %{status: "archived"}) do
       ListingCache.regenerate(group_slug)
       PublishingPubSub.broadcast_translation_deleted(group_slug, db_post.uuid, language_code)
+
+      ActivityLog.log_manual(
+        "publishing.translation.deleted",
+        ActivityLog.actor_uuid(opts),
+        "publishing_content",
+        content.uuid,
+        %{
+          "group_slug" => group_slug,
+          "post_uuid" => db_post.uuid,
+          "language" => language_code,
+          "version_uuid" => db_version.uuid
+        }
+      )
+
       :ok
     else
       nil -> {:error, :not_found}

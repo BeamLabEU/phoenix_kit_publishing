@@ -28,7 +28,8 @@ config :phoenix_kit_publishing, PhoenixKitPublishing.Test.Endpoint,
   secret_key_base: String.duplicate("t", 64),
   server: false,
   url: [host: "localhost"],
-  render_errors: [formats: [html: PhoenixKitPublishing.Test.Layouts]]
+  render_errors: [formats: [html: PhoenixKitPublishing.Test.Layouts]],
+  live_view: [signing_salt: "publishing-test-live-view-salt-1234567890ab"]
 
 config :phoenix, :json_library, Jason
 

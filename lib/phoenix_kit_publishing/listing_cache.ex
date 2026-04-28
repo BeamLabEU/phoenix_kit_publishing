@@ -556,6 +556,8 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   @doc """
   Finds a cached post by mode — uses date/time lookup for timestamp mode, slug for others.
   """
+  @spec find_post_by_mode(String.t(), map()) ::
+          {:ok, map()} | {:error, :cache_miss | :not_found}
   def find_post_by_mode(group_slug, post) do
     mode = Map.get(post, :mode)
 

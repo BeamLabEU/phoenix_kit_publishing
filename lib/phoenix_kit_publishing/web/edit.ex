@@ -10,9 +10,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   alias Phoenix.Component
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
 
+  @impl true
   def mount(%{"group" => group_slug} = _params, _session, socket) do
     case find_group(group_slug) do
       nil ->
@@ -38,14 +40,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     end
   end
 
+  @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
+  @impl true
   def handle_event("validate", %{"group" => params}, socket) do
     {:noreply, assign(socket, :form, Component.to_form(params, as: :group))}
   end
 
   def handle_event("save", %{"group" => params}, socket) do
-    case Publishing.update_group(socket.assigns.group["slug"], params) do
+    case Publishing.update_group(socket.assigns.group["slug"], params,
+           actor_uuid: Shared.actor_uuid_from_socket(socket)
+         ) do
       {:ok, updated_group} ->
         # Broadcast group updated for live dashboard updates
         PublishingPubSub.broadcast_group_updated(updated_group)
@@ -62,12 +68,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          |> assign(:form, updated_form)
          |> put_flash(:info, gettext("Group updated"))
          |> push_navigate(to: Routes.path("/admin/publishing/#{updated_group["slug"]}"))}
-
-      {:error, :already_exists} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("Another group already uses that slug."))
-         |> assign(:form, Component.to_form(params, as: :group))}
 
       {:error, :invalid_name} ->
         {:noreply,
@@ -86,24 +86,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          )
          |> assign(:form, Component.to_form(params, as: :group))}
 
-      {:error, :destination_exists} ->
+      {:error, :not_found} ->
         {:noreply,
          socket
-         |> put_flash(:error, gettext("Another group already uses that slug."))
-         |> assign(:form, Component.to_form(params, as: :group))}
-
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           gettext("Failed to update group: %{reason}", reason: inspect(reason))
-         )
-         |> assign(:form, Component.to_form(params, as: :group))}
+         |> put_flash(:error, gettext("Group not found"))
+         |> push_navigate(to: Routes.path("/admin/publishing"))}
     end
   rescue
-    e ->
-      Logger.error("[Publishing.Edit] Group save failed: #{Exception.message(e)}")
+    # Narrow to the realistic failure classes (DB errors, optimistic-lock
+    # races, query construction). Leaves system errors / programmer mistakes
+    # / ArithmeticError etc. to crash the LV with a useful stacktrace.
+    e in [
+      Ecto.QueryError,
+      Ecto.ConstraintError,
+      Ecto.StaleEntryError,
+      DBConnection.ConnectionError
+    ] ->
+      Logger.error(
+        "[Publishing.Edit] Group save failed: " <>
+          Exception.format(:error, e, __STACKTRACE__)
+      )
+
       {:noreply, put_flash(socket, :error, gettext("Something went wrong. Please try again."))}
   end
 
@@ -111,11 +114,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, push_navigate(socket, to: Routes.path("/admin/publishing"))}
   end
 
+  @impl true
+  def handle_info(msg, socket) do
+    Logger.debug("[Publishing.Web.Edit] unhandled message: #{inspect(msg)}")
+    {:noreply, socket}
+  end
+
   defp find_group(slug) do
     Publishing.list_groups()
     |> Enum.find(&(&1["slug"] == slug))
   end
 
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">
@@ -189,7 +199,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
             </div>
 
             <div class="flex flex-wrap gap-3 justify-end">
-              <button type="submit" class="btn btn-primary btn-sm">
+              <button
+                type="submit"
+                class="btn btn-primary btn-sm"
+                phx-disable-with={gettext("Saving…")}
+              >
                 <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save Changes")}
               </button>
               <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel">

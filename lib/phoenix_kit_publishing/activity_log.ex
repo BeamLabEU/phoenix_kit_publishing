@@ -19,15 +19,89 @@ defmodule PhoenixKit.Modules.Publishing.ActivityLog do
       try do
         PhoenixKit.Activity.log(Map.put(attrs, :module, @module_key))
       rescue
+        Postgrex.Error ->
+          # phoenix_kit_activities table may be missing in test sandboxes
+          # or hosts that haven't run the Activity migration. Silent —
+          # we don't want to spam Logger on every mutation.
+          :ok
+
+        DBConnection.OwnershipError ->
+          # Test process not allowed on sandbox connection (background
+          # task / async PubSub broadcast crossing into a logging path).
+          # The primary mutation already succeeded; audit failure is
+          # acceptable here. Silent for the same reason as Postgrex.Error.
+          :ok
+
         error ->
           Logger.warning(
             "PhoenixKit.Modules.Publishing activity log failed: " <>
               "#{Exception.message(error)} — " <>
               "attrs=#{inspect(Map.take(attrs, [:action, :resource_type, :resource_uuid]))}"
           )
+      catch
+        :exit, _reason ->
+          # Sandbox connection lost mid-call. Same rationale as
+          # rescue clauses above — primary write already done, audit
+          # row drop is acceptable.
+          :ok
       end
     end
 
     :ok
+  end
+
+  @doc """
+  Convenience for the standard "user-driven mutation" shape — wraps `log/1`
+  with `mode: "manual"` and the canonical key set so context functions only
+  pass the bits that vary.
+  """
+  @spec log_manual(String.t(), String.t() | nil, String.t(), String.t() | nil, map()) :: :ok
+  def log_manual(action, actor_uuid, resource_type, resource_uuid, metadata \\ %{}) do
+    log(%{
+      action: action,
+      mode: "manual",
+      actor_uuid: actor_uuid,
+      resource_type: resource_type,
+      resource_uuid: resource_uuid,
+      metadata: metadata
+    })
+  end
+
+  @doc """
+  Extracts `:actor_uuid` from an opts keyword list or map. Returns `nil` for
+  anything else. Designed to be the single point where context functions
+  read the caller's user identity — keeps the call sites short.
+  """
+  @spec actor_uuid(keyword() | map() | nil) :: String.t() | nil
+  def actor_uuid(opts) when is_list(opts), do: Keyword.get(opts, :actor_uuid)
+  def actor_uuid(opts) when is_map(opts), do: Map.get(opts, :actor_uuid)
+  def actor_uuid(_), do: nil
+
+  @doc """
+  Logs a failed user-driven mutation with `db_pending: true` so the audit
+  trail still captures the user-initiated action when the primary write
+  failed (DB constraint, sandbox crash, etc).
+
+  `resource_uuid` is `nil` when the failure happened before a row was
+  assigned a UUID — that's expected for create paths. Metadata callers
+  pass should still be PII-safe (slugs / names / status, never email or
+  free-text body).
+  """
+  @spec log_failed_mutation(
+          String.t(),
+          String.t() | nil,
+          String.t(),
+          String.t() | nil,
+          map()
+        ) :: :ok
+  def log_failed_mutation(action, actor_uuid, resource_type, resource_uuid, metadata \\ %{}) do
+    log(%{
+      action: action,
+      mode: "manual",
+      actor_uuid: actor_uuid,
+      resource_type: resource_type,
+      resource_uuid: resource_uuid,
+      metadata: Map.put(metadata, "db_pending", true)
+    })
   end
 end

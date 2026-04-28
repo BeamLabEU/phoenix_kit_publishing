@@ -20,6 +20,7 @@ defmodule PhoenixKit.Modules.Publishing do
 
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Modules.Languages
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.SlugHelpers
@@ -83,12 +84,15 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate remove_group(slug), to: Groups
   defdelegate remove_group(slug, opts), to: Groups
   defdelegate update_group(slug, params), to: Groups
+  defdelegate update_group(slug, params, opts), to: Groups
   defdelegate trash_group(slug), to: Groups
+  defdelegate trash_group(slug, opts), to: Groups
   defdelegate group_name(slug), to: Groups
   defdelegate get_group_mode(group_slug), to: Groups
   defdelegate preset_types(), to: Groups
   defdelegate valid_types(), to: Groups
   defdelegate restore_group(slug), to: Groups
+  defdelegate restore_group(slug, opts), to: Groups
   defdelegate list_trashed_groups(), to: Groups
 
   # ============================================================================
@@ -105,7 +109,9 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate read_post_by_uuid(post_uuid, language \\ nil, version \\ nil), to: Posts
   defdelegate update_post(group_slug, post, params, opts \\ %{}), to: Posts
   defdelegate trash_post(group_slug, post_uuid), to: Posts
+  defdelegate trash_post(group_slug, post_uuid, opts), to: Posts
   defdelegate restore_post(group_slug, post_uuid), to: Posts
+  defdelegate restore_post(group_slug, post_uuid, opts), to: Posts
   defdelegate count_posts_on_date(group_slug, date), to: Posts
   defdelegate list_times_on_date(group_slug, date), to: Posts
   defdelegate read_post_by_datetime(group_slug, date, time), to: DBStorage
@@ -147,6 +153,7 @@ defmodule PhoenixKit.Modules.Publishing do
 
   defdelegate unpublish_post(group_slug, post_uuid, opts \\ []), to: Versions
   defdelegate delete_version(group_slug, post_uuid, version), to: Versions
+  defdelegate delete_version(group_slug, post_uuid, version, opts), to: Versions
   @doc false
   defdelegate broadcast_version_created(group_slug, broadcast_id, new_version), to: Versions
 
@@ -156,11 +163,17 @@ defmodule PhoenixKit.Modules.Publishing do
 
   alias PhoenixKit.Modules.Publishing.TranslationManager
 
+  defdelegate add_language_to_post(group_slug, post_uuid, language_code, version, opts),
+    to: TranslationManager
+
   defdelegate add_language_to_post(group_slug, post_uuid, language_code, version \\ nil),
     to: TranslationManager
 
   @doc false
   defdelegate add_language_to_db(group_slug, post_uuid, language_code, version_number),
+    to: TranslationManager
+
+  defdelegate delete_language(group_slug, post_uuid, language_code, version, opts),
     to: TranslationManager
 
   defdelegate delete_language(group_slug, post_uuid, language_code, version \\ nil),
@@ -202,13 +215,37 @@ defmodule PhoenixKit.Modules.Publishing do
   @impl PhoenixKit.Module
   @spec enable_system() :: {:ok, any()} | {:error, any()}
   def enable_system do
-    settings_call(:update_boolean_setting, [@publishing_enabled_key, true])
+    result = settings_call(:update_boolean_setting, [@publishing_enabled_key, true])
+
+    with {:ok, _} <- result do
+      ActivityLog.log_manual(
+        "publishing.module.enabled",
+        nil,
+        "publishing_module",
+        nil,
+        %{}
+      )
+    end
+
+    result
   end
 
   @impl PhoenixKit.Module
   @spec disable_system() :: {:ok, any()} | {:error, any()}
   def disable_system do
-    settings_call(:update_boolean_setting, [@publishing_enabled_key, false])
+    result = settings_call(:update_boolean_setting, [@publishing_enabled_key, false])
+
+    with {:ok, _} <- result do
+      ActivityLog.log_manual(
+        "publishing.module.disabled",
+        nil,
+        "publishing_module",
+        nil,
+        %{}
+      )
+    end
+
+    result
   end
 
   @impl PhoenixKit.Module
@@ -354,7 +391,7 @@ defmodule PhoenixKit.Modules.Publishing do
 
   Group slugs cannot be language codes (like 'en', 'es', 'fr') to prevent routing ambiguity.
   """
-  @spec valid_slug?(String.t()) :: boolean()
+  @spec valid_slug?(any()) :: boolean()
   def valid_slug?(slug) when is_binary(slug) do
     slug != "" and Regex.match?(@slug_regex, slug) and not reserved_language_code?(slug)
   end

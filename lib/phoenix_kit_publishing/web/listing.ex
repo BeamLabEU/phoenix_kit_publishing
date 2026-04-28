@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.StaleFixer
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
@@ -133,7 +134,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   def handle_event("trash_post", %{"uuid" => post_uuid}, socket) do
     group_slug = socket.assigns.group_slug
 
-    case Publishing.trash_post(group_slug, post_uuid) do
+    case Publishing.trash_post(group_slug, post_uuid,
+           actor_uuid: Shared.actor_uuid_from_socket(socket)
+         ) do
       {:ok, _} ->
         {:noreply,
          socket
@@ -149,7 +152,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   def handle_event("restore_post", %{"uuid" => post_uuid}, socket) do
     group_slug = socket.assigns.group_slug
 
-    case Publishing.restore_post(group_slug, post_uuid) do
+    case Publishing.restore_post(group_slug, post_uuid,
+           actor_uuid: Shared.actor_uuid_from_socket(socket)
+         ) do
       {:ok, _} ->
         {:noreply,
          socket
@@ -424,6 +429,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     else
       {:noreply, assign(socket, :groups, load_db_groups())}
     end
+  end
+
+  # Catch-all — log unknown PubSub messages at :debug instead of crashing
+  # the LV. Matches the workspace precedent
+  # (`phoenix_kit_sync/lib/phoenix_kit_sync/web/connections_live.ex:1042`).
+  def handle_info(msg, socket) do
+    require Logger
+    Logger.debug("[Publishing.Listing] unhandled handle_info: #{inspect(msg)}")
+    {:noreply, socket}
   end
 
   defp refresh_posts(socket) do
@@ -866,7 +880,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   defp do_update_post_status(socket, post_uuid, new_status) do
     group_slug = socket.assigns.group_slug
 
-    result = apply_status_change(group_slug, post_uuid, new_status)
+    actor_uuid = Shared.actor_uuid_from_socket(socket)
+    result = apply_status_change(group_slug, post_uuid, new_status, actor_uuid)
 
     case result do
       :ok ->
@@ -880,17 +895,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
-  defp apply_status_change(group_slug, post_uuid, "published") do
+  defp apply_status_change(group_slug, post_uuid, "published", actor_uuid) do
     case Publishing.read_post_by_uuid(post_uuid) do
-      {:ok, post} -> Publishing.publish_version(group_slug, post_uuid, post[:version] || 1)
-      error -> error
+      {:ok, post} ->
+        Publishing.publish_version(group_slug, post_uuid, post[:version] || 1,
+          actor_uuid: actor_uuid
+        )
+
+      error ->
+        error
     end
   end
 
-  defp apply_status_change(group_slug, post_uuid, status) when status in ["draft", "archived"],
-    do: Publishing.unpublish_post(group_slug, post_uuid)
+  defp apply_status_change(group_slug, post_uuid, status, actor_uuid)
+       when status in ["draft", "archived"],
+       do: Publishing.unpublish_post(group_slug, post_uuid, actor_uuid: actor_uuid)
 
-  defp apply_status_change(_, _, _), do: {:error, :invalid_status}
+  defp apply_status_change(_, _, _, _), do: {:error, :invalid_status}
 
   @doc """
   Builds language data for the publishing_language_switcher component.
@@ -942,10 +963,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     <div class="space-y-4">
       <div class="flex-1">
         <div class="flex flex-wrap gap-2 items-center justify-end mb-2">
-          <button type="button" class="btn btn-outline btn-sm shadow-none" phx-click="refresh">
+          <button
+            type="button"
+            class="btn btn-outline btn-sm shadow-none"
+            phx-click="refresh"
+            phx-disable-with={gettext("Refreshing…")}
+          >
             <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" /> {gettext("Refresh")}
           </button>
-          <button type="button" class="btn btn-primary btn-sm" phx-click="create_post">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            phx-click="create_post"
+            phx-disable-with={gettext("Creating…")}
+          >
             <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Create Post")}
           </button>
         </div>
@@ -1152,6 +1183,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                             type="button"
                             phx-click="trash_post"
                             phx-value-uuid={post[:uuid]}
+                            phx-disable-with={gettext("Trashing…")}
                             class="inline-flex items-center gap-1.5 px-2.5 h-[2.5em] rounded-lg border border-error/20 bg-error/5 hover:bg-error/15 text-error/60 hover:text-error transition-colors cursor-pointer"
                             data-confirm={gettext("Move this post to trash?")}
                             title={gettext("Move to trash")}
@@ -1163,6 +1195,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                             type="button"
                             phx-click="restore_post"
                             phx-value-uuid={post[:uuid]}
+                            phx-disable-with={gettext("Restoring…")}
                             class="inline-flex items-center gap-1.5 px-2.5 h-[2.5em] rounded-lg border border-success/30 bg-success/10 hover:bg-success/20 text-success font-medium transition-colors cursor-pointer"
                             title={gettext("Restore")}
                           >
