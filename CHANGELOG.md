@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 - 2026-04-28
 
 PR #10 — quality sweep + 4 coverage-push batches (33.34% → 63.79% line coverage).
 
