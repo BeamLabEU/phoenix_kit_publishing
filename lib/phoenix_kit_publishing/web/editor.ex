@@ -30,6 +30,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.Web.Controller.Language, as: ControllerLanguage
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
   alias PhoenixKitAI, as: AI
@@ -214,7 +215,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
 
         {socket, form_key} =
-          if language && language not in post.available_languages do
+          if language && new_translation_request?(language, post) do
             handle_new_translation_params(
               socket,
               post,
@@ -269,7 +270,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
 
         {socket, form_key} =
-          if requested_lang && requested_lang not in post.available_languages do
+          if requested_lang && new_translation_request?(requested_lang, post) do
             handle_new_translation_params(
               socket,
               post,
@@ -367,6 +368,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   defp parse_version_param(_), do: nil
+
+  # Returns true when the requested ?lang= parameter does not resolve to any
+  # existing content row on the post — i.e. the editor should open a blank
+  # form for adding a new translation. A bare base code that matches one of
+  # the post's enabled dialects (e.g. ?lang=en against ["en-GB", "ru"]) is
+  # treated as editing the existing dialect, not as a new-translation request.
+  defp new_translation_request?(language, %{available_languages: available}) do
+    ControllerLanguage.resolve_language_for_post(language, available) not in available
+  end
 
   defp handle_new_translation_params(
          socket,

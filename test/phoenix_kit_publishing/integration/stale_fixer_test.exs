@@ -1,5 +1,10 @@
 defmodule PhoenixKit.Integration.Publishing.StaleFixerTest do
-  use PhoenixKit.DataCase, async: true
+  # async: false because every test in this file mutates the shared
+  # `content_language` setting (ETS-cached singleton). Two parallel runs
+  # in the same Elixir VM clobber each other's content_language, which
+  # made test ":96 url slug lookup repairs legacy base-language slugs"
+  # flake roughly 1-in-15 runs before this was switched off.
+  use PhoenixKit.DataCase, async: false
 
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups

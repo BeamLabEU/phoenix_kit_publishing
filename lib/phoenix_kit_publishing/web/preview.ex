@@ -65,7 +65,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
             translations =
               Translations.build_translation_links(group_slug, post, canonical_language)
 
-            breadcrumbs = PostRendering.build_breadcrumbs(group_slug, post, canonical_language, group_name)
+            breadcrumbs =
+              PostRendering.build_breadcrumbs(group_slug, post, canonical_language, group_name)
 
             version_dropdown =
               PostRendering.build_version_dropdown(group_slug, post, canonical_language)

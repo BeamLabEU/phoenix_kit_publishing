@@ -727,21 +727,44 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # Content rows store full dialect codes, but URL paths use base codes.
   defp resolve_language_to_dialect(nil), do: nil
 
-  # Only resolve base codes (e.g. "en") to dialects (e.g. "en-US") if the base
-  # code doesn't exist as an enabled language. If "en" is enabled, use "en" directly.
+  # Resolution order:
+  #   1. The code is itself an enabled language → use as-is.
+  #   2. The code is a base ("en") and an enabled dialect shares that base
+  #      ("en-GB") → use that dialect, preferring `get_primary_language/0`
+  #      when several dialects share the base.
+  #   3. The code is a base with no matching enabled dialect → fall back to
+  #      `DialectMapper.base_to_dialect/1` (hard-coded default like en→en-US).
+  #   4. The code is a full dialect not enabled → return as-is and let the
+  #      caller's `resolve_content/2` fallback chain handle the miss.
   defp resolve_language_to_dialect(language) do
     enabled = LanguageHelpers.enabled_language_codes()
 
-    if language in enabled do
-      language
-    else
-      base = DialectMapper.extract_base(language)
-
-      if base == language do
-        DialectMapper.base_to_dialect(language)
-      else
+    cond do
+      language in enabled ->
         language
-      end
+
+      DialectMapper.extract_base(language) == language ->
+        enabled_dialect_for_base(language, enabled) || DialectMapper.base_to_dialect(language)
+
+      true ->
+        language
+    end
+  end
+
+  # Picks an enabled dialect whose base matches `base`. When multiple dialects
+  # share the base, prefers `get_primary_language/0` if present, otherwise
+  # the first match in declaration order.
+  defp enabled_dialect_for_base(base, enabled) do
+    case Enum.filter(enabled, fn code -> DialectMapper.extract_base(code) == base end) do
+      [] ->
+        nil
+
+      [single] ->
+        single
+
+      multiple ->
+        primary = LanguageHelpers.get_primary_language()
+        if primary in multiple, do: primary, else: List.first(multiple)
     end
   end
 

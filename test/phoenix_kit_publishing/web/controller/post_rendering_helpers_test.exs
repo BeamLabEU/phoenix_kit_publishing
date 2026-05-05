@@ -62,7 +62,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRenderingHelpersTest 
     end
   end
 
-  describe "build_timestamp_url/4 + build_breadcrumbs/3" do
+  describe "build_timestamp_url/4 + build_breadcrumbs/4" do
     test "build_timestamp_url returns a path string" do
       url = PostRendering.build_timestamp_url("blog", "2026-04-27", "10:00", "en")
       assert is_binary(url)
@@ -71,10 +71,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRenderingHelpersTest 
 
     test "build_breadcrumbs returns a 2-element list with group + post" do
       post = %{slug: "x", metadata: %{title: "Title"}, mode: :slug}
-      result = PostRendering.build_breadcrumbs("nonexistent-group", post, "en")
+
+      result =
+        PostRendering.build_breadcrumbs("nonexistent-group", post, "en", "Nonexistent group")
 
       assert is_list(result)
       assert length(result) == 2
+      assert [%{label: "Nonexistent group"}, %{label: "Title"}] = result
     end
   end
 
