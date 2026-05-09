@@ -421,6 +421,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # and on post routes `enabled`/`known`) that are private to the in-page
   # switcher. We normalise to a fixed 5-field shape at the boundary so the
   # public contract is uniform across listing and post routes.
+  #
+  # `translations` is always a list — `Translations.build_listing_translations/3`
+  # and `build_translation_links/4` are the only producers and both return
+  # lists unconditionally. No fallback clause: if that contract is ever
+  # violated, let it crash so the regression surfaces.
   defp assign_publishing_translations(conn, translations) when is_list(translations) do
     normalized =
       Enum.map(translations, fn t ->
@@ -435,8 +440,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
     assign(conn, :phoenix_kit_publishing_translations, normalized)
   end
-
-  defp assign_publishing_translations(conn, _), do: conn
 
   # Read the in-page-switcher toggle. Default `true` preserves the historical
   # behaviour for hosts that haven't flipped the setting.
