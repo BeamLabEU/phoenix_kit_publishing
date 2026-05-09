@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @default_language_no_prefix_key "publishing_default_language_no_prefix"
   @memory_cache_key "publishing_memory_cache_enabled"
   @render_cache_key "publishing_render_cache_enabled"
+  @show_language_switcher_key "publishing_show_language_switcher"
 
   def mount(_params, _session, socket) do
     # Subscribe to group changes for live updates. All DB-backed reads
@@ -44,6 +45,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       |> assign(
         :default_language_no_prefix,
         Settings.get_boolean_setting(@default_language_no_prefix_key, false)
+      )
+      |> assign(
+        :show_language_switcher,
+        Settings.get_boolean_setting(@show_language_switcher_key, true)
       )
       |> assign(
         :memory_cache_enabled,
@@ -130,6 +135,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
        if(new_value,
          do: gettext("Default language public URLs now omit the locale prefix"),
          else: gettext("Default language public URLs now include the locale prefix")
+       )
+     )}
+  end
+
+  def handle_event("toggle_show_language_switcher", _params, socket) do
+    new_value = !socket.assigns.show_language_switcher
+    Settings.update_boolean_setting(@show_language_switcher_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:show_language_switcher, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do:
+           gettext(
+             "In-page language switcher enabled — publishing pages will render their own switcher"
+           ),
+         else:
+           gettext(
+             "In-page language switcher disabled — host layout / custom switcher should render translations"
+           )
        )
      )}
   end
@@ -319,11 +346,37 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             />
           </div>
 
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-language" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("In-Page Language Switcher")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "Render the language switcher on listing + post pages. Disable when your host layout already provides one."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@show_language_switcher}
+              phx-click="toggle_show_language_switcher"
+            />
+          </div>
+
           <div class="text-xs text-base-content/50">
             <p>
               <.icon name="hero-information-circle" class="w-3 h-3 inline" />
               {gettext(
                 "When enabled, default-language public URLs become prefixless and prefixed default-language URLs redirect to the canonical prefixless version."
+              )}
+            </p>
+            <p class="mt-1">
+              <.icon name="hero-information-circle" class="w-3 h-3 inline" />
+              {gettext(
+                "Per-translation URLs are always exposed on the conn under :phoenix_kit_publishing_translations — your host layout can read them whether the in-page switcher is enabled or not."
               )}
             </p>
           </div>

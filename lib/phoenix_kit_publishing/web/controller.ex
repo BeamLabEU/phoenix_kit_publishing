@@ -36,6 +36,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Utils.Routes
   @admin_edit_helper_mod PhoenixKitWeb.AdminEditHelper
 
+  @show_language_switcher_key "publishing_show_language_switcher"
+
   # ============================================================================
   # Main Entry Points
   # ============================================================================
@@ -202,11 +204,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:posts, assigns.posts)
         |> assign(:current_language, assigns.current_language)
         |> assign(:translations, assigns.translations)
+        |> assign_publishing_translations(assigns.translations)
         |> assign(:page, assigns.page)
         |> assign(:per_page, assigns.per_page)
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
         |> assign(:breadcrumbs, assigns.breadcrumbs)
+        |> assign(:show_language_switcher, show_language_switcher?())
         |> assign(:og, %{
           title: assigns.group["name"],
           url: base_url <> listing_url,
@@ -247,8 +251,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:html_content, assigns.html_content)
         |> assign(:current_language, assigns.current_language)
         |> assign(:translations, assigns.translations)
+        |> assign_publishing_translations(assigns.translations)
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:version_dropdown, assigns.version_dropdown)
+        |> assign(:show_language_switcher, show_language_switcher?())
         |> assign(:og, build_og_data(conn, assigns.post, canonical_url, assigns.current_language))
         |> maybe_assign_admin_edit(
           Routes.path("/admin/publishing/#{group_slug}/#{assigns.post.uuid}/edit"),
@@ -277,12 +283,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:html_content, assigns.html_content)
         |> assign(:current_language, assigns.current_language)
         |> assign(:translations, assigns.translations)
+        |> assign_publishing_translations(assigns.translations)
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:canonical_url, assigns.canonical_url)
         |> assign(:is_versioned_view, assigns.is_versioned_view)
         |> assign(:is_live_version, assigns.is_live_version)
         |> assign(:version, assigns.version)
         |> assign(:version_dropdown, assigns.version_dropdown)
+        |> assign(:show_language_switcher, show_language_switcher?())
         |> assign(
           :og,
           build_og_data(conn, assigns.post, assigns.canonical_url, assigns.current_language)
@@ -308,8 +316,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:html_content, assigns.html_content)
         |> assign(:current_language, assigns.current_language)
         |> assign(:translations, assigns.translations)
+        |> assign_publishing_translations(assigns.translations)
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:version_dropdown, assigns.version_dropdown)
+        |> assign(:show_language_switcher, show_language_switcher?())
         |> assign(:og, build_og_data(conn, assigns.post, canonical_url, assigns.current_language))
         |> maybe_assign_admin_edit(
           Routes.path("/admin/publishing/#{group_slug}/#{assigns.post.uuid}/edit"),
@@ -398,5 +408,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     else
       conn
     end
+  end
+
+  # Expose publishing's per-translation URL list under a publishing-namespaced
+  # assign so host root layouts and custom switchers can consume it. The host's
+  # own switcher (e.g. core's `<.language_switcher_dropdown>`) reads this via
+  # `assigns[:phoenix_kit_publishing_translations]` and uses the per-translation
+  # URLs instead of the locale-rewrite default — important for groups with
+  # per-language URL slugs where simple locale-rewrite produces wrong URLs.
+  #
+  # The same data is already available via the internal `:translations` assign,
+  # but that key is too generic for an external boundary; the namespaced assign
+  # is the public API contract.
+  defp assign_publishing_translations(conn, translations) when is_list(translations) do
+    assign(conn, :phoenix_kit_publishing_translations, translations)
+  end
+
+  defp assign_publishing_translations(conn, _), do: conn
+
+  # Read the in-page-switcher toggle. Default `true` preserves the historical
+  # behaviour for hosts that haven't flipped the setting.
+  defp show_language_switcher? do
+    Settings.get_boolean_setting(@show_language_switcher_key, true)
   end
 end

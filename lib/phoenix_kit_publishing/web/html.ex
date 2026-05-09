@@ -127,8 +127,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           </a>
         <% end %>
       </div>
-      <%!-- Language Switcher --%>
-      <%= if length(@translations) > 1 do %>
+      <%!-- Language Switcher (gated on `publishing_show_language_switcher` —
+            disable when the host renders its own switcher in the layout). --%>
+      <%= if assigns[:show_language_switcher] != false and length(@translations) > 1 do %>
         <div class="mt-4">
           <.language_switcher
             languages={build_public_translations(@translations, @current_language)}
@@ -284,8 +285,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         </div>
       <% end %>
       <div class="flex flex-wrap items-center gap-4 mt-4">
-        <%!-- Language Switcher --%>
-        <%= if length(@translations) > 1 do %>
+        <%!-- Language Switcher (gated on `publishing_show_language_switcher` —
+              disable when the host renders its own switcher in the layout). --%>
+        <%= if assigns[:show_language_switcher] != false and length(@translations) > 1 do %>
           <.language_switcher
             languages={build_public_translations(@translations, @current_language)}
             current_language={public_current_language(@translations, @current_language)}

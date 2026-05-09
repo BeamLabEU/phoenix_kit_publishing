@@ -345,6 +345,29 @@ Add new error atoms by extending `@type error_atom`, the doctest example, and ad
 | `publishing_memory_cache_enabled` | `true` | Toggle the listing cache |
 | `publishing_render_cache_enabled` | `true` | Toggle the Markdown render cache (global) |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group override for the render cache |
+| `publishing_show_language_switcher` | `true` | Render the in-page language switcher on listing + post pages. Disable when the host layout already provides one (see "Language switcher integration" below) |
+
+## Language switcher integration
+
+Publishing renders an in-page language switcher on group-listing and post pages by default. Most host apps already have one in their header, in which case the in-page switcher is duplicate UI. Three integration points:
+
+1. **`publishing_show_language_switcher` setting** (default `true`) — flip to `false` in `/admin/settings/publishing` to suppress the in-page switcher. The host layout is then responsible for rendering its own.
+
+2. **`:phoenix_kit_publishing_translations` conn assign** — the public API contract for external switchers. Always set on listing + post conns (regardless of the setting above) as a list of `%{code: <display_code>, url: <full_url>, name: ..., flag: ..., current: bool}` maps. Same data shape `Web.HTML.build_public_translations/2` consumes internally; renamed under the `phoenix_kit_publishing_*` namespace for the external boundary. Custom switchers iterate this list directly.
+
+3. **Core's `<.language_switcher_dropdown>` integration** — the host's root layout passes the assign via the new `:per_translation_urls` attr:
+
+   ```heex
+   <PhoenixKitWeb.Components.Core.LanguageSwitcher.language_switcher_dropdown
+     current_locale={@current_locale}
+     current_path={@url_path}
+     per_translation_urls={assigns[:phoenix_kit_publishing_translations]}
+   />
+   ```
+
+   When the assign is present, the switcher uses publishing's per-translation URLs (important for groups with per-language URL slugs where simple locale-rewrite produces wrong URLs). When absent (non-publishing pages), the switcher falls back to the locale-rewrite default. Languages without a publishing translation also fall back per-language.
+
+Per-translation URLs are exposed regardless of `publishing_show_language_switcher`, so the host can render them whether the in-page switcher is on or off.
 
 ## Testing
 
