@@ -417,11 +417,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # URLs instead of the locale-rewrite default — important for groups with
   # per-language URL slugs where simple locale-rewrite produces wrong URLs.
   #
-  # The same data is already available via the internal `:translations` assign,
-  # but that key is too generic for an external boundary; the namespaced assign
-  # is the public API contract.
+  # The internal `:translations` assign carries extra fields (`display_code`,
+  # and on post routes `enabled`/`known`) that are private to the in-page
+  # switcher. We normalise to a fixed 5-field shape at the boundary so the
+  # public contract is uniform across listing and post routes.
   defp assign_publishing_translations(conn, translations) when is_list(translations) do
-    assign(conn, :phoenix_kit_publishing_translations, translations)
+    normalized =
+      Enum.map(translations, fn t ->
+        %{
+          code: t.code,
+          name: t.name,
+          flag: t.flag,
+          url: t.url,
+          current: t.current
+        }
+      end)
+
+    assign(conn, :phoenix_kit_publishing_translations, normalized)
   end
 
   defp assign_publishing_translations(conn, _), do: conn

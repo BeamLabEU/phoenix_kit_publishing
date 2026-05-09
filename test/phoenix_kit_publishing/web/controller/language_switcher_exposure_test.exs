@@ -40,11 +40,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
 
     :ok = Versions.publish_version(group["slug"], post.uuid, 1)
 
-    on_exit(fn ->
-      # Reset the setting after each test so the file stays async-safe.
-      Settings.update_boolean_setting(@show_switcher_key, true)
-    end)
-
     {:ok, group_slug: group["slug"]}
   end
 
@@ -61,12 +56,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
       assert is_list(translations),
              "expected :phoenix_kit_publishing_translations to be assigned on the conn"
 
-      # Each entry has the documented shape — stable contract for external
-      # consumers (host's switcher, custom UI components).
+      # Each entry has exactly the documented 5-field shape — stable contract
+      # for external consumers (host's switcher, custom UI components).
+      # Internal-only fields (`display_code`, `enabled`, `known`) must NOT
+      # leak across the namespace boundary.
       Enum.each(translations, fn t ->
-        assert is_map(t)
+        assert Map.keys(t) |> Enum.sort() == [:code, :current, :flag, :name, :url]
         assert is_binary(t.code)
+        assert is_binary(t.name)
+        assert is_binary(t.flag)
         assert is_binary(t.url)
+        assert is_boolean(t.current)
       end)
     end
 
@@ -76,6 +76,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
 
       translations = conn.assigns[:phoenix_kit_publishing_translations]
       assert is_list(translations)
+
+      # Post route's internal `:translations` shape carries `enabled`/`known`
+      # in addition to `display_code`; pin that none leak across the boundary.
+      Enum.each(translations, fn t ->
+        assert Map.keys(t) |> Enum.sort() == [:code, :current, :flag, :name, :url]
+      end)
     end
   end
 

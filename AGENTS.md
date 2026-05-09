@@ -353,7 +353,7 @@ Publishing renders an in-page language switcher on group-listing and post pages 
 
 1. **`publishing_show_language_switcher` setting** (default `true`) — flip to `false` in `/admin/settings/publishing` to suppress the in-page switcher. The host layout is then responsible for rendering its own.
 
-2. **`:phoenix_kit_publishing_translations` conn assign** — the public API contract for external switchers. Always set on listing + post conns (regardless of the setting above) as a list of `%{code: <display_code>, url: <full_url>, name: ..., flag: ..., current: bool}` maps. Same data shape `Web.HTML.build_public_translations/2` consumes internally; renamed under the `phoenix_kit_publishing_*` namespace for the external boundary. Custom switchers iterate this list directly.
+2. **`:phoenix_kit_publishing_translations` conn assign** — the public API contract for external switchers. Always set on listing + post conns (regardless of the setting above) as a list of maps with exactly these five fields: `%{code: <display_code>, name: <language_name>, flag: <flag_emoji_or_"">, url: <full_url>, current: <bool>}`. Same fields on listing and post routes — the controller normalises at the boundary, stripping internal-only fields (`display_code`, and on post routes `enabled`/`known`) so external consumers get a uniform shape. Custom switchers iterate this list directly.
 
 3. **Core's `<.language_switcher_dropdown>` integration** — the host's root layout passes the assign via the new `:per_translation_urls` attr:
 
