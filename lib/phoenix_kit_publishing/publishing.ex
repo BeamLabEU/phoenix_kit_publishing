@@ -119,7 +119,13 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate find_by_previous_url_slug(group_slug, language, url_slug), to: Posts
   defdelegate extract_slug_version_and_language(group_slug, identifier), to: Posts
 
-  @doc "Always returns false — auto-versioning is disabled."
+  @doc """
+  Stub: always returns `false`. Versioning is opt-in via the editor's
+  explicit "create new version" action, not implicit on every save —
+  so this predicate is intentionally a no-op kept for API stability
+  with older callers that branch on it.
+  """
+  @spec should_create_new_version?(map(), map(), String.t()) :: false
   def should_create_new_version?(_post, _params, _editing_language), do: false
 
   @doc "Returns true when the given post is a DB-backed post (has a UUID)."
@@ -377,7 +383,21 @@ defmodule PhoenixKit.Modules.Publishing do
 
   @slug_regex ~r/^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
-  @doc false
+  @doc """
+  Lowercases `name`, replaces non-alphanumeric runs with `-`, and trims
+  leading/trailing hyphens. Pairs with `valid_slug?/1` — callers should
+  re-validate the result because slug-shape is enforced separately from
+  generation (reserved language codes, empty results).
+
+  ## Examples
+
+      iex> PhoenixKit.Modules.Publishing.slugify("My First Post!")
+      "my-first-post"
+
+      iex> PhoenixKit.Modules.Publishing.slugify("  spaces & ampersands  ")
+      "spaces-ampersands"
+  """
+  @spec slugify(String.t()) :: String.t()
   def slugify(name) when is_binary(name) do
     name
     |> String.downcase()

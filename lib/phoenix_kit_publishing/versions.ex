@@ -79,7 +79,20 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       "draft"
   end
 
-  # Version metadata lookup (DB-based)
+  @doc """
+  Returns a `%{status, title, url_slug, version}` map for the given
+  group/post/version/language tuple, or `nil` when any link in the
+  chain (post → version → per-language content) is missing.
+
+  Used by the editor and listing views to surface the version's
+  title and URL slug for a specific language without having to load
+  the full version + content rows.
+
+  Returns `nil` (not an `{:error, _}` tuple) on DB exceptions — the
+  caller treats absent metadata the same as a missing version, and
+  the exception is logged for diagnostics.
+  """
+  @spec get_version_metadata(String.t(), String.t(), integer(), String.t()) :: map() | nil
   def get_version_metadata(group_slug, post_slug, version_number, language) do
     with db_post when not is_nil(db_post) <- DBStorage.get_post(group_slug, post_slug),
          db_version when not is_nil(db_version) <-

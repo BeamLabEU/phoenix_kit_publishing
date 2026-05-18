@@ -402,6 +402,27 @@ Publishing renders an in-page language switcher on group-listing and post pages 
 
 Per-translation URLs are exposed regardless of `publishing_show_language_switcher`, so the host can render them whether the in-page switcher is on or off.
 
+### ⚠️ Function-component layouts ONLY see declared attrs
+
+`:phoenix_kit_publishing_translations` is set on `conn.assigns` by the controller. The assign reaches `root.html.heex` (a plain Phoenix template), but **NOT** inner function-component layouts (`<.app_layout>`, the host's `Layouts.app`) unless every wrapper component along the path declares the attr and forwards it explicitly. Phoenix 1.7+ function-components see only declared attrs, not surrounding `conn.assigns`.
+
+Today's forwarding chain:
+
+1. Controller sets `conn.assigns[:phoenix_kit_publishing_translations]` (in `Web.Controller`).
+2. Publishing's three public render branches (`all_groups/1`, `index/1`, `show/1` in `Web.HTML`) pass it explicitly via `phoenix_kit_publishing_translations={assigns[:phoenix_kit_publishing_translations]}` to `<PhoenixKitWeb.Components.LayoutWrapper.app_layout>`.
+3. `LayoutWrapper.app_layout` (in phoenix_kit core) declares the attr and forwards it to the host's `Layouts.app/1`.
+
+If the host consumes the assign from `root.html.heex`, the forwarding chain is irrelevant. If the host consumes it from `Layouts.app/1` (the typical custom-switcher placement), all three steps must hold. The boundary test in `test/phoenix_kit_publishing/web/controller/language_switcher_exposure_test.exs` ("host-integration boundary" describe) pins the full chain by rendering through the test `Layouts.app/1` and comparing `length(conn.assigns[...])` to the rendered nav's `data-count`.
+
+## OpenGraph metadata (`:og` conn assign)
+
+Publishing assigns a `:og` map on every public response for host root layouts to render `<meta property="og:...">` tags. Two shapes:
+
+- **Listing pages** — `%{title, url, locale, type: "website"}` (4 fields).
+- **Post pages** — `%{title, description, image, url, locale, type: "article"}` (6 fields). `description` and `image` may be `nil` when the post has no SEO metadata or featured image.
+
+`:og` lands on `conn.assigns`. It's NOT currently forwarded through `LayoutWrapper.app_layout` — hosts consuming it must do so from `root.html.heex`, not from `Layouts.app/1`. See the function-component-layout callout above for why this matters.
+
 ## Testing
 
 Integration tests live in `test/phoenix_kit_publishing/integration/` and controller tests in `test/phoenix_kit_publishing/web/controller/`. Both need a PostgreSQL database — automatically excluded when unavailable.
