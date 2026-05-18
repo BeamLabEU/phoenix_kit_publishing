@@ -63,9 +63,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/new")
 
-      assert is_binary(html)
-      # The editor renders a publishing-related page with form scaffolding
-      assert html =~ "form" || html =~ "editor"
+      # Mount-doesn't-crash plus the editor form is actually present —
+      # `<form` is the load-bearing landmark on the new-post page. The
+      # prior `"form" || "editor"` passed for any page that happened to
+      # mention either word in markup.
+      assert html =~ "<form"
     end
 
     test "/:group/:post_uuid/edit loads an existing post", %{conn: conn, group: group} do
@@ -76,8 +78,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      # Title is set on the page somewhere — title input or page header
-      assert html =~ "Editor Subject" || html =~ post[:slug]
+      # Title is the load-bearing assertion; the prior `|| post[:slug]`
+      # branch let the test pass even if the title field never rendered.
+      assert html =~ "Editor Subject"
     end
 
     test "?lang= query param selects the language", %{conn: conn, group: group} do

@@ -98,34 +98,48 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
       |> put_test_scope(fake_scope())
       |> live("/admin/publishing/#{group["slug"]}")
 
-    result = render_click(view, "create_post", %{})
-    assert match?({:error, {:live_redirect, _}}, result) or is_binary(result)
+    # `create_post` is expected to issue a live_redirect to the new-post
+    # path. The prior `match?(...) or is_binary(result)` disjunction
+    # passed even when the redirect never happened.
+    assert {:error, {:live_redirect, %{to: to}}} = render_click(view, "create_post", %{})
+    assert to =~ "/admin/publishing/#{group["slug"]}/new"
   end
 
-  test "refresh event re-fetches the post list", %{conn: conn, group: group} do
+  test "refresh event re-fetches the post list", %{conn: conn, group: group, post: _post} do
     {:ok, view, _html} =
       conn
       |> put_test_scope(fake_scope())
       |> live("/admin/publishing/#{group["slug"]}")
 
+    # The seeded post's title is the load-bearing assertion — refresh
+    # is meant to render the list, not just return any binary. (The
+    # listing renders the title verbatim; the slug only appears in the
+    # edit URL via UUID, never as readable text.)
     html = render_click(view, "refresh", %{})
-    assert is_binary(html)
+    assert html =~ "Sample post for listing"
   end
 
-  test "trash_post event soft-deletes a post", %{conn: conn, group: group, post: post} do
+  test "trash_post event soft-deletes a post and flashes success",
+       %{conn: conn, group: group, post: post} do
     {:ok, view, _html} =
       conn
       |> put_test_scope(fake_scope())
       |> live("/admin/publishing/#{group["slug"]}")
 
     html = render_click(view, "trash_post", %{"uuid" => post[:uuid]})
-    assert is_binary(html)
+
+    # Pin both the user-visible flash and the DB-side state. The prior
+    # `is_binary(html)` tautology accepted ANY render including ones
+    # where the trash silently failed. Trashed posts are filtered out
+    # of `Posts.read_post/2` (the active-listing read path), so the
+    # `:not_found` result is the soft-delete success signal.
+    assert html =~ "Post moved to trash"
+    assert Posts.read_post(group["slug"], post[:slug]) == {:error, :not_found}
   end
 
-  test "restore_post event un-trashes a post", %{conn: conn, group: group} do
-    {:ok, post} =
-      Posts.create_post(group["slug"], %{title: "ToRestore"})
-
+  test "restore_post event un-trashes a post and flashes success",
+       %{conn: conn, group: group} do
+    {:ok, post} = Posts.create_post(group["slug"], %{title: "ToRestore"})
     {:ok, _} = Posts.trash_post(group["slug"], post[:uuid])
 
     {:ok, view, _html} =
@@ -135,7 +149,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
 
     _ = render_click(view, "switch_post_view", %{"mode" => "trashed"})
     html = render_click(view, "restore_post", %{"uuid" => post[:uuid]})
-    assert is_binary(html)
+
+    # After restore the post should be visible to `read_post/2` again
+    # (it filters trashed). Flash + reachability together prove the
+    # restore worked end-to-end, not just rendered something.
+    assert html =~ "Post restored as draft"
+    assert {:ok, _reloaded} = Posts.read_post(group["slug"], post[:slug])
   end
 
   test "handle_info {:post_updated, post} schedules debounced refresh", %{

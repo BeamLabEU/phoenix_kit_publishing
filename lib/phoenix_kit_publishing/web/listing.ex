@@ -887,7 +887,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       :ok ->
         {:noreply,
          socket
-         |> put_flash(:info, gettext("Status updated to %{status}", status: new_status))
+         |> put_flash(:info, gettext("Status updated to %{status}", status: status_label(new_status)))
          |> reload_current_view()}
 
       {:error, _reason} ->
@@ -912,6 +912,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
        do: Publishing.unpublish_post(group_slug, post_uuid, actor_uuid: actor_uuid)
 
   defp apply_status_change(_, _, _, _), do: {:error, :invalid_status}
+
+  # Translates the four valid post statuses for user-facing display.
+  # The raw keys (`"draft"`/`"published"`/`"archived"`/`"trashed"`) flow
+  # through to the UI from the DB and from URL params; gettext.extract
+  # only catches literal arguments, so the keys must be enumerated here
+  # rather than passed as variables to gettext/1.
+  defp status_label("draft"), do: gettext("Draft")
+  defp status_label("published"), do: gettext("Published")
+  defp status_label("archived"), do: gettext("Archived")
+  defp status_label("trashed"), do: gettext("Trashed")
+  defp status_label(other) when is_binary(other), do: other
 
   @doc """
   Builds language data for the publishing_language_switcher component.

@@ -207,10 +207,15 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
 
   describe "render_markdown/1 — PHK XML detection" do
     test "renders pure PHK content via PageBuilder" do
-      # An unknown component goes through PageBuilder.render_unknown wrapper
+      # An unknown PHK tag rounds through the renderer; PageBuilder's
+      # current behaviour preserves the tag and inner text verbatim
+      # rather than wrapping it. The load-bearing assertion is that
+      # the inner text survives — silently dropping the body would
+      # erase user-visible content. Tag preservation is implementation
+      # detail we don't pin here.
       content = "<Foobar>hello</Foobar>"
       html = Renderer.render_markdown(content)
-      assert html =~ "unknown-component" or html =~ "hello"
+      assert html =~ "hello"
     end
 
     test "renders mixed content (markdown + inline component)" do

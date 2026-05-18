@@ -104,6 +104,56 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
     end
   end
 
+  describe "host-integration boundary (function-component layout)" do
+    # Pins the PR #15 bug class: setting :phoenix_kit_publishing_translations
+    # on the conn is necessary but NOT sufficient — the assign must also
+    # survive the function-component layout boundary (`LayoutWrapper.app_layout`
+    # → host's `Layouts.app`). Function components see ONLY explicitly
+    # declared attrs, so a missing `attr` on either side silently drops it.
+    # `PhoenixKitPublishing.Test.Layouts.app/1` declares the attr and renders
+    # `<nav data-testid="host-publishing-translations">` with one `<a>` per
+    # translation; asserting against that nav proves the chain end-to-end.
+
+    test "translations reach the host's Layouts.app via app_layout forwarding",
+         %{conn: conn, group_slug: group_slug} do
+      {:ok, _} = Settings.update_boolean_setting("languages_enabled", true)
+
+      conn = get(conn, "/" <> group_slug)
+      html = html_response(conn, 200)
+
+      # Length the controller actually put on the conn — this is the value
+      # the host's Layouts.app SHOULD see after forwarding.
+      expected_count = length(conn.assigns[:phoenix_kit_publishing_translations] || [])
+
+      assert html =~ ~s(data-testid="host-publishing-translations"),
+             "host Layouts.app didn't render — boundary marker missing"
+
+      # If forwarding is broken, the layout defaults the value to `nil` and
+      # renders `data-count="0"`, regardless of what the controller put on
+      # the conn. Asserting both halves match is what distinguishes "the
+      # assign survived the function-component boundary" from "we got a
+      # silently-coincident empty render."
+      assert html =~ ~s(data-testid="host-publishing-translations" data-count="#{expected_count}"),
+             "Layouts.app's `data-count` does not match `length(conn.assigns[:phoenix_kit_publishing_translations])` — the assign was dropped at the function-component layout boundary"
+    end
+
+    test "translations reach the host's Layouts.app for post pages too",
+         %{conn: conn, group_slug: group_slug} do
+      {:ok, _} = Settings.update_boolean_setting("languages_enabled", true)
+
+      conn = get(conn, "/" <> group_slug <> "/hello-world")
+      html = html_response(conn, 200)
+
+      expected_count = length(conn.assigns[:phoenix_kit_publishing_translations] || [])
+
+      assert html =~ ~s(data-testid="host-publishing-translations"),
+             "host Layouts.app didn't render — boundary marker missing"
+
+      assert html =~ ~s(data-testid="host-publishing-translations" data-count="#{expected_count}"),
+             "post-page render dropped :phoenix_kit_publishing_translations at the function-component layout boundary"
+    end
+  end
+
   describe "publishing_show_language_switcher setting" do
     test "default is true — in-page switcher renders when translations > 1", %{
       conn: conn,

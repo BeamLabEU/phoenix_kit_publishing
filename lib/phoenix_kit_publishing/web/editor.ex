@@ -2313,6 +2313,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <button
                     type="button"
                     phx-click="save"
+                    phx-disable-with={gettext("Saving…")}
                     class={[
                       "btn btn-primary btn-xs shadow-none gap-1",
                       save_disabled && "btn-disabled pointer-events-none opacity-60"

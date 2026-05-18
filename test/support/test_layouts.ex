@@ -34,15 +34,30 @@ defmodule PhoenixKitPublishing.Test.Layouts do
   # Embeds `data-current-user-email={email}` so the scope-forwarding
   # regression test can assert the scope reached the parent layout
   # without depending on what the real PhoenixKitWeb layout renders.
+  #
+  # Also surfaces `:phoenix_kit_publishing_translations` via a
+  # `data-testid="host-publishing-translations"` marker so the
+  # boundary-audit test (see `LanguageSwitcherExposureTest`) can pin
+  # that publishing's exposed conn assign actually crosses the
+  # function-component layout boundary into the host's `Layouts.app`.
+  #
+  # Note: this layout is called via `Phoenix.Controller.template_render`
+  # (controller render path), NOT as a HEEx `<.app>` component, so
+  # `attr` declarations would break it — the assigns map is read
+  # directly with `assigns[...]` instead.
   def app(assigns) do
     email = (assigns[:current_user] && assigns[:current_user].email) || ""
-    assigns = Map.put(assigns, :current_user_email, email)
+    translations = assigns[:phoenix_kit_publishing_translations] || []
+    assigns = Map.merge(assigns, %{current_user_email: email, translations: translations})
 
     ~H"""
     <main data-current-user-email={@current_user_email}>
       <div :if={msg = Phoenix.Flash.get(@flash || %{}, :info)} id="flash-info">{msg}</div>
       <div :if={msg = Phoenix.Flash.get(@flash || %{}, :error)} id="flash-error">{msg}</div>
       <div :if={msg = Phoenix.Flash.get(@flash || %{}, :warning)} id="flash-warning">{msg}</div>
+      <nav data-testid="host-publishing-translations" data-count={length(@translations)}>
+        <a :for={t <- @translations} href={t.url} data-lang={t.code}>{t.name}</a>
+      </nav>
       {@inner_content}
     </main>
     """
