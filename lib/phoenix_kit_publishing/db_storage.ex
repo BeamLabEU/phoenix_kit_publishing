@@ -603,6 +603,20 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       find_by_post_slug_fallback(group_slug, language, url_slug)
   end
 
+  # URL lookups must return at most one row even when a post has accumulated
+  # many versions sharing the same `url_slug` / language. The condition
+  # `v.uuid == p.active_version_uuid OR p.active_version_uuid IS NULL` picks:
+  #
+  #   - The active (published) version when the post has one — that's the
+  #     content a public URL should render.
+  #   - Any version when the post is unpublished (no active version yet),
+  #     ordered by version DESC + limited to 1 so we deterministically pick
+  #     the latest draft. This preserves the lookup path used by the
+  #     stale-language self-healing flow, which exercises draft posts.
+  #
+  # Without these guards a post with N versions sharing an empty `url_slug`
+  # crashed `repo().one()` with `Ecto.MultipleResultsError` (observed on a
+  # real post with 14 historical versions).
   defp find_by_custom_url_slug(group_slug, language, url_slug) do
     from(c in PublishingContent,
       join: v in assoc(c, :version),
@@ -610,7 +624,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       join: g in assoc(p, :group),
       where:
         g.slug == ^group_slug and c.language == ^language and c.url_slug == ^url_slug and
-          is_nil(p.trashed_at),
+          is_nil(p.trashed_at) and
+          (v.uuid == p.active_version_uuid or is_nil(p.active_version_uuid)),
+      order_by: [desc: v.version_number],
+      limit: 1,
       preload: [version: {v, post: {p, group: g}}]
     )
     |> repo().one()
@@ -624,7 +641,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       where:
         g.slug == ^group_slug and c.language == ^language and p.slug == ^url_slug and
           is_nil(p.trashed_at) and
+          (v.uuid == p.active_version_uuid or is_nil(p.active_version_uuid)) and
           (is_nil(c.url_slug) or c.url_slug == ""),
+      order_by: [desc: v.version_number],
+      limit: 1,
       preload: [version: {v, post: {p, group: g}}]
     )
     |> repo().one()
@@ -642,7 +662,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         g.slug == ^group_slug and
           c.language == ^language and
           is_nil(p.trashed_at) and
+          (v.uuid == p.active_version_uuid or is_nil(p.active_version_uuid)) and
           fragment("? @> ?", c.data, ^%{"previous_url_slugs" => [url_slug]}),
+      order_by: [desc: v.version_number],
+      limit: 1,
       preload: [version: {v, post: {p, group: g}}]
     )
     |> repo().one()
