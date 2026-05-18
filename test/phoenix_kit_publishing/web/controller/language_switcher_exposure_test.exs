@@ -28,10 +28,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
   defp unique_name, do: "switcher-test-#{System.unique_integer([:positive])}"
 
   setup do
+    # Snapshot the five settings this file mutates so each test exits the
+    # global state where it found it. The boolean settings read back as
+    # booleans (default = true if absent); the content_language setting is
+    # a string. Restoring with the same setter shape avoids drift between
+    # tests that share a SQL Sandbox connection.
+    prior_publishing_enabled = Settings.get_boolean_setting("publishing_enabled", true)
+    prior_publishing_public = Settings.get_boolean_setting("publishing_public_enabled", true)
+    prior_languages_enabled = Settings.get_boolean_setting("languages_enabled", true)
+    prior_content_language = Settings.get_setting("content_language") || ""
+    prior_show_switcher = Settings.get_boolean_setting(@show_switcher_key, true)
+
     {:ok, _} = Settings.update_boolean_setting("publishing_enabled", true)
     {:ok, _} = Settings.update_boolean_setting("publishing_public_enabled", true)
     {:ok, _} = Settings.update_boolean_setting("languages_enabled", false)
     {:ok, _} = Settings.update_setting("content_language", "en")
+
+    on_exit(fn ->
+      {:ok, _} = Settings.update_boolean_setting("publishing_enabled", prior_publishing_enabled)
+      {:ok, _} = Settings.update_boolean_setting("publishing_public_enabled", prior_publishing_public)
+      {:ok, _} = Settings.update_boolean_setting("languages_enabled", prior_languages_enabled)
+      {:ok, _} = Settings.update_setting("content_language", prior_content_language)
+      {:ok, _} = Settings.update_boolean_setting(@show_switcher_key, prior_show_switcher)
+    end)
 
     {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
 

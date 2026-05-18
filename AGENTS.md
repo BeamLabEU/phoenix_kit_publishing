@@ -161,7 +161,40 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **Public templates must forward `phoenix_kit_current_scope`** — every `<PhoenixKitWeb.Components.LayoutWrapper.app_layout>` call in `Web.HTML` needs `phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}` so the parent app's header sees the authenticated user. Omitting it renders the page as logged-out even when the controller knows otherwise (see Issue #8)
 - **Public URL building** — always go through `PublishingHTML.group_listing_path/3` / `build_post_url/4` / `build_public_path_with_time/4`; never hand-roll prefix logic in admin templates (see Issue #7)
 - **Language normalization on read** — `Posts.read_post/4` and the slug finders retry through the legacy base language on `:not_found` and fix stale content in place via `StaleFixer`. Don't pre-check for staleness on the hot path — the retry-on-miss pattern keeps healthy reads at one query
-- **Base→enabled-dialect resolution** — `Posts.resolve_language_to_dialect/1` (private, used by every `read_post*` entry point) maps a base code (`"en"`) to whichever enabled dialect actually exists. When several dialects share the base, prefers `LanguageHelpers.get_primary_language/0`, otherwise the first match in `enabled_language_codes/0` declaration order; falls back to `DialectMapper.base_to_dialect/1` only when no enabled dialect matches the base. The Listing builds `?lang=<primary_base>` for the editor's default click-through, so this resolver is on the hot path for every "click a post title" navigation. **The Editor's UUID-mode and path-mode `handle_params` clauses must run `Web.Controller.Language.resolve_language_for_post/2` (via the local `new_translation_request?/2` helper) against `post.available_languages` before deciding new-vs-existing translation.** A naive `language not in post.available_languages` check on the raw URL param routes `?lang=en` against `["en-GB", "ru"]` into `handle_new_translation_params/6` — which empties the form (see Issue #11)
+- **Base→enabled-dialect resolution** — `Posts.resolve_language_to_dialect/1` (private, used by every `read_post*` entry point) maps a base code (`"en"`) to whichever enabled dialect actually exists. When several dialects share the base, prefers `LanguageHelpers.get_primary_language/0`, otherwise the first match in `enabled_language_codes/0` declaration order; falls back to `DialectMapper.base_to_dialect/1` only when no enabled dialect matches the base. The Listing builds `?lang=<primary_base>` for the editor's default click-through, so this resolver is on the hot path for every "click a post title" navigation. **The Editor's UUID-mode and path-mode `handle_params` clauses must run `Web.Controller.Language.resolve_language_for_post/2` (via the local `new_translation_request?/2` helper) against `post.available_languages` before deciding new-vs-existing translation.** A naive `language not in post.available_languages` check on the raw URL param routes `?lang=en` against `["en-GB", "ru"]` into `handle_new_translation_params/6` — which empties the form (see Issue #11).
+
+  Two-stage flow on a click into the editor:
+
+  ```
+  URL ?lang=<code>
+       │
+       ▼
+  new_translation_request?/2
+       │   uses Web.Controller.Language.resolve_language_for_post/2
+       │   against post.available_languages (Enum.find first match)
+       ▼
+  ┌──── resolved in available? ────┐
+  │ yes                         no │
+  ▼                                ▼
+  load existing translation     handle_new_translation_params/6
+       │                        (empty form)
+       ▼
+  Publishing.read_post_by_uuid(language, …)
+       │
+       ▼
+  Posts.resolve_language_to_dialect/1
+       │   against enabled_language_codes/0
+       │   (primary tie-break, then declaration order;
+       │    DialectMapper fallback if no enabled dialect)
+       ▼
+  read content for the resolved dialect
+  ```
+
+  The two stages answer the same "base → dialect" question with
+  subtly different tie-break rules and against different lists. A
+  future unification (`Languages.resolve_in/3` with a `:tie_break`
+  opt) would close that divergence — flag for the next refactor that
+  touches either layer.
 
 ## Routing: Single Page vs Multi-Page
 
