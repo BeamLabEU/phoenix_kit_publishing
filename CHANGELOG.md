@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.10 - 2026-05-19
+
+Maintenance release — LiveView callback annotations and dependency bumps.
+
+### Changed
+- Added `@impl true` annotations to the `Web.Settings` LiveView callbacks (`mount/3`, `handle_params/3`, `terminate/2`, `handle_event/3`, `handle_info/2`, `render/1`) so the compiler verifies them against the `Phoenix.LiveView` behaviour.
+- Bumped dependencies: `ecto` `3.13.6` → `3.14.0`, `ecto_sql` `3.13.5` → `3.14.0`, `fresco` `0.5.0` → `0.5.2`.
+
 ## 0.1.9 - 2026-05-19
 
 PR #16 — Phase 2 quality sweep (URL-slug correctness, DoS guards, race fixes, archive semantics, host boundaries) + post-merge review fixes + the `phoenix_kit 1.7.114` upgrade.
