@@ -361,6 +361,20 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
 
     tx_result =
       repo.transaction(fn ->
+        # Lock the post row for the duration of the transaction, mirroring
+        # `do_publish_version/4`. Both paths mutate `active_version_uuid`
+        # and version statuses; without taking the SAME `FOR UPDATE` lock
+        # here, a concurrent publish (locked) and unpublish (unlocked)
+        # could still interleave and leave the post with a stale
+        # `active_version_uuid` or a "published" version that's no longer
+        # active. The lock serializes both operations per-post.
+        _locked_post =
+          from(p in PublishingPost,
+            where: p.uuid == ^db_post.uuid,
+            lock: "FOR UPDATE"
+          )
+          |> repo.one()
+
         # Find the currently active version
         active_version = DBStorage.get_active_version(db_post)
 

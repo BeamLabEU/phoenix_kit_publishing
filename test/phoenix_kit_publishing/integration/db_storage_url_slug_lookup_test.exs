@@ -525,6 +525,27 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageUrlSlugLookupTest do
       assert DBStorage.find_by_previous_url_slug(group["slug"], "en-US", "was-here") == nil
     end
 
+    test "returns nil for an unpublished post even if previous_url_slugs matches" do
+      # Public 301-redirect path: a post that was never published has no
+      # active version and is unreachable from a public URL, so resolving
+      # its previous slug would just redirect a visitor onto a 404.
+      {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
+
+      {:ok, post} =
+        Posts.create_post(group["slug"], %{title: "Never Published", slug: "never-published"})
+
+      [version] = DBStorage.list_versions(post.uuid)
+      [content] = DBStorage.list_contents(version.uuid)
+
+      {:ok, _} =
+        DBStorage.update_content(content, %{
+          data: %{"previous_url_slugs" => ["draft-old-slug"]}
+        })
+
+      # Deliberately NOT calling Versions.publish_version/3.
+      assert DBStorage.find_by_previous_url_slug(group["slug"], "en-US", "draft-old-slug") == nil
+    end
+
     test "returns nil for a different language than the row that holds the previous slug" do
       {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
 
@@ -542,7 +563,8 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageUrlSlugLookupTest do
       :ok = Versions.publish_version(group["slug"], post.uuid, version.version_number)
 
       # The previous-slug entry only exists on the en-US row.
-      assert DBStorage.find_by_previous_url_slug(group["slug"], "de-DE", "english-only-old") == nil
+      assert DBStorage.find_by_previous_url_slug(group["slug"], "de-DE", "english-only-old") ==
+               nil
     end
 
     test "post with many versions sharing a previous slug resolves to a single row" do

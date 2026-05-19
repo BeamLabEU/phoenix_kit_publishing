@@ -820,7 +820,17 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     end
   end
 
-  @doc "Finds content by a previous URL slug (stored in data.previous_url_slugs JSONB array). Excludes trashed posts."
+  @doc """
+  Finds content by a previous URL slug (stored in the
+  `data.previous_url_slugs` JSONB array). Used to issue public 301
+  redirects from a post's old URL to its current one.
+
+  Published-only: matches the post's ACTIVE version exclusively. An
+  unpublished post (no `active_version_uuid`, or a draft version) is not
+  reachable from a public URL, so redirecting to it would just land the
+  visitor on a 404 — the lookup must not surface those rows. Excludes
+  trashed posts.
+  """
   @spec find_by_previous_url_slug(String.t(), String.t(), String.t()) ::
           PublishingContent.t() | nil
   def find_by_previous_url_slug(group_slug, language, url_slug) do
@@ -832,7 +842,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         g.slug == ^group_slug and
           c.language == ^language and
           is_nil(p.trashed_at) and
-          (v.uuid == p.active_version_uuid or is_nil(p.active_version_uuid)) and
+          v.uuid == p.active_version_uuid and
           fragment("? @> ?", c.data, ^%{"previous_url_slugs" => [url_slug]}),
       order_by: [desc: v.version_number],
       limit: 1,
