@@ -23,7 +23,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     page_title={@page_title}
     current_path={@conn.request_path}
     phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-    module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations]}}
+    module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations], og: assigns[:og]}}
     >
     <div class="groups-overview-container max-w-6xl mx-auto px-6 py-8">
     <%!-- Page Header --%>
@@ -49,7 +49,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               </h2>
 
               <div class="text-sm text-base-content/70 mt-2">
-                <span>{group["post_count"]} posts</span>
+                <span>{ngettext("%{count} post", "%{count} posts", group["post_count"], count: group["post_count"])}</span>
               </div>
 
               <div class="card-actions justify-end mt-4">
@@ -57,7 +57,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                   navigate={group_listing_path(@current_language, group["slug"])}
                   class="btn btn-sm btn-primary"
                 >
-                  View Posts →
+                  {gettext("View Posts")} →
                 </.link>
               </div>
             </div>
@@ -80,7 +80,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           >
           </path>
         </svg>
-        <span>No groups configured yet.</span>
+        <span>{gettext("No groups configured yet.")}</span>
       </div>
     <% end %>
     </div>
@@ -95,7 +95,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     page_title={@page_title}
     current_path={@conn.request_path}
     phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-    module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations]}}
+    module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations], og: assigns[:og]}}
     >
     <div class="group-index-container max-w-6xl mx-auto px-6 py-8">
     <%!-- Breadcrumb Navigation --%>
@@ -251,7 +251,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     page_title={@page_title}
     current_path={@conn.request_path}
     phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-    module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations]}}
+    module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations], og: assigns[:og]}}
     >
     <article class="post-container max-w-4xl mx-auto px-6 py-8">
     <%!-- Breadcrumb Navigation --%>

@@ -423,7 +423,7 @@ Publishing assigns a `:og` map on every public response for host root layouts to
 - **Listing pages** — `%{title, url, locale, type: "website"}` (4 fields).
 - **Post pages** — `%{title, description, image, url, locale, type: "article"}` (6 fields). `description` and `image` may be `nil` when the post has no SEO metadata or featured image.
 
-`:og` lands on `conn.assigns`. It's NOT currently forwarded through `LayoutWrapper.app_layout` — hosts consuming it must do so from `root.html.heex`, not from `Layouts.app/1`. See the function-component-layout callout above for why this matters.
+`:og` lands on `conn.assigns` AND is forwarded through `LayoutWrapper.app_layout`'s `:module_assigns` map, so hosts can consume it from either `root.html.heex` (the conn assign) OR `Layouts.app/1` (the forwarded `@og` assign). The forwarding happens in publishing's three public render branches (`all_groups/1`, `index/1`, `show/1` in `Web.HTML`) the same way `:phoenix_kit_publishing_translations` does — see the function-component-layout callout above for the boundary mechanism.
 
 ## Testing
 

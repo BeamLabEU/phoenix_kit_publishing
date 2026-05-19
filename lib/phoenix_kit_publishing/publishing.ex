@@ -185,7 +185,8 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate delete_language(group_slug, post_uuid, language_code, version \\ nil),
     to: TranslationManager
 
-  defdelegate clear_translation(group_slug, post_uuid, language_code), to: TranslationManager
+  defdelegate clear_translation(group_slug, post_uuid, language_code, opts \\ []),
+    to: TranslationManager
 
   defdelegate set_translation_status(group_slug, post_identifier, version, language, status),
     to: TranslationManager
@@ -326,8 +327,12 @@ defmodule PhoenixKit.Modules.Publishing do
       }
     end)
   rescue
-    e ->
-      Logger.warning("[Publishing] dashboard_tabs failed: #{inspect(e)}")
+    # Narrow: dashboard tabs are rendered at every admin LV mount, so a
+    # transient DB blip shouldn't crash the whole admin shell. Genuine
+    # programmer errors (UndefinedFunctionError, MatchError, …) should
+    # still bubble up so the bug isn't masked.
+    e in [Ecto.QueryError, DBConnection.ConnectionError, Postgrex.Error] ->
+      Logger.warning("[Publishing] dashboard_tabs DB failure: #{inspect(e)}")
       []
   end
 
@@ -345,8 +350,11 @@ defmodule PhoenixKit.Modules.Publishing do
       []
     end
   rescue
-    e ->
-      Logger.warning("[Publishing] load_publishing_groups_for_tabs failed: #{inspect(e)}")
+    e in [Ecto.QueryError, DBConnection.ConnectionError, Postgrex.Error] ->
+      Logger.warning(
+        "[Publishing] load_publishing_groups_for_tabs DB failure: #{inspect(e)}"
+      )
+
       []
   end
 

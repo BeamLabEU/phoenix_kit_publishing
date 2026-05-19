@@ -75,6 +75,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       {:ok, html} = Renderer.render_post(post)
 
   """
+  @spec render_post(map()) :: {:ok, String.t()} | {:error, any()}
   def render_post(post) do
     if post.metadata.status == "published" and render_cache_enabled?(post.group) do
       cache_key = build_cache_key(post)
@@ -142,6 +143,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       html = Renderer.render_markdown(content)
 
   """
+  @spec render_markdown(String.t() | any()) :: String.t()
   def render_markdown(content) when is_binary(content) do
     {time, result} =
       :timer.tc(fn ->
@@ -511,6 +513,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       Renderer.invalidate_cache("docs", "getting-started", "en")
 
   """
+  @spec invalidate_cache(String.t(), String.t(), String.t()) :: :ok
   def invalidate_cache(group_slug, identifier, language) do
     # Build pattern to match all cache keys for this post
     # We don't know the content hash, so we invalidate by prefix

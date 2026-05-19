@@ -88,6 +88,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     {:noreply, assign(socket, :endpoint_url, extract_endpoint_url(uri))}
   end
 
+  @impl true
+  def terminate(_reason, socket) do
+    # Phoenix.PubSub auto-cleans on process exit, but explicit
+    # unsubscribe keeps subscribe / unsubscribe paired in code review
+    # and matches `editor.ex` / `listing.ex`'s pattern.
+    PublishingPubSub.unsubscribe_from_groups()
+
+    for group <- socket.assigns[:groups] || [] do
+      PublishingPubSub.unsubscribe_from_posts(group["slug"])
+    end
+
+    :ok
+  end
+
   # PubSub handlers for live updates — debounced to prevent rapid re-renders
   @dashboard_debounce_ms 500
 

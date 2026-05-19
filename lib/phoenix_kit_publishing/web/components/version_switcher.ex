@@ -148,7 +148,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
         v{@version}
       </span>
       <%= if @is_live do %>
-        <span class="text-xs text-success font-medium">(live)</span>
+        <span class="text-xs text-success font-medium">{gettext("(live)")}</span>
       <% end %>
     </span>
     """

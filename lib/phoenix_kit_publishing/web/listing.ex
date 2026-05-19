@@ -69,10 +69,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
     socket = handle_subscription_change(socket, old_group_slug, new_group_slug)
 
-    # Run stale fixer for this group's posts on first connected load.
-    # Includes trashed posts so empty ones get hard-deleted instead of
-    # sitting in trash with no recoverable content.
-    if connected?(socket) and new_group_slug do
+    # Run stale fixer ONLY when the group changes (or on the first
+    # connected load) — not on every `handle_params/3` invocation.
+    # `handle_params` fires for pagination clicks, query-param tweaks,
+    # filter changes, etc.; running the fixer over every active +
+    # trashed post on each one creates needless DB load and background
+    # process churn on large groups.
+    if connected?(socket) and not is_nil(new_group_slug) and old_group_slug != new_group_slug do
       Task.Supervisor.start_child(PhoenixKit.TaskSupervisor, fn ->
         try do
           active = Publishing.list_raw_posts(new_group_slug)
@@ -500,6 +503,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       Process.cancel_timer(timer_ref)
     end
 
+    # Phoenix.PubSub auto-cleans subscriptions when the LV process exits,
+    # so these explicit `unsubscribe_from_*` calls aren't strictly required
+    # to avoid a leak — they're here for symmetry with `editor.ex`'s
+    # `Collaborative.unsubscribe_from_old_post_topics/1` pattern, and so
+    # the subscribe / unsubscribe sites stay paired in code review.
+    PublishingPubSub.unsubscribe_from_groups()
+
+    if group_slug = socket.assigns[:group_slug] do
+      PublishingPubSub.unsubscribe_from_posts(group_slug)
+      PublishingPubSub.unsubscribe_from_cache(group_slug)
+      PublishingPubSub.unsubscribe_from_group_editors(group_slug)
+    end
+
     :ok
   end
 
@@ -908,8 +924,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   end
 
   defp apply_status_change(group_slug, post_uuid, status, actor_uuid)
-       when status in ["draft", "archived"],
-       do: Publishing.unpublish_post(group_slug, post_uuid, actor_uuid: actor_uuid)
+       when status in ["draft", "archived"] do
+    # Pass `:target_status` through so "Archived" UI label actually
+    # results in the version row carrying status "archived" — without
+    # it the version reverts to "draft" and the listing's status badge
+    # silently misrepresents DB state.
+    Publishing.unpublish_post(group_slug, post_uuid,
+      actor_uuid: actor_uuid,
+      target_status: status
+    )
+  end
 
   defp apply_status_change(_, _, _, _), do: {:error, :invalid_status}
 

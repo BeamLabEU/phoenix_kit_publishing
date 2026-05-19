@@ -619,12 +619,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   def handle_event("noop", _params, socket), do: {:noreply, socket}
 
   def handle_event("clear_translation", _params, socket) do
+    cond do
+      # Match every other destructive editor event (save, new_version, etc.):
+      # spectators and viewers locked out of the current translation can't
+      # mutate. Without this guard a spectator could send this event
+      # directly via the socket and hard-delete the translation row.
+      socket.assigns[:readonly?] ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You don't have permission to clear translations"))}
+
+      socket.assigns[:translation_locked?] ->
+        {:noreply,
+         put_flash(socket, :error, gettext("This translation is currently locked by another editor"))}
+
+      true ->
+        clear_translation_unguarded(socket)
+    end
+  end
+
+  defp clear_translation_unguarded(socket) do
     group_slug = socket.assigns.group_slug
     post = socket.assigns.post
     language = socket.assigns.current_language
     post_uuid = post[:uuid]
 
-    result = Publishing.clear_translation(group_slug, post_uuid, language)
+    result =
+      Publishing.clear_translation(group_slug, post_uuid, language,
+        actor_uuid: Shared.actor_uuid_from_socket(socket)
+      )
 
     case result do
       :ok ->
@@ -1853,7 +1875,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             }
           >
             <.icon name="hero-globe-alt" class="w-4 h-4 sm:mr-1" />
-            <span class="hidden sm:inline">View Public</span>
+            <span class="hidden sm:inline">{gettext("View Public")}</span>
           </a>
         <% end %>
       </div>

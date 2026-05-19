@@ -543,18 +543,16 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       repo = PhoenixKit.RepoHelper.repo()
 
       tx_result =
-        repo.transaction(fn ->
-          create_post_in_transaction(
-            repo,
-            post_attrs,
-            mode,
-            group_slug,
-            opts,
-            primary_language,
-            created_by_uuid,
-            post_slug
-          )
-        end)
+        create_post_with_timestamp_retry(
+          repo,
+          post_attrs,
+          mode,
+          group_slug,
+          opts,
+          primary_language,
+          created_by_uuid,
+          post_slug
+        )
 
       with {:ok, db_post} <- tx_result,
            {:ok, post} <- read_back_created_post(group_slug, db_post, mode, primary_language) do
@@ -564,6 +562,75 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       end
     end
   end
+
+  # Timestamp-mode posts have a UNIQUE INDEX on `(group_uuid, post_date,
+  # post_time)`. `resolve_timestamp_in_transaction/3` searches for the
+  # first free minute by reading `get_post_by_datetime/3` then inserting
+  # — but the read-then-insert is not atomic. Two concurrent
+  # `create_post` calls in the same minute both see "free", both try to
+  # insert, one fails with a unique-constraint violation.
+  #
+  # We retry the WHOLE transaction (not just the insert) on a
+  # constraint violation so the new attempt re-runs the timestamp
+  # scan and picks the next free minute. `@max_timestamp_retries`
+  # bounds the loop; slug-mode posts never hit this path because
+  # their unique key is `(group_uuid, slug)` which is enforced by the
+  # `SlugHelpers.generate_unique_slug/3` upstream check.
+  @max_timestamp_retries 5
+
+  defp create_post_with_timestamp_retry(
+         repo,
+         post_attrs,
+         mode,
+         group_slug,
+         opts,
+         primary_language,
+         created_by_uuid,
+         post_slug,
+         attempt \\ 0
+       )
+
+  defp create_post_with_timestamp_retry(_repo, _post_attrs, _mode, _group_slug, _opts, _pl, _cbu, _ps, attempt)
+       when attempt >= @max_timestamp_retries do
+    {:error, :timestamp_collision_unresolvable}
+  end
+
+  defp create_post_with_timestamp_retry(repo, post_attrs, mode, group_slug, opts, pl, cbu, ps, attempt) do
+    result =
+      repo.transaction(fn ->
+        create_post_in_transaction(repo, post_attrs, mode, group_slug, opts, pl, cbu, ps)
+      end)
+
+    cond do
+      mode == "timestamp" and timestamp_collision?(result) ->
+        Logger.warning(
+          "[Publishing] Timestamp collision detected, retrying " <>
+            "(attempt #{attempt + 1}/#{@max_timestamp_retries})"
+        )
+
+        create_post_with_timestamp_retry(repo, post_attrs, mode, group_slug, opts, pl, cbu, ps, attempt + 1)
+
+      true ->
+        result
+    end
+  end
+
+  # The `(group_uuid, post_date, post_time)` unique-constraint
+  # violation lands here as a changeset error after `repo.rollback`.
+  # Both the field-level and constraint-name keys are checked because
+  # Ecto puts the error under whichever field is declared in the
+  # `unique_constraint/3` call (currently `:post_time`).
+  defp timestamp_collision?({:error, %Ecto.Changeset{errors: errors}}) do
+    Enum.any?(errors, fn
+      {field, {_msg, opts}} when field in [:post_time, :post_date] ->
+        opts[:constraint] == :unique
+
+      _ ->
+        false
+    end)
+  end
+
+  defp timestamp_collision?(_other), do: false
 
   defp create_post_in_transaction(
          repo,

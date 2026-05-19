@@ -156,8 +156,9 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
   Unlike `delete_language` (which archives), this permanently removes the content.
   Refuses to delete the last remaining language.
   """
-  @spec clear_translation(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
-  def clear_translation(group_slug, post_uuid, language_code) do
+  @spec clear_translation(String.t(), String.t(), String.t(), keyword() | map()) ::
+          :ok | {:error, term()}
+  def clear_translation(group_slug, post_uuid, language_code, opts \\ []) do
     with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
          db_version when not is_nil(db_version) <- Shared.resolve_db_version(db_post, nil),
          content when not is_nil(content) <-
@@ -167,6 +168,24 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
          {:ok, _} <- repo.delete(content) do
       ListingCache.regenerate(group_slug)
       PublishingPubSub.broadcast_translation_deleted(group_slug, db_post.uuid, language_code)
+
+      # Match `delete_language/5`'s audit pattern so the destructive
+      # branch is auditable. Distinct `action` ("cleared" vs "deleted")
+      # keeps the activity feed from collapsing the two — `delete_language`
+      # archives the content row, `clear_translation` hard-deletes it.
+      ActivityLog.log_manual(
+        "publishing.translation.cleared",
+        ActivityLog.actor_uuid(opts),
+        "publishing_content",
+        content.uuid,
+        %{
+          "group_slug" => group_slug,
+          "post_uuid" => db_post.uuid,
+          "language" => language_code,
+          "version_uuid" => db_version.uuid
+        }
+      )
+
       :ok
     else
       nil -> {:error, :not_found}

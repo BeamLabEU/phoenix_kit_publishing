@@ -65,6 +65,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     {:noreply, socket}
   end
 
+  def terminate(_reason, _socket) do
+    # Phoenix.PubSub auto-cleans on process exit; explicit unsubscribe
+    # keeps the subscribe / unsubscribe sites paired in code review.
+    PublishingPubSub.unsubscribe_from_groups()
+    :ok
+  end
+
   def handle_event("regenerate_cache", %{"slug" => slug}, socket) do
     case ListingCache.regenerate(slug) do
       :ok ->

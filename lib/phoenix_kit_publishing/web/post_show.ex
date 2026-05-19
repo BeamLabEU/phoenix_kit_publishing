@@ -74,6 +74,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
     {:noreply, socket}
   end
 
+  @impl true
+  def terminate(_reason, socket) do
+    # Phoenix.PubSub auto-cleans on process exit; explicit unsubscribe
+    # keeps the subscribe / unsubscribe sites paired in code review.
+    if group_slug = socket.assigns[:group_slug] do
+      PublishingPubSub.unsubscribe_from_posts(group_slug)
+    end
+
+    :ok
+  end
+
   # PubSub handlers for live updates
   @impl true
   def handle_info({:post_updated, _group_slug, _post_slug}, socket) do
