@@ -74,11 +74,15 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheTest do
   end
 
   describe "find_post/2" do
-    test "returns :not_found when group has no cache and no DB rows" do
-      # With sandbox checked out, read/1 triggers regenerate/1 which queries
-      # the DB; an empty result lands in persistent_term, then find_post
-      # walks the empty list and returns :not_found.
-      assert {:error, :not_found} = ListingCache.find_post(unique_group(), "any-slug")
+    test "returns :cache_miss when group doesn't exist in the DB" do
+      # `regenerate/1` refuses to cache unknown groups (DoS guard added
+      # against random-slug flood writing unbounded :persistent_term
+      # entries). For an unknown group_slug, `read/1` therefore returns
+      # `{:error, :cache_miss}` and `find_post/2` surfaces that
+      # unchanged. Callers that need a "post not found" semantic should
+      # treat `:cache_miss` the same as `:not_found` (none in the
+      # codebase rely on the previous "empty list → :not_found" path).
+      assert {:error, :cache_miss} = ListingCache.find_post(unique_group(), "any-slug")
     end
 
     test "returns :not_found when post slug isn't in the cached list" do

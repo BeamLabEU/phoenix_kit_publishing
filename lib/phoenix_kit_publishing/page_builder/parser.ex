@@ -136,11 +136,25 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.SaxHandler do
     {:ok, state}
   end
 
-  # Normalize tag names to atoms (Page -> :page, Hero -> :hero)
+  # Normalize tag names to atoms (Page -> :page, Hero -> :hero).
+  #
+  # Uses `String.to_existing_atom/1` so user-supplied (admin-edited) PHK
+  # XML content can't keep minting new atoms — the BEAM atom table is
+  # finite (default ~1M, GC-free), so arbitrary unique tags would
+  # eventually OOM-crash the VM. Unknown tags route to `:unknown`,
+  # which the renderer's catch-all `resolve_component(_)` handles.
+  #
+  # The atoms for legitimate PHK components are pre-allocated at compile
+  # time by their resolver clauses in
+  # `PhoenixKit.Modules.Publishing.PageBuilder.Renderer` (`:page`,
+  # `:hero`, `:headline`, `:subheadline`, `:cta`, `:image`, `:video`,
+  # `:entityform`), so `String.to_existing_atom/1` finds them. New
+  # components added in the future must ship a matching resolver clause
+  # to register their atom — same as today.
   defp normalize_tag_name(name) do
-    name
-    |> String.downcase()
-    |> String.to_atom()
+    String.to_existing_atom(String.downcase(name))
+  rescue
+    ArgumentError -> :unknown
   end
 
   # Convert attribute list to map with string keys

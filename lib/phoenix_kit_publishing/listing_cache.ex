@@ -136,6 +136,36 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   defp do_regenerate(group_slug) do
     start_time = System.monotonic_time(:millisecond)
 
+    # Verify the group actually exists BEFORE writing anything to
+    # `:persistent_term`. `Language.has_content_for_language?/2` (and
+    # other callers reachable from public URL parsing) treats any URL
+    # segment as a potential group slug, so without this guard a
+    # request for `/<random-slug>/anything` would mint a fresh
+    # `:persistent_term` entry that's never garbage collected.
+    # `:persistent_term` writes are also expensive (full GC pass on
+    # every existing term), so a flood of bad requests is a DoS vector
+    # on top of the memory leak.
+    case DBStorage.get_group_by_slug(group_slug) do
+      nil ->
+        Logger.debug(
+          "[ListingCache] Refusing to cache unknown group #{inspect(group_slug)}"
+        )
+
+        {:error, :group_not_found}
+
+      _group ->
+        do_regenerate_existing_group(group_slug, start_time)
+    end
+  rescue
+    error ->
+      Logger.error(
+        "[ListingCache] Failed to regenerate cache for #{group_slug}: #{inspect(error)}"
+      )
+
+      {:error, {:regenerate_failed, error}}
+  end
+
+  defp do_regenerate_existing_group(group_slug, start_time) do
     # Posts from to_listing_map are already atom-key maps with excerpts
     all_posts = DBStorage.list_posts_for_listing(group_slug)
 
@@ -164,13 +194,6 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
 
     PublishingPubSub.broadcast_cache_changed(group_slug)
     :ok
-  rescue
-    error ->
-      Logger.error(
-        "[ListingCache] Failed to regenerate cache for #{group_slug}: #{inspect(error)}"
-      )
-
-      {:error, {:regenerate_failed, error}}
   end
 
   # Lock timeout in milliseconds (30 seconds)
