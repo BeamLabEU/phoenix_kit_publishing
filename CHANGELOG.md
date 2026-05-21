@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.12 - 2026-05-21
+
+PR #19 — unify the translation-response parser with core (paired with `phoenix_kit 1.7.117`).
+
+### Changed
+- `TranslatePostWorker.parse_translated_response/1` now delegates to `PhoenixKit.Modules.AI.Translation.parse_response/2` (the canonical `---FIELD---` parser shared with `phoenix_kit_projects`, shipped in core PR #557) instead of a hand-rolled chained-regex matcher. It tries `["title", "slug", "content"]` first, retries with `["title", "content"]` on missing fields, and falls back to the publishing-specific `parse_markdown_response/1` salvage when no markers are present. The AI call sites, `extract_content/1`, and `sanitize_slug/1` are untouched.
+- Bumped the `phoenix_kit` dependency floor to `~> 1.7.117`, which is where `Modules.AI.Translation.parse_response/2` became available; the lock also picks up `etcher 0.4.6`, `fresco 0.5.4`, and `req 0.5.18`.
+
+### Fixed
+- Translation responses with `---FIELD---` markers in any order, or with lower/mixed-case marker names, now parse correctly instead of falling through to the bare-markdown salvage path. Covered by new regression tests for marker order-independence, case-insensitive markers, and the TITLE-only fallback.
+
 ## 0.1.11 - 2026-05-19
 
 PR #18 — delegate the `default_language_no_prefix` toggle to the site-wide core setting (paired with `phoenix_kit 1.7.115`).
