@@ -302,6 +302,18 @@ defmodule PhoenixKit.Modules.Publishing.TranslatePostWorkerTest do
       assert content =~ "Mixed case content"
     end
 
+    test "non-binary input fails closed with empty tuple (defensive)" do
+      # `parse_translated_response/1` is `def` (public for testing).
+      # `Translation.parse_response/2` guards on `is_binary/1`, so
+      # passing nil / atom / number would crash with FunctionClauseError.
+      # Defensive fallback returns the empty-tuple shape so a test or
+      # external caller can hand us anything without crashing the worker.
+      assert {"", nil, ""} = TranslatePostWorker.parse_translated_response(nil)
+      assert {"", nil, ""} = TranslatePostWorker.parse_translated_response(:atom)
+      assert {"", nil, ""} = TranslatePostWorker.parse_translated_response(123)
+      assert {"", nil, ""} = TranslatePostWorker.parse_translated_response(%{})
+    end
+
     test "only TITLE present (no CONTENT, no SLUG) falls back to markdown salvage with empty values" do
       # When parse_response/2 returns missing_fields for ["title",
       # "slug", "content"], we retry with ["title", "content"]. If

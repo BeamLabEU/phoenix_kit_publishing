@@ -418,7 +418,7 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
   # would have fallen back to markdown for re-ordered responses.
   # This is an improvement; regression test
   # `"parses markers in any order"` documents the new contract.
-  def parse_translated_response(response) do
+  def parse_translated_response(response) when is_binary(response) do
     case Translation.parse_response(response, ["title", "slug", "content"]) do
       {:ok, fields} ->
         {extract_field(fields, "title"), sanitize_slug_if_present(fields["slug"]),
@@ -432,6 +432,13 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
         {title, nil, content}
     end
   end
+
+  # Fail closed for nil / non-binary input rather than letting
+  # `Translation.parse_response/2`'s `is_binary/1` guard raise a
+  # FunctionClauseError. The AI extract pipeline always feeds us
+  # strings, but the function is `def` (public for testing) so a
+  # test or external caller can hand us anything.
+  def parse_translated_response(_other), do: {"", nil, ""}
 
   # Re-attempt parsing against title+content only (no slug). Matches
   # the format used by older prompts that don't ask for a slug. Falls
