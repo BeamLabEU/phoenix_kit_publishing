@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
 
   use Gettext, backend: PhoenixKitWeb.Gettext
 
+  alias PhoenixKit.Modules.AI.Translations
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PresenceHelpers
@@ -22,41 +23,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   # Availability Checks
   # ============================================================================
 
+  # Availability + endpoint/prompt listing are generic across every
+  # AI-translation consumer, so they delegate to core
+  # `PhoenixKit.Modules.AI.Translations` — the canonical implementation —
+  # rather than re-deriving the same `{uuid, name}` shape here. (Catalogue
+  # and projects share the same core helpers.) Publishing keeps its own
+  # *default* endpoint/prompt resolution below, since those read
+  # publishing-specific setting keys + the publishing-specific prompt slug.
+
   @doc """
   Checks if AI translation is available (AI module installed + enabled + endpoints configured).
   """
-  def ai_translation_available? do
-    ai_module_available?() and AI.enabled?() and list_ai_endpoints() != []
-  end
+  def ai_translation_available?, do: Translations.available?()
 
   defp ai_module_available?, do: Code.ensure_loaded?(PhoenixKitAI)
 
   @doc """
-  Lists available AI endpoints for translation.
+  Lists available AI endpoints for translation as `[{uuid, name}]`.
   """
-  def list_ai_endpoints do
-    if ai_module_available?() and AI.enabled?() do
-      # Use UUID for dropdown values (stable across systems, matches settings storage)
-      {endpoints, _total} = AI.list_endpoints(enabled: true)
-      Enum.map(endpoints, &{&1.uuid, &1.name})
-    else
-      []
-    end
-  end
+  def list_ai_endpoints, do: Translations.list_endpoints()
 
   @doc """
-  Lists available AI prompts for translation.
+  Lists available AI prompts for translation as `[{uuid, name}]`.
   """
-  def list_ai_prompts do
-    if ai_module_available?() and AI.enabled?() do
-      case AI.list_prompts(enabled: true) do
-        {prompts, _total} -> Enum.map(prompts, &{&1.uuid, &1.name})
-        prompts when is_list(prompts) -> Enum.map(prompts, &{&1.uuid, &1.name})
-      end
-    else
-      []
-    end
-  end
+  def list_ai_prompts, do: Translations.list_prompts()
 
   @doc """
   Gets the default AI endpoint UUID from settings.
