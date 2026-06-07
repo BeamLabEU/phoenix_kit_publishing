@@ -387,8 +387,6 @@ defmodule PhoenixKit.Modules.Publishing do
 
   alias PhoenixKit.Modules.Publishing.Shared
 
-  @slug_regex ~r/^[a-z0-9]+(?:-[a-z0-9]+)*$/
-
   @doc """
   Lowercases `name`, replaces non-alphanumeric runs with `-`, and trims
   leading/trailing hyphens. Pairs with `valid_slug?/1` — callers should
@@ -405,10 +403,7 @@ defmodule PhoenixKit.Modules.Publishing do
   """
   @spec slugify(String.t()) :: String.t()
   def slugify(name) when is_binary(name) do
-    name
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9]+/u, "-")
-    |> String.trim("-")
+    SlugHelpers.slugify(name)
   end
 
   @doc """
@@ -419,7 +414,7 @@ defmodule PhoenixKit.Modules.Publishing do
   """
   @spec valid_slug?(any()) :: boolean()
   def valid_slug?(slug) when is_binary(slug) do
-    slug != "" and Regex.match?(@slug_regex, slug) and not reserved_language_code?(slug)
+    slug != "" and SlugHelpers.matches_shape?(slug) and not reserved_language_code?(slug)
   end
 
   def valid_slug?(_), do: false

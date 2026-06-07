@@ -520,16 +520,10 @@ defmodule PhoenixKit.Modules.Publishing.Workers.TranslatePostWorker do
   @doc false
   # Public for testing — sanitize and validate the AI-returned slug.
   def sanitize_slug(slug) do
-    sanitized =
-      slug
-      |> String.trim()
-      |> String.downcase()
-      # Replace invalid chars with hyphens
-      |> String.replace(~r/[^a-z0-9-]/, "-")
-      # Collapse multiple hyphens
-      |> String.replace(~r/-+/, "-")
-      # Remove leading/trailing hyphens
-      |> String.replace(~r/^-|-$/, "")
+    # Route through the publishing slug engine so the AI-returned slug honors
+    # the configured slug style (transliterate Cyrillic, keep unicode, etc.)
+    # instead of collapsing a non-Latin slug to nothing.
+    sanitized = Publishing.slugify(slug)
 
     if sanitized == "" or String.length(sanitized) < 2 do
       # Invalid slug, don't use it

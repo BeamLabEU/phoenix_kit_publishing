@@ -10,7 +10,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Utils.Date, as: UtilsDate
-  alias PhoenixKit.Utils.Slug
 
   # ============================================================================
   # Form Building
@@ -288,7 +287,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
     if not force? and url_slug_manually_set? do
       no_slug_update(socket)
     else
-      new_url_slug = Slug.slugify(title)
+      new_url_slug = Publishing.slugify(title)
       current_url_slug = Map.get(socket.assigns.form, "url_slug", "")
 
       if new_url_slug == "" do

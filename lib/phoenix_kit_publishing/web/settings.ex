@@ -18,6 +18,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @memory_cache_key "publishing_memory_cache_enabled"
   @render_cache_key "publishing_render_cache_enabled"
   @show_language_switcher_key "publishing_show_language_switcher"
+  @slug_style_key "publishing_slug_style"
+  @valid_slug_styles ~w(transliterate unicode ascii)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -50,6 +52,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
         :show_language_switcher,
         Settings.get_boolean_setting(@show_language_switcher_key, true)
       )
+      |> assign(:slug_style, Settings.get_setting(@slug_style_key, "transliterate"))
       |> assign(
         :memory_cache_enabled,
         Settings.get_setting(@memory_cache_key, "true") == "true"
@@ -154,6 +157,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      )}
   end
 
+  def handle_event("change_slug_style", %{"slug_style" => style}, socket)
+      when style in @valid_slug_styles do
+    Settings.update_setting(@slug_style_key, style)
+
+    {:noreply,
+     socket
+     |> assign(:slug_style, style)
+     |> put_flash(
+       :info,
+       gettext("Slug style updated to %{style}", style: slug_style_label(style))
+     )}
+  end
+
+  def handle_event("change_slug_style", _params, socket), do: {:noreply, socket}
+
   def handle_event("clear_render_cache", _params, socket) do
     Renderer.clear_all_cache()
 
@@ -229,6 +247,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     |> assign(:cache_status, build_cache_status(groups))
     |> assign(:render_cache_per_group, build_render_cache_per_group(groups))
   end
+
+  defp slug_style_label("unicode"), do: gettext("Unicode")
+  defp slug_style_label("ascii"), do: gettext("ASCII only")
+  defp slug_style_label(_), do: gettext("Transliterate")
 
   defp db_groups_to_maps do
     Publishing.list_groups()
@@ -368,6 +390,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               checked={@show_language_switcher}
               phx-click="toggle_show_language_switcher"
             />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-link" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("Slug Style")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "How titles in non-Latin scripts (e.g. Cyrillic) are turned into URL slugs."
+                  )}
+                </p>
+              </div>
+            </div>
+            <form phx-change="change_slug_style">
+              <label class="select select-bordered select-sm">
+                <select name="slug_style">
+                  <option value="transliterate" selected={@slug_style == "transliterate"}>
+                    {gettext("Transliterate — privet")}
+                  </option>
+                  <option value="unicode" selected={@slug_style == "unicode"}>
+                    {gettext("Unicode — привет")}
+                  </option>
+                  <option value="ascii" selected={@slug_style == "ascii"}>
+                    {gettext("ASCII only — strip")}
+                  </option>
+                </select>
+              </label>
+            </form>
           </div>
 
           <div class="text-xs text-base-content/50">

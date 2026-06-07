@@ -659,6 +659,37 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       any_version_by_post_slug_fallback(group_slug, language, url_slug)
   end
 
+  @doc """
+  Returns true when a custom `url_slug` is already taken in this group+language
+  by a post OTHER than `exclude_post_slug` (any version, incl. drafts).
+
+  Used by uniqueness checks: unlike fetching a single row and inspecting it,
+  the exclusion happens in SQL, so a collision can't be masked when the
+  arbitrarily-ordered match happens to be the post being edited.
+  """
+  @spec url_slug_taken_by_other_post?(String.t(), String.t(), String.t(), String.t() | nil) ::
+          boolean()
+  def url_slug_taken_by_other_post?(group_slug, language, url_slug, exclude_post_slug) do
+    base =
+      from(c in PublishingContent,
+        join: v in assoc(c, :version),
+        join: p in assoc(v, :post),
+        join: g in assoc(p, :group),
+        where:
+          g.slug == ^group_slug and c.language == ^language and c.url_slug == ^url_slug and
+            is_nil(p.trashed_at)
+      )
+
+    query =
+      if is_binary(exclude_post_slug) and exclude_post_slug != "" do
+        from([c, v, p, g] in base, where: p.slug != ^exclude_post_slug)
+      else
+        base
+      end
+
+    repo().exists?(query)
+  end
+
   # Published-only custom-slug match — returns ALL matches so the caller
   # can apply the tie-breaker. Ordering by `p.uuid DESC` exploits UUIDv7's
   # monotonic timestamp encoding: the newest post sorts first without
