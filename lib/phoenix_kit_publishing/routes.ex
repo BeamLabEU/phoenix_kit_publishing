@@ -26,10 +26,10 @@ defmodule PhoenixKitPublishing.Routes do
   + `AGENTS.md` "Public dispatch — RouterDispatch" for the full mechanism.
 
   This callback is kept (returning a no-op) for backwards compatibility
-  with `PhoenixKitWeb.Integration.compile_external_public_routes/1`, which
-  walks every route_module looking for the function. Removing the callback
-  entirely would require a coordinated bump of the `function_exported?/3`
-  guard in core.
+  with core's route compiler in `PhoenixKitWeb.Integration` (the
+  `compile_external_public_routes` hook), which walks every route_module
+  looking for the function. Removing the callback entirely would require a
+  coordinated bump of the `function_exported?/3` guard in core.
   """
   @spec public_routes(String.t()) :: Macro.t()
   def public_routes(_url_prefix) do
