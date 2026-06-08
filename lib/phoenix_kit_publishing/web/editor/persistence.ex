@@ -559,12 +559,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   end
 
   defp handle_post_in_place_error(socket, :slug_already_exists) do
-    {:noreply,
-     Phoenix.LiveView.put_flash(
-       socket,
-       :error,
-       gettext("A post with that slug already exists")
-     )}
+    {:noreply, Phoenix.LiveView.put_flash(socket, :error, slug_taken_message(socket))}
   end
 
   defp handle_post_in_place_error(socket, reason) do
@@ -649,12 +644,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   end
 
   defp handle_post_update_error(socket, :slug_already_exists) do
-    {:noreply,
-     Phoenix.LiveView.put_flash(
-       socket,
-       :error,
-       gettext("A post with that slug already exists")
-     )}
+    {:noreply, Phoenix.LiveView.put_flash(socket, :error, slug_taken_message(socket))}
   end
 
   defp handle_post_update_error(socket, :title_required) do
@@ -670,6 +660,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     post_id = socket.assigns[:post] && socket.assigns.post[:uuid]
     Logger.warning("[Publishing.Editor] Update failed for post #{post_id}: #{inspect(reason)}")
     {:noreply, Phoenix.LiveView.put_flash(socket, :error, gettext("Failed to save post"))}
+  end
+
+  # Clear, actionable message for a duplicate post slug. Names the offending
+  # slug (slugs are unique per group) so the user knows exactly what to change.
+  defp slug_taken_message(socket) do
+    slug =
+      socket.assigns |> Map.get(:form, %{}) |> Map.get("slug", "") |> to_string() |> String.trim()
+
+    if slug == "" do
+      gettext(
+        "That slug is already used by another post in this group. Please choose a different one."
+      )
+    else
+      gettext(
+        "The slug \"%{slug}\" is already used by another post in this group. Choose a different slug or change the title.",
+        slug: slug
+      )
+    end
   end
 
   defp slug_constraint_error?(changeset) do
@@ -695,14 +703,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   end
 
   defp handle_post_creation_error(socket, :slug_already_exists, _fallback_message) do
-    {:noreply,
-     Phoenix.LiveView.put_flash(
-       socket,
-       :error,
-       gettext(
-         "A post with that slug already exists. Please choose a different title or edit the slug manually."
-       )
-     )}
+    {:noreply, Phoenix.LiveView.put_flash(socket, :error, slug_taken_message(socket))}
   end
 
   defp handle_post_creation_error(socket, %Ecto.Changeset{} = changeset, fallback_message) do
