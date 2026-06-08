@@ -37,6 +37,27 @@ mix quality.ci                                # format --check-formatted + credo
 mix docs                                      # Generate documentation
 ```
 
+## Local cross-repo development
+
+`phoenix_kit` (and any sibling `phoenix_kit_*` dep) resolves from Hex by
+default. To build or test this module against a **local checkout** of a
+dependency — e.g. an unpublished core change — export `<APP>_PATH` and Mix
+swaps the Hex pin for a `path:` + `override: true` dep at resolve time:
+
+```bash
+PHOENIX_KIT_PATH=../phoenix_kit mix test     # this module against local core
+PHOENIX_KIT_AI_PATH=../phoenix_kit_ai mix test
+```
+
+The variable name is the dep's app name upper-cased with `_PATH` appended
+(`:phoenix_kit` -> `PHOENIX_KIT_PATH`, `:phoenix_kit_ai` ->
+`PHOENIX_KIT_AI_PATH`). Set several at once to override multiple deps. This
+module's sibling overrides: `PHOENIX_KIT_AI_PATH`. **Unset = the
+published pin**, so `mix hex.publish` and CI resolve exactly as before.
+Implemented via `pk_dep/3` in `mix.exs` — never hand-edit a `phoenix_kit*`
+dep into a `path:` tuple (a committed path dep ships a broken package); set
+the env var instead.
+
 ## Architecture
 
 This is a **library** (not a standalone Phoenix app) that provides publishing/CMS capabilities as a PhoenixKit plugin module.

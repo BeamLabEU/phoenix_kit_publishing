@@ -64,14 +64,28 @@ defmodule PhoenixKitPublishing.MixProject do
     ]
   end
 
+  # phoenix_kit deps resolve from Hex by default. For cross-repo work against a
+  # local checkout, export <APP>_PATH — e.g. PHOENIX_KIT_PATH=../phoenix_kit or
+  # PHOENIX_KIT_AI_PATH=../phoenix_kit_ai. Unset => the published pin, so
+  # mix hex.publish is unaffected.
+  defp pk_dep(app, requirement, opts \\ []) do
+    env_var = String.upcase(Atom.to_string(app)) <> "_PATH"
+
+    case System.get_env(env_var) do
+      nil when opts == [] -> {app, requirement}
+      nil -> {app, requirement, opts}
+      path -> {app, [path: path, override: true] ++ opts}
+    end
+  end
+
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, and core infrastructure.
       # 1.7.132 is the floor — it carries the generic AI-translation pipeline
       # (`Modules.AI.{Translatable,Translations,TranslateWorker}` +
       # `ai_translatables/0`) that `ai_translatable.ex` plugs into.
-      {:phoenix_kit, "~> 1.7.132"},
-      {:phoenix_kit_ai, "~> 0.3"},
+      pk_dep(:phoenix_kit, "~> 1.7.132"),
+      pk_dep(:phoenix_kit_ai, "~> 0.3"),
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},
