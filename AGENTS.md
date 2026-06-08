@@ -509,8 +509,12 @@ PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` direct
 
 ## External Dependencies
 
-- **PhoenixKit** (`~> 1.7`) — Module behaviour, Settings API, shared components, RepoHelper
-- **PhoenixKitAI** (`~> 0.1`) — AI translation dispatch (OpenRouter via core's `AI.ask_with_prompt/4`)
+- **PhoenixKit** (`~> 1.7.132`) — Module behaviour, Settings API, shared components, RepoHelper
+- **PhoenixKitAI** (`~> 0.3`) — the AI-translation pipeline lives here (moved out of core): the
+  `PhoenixKitAI.Translatable` adapter behaviour (publishing's `AITranslatable` implements it),
+  `PhoenixKitAI.{Translations,TranslateWorker,Translation}`, and the `AITranslate` modal UI. The
+  per-language Oban fan-out + the LLM call (`PhoenixKitAI.ask_with_prompt/4`, OpenRouter) are owned
+  by this plugin; publishing only contributes the adapter + editor wiring.
 - **Phoenix LiveView** (`~> 1.0`) — Admin LiveViews
 - **Earmark** (`~> 1.4`) — Markdown rendering (GFM)
 - **Saxy** (`~> 1.5`) — XML parsing for PHK page builder components
