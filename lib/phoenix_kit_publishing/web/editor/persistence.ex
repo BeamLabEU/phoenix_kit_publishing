@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   use Gettext, backend: PhoenixKitWeb.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
@@ -264,7 +265,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         })
 
       {:error, error} ->
-        handle_post_creation_error(socket, error, gettext("Failed to create post"))
+        handle_post_creation_error(socket, error, gettext("Couldn't create this post."))
     end
   end
 
@@ -303,12 +304,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
             )
         end
 
-      {:error, _reason} ->
+      {:error, reason} ->
         {:noreply,
          Phoenix.LiveView.put_flash(
            socket,
            :error,
-           gettext("Failed to create translation")
+           gettext("Couldn't create this translation.") <> " " <> Errors.message(reason)
          )}
     end
   end
@@ -377,7 +378,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
          Phoenix.LiveView.put_flash(
            socket,
            :error,
-           gettext("Failed to create new version: %{reason}", reason: inspect(reason))
+           gettext("Couldn't create a new version.") <> " " <> Errors.message(reason)
          )}
     end
   end
@@ -464,9 +465,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
          Phoenix.LiveView.put_flash(
            socket,
            :warning,
-           gettext("Post saved but failed to archive other versions: %{reason}",
-             reason: inspect(reason)
-           )
+           gettext("Post saved, but archiving the other versions failed.") <>
+             " " <> Errors.message(reason)
          )}
     end
   end
@@ -565,7 +565,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   defp handle_post_in_place_error(socket, reason) do
     post_id = socket.assigns[:post] && socket.assigns.post[:uuid]
     Logger.warning("[Publishing.Editor] Save failed for post #{post_id}: #{inspect(reason)}")
-    {:noreply, Phoenix.LiveView.put_flash(socket, :error, gettext("Failed to save post"))}
+
+    {:noreply,
+     Phoenix.LiveView.put_flash(
+       socket,
+       :error,
+       gettext("Couldn't save this post.") <> " " <> Errors.message(reason)
+     )}
   end
 
   defp handle_post_update_result(socket, update_result, success_message, extra_assigns) do
@@ -659,7 +665,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   defp handle_post_update_error(socket, reason) do
     post_id = socket.assigns[:post] && socket.assigns.post[:uuid]
     Logger.warning("[Publishing.Editor] Update failed for post #{post_id}: #{inspect(reason)}")
-    {:noreply, Phoenix.LiveView.put_flash(socket, :error, gettext("Failed to save post"))}
+
+    {:noreply,
+     Phoenix.LiveView.put_flash(
+       socket,
+       :error,
+       gettext("Couldn't save this post.") <> " " <> Errors.message(reason)
+     )}
   end
 
   # Clear, actionable message for a duplicate post slug. Names the offending
@@ -716,14 +728,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         "[Publishing.Editor] Post creation failed in #{group}: #{inspect(changeset.errors)}"
       )
 
-      {:noreply, Phoenix.LiveView.put_flash(socket, :error, fallback_message)}
+      {:noreply,
+       Phoenix.LiveView.put_flash(
+         socket,
+         :error,
+         fallback_message <> " " <> Errors.message(changeset)
+       )}
     end
   end
 
   defp handle_post_creation_error(socket, reason, fallback_message) do
     group = socket.assigns[:group_slug]
     Logger.warning("[Publishing.Editor] Post creation failed in #{group}: #{inspect(reason)}")
-    {:noreply, Phoenix.LiveView.put_flash(socket, :error, fallback_message)}
+
+    {:noreply,
+     Phoenix.LiveView.put_flash(
+       socket,
+       :error,
+       fallback_message <> " " <> Errors.message(reason)
+     )}
   end
 
   # ============================================================================

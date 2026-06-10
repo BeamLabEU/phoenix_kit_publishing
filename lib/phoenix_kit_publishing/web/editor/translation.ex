@@ -12,6 +12,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PresenceHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -301,8 +302,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
 
         {:noreply, translation_success_socket(socket, in_flight)}
 
-      {:error, _reason} ->
-        {:noreply, translation_error_socket(socket)}
+      {:error, reason} ->
+        {:noreply, translation_error_socket(socket, reason)}
     end
   end
 
@@ -321,10 +322,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
     )
   end
 
-  defp translation_error_socket(socket) do
+  defp translation_error_socket(socket, reason \\ nil) do
+    detail = if reason, do: " " <> Errors.message(reason), else: ""
+
     socket
     |> Phoenix.Component.assign(:ai_translation_status, :error)
-    |> Phoenix.LiveView.put_flash(:error, gettext("Failed to enqueue translation job"))
+    |> Phoenix.LiveView.put_flash(
+      :error,
+      gettext("Couldn't start the translation job.") <> detail
+    )
   end
 
   # ============================================================================

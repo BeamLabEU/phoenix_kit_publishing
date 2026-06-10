@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
 
   alias Phoenix.Component
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
@@ -107,7 +108,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
           Exception.format(:error, e, __STACKTRACE__)
       )
 
-      {:noreply, put_flash(socket, :error, gettext("Something went wrong. Please try again."))}
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         gettext("Something went wrong while saving this group.") <>
+           " " <> Errors.truncate_for_log(Exception.message(e), 200)
+       )}
   end
 
   def handle_event("cancel", _params, socket) do

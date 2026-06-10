@@ -17,6 +17,9 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
       `{:ai_extract_failed, reason}`, `{:ai_request_failed, reason}`,
       `{:source_post_read_failed, reason}`
     * strings — passed through unchanged (legacy / interpolated messages)
+    * `%Ecto.Changeset{}` — a humanized, two-error-capped summary of its
+      field errors (defensive: changesets are normally normalized to atoms
+      upstream, but if one reaches the UI it must not render as a struct)
     * unknown reasons — rendered as `"Unexpected error: <inspect>"` via
       gettext so nothing ever silently surfaces a raw struct
 
@@ -68,10 +71,12 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | :not_published
           | :post_not_found
           | :post_trashed
+          | :resource_not_found
           | :reserved_language_code
           | :reserved_route_word
           | :slug_already_exists
           | :slug_taken
+          | :timestamp_collision_unresolvable
           | :title_required
           | :unpublished
           | :version_access_disabled
@@ -117,6 +122,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:not_published), do: gettext("Not published")
   def message(:post_not_found), do: gettext("Post not found")
   def message(:post_trashed), do: gettext("Post is trashed")
+  def message(:resource_not_found), do: gettext("Resource not found")
 
   def message(:reserved_language_code),
     do: gettext("Slug conflicts with a reserved language code")
@@ -124,6 +130,13 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:reserved_route_word), do: gettext("Slug conflicts with a reserved route word")
   def message(:slug_already_exists), do: gettext("Slug already exists")
   def message(:slug_taken), do: gettext("Slug taken")
+
+  def message(:timestamp_collision_unresolvable),
+    do:
+      gettext(
+        "Every time slot on this post's date is taken. Change the date or time, then try again."
+      )
+
   def message(:title_required), do: gettext("Title is required to publish")
   def message(:unpublished), do: gettext("Unpublished")
   def message(:version_access_disabled), do: gettext("Version access is disabled")
@@ -149,12 +162,59 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
     gettext("Failed to read source post: %{reason}", reason: truncate_for_log(reason))
   end
 
+  # Changesets normally get normalized to atoms upstream, but if one reaches
+  # the UI directly, render a short humanized summary of its field errors
+  # rather than an inspected struct. Capped at two errors so a wall of
+  # validation messages can't fill a flash; the editor form has no inline
+  # error display to fall back on, so this summary is the only signal.
+  def message(%Ecto.Changeset{} = changeset) do
+    case humanize_changeset_errors(changeset) do
+      [] -> gettext("Some fields are invalid. Please review and try again.")
+      parts -> Enum.join(parts, "; ")
+    end
+  end
+
   # Passthrough for strings so legacy callers returning {:error, "..."}
   # still render something. New code should return atoms / tagged tuples.
   def message(reason) when is_binary(reason), do: reason
 
   def message(reason) do
     gettext("Unexpected error: %{reason}", reason: truncate_for_log(reason))
+  end
+
+  defp humanize_changeset_errors(changeset) do
+    changeset
+    |> Ecto.Changeset.traverse_errors(fn {msg, opts} ->
+      Enum.reduce(opts, msg, fn {key, value}, acc ->
+        String.replace(acc, "%{#{key}}", safe_to_string(value))
+      end)
+    end)
+    |> Enum.flat_map(fn {field, msgs} ->
+      Enum.map(msgs, fn msg -> "#{humanize_field(field)} #{msg}" end)
+    end)
+    |> Enum.take(2)
+  end
+
+  # Ecto error opts can carry values with no String.Chars implementation
+  # (e.g. a `{:array, :string}` type, or arbitrary `add_error/4` metadata).
+  # Building the flash must never crash, so fall back to inspect/1.
+  defp safe_to_string(value) when is_binary(value), do: value
+
+  defp safe_to_string(value) do
+    to_string(value)
+  rescue
+    Protocol.UndefinedError -> inspect(value)
+  end
+
+  # "active_version_uuid" -> "Active version" — strip the internal *_uuid
+  # suffix and underscores so we don't surface raw column names to users.
+  defp humanize_field(field) do
+    field
+    |> to_string()
+    |> String.replace_suffix("_uuid", "")
+    |> String.replace("_", " ")
+    |> String.trim()
+    |> String.capitalize()
   end
 
   @doc """

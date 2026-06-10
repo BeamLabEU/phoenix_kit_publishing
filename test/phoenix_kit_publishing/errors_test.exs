@@ -40,6 +40,7 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
       assert Errors.message(:not_published) == "Not published"
       assert Errors.message(:post_not_found) == "Post not found"
       assert Errors.message(:post_trashed) == "Post is trashed"
+      assert Errors.message(:resource_not_found) == "Resource not found"
 
       assert Errors.message(:reserved_language_code) ==
                "Slug conflicts with a reserved language code"
@@ -47,6 +48,10 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
       assert Errors.message(:reserved_route_word) == "Slug conflicts with a reserved route word"
       assert Errors.message(:slug_already_exists) == "Slug already exists"
       assert Errors.message(:slug_taken) == "Slug taken"
+
+      assert Errors.message(:timestamp_collision_unresolvable) ==
+               "Every time slot on this post's date is taken. Change the date or time, then try again."
+
       assert Errors.message(:title_required) == "Title is required to publish"
       assert Errors.message(:unpublished) == "Unpublished"
       assert Errors.message(:version_access_disabled) == "Version access is disabled"
@@ -101,6 +106,62 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
 
     test "nil renders via the catch-all" do
       assert Errors.message(nil) == "Unexpected error: nil"
+    end
+  end
+
+  describe "message/1 — %Ecto.Changeset{}" do
+    defp changeset_with(errors) do
+      Enum.reduce(errors, Ecto.Changeset.change({%{}, %{title: :string}}), fn
+        {field, msg, opts}, acc -> Ecto.Changeset.add_error(acc, field, msg, opts)
+        {field, msg}, acc -> Ecto.Changeset.add_error(acc, field, msg)
+      end)
+    end
+
+    test "humanizes a single field error" do
+      assert Errors.message(changeset_with([{:title, "can't be blank"}])) ==
+               "Title can't be blank"
+    end
+
+    test "strips the internal *_uuid suffix from field names" do
+      msg = Errors.message(changeset_with([{:active_version_uuid, "is invalid"}]))
+      assert msg == "Active version is invalid"
+      refute msg =~ "uuid"
+    end
+
+    test "interpolates %{...} placeholders from error opts" do
+      msg =
+        Errors.message(
+          changeset_with([{:title, "should be at most %{count} character(s)", [count: 5]}])
+        )
+
+      assert msg == "Title should be at most 5 character(s)"
+    end
+
+    test "caps the summary at two field errors" do
+      msg =
+        Errors.message(
+          changeset_with([
+            {:title, "can't be blank"},
+            {:slug, "is invalid"},
+            {:mode, "is invalid"}
+          ])
+        )
+
+      # Two errors joined by "; ", the third dropped so a flash can't be flooded.
+      assert length(String.split(msg, "; ")) == 2
+    end
+
+    test "never renders the inspected struct" do
+      refute Errors.message(changeset_with([{:title, "can't be blank"}])) =~ "Ecto.Changeset"
+    end
+
+    test "does not crash on error opts whose value has no String.Chars impl" do
+      # to_string({:array, :string}) would raise Protocol.UndefinedError;
+      # the formatter must fall back to inspect rather than crash the flash.
+      msg = Errors.message(changeset_with([{:title, "is invalid", [type: {:array, :string}]}]))
+
+      assert is_binary(msg)
+      assert msg =~ "Title is invalid"
     end
   end
 

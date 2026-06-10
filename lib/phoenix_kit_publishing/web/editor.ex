@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   alias Phoenix.LiveView.JS
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
@@ -636,7 +637,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   rescue
     e ->
       Logger.error("Editor save failed: #{Exception.message(e)}")
-      {:noreply, put_flash(socket, :error, gettext("Something went wrong. Please try again."))}
+
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         gettext("Something went wrong while saving this post.") <>
+           " " <> Errors.truncate_for_log(Exception.message(e), 200)
+       )}
   end
 
   def handle_event("noop", _params, socket), do: {:noreply, socket}
@@ -756,12 +764,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
          |> assign(:ai_default_prompt_exists, true)
          |> Phoenix.LiveView.put_flash(:info, gettext("Default translation prompt created"))}
 
-      {:error, _changeset} ->
+      {:error, changeset} ->
         {:noreply,
          Phoenix.LiveView.put_flash(
            socket,
            :error,
-           gettext("Failed to create prompt. It may already exist.")
+           gettext("Couldn't create the default translation prompt.") <>
+             " " <> Errors.message(changeset)
          )}
     end
   end
@@ -777,12 +786,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
          |> assign(:ai_default_prompt_stale, false)
          |> Phoenix.LiveView.put_flash(:info, gettext("Default translation prompt updated"))}
 
-      {:error, _changeset} ->
+      {:error, changeset} ->
         {:noreply,
          Phoenix.LiveView.put_flash(
            socket,
            :error,
-           gettext("Failed to update the default prompt")
+           gettext("Couldn't update the default translation prompt.") <>
+             " " <> Errors.message(changeset)
          )}
     end
   end
@@ -1007,8 +1017,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         {:noreply,
          put_flash(socket, :error, gettext("Cannot remove the last language from a post"))}
 
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, gettext("Failed to clear translation"))}
+      {:error, reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't clear this translation.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 
@@ -1034,8 +1049,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
          |> assign(:post, saved_post)
          |> put_flash(:info, flash_msg)}
 
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, gettext("Failed to update version access setting"))}
+      {:error, reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't update the version-access setting.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 

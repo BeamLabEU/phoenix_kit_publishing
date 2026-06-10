@@ -6,6 +6,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   use Gettext, backend: PhoenixKitWeb.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
@@ -85,8 +86,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
          |> assign(:cache_status, build_cache_status(socket.assigns.cache_groups))
          |> put_flash(:info, gettext("Cache regenerated for %{group}", group: slug))}
 
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, gettext("Failed to regenerate cache"))}
+      {:error, reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't regenerate the cache for this group.") <>
+             " " <> Errors.message(reason)
+         )}
     end
   end
 
@@ -192,8 +199,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
            gettext("Cleared %{count} cached posts for %{group}", count: count, group: slug)
          )}
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Failed to clear cache"))}
+      {:error, reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't clear the cache for this group.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 

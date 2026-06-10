@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
   @group_statuses Constants.group_statuses()
@@ -171,7 +172,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
       {:error, reason} ->
         Logger.warning("[Publishing.Index] Trash group failed for #{slug}: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, gettext("Failed to trash group"))}
+
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't move this group to trash.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 
@@ -185,7 +192,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
       {:error, reason} ->
         Logger.warning("[Publishing.Index] Restore group failed for #{slug}: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, gettext("Failed to restore group"))}
+
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't restore this group.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 
@@ -202,7 +215,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
       {:error, reason} ->
         Logger.warning("[Publishing.Index] Delete group failed for #{slug}: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, gettext("Failed to delete group"))}
+
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't delete this group.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 

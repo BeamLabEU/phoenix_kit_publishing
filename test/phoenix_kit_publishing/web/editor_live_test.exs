@@ -255,6 +255,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(html)
     end
 
+    test "save failure surfaces a descriptive flash, not a bare generic one",
+         %{conn: conn, group: group, post: post} do
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      _ = render_change(view, "update_meta", %{"title" => "Saved Title", "_target" => ["title"]})
+      _ = render_change(view, "update_content", %{"content" => "## Body"})
+
+      html = render_click(view, "save", %{})
+
+      # fake_scope's actor uuid is not a real user row, so the audit FK fails
+      # and the save errors. The flash must carry the reason via Errors.message,
+      # never the old bare "Failed to save post". (The apostrophe in "Couldn't"
+      # is HTML-escaped in the rendered output, so match the unambiguous tail.)
+      assert html =~ "save this post."
+      assert html =~ "does not exist"
+      refute html =~ "Failed to save post"
+    end
+
     test "save with empty title flashes warning (Persistence guard)",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =

@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   use Gettext, backend: PhoenixKitWeb.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
@@ -131,7 +132,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
           |> Phoenix.Component.assign(:show_new_version_modal, false)
           |> Phoenix.LiveView.put_flash(
             :error,
-            gettext("Failed to create new version: %{reason}", reason: inspect(reason))
+            gettext("Couldn't create a new version.") <> " " <> Errors.message(reason)
           )
 
         {:error, socket}

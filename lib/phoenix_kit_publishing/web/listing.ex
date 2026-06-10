@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
@@ -148,7 +149,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
       {:error, reason} ->
         Logger.warning("[Publishing.Listing] Trash post failed: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, gettext("Failed to trash post"))}
+
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't move this post to trash.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 
@@ -169,7 +176,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
       {:error, reason} ->
         Logger.warning("[Publishing.Listing] Restore post failed: #{inspect(reason)}")
-        {:noreply, put_flash(socket, :error, gettext("Failed to restore post"))}
+
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't restore this post.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 
@@ -909,8 +922,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
          )
          |> reload_current_view()}
 
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, gettext("Failed to update status"))}
+      {:error, reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't update the post status.") <> " " <> Errors.message(reason)
+         )}
     end
   end
 
