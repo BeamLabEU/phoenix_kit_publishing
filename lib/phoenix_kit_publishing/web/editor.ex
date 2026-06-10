@@ -1002,9 +1002,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     post = socket.assigns.post
     language = socket.assigns.current_language
     post_uuid = post[:uuid]
+    # Target the version the editor is actually on, not whatever is newest —
+    # otherwise clearing a translation while viewing/editing an older version
+    # hard-deletes the language row from the wrong (e.g. live) version.
+    version = socket.assigns[:current_version]
 
     result =
-      Publishing.clear_translation(group_slug, post_uuid, language,
+      Publishing.clear_translation(group_slug, post_uuid, language, version,
         actor_uuid: Shared.actor_uuid_from_socket(socket)
       )
 

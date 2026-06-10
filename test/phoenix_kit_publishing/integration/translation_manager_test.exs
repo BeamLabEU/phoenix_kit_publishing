@@ -128,6 +128,7 @@ defmodule PhoenixKit.Integration.Publishing.TranslationManagerTest do
                  group["slug"],
                  post[:uuid],
                  "de-DE",
+                 nil,
                  actor_uuid: @actor_uuid
                )
 
@@ -164,6 +165,29 @@ defmodule PhoenixKit.Integration.Publishing.TranslationManagerTest do
         actor_uuid: nil,
         metadata_has: %{"language" => "de-DE"}
       )
+    end
+
+    test "clears the GIVEN version, not the latest (data-loss regression)",
+         %{group: group, post: post} do
+      # v1: en-US + de-DE.
+      assert {:ok, _} =
+               TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de-DE")
+
+      # v2 (now the latest): cloned from v1, so it carries de-DE too.
+      assert {:ok, _v2} = DBStorage.create_version_from(post[:uuid], 1)
+
+      [v1, v2] = DBStorage.list_versions(post[:uuid]) |> Enum.sort_by(& &1.version_number)
+      assert {v1.version_number, v2.version_number} == {1, 2}
+      assert Enum.any?(DBStorage.list_contents(v1.uuid), &(&1.language == "de-DE"))
+      assert Enum.any?(DBStorage.list_contents(v2.uuid), &(&1.language == "de-DE"))
+
+      # Clear de-DE on v1 (the OLDER, non-latest version) explicitly.
+      assert :ok = TranslationManager.clear_translation(group["slug"], post[:uuid], "de-DE", 1)
+
+      # v1's de-DE is gone; v2 (latest) is untouched. Before the fix this
+      # resolved `nil` -> latest version and would have deleted v2's row.
+      refute Enum.any?(DBStorage.list_contents(v1.uuid), &(&1.language == "de-DE"))
+      assert Enum.any?(DBStorage.list_contents(v2.uuid), &(&1.language == "de-DE"))
     end
   end
 

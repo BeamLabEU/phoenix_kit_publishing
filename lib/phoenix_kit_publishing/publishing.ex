@@ -185,7 +185,10 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate delete_language(group_slug, post_uuid, language_code, version \\ nil),
     to: TranslationManager
 
-  defdelegate clear_translation(group_slug, post_uuid, language_code, opts \\ []),
+  defdelegate clear_translation(group_slug, post_uuid, language_code, version, opts),
+    to: TranslationManager
+
+  defdelegate clear_translation(group_slug, post_uuid, language_code, version \\ nil),
     to: TranslationManager
 
   defdelegate set_translation_status(group_slug, post_identifier, version, language, status),

@@ -227,11 +227,16 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
   Unlike `delete_language` (which archives), this permanently removes the content.
   Refuses to delete the last remaining language.
   """
-  @spec clear_translation(String.t(), String.t(), String.t(), keyword() | map()) ::
-          :ok | {:error, term()}
-  def clear_translation(group_slug, post_uuid, language_code, opts \\ []) do
+  @spec clear_translation(
+          String.t(),
+          String.t(),
+          String.t(),
+          pos_integer() | nil,
+          keyword() | map()
+        ) :: :ok | {:error, term()}
+  def clear_translation(group_slug, post_uuid, language_code, version \\ nil, opts \\ []) do
     with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
-         db_version when not is_nil(db_version) <- Shared.resolve_db_version(db_post, nil),
+         db_version when not is_nil(db_version) <- Shared.resolve_db_version(db_post, version),
          content when not is_nil(content) <-
            DBStorage.get_content(db_version.uuid, language_code),
          :ok <- validate_not_last_content(db_version, language_code),
