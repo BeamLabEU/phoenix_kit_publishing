@@ -400,6 +400,7 @@ Add new error atoms by extending `@type error_atom`, the doctest example, and ad
 | `publishing_render_cache_enabled` | `true` | Toggle the Markdown render cache (global) |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group override for the render cache |
 | `publishing_show_language_switcher` | `true` | Render the in-page language switcher on listing + post pages. Disable when the host layout already provides one (see "Language switcher integration" below) |
+| `publishing_render_og_tags` | `true` | Render OpenGraph + Twitter Card meta tags **in-page** (inside the public body) so social previews work even when the host root layout doesn't render the forwarded `:og` assign in `<head>`. Disable when the host renders `:og` in `<head>` itself, to avoid duplicate tags (see "OpenGraph metadata" below) |
 
 ## Language switcher integration
 
@@ -445,6 +446,12 @@ Publishing assigns a `:og` map on every public response for host root layouts to
 - **Post pages** — `%{title, description, image, url, locale, type: "article"}` (6 fields). `description` and `image` may be `nil` when the post has no SEO metadata or featured image.
 
 `:og` lands on `conn.assigns` AND is forwarded through `LayoutWrapper.app_layout`'s `:module_assigns` map, so hosts can consume it from either `root.html.heex` (the conn assign) OR `Layouts.app/1` (the forwarded `@og` assign). The forwarding happens in publishing's three public render branches (`all_groups/1`, `index/1`, `show/1` in `Web.HTML`) the same way `:phoenix_kit_publishing_translations` does — see the function-component-layout callout above for the boundary mechanism.
+
+### Automatic in-page rendering (default on)
+
+Meta tags belong in `<head>`, which the **host app owns** — and most hosts ship their own `root.html.heex` that doesn't render the forwarded `:og`, so relying on the host alone left previews broken. So publishing **also renders the og/twitter tags itself**, in-page, via `Web.HTML.og_meta_tags/1` (rendered as the first child inside `LayoutWrapper.app_layout` in all three public branches). This mirrors the in-page language switcher: it works out of the box with zero host setup. Body placement is read by the major scrapers (FB/Slack/Discord/Telegram/LinkedIn); `<head>` is still the strict-standard location, which is what the `module_assigns` pass-along is for.
+
+The `publishing_render_og_tags` setting (default `true`) gates the in-page copy. A host that renders the forwarded `:og` in its own `<head>` (e.g. via core's `root.html.heex`, which renders the full og+twitter+canonical block) should flip it **off** from `/admin/settings/publishing` to avoid duplicate tags. The setting is read per-request in `og_tags_enabled?/0` — it is **not** part of the Markdown render cache (that caches post-body HTML only), so toggling takes effect immediately. The component renders nothing when `:og` is absent (e.g. the groups overview).
 
 ## Testing
 

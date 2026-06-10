@@ -214,7 +214,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:og, %{
           title: assigns.group["name"],
           url: base_url <> listing_url,
-          locale: assigns.current_language,
+          locale: og_locale(assigns.current_language),
           type: "website"
         })
         |> maybe_assign_admin_edit(
@@ -384,7 +384,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       description: description,
       image: absolute_url(base_url, image),
       url: absolute_url(base_url, canonical_url),
-      locale: language,
+      locale: og_locale(language),
       type: "article"
     }
   end
@@ -393,12 +393,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp absolute_url(_base, ""), do: nil
 
   defp absolute_url(base, url) when is_binary(url) do
-    if String.starts_with?(url, "http://") or String.starts_with?(url, "https://"),
-      do: url,
-      else: base <> url
+    cond do
+      String.starts_with?(url, "http://") or String.starts_with?(url, "https://") -> url
+      # Protocol-relative (`//cdn/...`) is already absolute — leave it.
+      String.starts_with?(url, "//") -> url
+      String.starts_with?(url, "/") -> base <> url
+      # Bare relative (e.g. an admin-entered SEO `og_image` of "images/og.png")
+      # — treat as site-absolute so we don't emit "https://hostimages/og.png".
+      true -> base <> "/" <> url
+    end
   end
 
   defp absolute_url(_base, _url), do: nil
+
+  # OpenGraph wants `language_TERRITORY` (underscore); our locale codes are
+  # BCP47-style (`en-US`) or base-only (`ja`). Normalise the separator and
+  # leave base-only codes as-is (territory unknown; consumers accept
+  # language-only).
+  defp og_locale(nil), do: nil
+  defp og_locale(code) when is_binary(code), do: String.replace(code, "-", "_")
+  defp og_locale(code), do: code
 
   defp maybe_assign_admin_edit(conn, path, label) do
     mod = @admin_edit_helper_mod

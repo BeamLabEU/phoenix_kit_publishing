@@ -10,11 +10,64 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Storage
+  alias PhoenixKit.Settings
 
   @timestamp_modes Constants.timestamp_modes()
   @slug_modes Constants.slug_modes()
 
+  @og_render_key "publishing_render_og_tags"
+
   import PhoenixKitWeb.Components.LanguageSwitcher
+
+  @doc """
+  Renders the OpenGraph + Twitter Card meta tags for a public page from the
+  `:og` map the controller builds.
+
+  These are emitted in-page (inside the rendered body) so a social preview
+  works out of the box even when the host's root layout doesn't render the
+  forwarded `:og` assign in `<head>` — most host apps ship their own root
+  layout. The same `:og` map is ALSO forwarded via `module_assigns`, so a host
+  that does render it in `<head>` gets the strictly-correct placement; such a
+  host disables the in-page copy via `publishing_render_og_tags` to avoid
+  duplicate tags. Renders nothing when `:og` is absent (e.g. the groups index).
+  """
+  attr :og, :map, default: nil
+
+  def og_meta_tags(assigns) do
+    ~H"""
+    <%= if @og && (@og[:title] || @og[:url]) do %>
+      <meta property="og:type" content={@og[:type] || "article"} />
+      <%= if @og[:title] do %>
+        <meta property="og:title" content={@og[:title]} />
+        <meta name="twitter:title" content={@og[:title]} />
+      <% end %>
+      <%= if @og[:description] do %>
+        <meta property="og:description" content={@og[:description]} />
+        <meta name="twitter:description" content={@og[:description]} />
+      <% end %>
+      <%= if @og[:image] do %>
+        <meta property="og:image" content={@og[:image]} />
+        <meta name="twitter:image" content={@og[:image]} />
+      <% end %>
+      <meta :if={@og[:url]} property="og:url" content={@og[:url]} />
+      <meta :if={@og[:locale]} property="og:locale" content={@og[:locale]} />
+      <meta property="og:site_name" content={Settings.get_project_title()} />
+      <meta
+        name="twitter:card"
+        content={if @og[:image], do: "summary_large_image", else: "summary"}
+      />
+    <% end %>
+    """
+  end
+
+  # Whether to emit the in-page OG/Twitter tags. On by default; a host that
+  # renders the forwarded `:og` assign in its own `<head>` flips this off from
+  # /admin/settings/publishing so the tags aren't duplicated.
+  defp og_tags_enabled? do
+    Settings.get_boolean_setting(@og_render_key, true)
+  rescue
+    _ -> true
+  end
 
   def all_groups(assigns) do
     ~H"""
@@ -25,6 +78,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
     module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations], og: assigns[:og]}}
     >
+    <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
     <div class="groups-overview-container max-w-6xl mx-auto px-6 py-8">
     <%!-- Page Header --%>
     <header class="mb-8">
@@ -97,6 +151,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
     module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations], og: assigns[:og]}}
     >
+    <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
     <div class="group-index-container max-w-6xl mx-auto px-6 py-8">
     <%!-- Breadcrumb Navigation --%>
     <div class="breadcrumbs text-sm mb-6">
@@ -253,6 +308,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
     module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations], og: assigns[:og]}}
     >
+    <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
     <article class="post-container max-w-4xl mx-auto px-6 py-8">
     <%!-- Breadcrumb Navigation --%>
     <div class="breadcrumbs text-sm mb-6">

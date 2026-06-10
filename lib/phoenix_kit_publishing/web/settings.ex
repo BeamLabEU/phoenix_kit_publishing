@@ -19,6 +19,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @memory_cache_key "publishing_memory_cache_enabled"
   @render_cache_key "publishing_render_cache_enabled"
   @show_language_switcher_key "publishing_show_language_switcher"
+  @render_og_tags_key "publishing_render_og_tags"
   @slug_style_key "publishing_slug_style"
   @valid_slug_styles ~w(transliterate unicode ascii)
 
@@ -52,6 +53,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       |> assign(
         :show_language_switcher,
         Settings.get_boolean_setting(@show_language_switcher_key, true)
+      )
+      |> assign(
+        :render_og_tags,
+        Settings.get_boolean_setting(@render_og_tags_key, true)
       )
       |> assign(:slug_style, Settings.get_setting(@slug_style_key, "transliterate"))
       |> assign(
@@ -159,6 +164,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
          else:
            gettext(
              "In-page language switcher disabled — host layout / custom switcher should render translations"
+           )
+       )
+     )}
+  end
+
+  def handle_event("toggle_render_og_tags", _params, socket) do
+    new_value = !socket.assigns.render_og_tags
+    Settings.update_boolean_setting(@render_og_tags_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:render_og_tags, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do:
+           gettext(
+             "In-page OpenGraph tags enabled — publishing pages will render their own social meta tags"
+           ),
+         else:
+           gettext(
+             "In-page OpenGraph tags disabled — your host layout should render the forwarded :og assign in <head>"
            )
        )
      )}
@@ -401,6 +428,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               class="toggle toggle-primary"
               checked={@show_language_switcher}
               phx-click="toggle_show_language_switcher"
+            />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-share" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("In-Page OpenGraph Tags")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "Render OpenGraph + Twitter Card meta tags on listing + post pages so link previews work out of the box. Disable when your host layout renders the forwarded :og assign in <head>."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@render_og_tags}
+              phx-click="toggle_render_og_tags"
             />
           </div>
 
