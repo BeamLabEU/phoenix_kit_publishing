@@ -14,13 +14,27 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias PhoenixKit.Modules.Publishing.PageBuilder
   alias PhoenixKit.Modules.Shared.Components.Image
   alias PhoenixKit.Modules.Shared.Components.Video
+  alias PhoenixKit.Modules.Storage.URLSigner
   alias PhoenixKit.Settings
   # Optional dependency — available when phoenix_kit_entities is installed
   @entity_form_mod PhoenixKitEntities.Components.EntityForm
   @compile {:no_warn_undefined, @entity_form_mod}
 
   @cache_name :publishing_posts
-  @cache_version "v2"
+  # v3: render output now heals legacy signed-file URLs against the current
+  # url_prefix/secret (see heal_signed_file_urls/1) — bump drops stale v2
+  # entries that still carry an old prefix baked into <img src>.
+  @cache_version "v3"
+
+  # Matches the internal signed-file route — `<prefix>/file/<uuid>/<variant>/<token>`
+  # — embedded as an `<img src>`. The prefix is bounded to plain path segments
+  # (`(?:/[A-Za-z0-9_-]+)*`), so this only fires on genuine root-relative app
+  # URLs: a `url_prefix` is always simple path segments. That deliberately
+  # excludes absolute (`https://…`) and protocol-relative (`//cdn…`) external
+  # URLs, and paths carrying a query string / `/file/` inside a query
+  # (`/proxy?next=/file/…`). The UUID group is a strict UUID shape so arbitrary
+  # hex-ish strings don't get re-signed into fresh 404s.
+  @signed_file_url_regex ~r|src="(?:/[A-Za-z0-9_-]+)*/file/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/([a-z0-9_]+)/[0-9a-fA-F]{4}"|
 
   @global_cache_key "publishing_render_cache_enabled"
   @per_group_cache_prefix "publishing_render_cache_enabled_"
@@ -161,10 +175,27 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
     # credo:disable-for-lines:2 Credo.Check.Warning.MissingMetadataKeyInLoggerConfig
     Logger.debug("Content render time: #{time}μs", content_size: byte_size(content))
-    result
+    heal_signed_file_urls(result)
   end
 
   def render_markdown(_), do: ""
+
+  # Re-resolves embedded signed-file URLs against the CURRENT url_prefix and
+  # secret. Legacy inline images stored a fully-resolved `<old-prefix>/file/...`
+  # string in the markdown body; when the host later changes its url_prefix
+  # (e.g. "/phoenix_kit" -> "/") or rotates `secret_key_base`, those frozen URLs
+  # 404. The file UUID + variant are recoverable from the path, so we re-sign at
+  # render time — healing old content with no data migration. Idempotent for
+  # content already carrying the current prefix/token. `<Image file_uuid>`
+  # components (the current format) resolve correctly on their own; this only
+  # matters for the legacy frozen-URL markdown.
+  defp heal_signed_file_urls(html) when is_binary(html) do
+    Regex.replace(@signed_file_url_regex, html, fn _full, file_uuid, variant ->
+      ~s(src="#{URLSigner.signed_url(file_uuid, variant)}")
+    end)
+  end
+
+  defp heal_signed_file_urls(other), do: other
 
   # Detect if content is pure PHK XML format (starts with <Page> or <Hero>)
   defp pure_phk_content?(content) do
@@ -591,8 +622,14 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   end
 
   defp build_cache_key(post) do
-    # Build content hash from content + metadata
-    content_to_hash = post.content <> inspect(post.metadata)
+    # Build content hash from content + metadata + the two inputs that
+    # heal_signed_file_urls/1 re-signs against: the active url_prefix and a
+    # secret-derived marker. Both participate so a prefix change OR a
+    # secret_key_base rotation invalidates cached HTML automatically — otherwise
+    # a cache hit would keep serving stale (now-404) image URLs until the
+    # content itself changed.
+    content_to_hash =
+      post.content <> inspect(post.metadata) <> url_prefix_marker() <> signer_marker()
 
     content_hash =
       :crypto.hash(:md5, content_to_hash)
@@ -602,6 +639,22 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     identifier = post[:uuid] || post.slug
 
     "#{@cache_version}:publishing_post:#{post.group}:#{identifier}:#{post.language}:#{content_hash}"
+  end
+
+  defp url_prefix_marker do
+    PhoenixKit.Config.get_url_prefix()
+  rescue
+    _ -> ""
+  end
+
+  # A stable 4-char token over a fixed probe UUID — changes only when
+  # secret_key_base changes, so it lets the render cache key track secret
+  # rotation without exposing the secret itself.
+  @cache_signer_probe "00000000-0000-0000-0000-000000000000"
+  defp signer_marker do
+    URLSigner.generate_token(@cache_signer_probe, "cache")
+  rescue
+    _ -> ""
   end
 
   defp get_cached(key) do

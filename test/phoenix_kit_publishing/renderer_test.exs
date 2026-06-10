@@ -465,4 +465,61 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
       assert is_boolean(Renderer.global_render_cache_enabled?())
     end
   end
+
+  describe "render_markdown/1 heals legacy signed-file URLs" do
+    # Tests pin url_prefix to "/", so a re-signed URL is prefixless `/file/...`.
+    @file_uuid "018e3c4a-9f6b-7890-abcd-ef1234567890"
+
+    test "rewrites a stale url_prefix on an inline image to the current prefix" do
+      # Authored when url_prefix was "/phoenix_kit"; serving now uses "/".
+      html = Renderer.render_markdown("![Shot](/phoenix_kit/file/#{@file_uuid}/original/dead)")
+
+      assert html =~ "/file/#{@file_uuid}/original/"
+      refute html =~ "/phoenix_kit/file/"
+    end
+
+    test "re-signs a legacy token (handles secret_key_base rotation)" do
+      # The stale token "dead" is replaced by a freshly computed one.
+      html = Renderer.render_markdown("![Shot](/file/#{@file_uuid}/original/dead)")
+
+      assert html =~ ~r|/file/#{@file_uuid}/original/[0-9a-f]{4}"|
+    end
+
+    test "is idempotent for an already-current prefixless URL" do
+      html = Renderer.render_markdown("![Shot](/file/#{@file_uuid}/medium/beef)")
+
+      assert html =~ "/file/#{@file_uuid}/medium/"
+      refute html =~ "/phoenix_kit/"
+    end
+
+    test "leaves absolute external image URLs untouched" do
+      url = "https://cdn.example.com/assets/photo.png"
+      html = Renderer.render_markdown("![Ext](#{url})")
+
+      assert html =~ url
+    end
+
+    test "leaves provider/CDN hash-style storage URLs untouched" do
+      url = "https://cdn.example.com/12/a1/abcdef123456/abcdef123456_original.jpg"
+      html = Renderer.render_markdown("![CDN](#{url})")
+
+      assert html =~ url
+    end
+
+    test "leaves protocol-relative external URLs untouched" do
+      # Looks like a file route but is an absolute //host/... URL — must not be
+      # rewritten to local storage.
+      url = "//cdn.example.com/x/file/#{@file_uuid}/original/dead"
+      html = Renderer.render_markdown("![PR](#{url})")
+
+      assert html =~ url
+    end
+
+    test "does not rewrite a /file/ path that lives inside a query string" do
+      url = "/proxy?next=/file/#{@file_uuid}/original/dead"
+      html = Renderer.render_markdown("[link](#{url})")
+
+      assert html =~ "/proxy?next=/file/"
+    end
+  end
 end
