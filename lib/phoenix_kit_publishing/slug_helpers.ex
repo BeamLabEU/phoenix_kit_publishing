@@ -298,16 +298,22 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpers do
   """
   @spec clear_conflicting_url_slugs(String.t(), String.t()) :: [{String.t(), String.t()}]
   def clear_conflicting_url_slugs(group_slug, post_slug) do
-    case ListingCache.read(group_slug) do
-      {:ok, posts} ->
-        conflicts = find_conflicting_url_slugs(posts, post_slug)
-        clear_url_slugs_for_conflicts(group_slug, post_slug, conflicts)
-        log_cleared_conflicts(conflicts, post_slug)
-        conflicts
+    # On a cache miss, fall back to the SAME source the cache is built from
+    # (`list_posts_for_listing/1`), so the conflict scan sees identical
+    # `:language_slugs`-bearing maps either way. This is a mutation path:
+    # silently returning [] on a miss (memory cache disabled, or a loser of a
+    # concurrent regeneration) would skip conflict cleanup and leave a stale
+    # custom url_slug pointing at the wrong post.
+    posts =
+      case ListingCache.read(group_slug) do
+        {:ok, posts} -> posts
+        {:error, _} -> DBStorage.list_posts_for_listing(group_slug)
+      end
 
-      {:error, _} ->
-        []
-    end
+    conflicts = find_conflicting_url_slugs(posts, post_slug)
+    clear_url_slugs_for_conflicts(group_slug, post_slug, conflicts)
+    log_cleared_conflicts(conflicts, post_slug)
+    conflicts
   end
 
   @doc """

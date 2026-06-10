@@ -81,7 +81,13 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
         hit
 
       :not_found ->
-        regenerate(group_slug)
+        # Go through the in-progress guard, not `regenerate/1` directly, so a
+        # burst of concurrent misses (e.g. right after a restart) doesn't fire
+        # N synchronous regenerations + N global `:persistent_term.put` GCs.
+        # A loser sees `:already_in_progress`, reads an as-yet-empty term, and
+        # returns `:cache_miss` — which every caller already handles with a
+        # direct DB read (see PostFetching.handle_cache_miss/2).
+        regenerate_if_not_in_progress(group_slug)
         read_after_regenerate(term_key)
     end
   end

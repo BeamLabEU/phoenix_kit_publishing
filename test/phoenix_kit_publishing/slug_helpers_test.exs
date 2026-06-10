@@ -133,9 +133,11 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpersDBTest do
 
   use PhoenixKitPublishing.DataCase, async: false
 
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.SlugHelpers
+  alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
 
   setup do
@@ -254,6 +256,29 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpersDBTest do
   describe "clear_conflicting_url_slugs/2" do
     test "returns [] when no conflicts exist", %{group_slug: group_slug} do
       assert SlugHelpers.clear_conflicting_url_slugs(group_slug, "no-conflicts") == []
+    end
+
+    test "with the memory cache disabled, finds + clears conflicts via the DB fallback",
+         %{group_slug: group_slug} do
+      # Regression: this is a mutation path. On a cache miss (memory cache
+      # disabled, or a loser of a concurrent regeneration) it must fall back to
+      # a DB listing — not silently return [] and skip clearing a stale custom
+      # url_slug that now collides with another post's slug.
+      {:ok, _} = Settings.update_boolean_setting("publishing_memory_cache_enabled", false)
+
+      # Post B owns the custom url_slug "taken-slug" on en-US.
+      {:ok, post_b} = Posts.create_post(group_slug, %{title: "Post B", slug: "post-b"})
+      [version] = DBStorage.list_versions(post_b.uuid)
+      [content] = DBStorage.list_contents(version.uuid)
+      {:ok, _} = DBStorage.update_content(content, %{url_slug: "taken-slug"})
+      :ok = Versions.publish_version(group_slug, post_b.uuid, version.version_number)
+
+      # Clearing conflicts for "taken-slug" must surface post B's clash, not [].
+      assert [{"post-b", "en-US"}] =
+               SlugHelpers.clear_conflicting_url_slugs(group_slug, "taken-slug")
+
+      # The url_slug was actually removed from the DB, so it no longer resolves.
+      assert DBStorage.find_by_url_slug(group_slug, "en-US", "taken-slug") == nil
     end
   end
 
