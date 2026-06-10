@@ -14,21 +14,22 @@ codebase-shape observations — no findings tagged HIGH or MEDIUM.
   then `read_post_by_uuid` → `resolve_language_to_dialect/1` against
   enabled languages. Closes follow-up #2 from the review.
 
-## Skipped (with rationale)
+## Fixed (pre-existing — verified 2026-06-11)
 
-- **#1 (codebase-shape) — Unify the three base→dialect resolvers**
-  (`Posts.enabled_dialect_for_base/2`,
-  `Web.Controller.Language.find_dialect_for_base/2`,
-  `Web.Controller.Language.resolve_language_for_post/2`). The
-  reviewer framed this as "~1 hour when next touching either
-  layer." Deferred to its own PR because: (a) the helpers operate
-  at different abstraction levels (one is a higher-level wrapper
-  around another), (b) `enabled_dialect_for_base/2`'s primary
-  tie-break does a DB-cached read (`LanguageHelpers.get_primary_language/0`)
-  that's a side effect baked into the helper — purely-functional
-  extraction needs more thought, and (c) the divergence is now
-  documented in the AGENTS.md flow diagram so the next contributor
-  knows it exists. Not blocking; not a live bug.
+- **#1 — Unify the three base→dialect resolvers.** Done in a later PR.
+  The shared resolver is now `LanguageHelpers.resolve_dialect_for_base/3`
+  (`lib/phoenix_kit_publishing/language_helpers.ex:392`), whose `opts`
+  carry the tie-break as `prefer:` (primary-language preference) /
+  `exclude:` — exactly the `resolve_in/3` + `:tie_break` shape the review
+  envisioned. Both context entry points delegate to it:
+  `Posts.resolve_language_to_dialect/1` (`posts.ex:840`, `prefer:` =
+  primary) and `Web.Controller.Language.find_dialect_for_base/2`
+  (`language.ex:269`, no prefer = first-match), plus `StaleFixer`
+  (`stale_fixer.ex:543`). The DB-cached primary read is lifted out and
+  passed in as the `prefer:` opt by the caller, so the side effect no
+  longer lives in the helper. The duplication is gone; the remaining
+  two thin wrappers are just context-specific callers of one shared
+  helper with different opts — the desired end state.
 
 ## Files touched
 
@@ -38,10 +39,10 @@ codebase-shape observations — no findings tagged HIGH or MEDIUM.
 
 ## Verification
 
-- `AGENTS.md` content review only. No code edits in this sweep.
+- 2026-05-18: `AGENTS.md` content review only. No code edits in that sweep.
+- 2026-06-11: re-verified `#1` is resolved by `resolve_dialect_for_base/3`
+  (source-read of `posts.ex:840`, `language.ex:269`, `stale_fixer.ex:543`).
 
 ## Open
 
-- **#1** — Unify the three base→dialect resolvers into a single
-  `Languages.resolve_in/3` with an explicit `:tie_break` opt. Wants
-  its own focused PR with test verification.
+None.
