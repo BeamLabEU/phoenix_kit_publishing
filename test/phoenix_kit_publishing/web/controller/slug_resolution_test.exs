@@ -120,5 +120,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SlugResolutionTest do
       assert is_binary(url)
       assert url =~ "blog"
     end
+
+    test "builds the URL from a DB-shaped post map (no :mode/:date/:time/:language_slugs)" do
+      # `find_by_previous_url_slug/3` returns `db_content_to_post_map/1` shape,
+      # which only carries :slug/:url_slug/:language/:metadata. Before the fix the
+      # dot-access on :mode/:date/:time/:language_slugs raised KeyError, 500ing the
+      # 301 redirect instead of redirecting. Mode must default to slug mode here.
+      db_post = %{slug: "real", url_slug: "redirected", language: "en", metadata: %{}}
+
+      url = SlugResolution.build_post_redirect_url("blog", db_post, "en", "redirected")
+      assert is_binary(url)
+      assert url =~ "blog"
+      assert url =~ "redirected"
+    end
   end
 end
