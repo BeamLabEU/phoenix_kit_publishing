@@ -1,6 +1,7 @@
 defmodule PhoenixKit.Integration.Publishing.PostsTest do
   use PhoenixKit.DataCase, async: true
 
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
@@ -331,6 +332,25 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
       group = create_group("slug")
       {:ok, post} = Posts.create_post(group["slug"], %{title: "Trash Me"})
       assert {:ok, _uuid} = Posts.trash_post(group["slug"], post[:uuid])
+    end
+
+    test "timestamp_slot_taken? still sees a trashed post's slot (M2)" do
+      group = create_group("timestamp")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Timed"})
+      db_post = DBStorage.get_post_by_uuid(post[:uuid])
+      date = db_post.post_date
+      time = db_post.post_time
+
+      assert DBStorage.timestamp_slot_taken?(group["slug"], date, time)
+
+      {:ok, _} = Posts.trash_post(group["slug"], post[:uuid])
+
+      # The unique index includes trashed rows, so the availability probe must
+      # too — otherwise a new post at the same minute would target the slot, the
+      # insert would hit the index, and the collision retry could never converge.
+      assert DBStorage.timestamp_slot_taken?(group["slug"], date, time)
+      # The live-serving lookup correctly treats the slot as free.
+      assert DBStorage.get_post_by_datetime(group["slug"], date, time) == nil
     end
 
     test "trashed post is excluded from list_posts" do

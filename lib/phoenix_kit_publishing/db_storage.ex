@@ -207,6 +207,27 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     end
   end
 
+  @doc """
+  Returns true if the `(group, date, minute)` timestamp slot is occupied by ANY
+  post — including trashed ones.
+
+  `get_post_by_datetime/3` filters out trashed posts (correct for serving), but
+  the unique index on `(group_uuid, post_date, post_time)` includes them (to
+  protect restore). So availability probes must see trashed rows too, otherwise a
+  trashed post's slot looks free, the insert hits the index, and the collision
+  retry can never resolve it.
+  """
+  @spec timestamp_slot_taken?(String.t(), Date.t(), Time.t()) :: boolean()
+  def timestamp_slot_taken?(group_slug, date, time) do
+    normalized_time = %Time{hour: time.hour, minute: time.minute, second: 0, microsecond: {0, 0}}
+
+    from(p in PublishingPost,
+      join: g in assoc(p, :group),
+      where: g.slug == ^group_slug and p.post_date == ^date and p.post_time == ^normalized_time
+    )
+    |> repo().exists?()
+  end
+
   @doc "Gets a post by UUID with preloads."
   @spec get_post_by_uuid(String.t(), list(atom() | tuple())) :: PublishingPost.t() | nil
   def get_post_by_uuid(uuid, preloads \\ []) do

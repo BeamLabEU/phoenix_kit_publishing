@@ -15,7 +15,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
   @group_statuses Constants.group_statuses()
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
-  alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
@@ -278,12 +277,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   defp build_group_insight(db_group, current_user, date_time_settings) do
     group_slug = db_group["slug"]
 
-    # Use ListingCache when available (sub-microsecond), fall back to DB
-    posts =
-      case ListingCache.read(group_slug) do
-        {:ok, cached_posts} -> cached_posts
-        {:error, _} -> Publishing.list_posts(group_slug)
-      end
+    # Always read from the DB (all non-trashed posts, including drafts). The
+    # ListingCache is built from active/published versions only, so a warm-cache
+    # read would silently zero out the draft/scheduled counts this admin insight
+    # exists to show — making the same widget report different numbers depending
+    # on cache warmth.
+    posts = Publishing.list_posts(group_slug)
 
     status_counts = Enum.frequencies_by(posts, &Map.get(&1[:metadata] || %{}, :status, "draft"))
 

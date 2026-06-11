@@ -624,18 +624,25 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  # The `(group_uuid, post_date, post_time)` unique-constraint
-  # violation lands here as a changeset error after `repo.rollback`.
-  # Both the field-level and constraint-name keys are checked because
-  # Ecto puts the error under whichever field is declared in the
-  # `unique_constraint/3` call (currently `:post_time`).
+  # The `(group_uuid, post_date, post_time)` unique-constraint violation lands
+  # here as a changeset error after `repo.rollback`. Ecto puts the error under
+  # the FIRST field of the `unique_constraint/3` list — `:group_uuid`, NOT
+  # `:post_time` — so matching only the date/time keys meant this never fired and
+  # concurrent same-minute creates surfaced "Group has already been taken". Match
+  # the constraint NAME (like StaleFixer.slug_conflict?/1) so a real FK error or
+  # the slug-uniqueness violation on the same `:group_uuid` key isn't mistaken
+  # for a timestamp collision.
   defp timestamp_collision?({:error, %Ecto.Changeset{errors: errors}}) do
-    Enum.any?(errors, fn
-      {field, {_msg, opts}} when field in [:post_time, :post_date] ->
-        opts[:constraint] == :unique
+    Enum.any?([:group_uuid, :post_date, :post_time], fn key ->
+      case Keyword.get(errors, key) do
+        {_msg, opts} ->
+          Keyword.get(opts, :constraint) == :unique and
+            Keyword.get(opts, :constraint_name) ==
+              "idx_publishing_posts_group_date_time_unique"
 
-      _ ->
-        false
+        _ ->
+          false
+      end
     end)
   end
 
@@ -862,24 +869,29 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   defp find_available_timestamp(group_slug, date, time, attempts) do
-    case DBStorage.get_post_by_datetime(group_slug, date, time) do
-      nil ->
-        {date, time}
+    # Trashed-INCLUSIVE check: the unique index includes trashed rows, so a
+    # version that only looked at live posts would keep handing back a slot the
+    # DB rejects, and the collision retry could never converge (see M2/M1).
+    if DBStorage.timestamp_slot_taken?(group_slug, date, time) do
+      bump_timestamp(group_slug, date, time, attempts)
+    else
+      {date, time}
+    end
+  end
 
-      _existing ->
-        # Bump by one minute
-        total_seconds = time.hour * 3600 + time.minute * 60 + 60
+  # Advance the candidate timestamp by one minute, rolling over to the next day
+  # at midnight, and retry the availability check.
+  defp bump_timestamp(group_slug, date, time, attempts) do
+    total_seconds = time.hour * 3600 + time.minute * 60 + 60
 
-        if total_seconds >= 86_400 do
-          # Rolled past midnight — advance to next day at 00:00
-          next_date = Date.add(date, 1)
-          find_available_timestamp(group_slug, next_date, ~T[00:00:00], attempts + 1)
-        else
-          next_hour = div(total_seconds, 3600)
-          next_minute = div(rem(total_seconds, 3600), 60)
-          next_time = %Time{hour: next_hour, minute: next_minute, second: 0, microsecond: {0, 0}}
-          find_available_timestamp(group_slug, date, next_time, attempts + 1)
-        end
+    if total_seconds >= 86_400 do
+      next_date = Date.add(date, 1)
+      find_available_timestamp(group_slug, next_date, ~T[00:00:00], attempts + 1)
+    else
+      next_hour = div(total_seconds, 3600)
+      next_minute = div(rem(total_seconds, 3600), 60)
+      next_time = %Time{hour: next_hour, minute: next_minute, second: 0, microsecond: {0, 0}}
+      find_available_timestamp(group_slug, date, next_time, attempts + 1)
     end
   end
 

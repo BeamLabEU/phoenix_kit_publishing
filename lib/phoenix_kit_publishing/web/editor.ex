@@ -192,18 +192,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # UUID-based route: /admin/publishing/:group/:post_uuid/edit
   def handle_params(%{"post_uuid" => post_uuid} = params, uri, socket)
       when not is_map_key(params, "preview_token") do
-    socket = assign(socket, :endpoint_url, extract_endpoint_url(uri))
+    socket =
+      socket
+      |> assign(:endpoint_url, extract_endpoint_url(uri))
+      |> reset_translation_state()
+
     handle_uuid_post_params(socket, post_uuid, params)
   end
 
   def handle_params(%{"path" => path} = params, uri, socket)
       when not is_map_key(params, "preview_token") do
-    socket = assign(socket, :endpoint_url, extract_endpoint_url(uri))
+    socket =
+      socket
+      |> assign(:endpoint_url, extract_endpoint_url(uri))
+      |> reset_translation_state()
+
     handle_path_post_params(socket, path, params)
   end
 
   def handle_params(_params, _uri, socket) do
     {:noreply, socket}
+  end
+
+  # Clear any in-flight translation lock/spinner when (re)loading a post scope.
+  # A version or language switch patches through handle_params, but completion
+  # events for the PREVIOUS scope are deliberately ignored — so without this the
+  # editor would stay locked behind a spinner until a full remount.
+  defp reset_translation_state(socket) do
+    socket
+    |> assign(:translation_locked?, false)
+    |> assign(:ai_translation_progress, nil)
   end
 
   # Derive the public-facing origin (scheme://host[:port]) from the current
