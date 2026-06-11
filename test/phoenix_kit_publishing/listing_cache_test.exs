@@ -30,17 +30,10 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheTest do
     end
   end
 
-  describe "loaded_at_key/1" do
+  describe "cache_generated_at_key/1" do
     test "returns a tuple distinct from persistent_term_key" do
       group = unique_group()
-      refute ListingCache.loaded_at_key(group) == ListingCache.persistent_term_key(group)
-    end
-  end
-
-  describe "cache_generated_at_key/1" do
-    test "returns a tuple distinct from loaded_at_key" do
-      group = unique_group()
-      refute ListingCache.cache_generated_at_key(group) == ListingCache.loaded_at_key(group)
+      refute ListingCache.cache_generated_at_key(group) == ListingCache.persistent_term_key(group)
     end
   end
 
@@ -53,7 +46,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheTest do
 
     test "return the value from persistent_term when set" do
       group = unique_group()
-      :persistent_term.put(ListingCache.loaded_at_key(group), "2026-04-27T00:00:00Z")
+      # Both readers share one entry now (L12) — memory_loaded_at == cache_generated_at.
       :persistent_term.put(ListingCache.cache_generated_at_key(group), "2026-04-27T00:00:00Z")
 
       assert ListingCache.memory_loaded_at(group) == "2026-04-27T00:00:00Z"
@@ -230,6 +223,19 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheRegenerateTest do
 
       :ok = ListingCache.invalidate(group_slug)
       refute ListingCache.exists?(group_slug)
+    end
+
+    test "erase_all/0 clears the cache so a re-enable can't serve stale data (L7)",
+         %{group_slug: group_slug} do
+      :ok = ListingCache.regenerate(group_slug)
+      assert ListingCache.exists?(group_slug)
+      assert is_binary(ListingCache.cache_generated_at(group_slug))
+
+      :ok = ListingCache.erase_all()
+
+      refute ListingCache.exists?(group_slug)
+      # The timestamp prefixes are cleared too (the old per-group loop missed them).
+      assert ListingCache.cache_generated_at(group_slug) == nil
     end
   end
 

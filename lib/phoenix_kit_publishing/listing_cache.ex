@@ -47,7 +47,6 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   require Logger
 
   @persistent_term_prefix :phoenix_kit_group_listing_cache
-  @persistent_term_loaded_at_prefix :phoenix_kit_group_listing_cache_loaded_at
   @persistent_term_cache_generated_at_prefix :phoenix_kit_group_listing_cache_generated_at
 
   # ETS table for regeneration locks (provides atomic test-and-set via insert_new)
@@ -186,8 +185,10 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
 
     generated_at = UtilsDate.utc_now() |> DateTime.to_iso8601()
 
+    # Two puts, not three: the loaded-at and generated-at timestamps were always
+    # written with the SAME value, and each :persistent_term.put triggers a global
+    # GC pass — wasteful under autosave traffic. Store the timestamp once (L12).
     safe_persistent_term_put(persistent_term_key(group_slug), posts)
-    safe_persistent_term_put(loaded_at_key(group_slug), generated_at)
     safe_persistent_term_put(cache_generated_at_key(group_slug), generated_at)
 
     elapsed = System.monotonic_time(:millisecond) - start_time
@@ -382,7 +383,6 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     generated_at = UtilsDate.utc_now() |> DateTime.to_iso8601()
 
     safe_persistent_term_put(persistent_term_key(group_slug), posts)
-    safe_persistent_term_put(loaded_at_key(group_slug), generated_at)
     safe_persistent_term_put(cache_generated_at_key(group_slug), generated_at)
 
     Logger.debug(
@@ -416,18 +416,39 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     end
 
     try do
-      :persistent_term.erase(loaded_at_key(group_slug))
-    rescue
-      ArgumentError -> :ok
-    end
-
-    try do
       :persistent_term.erase(cache_generated_at_key(group_slug))
     rescue
       ArgumentError -> :ok
     end
 
     Logger.debug("[ListingCache] Invalidated cache for #{group_slug}")
+    :ok
+  end
+
+  @doc """
+  Erases EVERY listing-cache `:persistent_term` entry (all groups, this node).
+
+  Used when memory caching is toggled off, so a later re-enable can't serve
+  pre-disable data — `read/1` returns `:cache_miss` while disabled, but the stale
+  terms would otherwise still be present (under all three prefixes) the moment it's
+  re-enabled. `:persistent_term` has no prefix-scan, so this filters the full term
+  snapshot — fine for a rare admin toggle, never call it on a hot path.
+  """
+  @spec erase_all() :: :ok
+  def erase_all do
+    Enum.each(:persistent_term.get(), fn
+      {{prefix, _slug} = key, _value}
+      when prefix in [@persistent_term_prefix, @persistent_term_cache_generated_at_prefix] ->
+        try do
+          :persistent_term.erase(key)
+        rescue
+          ArgumentError -> :ok
+        end
+
+      _ ->
+        :ok
+    end)
+
     :ok
   end
 
@@ -649,22 +670,15 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   end
 
   @doc """
-  Returns the :persistent_term key for tracking when the memory cache was loaded.
-  """
-  @spec loaded_at_key(String.t()) :: tuple()
-  def loaded_at_key(group_slug) do
-    {@persistent_term_loaded_at_prefix, group_slug}
-  end
-
-  @doc """
   Returns when the memory cache was loaded (ISO 8601 string), or nil if not loaded.
+
+  Backed by the same `:persistent_term` entry as `cache_generated_at/1` — on this
+  node the cache is loaded exactly when it's generated, so the two are identical
+  and share one entry (L12).
   """
   @spec memory_loaded_at(String.t()) :: String.t() | nil
   def memory_loaded_at(group_slug) do
-    case safe_persistent_term_get(loaded_at_key(group_slug)) do
-      {:ok, loaded_at} -> loaded_at
-      :not_found -> nil
-    end
+    cache_generated_at(group_slug)
   end
 
   @doc """
