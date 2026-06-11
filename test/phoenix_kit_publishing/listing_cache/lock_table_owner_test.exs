@@ -7,6 +7,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.LockTableOwnerTest do
 
   use ExUnit.Case, async: false
 
+  alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.ListingCache.LockTableOwner
 
   @lock_table :phoenix_kit_listing_cache_locks
@@ -29,7 +30,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.LockTableOwnerTest do
     # Pins the contract do_regenerate_with_lock/2's release relies on: the lock
     # value is {timestamp, token}, and a release matched on a stale token is a
     # no-op — so a slow original holder can't delete a takeover holder's lock.
-    PhoenixKit.Modules.Publishing.ListingCache.ensure_lock_table_exists()
+    ListingCache.ensure_lock_table_exists()
     group = "l10-#{System.unique_integer([:positive])}"
     token_a = make_ref()
     token_b = make_ref()
