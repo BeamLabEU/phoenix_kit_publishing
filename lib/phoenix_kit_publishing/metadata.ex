@@ -124,7 +124,6 @@ defmodule PhoenixKit.Modules.Publishing.Metadata do
 
   defp extract_title_from_components(content) do
     component_title(content, "Headline") ||
-      component_attribute(content, "Hero", "title") ||
       component_title(content, "Title")
   end
 
@@ -133,15 +132,6 @@ defmodule PhoenixKit.Modules.Publishing.Metadata do
 
     case Regex.run(regex, content, capture: :all_but_first) do
       [inner | _] -> sanitize_component_text(inner)
-      _ -> nil
-    end
-  end
-
-  defp component_attribute(content, tag, attr) do
-    regex = ~r/<#{tag}\b[^>]*#{attr}="([^"]+)"[^>]*>/i
-
-    case Regex.run(regex, content, capture: :all_but_first) do
-      [value | _] -> sanitize_component_text(value)
       _ -> nil
     end
   end

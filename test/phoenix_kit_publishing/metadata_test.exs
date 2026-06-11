@@ -38,9 +38,9 @@ defmodule PhoenixKit.Modules.Publishing.MetadataTest do
 
     test "ignores content inside components" do
       content = """
-      <Hero title="Welcome">
+      <CTA title="Welcome">
         # This should be ignored
-      </Hero>
+      </CTA>
 
       # Real Title
       """
@@ -51,11 +51,6 @@ defmodule PhoenixKit.Modules.Publishing.MetadataTest do
     test "extracts title from Headline component" do
       content = "<Headline>My Headline</Headline>"
       assert Metadata.extract_title_from_content(content) == "My Headline"
-    end
-
-    test "extracts title from Hero component title attribute" do
-      content = ~s(<Hero title="Welcome Home" background="dark" />)
-      assert Metadata.extract_title_from_content(content) == "Welcome Home"
     end
   end
 end

@@ -42,8 +42,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @global_cache_key "publishing_render_cache_enabled"
   @per_group_cache_prefix "publishing_render_cache_enabled_"
 
-  @component_regex ~r/<(Image|Hero|CTA|Headline|Subheadline|Video|EntityForm)\s+([^>]*?)\/>/s
-  @component_block_regex ~r/<(Hero|CTA|Headline|Subheadline|Video|EntityForm)\s*([^>]*)>(.*?)<\/\1>/s
+  @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|EntityForm)\s+([^>]*?)\/>/s
+  @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|EntityForm)\s*([^>]*)>(.*?)<\/\1>/s
 
   # Fenced (```…``` or ~~~…~~~) and inline (`…`) code spans — masked out before
   # the component scan so a literal component example inside a code block isn't
@@ -171,19 +171,14 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   def render_markdown(content) when is_binary(content) do
     {time, result} =
       :timer.tc(fn ->
-        cond do
-          pure_phk_content?(content) ->
-            render_phk_content(content)
-
-          has_embedded_components?(content) ->
-            render_mixed_content(content)
-
-          true ->
-            # Escape code regions on the plain path too, so raw HTML inside a
-            # ```fence``` (e.g. <script>) renders as literal text instead of
-            # executing — matching the mixed path. escape: false makes this the
-            # only thing standing between a fenced <script> and live HTML.
-            render_earmark_markdown(escape_code_regions(content))
+        if has_embedded_components?(content) do
+          render_mixed_content(content)
+        else
+          # Escape code regions on the plain path too, so raw HTML inside a
+          # ```fence``` (e.g. <script>) renders as literal text instead of
+          # executing — matching the mixed path. escape: false makes this the
+          # only thing standing between a fenced <script> and live HTML.
+          render_earmark_markdown(escape_code_regions(content))
         end
       end)
 
@@ -211,39 +206,17 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   defp heal_signed_file_urls(other), do: other
 
-  # Detect if content is pure PHK XML format (starts with <Page> or <Hero>)
-  defp pure_phk_content?(content) do
-    trimmed = String.trim(content)
-    String.starts_with?(trimmed, "<Page") || String.starts_with?(trimmed, "<Hero")
-  end
-
   # Detect if markdown content has embedded XML components
   defp has_embedded_components?(content) do
     # `<Image` may be followed by a space OR a newline (the format spec's own
     # examples put the attributes on the next line); match either so multi-line
     # tags route through the component path instead of being smartypants-mangled.
     Regex.match?(~r/<Image[\s>]/, content) ||
-      String.contains?(content, "<Hero") ||
       String.contains?(content, "<CTA") ||
       String.contains?(content, "<Headline") ||
       String.contains?(content, "<Subheadline") ||
       String.contains?(content, "<Video") ||
       String.contains?(content, "<EntityForm")
-  end
-
-  # Render PHK content using PageBuilder
-  defp render_phk_content(content) do
-    case PageBuilder.render_content(content) do
-      {:ok, html} ->
-        # Convert Phoenix.LiveView.Rendered to string
-        html
-        |> Safe.to_iodata()
-        |> IO.iodata_to_binary()
-
-      {:error, reason} ->
-        Logger.warning("PHK render error: #{inspect(reason)}")
-        "<p>Error rendering page content</p>"
-    end
   end
 
   # Render markdown using Earmark, then inject Tailwind/daisyUI classes on each tag.
@@ -390,7 +363,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   defp render_mixed_content(content) do
     # Escape HTML inside fenced/inline code spans BEFORE scanning for components,
-    # so a `<Image>`/`<Hero>`/… shown literally inside a code block (a docs post
+    # so a `<Image>`/`<CTA>`/… shown literally inside a code block (a docs post
     # demonstrating the PHK syntax) (a) no longer matches the component regex
     # (it's now `&lt;Image`) and (b) renders as visible code text — `escape:
     # false` would otherwise leave the raw tag in `<code>`, where the browser

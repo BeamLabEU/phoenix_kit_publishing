@@ -1230,7 +1230,6 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       )
       |> maybe_put_version_field("seo_title", Map.get(params, "seo_title"))
       |> maybe_put_version_field("tags", Map.get(params, "tags"))
-      |> maybe_put_version_field("seo", Map.get(params, "seo"))
       |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
 
     # Also update version-level status and published_at if provided.

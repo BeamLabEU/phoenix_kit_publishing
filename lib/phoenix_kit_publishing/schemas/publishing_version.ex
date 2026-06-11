@@ -17,7 +17,6 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   ### Version metadata (defaults for all languages)
   - `featured_image_uuid` - Featured image reference (media UUID)
   - `tags` - List of tag strings
-  - `seo` - SEO metadata map (og_title, og_description, og_image, etc.)
   - `description` - SEO meta description
   - `allow_version_access` - Whether older versions are publicly accessible
 
@@ -99,9 +98,6 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
 
   @doc "Returns the post tags."
   def get_tags(%__MODULE__{data: data}), do: Map.get(data, "tags", [])
-
-  @doc "Returns SEO metadata."
-  def get_seo(%__MODULE__{data: data}), do: Map.get(data, "seo", %{})
 
   @doc "Returns the SEO description."
   def get_description(%__MODULE__{data: data}), do: Map.get(data, "description")

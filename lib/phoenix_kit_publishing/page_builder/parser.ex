@@ -4,31 +4,17 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Parser do
 
   Example input:
   ```xml
-  <Page slug="home">
-    <Hero variant="split-image">
-      <Headline>Welcome to PhoenixKit</Headline>
-      <Subheadline>Build faster with {{framework}}</Subheadline>
-      <CTA primary="true" action="/signup">Get Started</CTA>
-    </Hero>
-  </Page>
+  <Headline>Welcome to PhoenixKit</Headline>
+  <Subheadline>Build faster with {{framework}}</Subheadline>
+  <CTA primary="true" action="/signup">Get Started</CTA>
   ```
 
-  Output AST:
+  Output AST (one node per top-level element):
   ```elixir
   %{
-    type: :page,
-    attributes: %{slug: "home"},
-    children: [
-      %{
-        type: :hero,
-        attributes: %{variant: "split-image"},
-        children: [
-          %{type: :headline, content: "Welcome to PhoenixKit"},
-          %{type: :subheadline, content: "Build faster with {{framework}}"},
-          %{type: :cta, attributes: %{primary: "true", action: "/signup"}, content: "Get Started"}
-        ]
-      }
-    ]
+    type: :headline,
+    attributes: %{},
+    content: "Welcome to PhoenixKit"
   }
   ```
   """
@@ -136,7 +122,7 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.SaxHandler do
     {:ok, state}
   end
 
-  # Normalize tag names to atoms (Page -> :page, Hero -> :hero).
+  # Normalize tag names to atoms (Headline -> :headline, CTA -> :cta).
   #
   # Uses `String.to_existing_atom/1` so user-supplied (admin-edited) PHK
   # XML content can't keep minting new atoms — the BEAM atom table is
@@ -146,9 +132,9 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.SaxHandler do
   #
   # The atoms for legitimate PHK components are pre-allocated at compile
   # time by their resolver clauses in
-  # `PhoenixKit.Modules.Publishing.PageBuilder.Renderer` (`:page`,
-  # `:hero`, `:headline`, `:subheadline`, `:cta`, `:image`, `:video`,
-  # `:entityform`), so `String.to_existing_atom/1` finds them. New
+  # `PhoenixKit.Modules.Publishing.PageBuilder.Renderer` (`:headline`,
+  # `:subheadline`, `:cta`, `:image`, `:video`, `:entityform`), so
+  # `String.to_existing_atom/1` finds them. New
   # components added in the future must ship a matching resolver clause
   # to register their atom — same as today.
   defp normalize_tag_name(name) do

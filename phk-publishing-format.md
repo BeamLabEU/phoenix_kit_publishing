@@ -61,7 +61,7 @@ Only a subset is required, but the publishing UI will populate everything shown 
 After the frontmatter, everything is standard Markdown. The renderer automatically:
 
 1. Runs Markdown through Earmark (GitHub-flavoured Markdown).
-2. Scans for inline PHK components (`<Image />`, `<Hero>…</Hero>`, `<CTA />`, `<Headline>`, `<Subheadline>`).
+2. Scans for inline PHK components (`<Image />`, `<CTA />`, `<Headline>`, `<Subheadline>`, `<Video>`).
 3. Renders those components with Phoenix components before returning HTML.
 
 This means you can drop components alongside text:
@@ -80,7 +80,6 @@ You can mix **bold text** and inline components:
 | Component | Notes |
 |-----------|-------|
 | `<Image … />` | Works with either `src="/path/to/file.jpg"` or `file_uuid="…"`. Optional `file_variant="thumbnail" | "small" | "medium" | "large"` picks a specific variant from PhoenixKit Storage. The renderer now always returns the natural dimensions; add your own `class` if you want to constrain width. |
-| `<Hero variant="split-image|centered|minimal"> … </Hero>` | A layout block that can wrap `<Headline>`, `<Subheadline>`, `<CTA />`, `<Image />`. Use sparingly inside Markdown (usually near the top). |
 | `<Headline>…</Headline>` | Renders a hero-style heading. |
 | `<Subheadline>…</Subheadline>` | Medium-sized supporting text. |
 | `<CTA primary="true|false" action="/path-or-anchor">Label</CTA>` | Button styled by the admin theme. |
@@ -116,12 +115,10 @@ published_at: 2025-10-31T09:00:00Z
 
 Thanks for building with PhoenixKit! Here are the highlights from this month.
 
-<Hero variant="split-image">
-  <Headline>Maintenance Mode v2</Headline>
-  <Subheadline>Plan downtime with confidence.</Subheadline>
-  <CTA primary="true" action="/admin/modules">Enable Module</CTA>
-  <Image file_uuid="018e3c4a-9f6b-7890-abcd-ef1234567890" alt="Maintenance Mode Screenshot" />
-</Hero>
+<Headline>Maintenance Mode v2</Headline>
+<Subheadline>Plan downtime with confidence.</Subheadline>
+<CTA primary="true" action="/admin/modules">Enable Module</CTA>
+<Image file_uuid="018e3c4a-9f6b-7890-abcd-ef1234567890" alt="Maintenance Mode Screenshot" />
 
 ## New referral analytics
 
@@ -152,43 +149,35 @@ published_at: 2025-07-01T10:00:00Z
 # Working with PhoenixKit Storage
 
 <!-- Example 1: Using direct URL -->
-<Hero variant="split-image">
-  <Headline>Direct URL Image Example</Headline>
-  <Subheadline>This uses a direct asset path to display an image.</Subheadline>
-  <CTA primary="true" action="/signup">Get Started</CTA>
-  <Image src="/assets/dashboard-preview.png" alt="Dashboard Preview" />
-</Hero>
+<Headline>Direct URL Image Example</Headline>
+<Subheadline>This uses a direct asset path to display an image.</Subheadline>
+<CTA primary="true" action="/signup">Get Started</CTA>
+<Image src="/assets/dashboard-preview.png" alt="Dashboard Preview" />
 
 <!-- Example 2: Using file_uuid -->
-<Hero variant="centered">
-  <Headline>Storage File ID Example</Headline>
-  <Subheadline>This pulls from PhoenixKit Storage.</Subheadline>
-  <CTA primary="true" action="/upload">Upload Image</CTA>
-  <Image file_uuid="018e3c4a-9f6b-7890-abcd-ef1234567890" alt="Uploaded Image" />
-</Hero>
+<Headline>Storage File ID Example</Headline>
+<Subheadline>This pulls from PhoenixKit Storage.</Subheadline>
+<CTA primary="true" action="/upload">Upload Image</CTA>
+<Image file_uuid="018e3c4a-9f6b-7890-abcd-ef1234567890" alt="Uploaded Image" />
 
 <!-- Example 3: Using file_uuid with variant -->
-<Hero variant="minimal">
-  <Headline>Thumbnail Variant</Headline>
-  <Subheadline>Great for small inline previews.</Subheadline>
-  <Image
-    file_uuid="018e3c4a-9f6b-7890-abcd-ef1234567890"
-    file_variant="thumbnail"
-    alt="Thumbnail Image"
-  />
-</Hero>
+<Headline>Thumbnail Variant</Headline>
+<Subheadline>Great for small inline previews.</Subheadline>
+<Image
+  file_uuid="018e3c4a-9f6b-7890-abcd-ef1234567890"
+  file_variant="thumbnail"
+  alt="Thumbnail Image"
+/>
 
 <!-- Example 4: Custom classes -->
-<Hero variant="split-image">
-  <Headline>Custom Styling</Headline>
-  <Subheadline>Combine variants with Tailwind utility classes.</Subheadline>
-  <Image
-    file_uuid="018e3c4a-9f6b-7890-abcd-ef1234567890"
-    file_variant="medium"
-    class="border-4 border-primary"
-    alt="Styled Image"
-  />
-</Hero>
+<Headline>Custom Styling</Headline>
+<Subheadline>Combine variants with Tailwind utility classes.</Subheadline>
+<Image
+  file_uuid="018e3c4a-9f6b-7890-abcd-ef1234567890"
+  file_variant="medium"
+  class="border-4 border-primary"
+  alt="Styled Image"
+/>
 ```
 
 ---

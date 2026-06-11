@@ -10,11 +10,11 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.ParserTest do
 
   describe "parse/1 — element nodes" do
     test "parses a self-closed element with only attributes" do
-      assert {:ok, ast} = Parser.parse(~s(<Hero variant="split-image"/>))
+      assert {:ok, ast} = Parser.parse(~s(<Video variant="autoplay"/>))
 
       assert ast == %{
-               type: :hero,
-               attributes: %{"variant" => "split-image"},
+               type: :video,
+               attributes: %{"variant" => "autoplay"},
                children: [],
                content: nil
              }
@@ -31,10 +31,10 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.ParserTest do
     end
 
     test "parses an element with children into the children key" do
-      input = ~s(<Page><Headline>Hi</Headline><CTA action="/x">Go</CTA></Page>)
+      input = ~s(<EntityForm><Headline>Hi</Headline><CTA action="/x">Go</CTA></EntityForm>)
       assert {:ok, ast} = Parser.parse(input)
 
-      assert ast.type == :page
+      assert ast.type == :entityform
       assert length(ast.children) == 2
       assert Enum.at(ast.children, 0).type == :headline
       assert Enum.at(ast.children, 0).content == "Hi"
@@ -43,20 +43,20 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.ParserTest do
     end
 
     test "downcases tag names to atoms" do
-      assert {:ok, %{type: :hero}} = Parser.parse("<Hero/>")
-      assert {:ok, %{type: :hero}} = Parser.parse("<hero/>")
-      assert {:ok, %{type: :hero}} = Parser.parse("<HERO/>")
+      assert {:ok, %{type: :video}} = Parser.parse("<Video/>")
+      assert {:ok, %{type: :video}} = Parser.parse("<video/>")
+      assert {:ok, %{type: :video}} = Parser.parse("<VIDEO/>")
     end
 
     test "downcases attribute keys" do
-      assert {:ok, ast} = Parser.parse(~s(<Hero VARIANT="split-image"/>))
-      assert ast.attributes["variant"] == "split-image"
+      assert {:ok, ast} = Parser.parse(~s(<Video VARIANT="autoplay"/>))
+      assert ast.attributes["variant"] == "autoplay"
     end
   end
 
   describe "parse/1 — error paths" do
     test "returns parse_error tuple for malformed XML" do
-      assert {:error, {:parse_error, _}} = Parser.parse("<Hero")
+      assert {:error, {:parse_error, _}} = Parser.parse("<Video")
     end
 
     test "returns invalid_content for non-binary input" do
@@ -66,7 +66,7 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.ParserTest do
     end
 
     test "trims content before parsing" do
-      assert {:ok, %{type: :hero}} = Parser.parse("   \n  <Hero/>  \n")
+      assert {:ok, %{type: :video}} = Parser.parse("   \n  <Video/>  \n")
     end
   end
 

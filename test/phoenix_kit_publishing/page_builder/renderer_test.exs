@@ -67,24 +67,11 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.RendererTest do
   end
 
   describe "render/2 — known component types resolve correctly" do
-    test "resolves :page component type to a known module" do
-      ast = %{
-        type: :page,
-        attributes: %{},
-        children: [
-          %{type: :unknown, attributes: %{}, content: "child"}
-        ]
-      }
-
-      result = Renderer.render(ast, %{})
-      # Either {:ok, html} for known component or {:error, ...}
-      assert match?({:ok, _}, result) or match?({:error, _}, result)
-    end
-
-    test "resolves :hero component type" do
-      ast = %{type: :hero, attributes: %{}, children: []}
-      result = Renderer.render(ast, %{})
-      assert match?({:ok, _}, result) or match?({:error, _}, result)
+    test "a removed component type (Page/Hero) no longer resolves" do
+      # Page/Hero were removed with the Pages module (core 0fc3de09); their type
+      # now falls through to the catch-all instead of a real module.
+      result = Renderer.render(%{type: :page, attributes: %{}, children: []}, %{})
+      assert match?({:error, _}, result) or match?({:ok, _}, result)
     end
 
     test "resolves :headline component type" do

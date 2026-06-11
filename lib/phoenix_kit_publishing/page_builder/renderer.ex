@@ -33,9 +33,8 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
     {:ok, Phoenix.HTML.raw(content)}
   end
 
-  # Resolve component type to module
-  defp resolve_component(:page), do: {:ok, PhoenixKit.Modules.Shared.Components.Page}
-  defp resolve_component(:hero), do: {:ok, PhoenixKit.Modules.Shared.Components.Hero}
+  # Resolve component type to module. Page/Hero were removed with the Pages module
+  # (see core 0fc3de09); their tags now fall through to the catch-all.
   defp resolve_component(:headline), do: {:ok, PhoenixKit.Modules.Shared.Components.Headline}
 
   defp resolve_component(:subheadline),

@@ -364,15 +364,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   end
 
   defp build_og_data(conn, post, canonical_url, language) do
-    seo = Map.get(post.metadata, :seo) || Map.get(post, :seo) || %{}
-    description = seo["og_description"] || Map.get(post.metadata, :description)
-    image = seo["og_image"] || PublishingHTML.featured_image_url(post, "large")
+    description = Map.get(post.metadata, :description)
+    image = PublishingHTML.featured_image_url(post, "large")
 
     base_url =
       "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
 
     %{
-      title: seo["og_title"] || post.metadata.title,
+      title: post.metadata.title,
       description: description,
       image: absolute_url(base_url, image),
       url: absolute_url(base_url, canonical_url),
@@ -390,8 +389,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       # Protocol-relative (`//cdn/...`) is already absolute — leave it.
       String.starts_with?(url, "//") -> url
       String.starts_with?(url, "/") -> base <> url
-      # Bare relative (e.g. an admin-entered SEO `og_image` of "images/og.png")
-      # — treat as site-absolute so we don't emit "https://hostimages/og.png".
+      # Bare relative (e.g. a featured-image path like "images/og.png") — treat as
+      # site-absolute so we don't emit "https://hostimages/og.png".
       true -> base <> "/" <> url
     end
   end
