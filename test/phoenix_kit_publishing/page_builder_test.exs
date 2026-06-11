@@ -45,9 +45,11 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilderTest do
       assert html(safe) =~ "Hi Ada"
     end
 
-    test "missing variables resolve to empty string" do
+    test "an unresolved variable is left as a literal placeholder, not deleted (L9)" do
+      # Replacing it with "" would silently delete author-written braces when
+      # content is rendered without the data that fills them.
       assert {:ok, safe} = PageBuilder.render_content("<Foobar>Hi {{missing}}</Foobar>")
-      assert html(safe) =~ "Hi "
+      assert html(safe) =~ "{{missing}}"
     end
 
     test "returns parse_error for malformed XML" do

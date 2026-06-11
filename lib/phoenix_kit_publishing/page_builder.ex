@@ -76,10 +76,15 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder do
 
   defp inject_assigns(value, _assigns), do: value
 
-  # Interpolate {{variable}} placeholders
+  # Interpolate {{variable}} placeholders. An unresolved placeholder (no value in
+  # assigns) is left AS-IS — replacing it with "" silently deletes author-written
+  # braces when content is rendered without data (L9, content loss).
   defp interpolate_string(string, assigns) do
-    Regex.replace(~r/\{\{([^}]+)\}\}/, string, fn _, path ->
-      get_nested_value(assigns, String.trim(path)) |> to_string()
+    Regex.replace(~r/\{\{([^}]+)\}\}/, string, fn full_match, path ->
+      case get_nested_value(assigns, String.trim(path)) do
+        nil -> full_match
+        value -> to_string(value)
+      end
     end)
   end
 

@@ -356,6 +356,36 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     PublishingPubSub.broadcast_post_version_published(group_slug, post_uuid, version, source_id)
   end
 
+  # Create an empty version + its site-default-language content row in ONE
+  # transaction, so a content-insert failure rolls the version back instead of
+  # orphaning an empty version (L4).
+  defp create_blank_version(db_post, created_by_uuid) do
+    primary_language = LanguageHelpers.get_primary_language()
+    repo = PhoenixKit.RepoHelper.repo()
+
+    repo.transaction(fn ->
+      with {:ok, db_version} <-
+             DBStorage.create_version(%{
+               post_uuid: db_post.uuid,
+               version_number: DBStorage.next_version_number(db_post.uuid),
+               status: "draft",
+               created_by_uuid: created_by_uuid
+             }),
+           {:ok, _content} <-
+             DBStorage.create_content(%{
+               version_uuid: db_version.uuid,
+               language: primary_language,
+               title: "",
+               content: "",
+               status: "draft"
+             }) do
+        db_version
+      else
+        {:error, reason} -> repo.rollback(reason)
+      end
+    end)
+  end
+
   defp do_unpublish_post(group_slug, db_post, opts) do
     repo = PhoenixKit.RepoHelper.repo()
     target_status = Keyword.get(opts, :target_status, "draft")
@@ -364,7 +394,10 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       repo.transaction(fn ->
         lock_post!(repo, db_post.uuid)
 
-        # Find the currently active version
+        # Re-read under the lock so active_version_uuid reflects any publish that
+        # committed between the initial read and acquiring the row lock — otherwise
+        # we'd demote the wrong (stale) version (L3).
+        db_post = DBStorage.get_post_by_uuid(db_post.uuid) || db_post
         active_version = DBStorage.get_active_version(db_post)
 
         # Clear active_version_uuid on the post
@@ -571,26 +604,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       if source_version do
         DBStorage.create_version_from(db_post.uuid, source_version, user_opts)
       else
-        # Blank version — create empty version with site default language content
-        primary_language = LanguageHelpers.get_primary_language()
-
-        with {:ok, db_version} <-
-               DBStorage.create_version(%{
-                 post_uuid: db_post.uuid,
-                 version_number: DBStorage.next_version_number(db_post.uuid),
-                 status: "draft",
-                 created_by_uuid: created_by_uuid
-               }),
-             {:ok, _content} <-
-               DBStorage.create_content(%{
-                 version_uuid: db_version.uuid,
-                 language: primary_language,
-                 title: "",
-                 content: "",
-                 status: "draft"
-               }) do
-          {:ok, db_version}
-        end
+        create_blank_version(db_post, created_by_uuid)
       end
 
     with {:ok, db_version} <- result,
