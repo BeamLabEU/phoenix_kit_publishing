@@ -803,15 +803,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   def handle_event("translate_to_all_languages", _params, socket) do
-    target_languages = Translation.get_all_target_languages(socket)
-    empty_opts = {:warning, gettext("No other languages enabled to translate to")}
-    Translation.enqueue_translation(socket, target_languages, empty_opts)
+    if socket.assigns[:readonly?] do
+      {:noreply, socket}
+    else
+      target_languages = Translation.get_all_target_languages(socket)
+      empty_opts = {:warning, gettext("No other languages enabled to translate to")}
+      Translation.enqueue_translation(socket, target_languages, empty_opts)
+    end
   end
 
   def handle_event("translate_missing_languages", _params, socket) do
-    target_languages = Translation.get_target_languages_for_translation(socket)
-    empty_opts = {:info, gettext("All languages already have translations")}
-    Translation.enqueue_translation(socket, target_languages, empty_opts)
+    if socket.assigns[:readonly?] do
+      {:noreply, socket}
+    else
+      target_languages = Translation.get_target_languages_for_translation(socket)
+      empty_opts = {:info, gettext("All languages already have translations")}
+      Translation.enqueue_translation(socket, target_languages, empty_opts)
+    end
   end
 
   def handle_event("translate_to_this_language", _params, socket) do
@@ -820,6 +828,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     else
       Translation.start_translation_to_current(socket)
     end
+  end
+
+  def handle_event("confirm_translation", _params, socket)
+      when socket.assigns.readonly? == true do
+    {:noreply, socket}
   end
 
   def handle_event("confirm_translation", _params, socket) do
@@ -928,6 +941,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  def handle_event("create_version_from_source", _params, socket)
+      when socket.assigns.readonly? == true do
+    {:noreply, socket}
+  end
+
   def handle_event("create_version_from_source", _params, socket) do
     case Versions.create_version_from_source(socket) do
       {:ok, socket} -> {:noreply, socket}
@@ -953,9 +971,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # ============================================================================
 
   def handle_event("preview", _params, socket) do
-    # Save first if there are pending changes (autosave is 500ms but user might click fast)
+    # Save first if there are pending changes (autosave is 500ms but user might click fast).
+    # Never save for a read-only spectator — they always read has_pending_changes: true
+    # after a remote sync, so an unguarded save here would clobber the lock owner's work.
     socket =
-      if socket.assigns.has_pending_changes do
+      if socket.assigns.has_pending_changes and not socket.assigns[:readonly?] do
         {:noreply, saved} = Persistence.perform_save(socket)
         saved
       else
@@ -1175,7 +1195,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   @impl true
   def handle_info(:autosave, socket) do
-    if socket.assigns.has_pending_changes and not socket.assigns.translation_locked? do
+    # A read-only spectator must never autosave — their buffer is stale and would
+    # clobber the lock owner's work. translation_locked? alone didn't cover them.
+    if socket.assigns.has_pending_changes and not socket.assigns.translation_locked? and
+         not socket.assigns[:readonly?] do
       socket =
         socket
         |> assign(:is_autosaving, true)
@@ -1223,17 +1246,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   def handle_info({:editor_content_changed, %{content: content}}, socket) do
-    has_changes = Forms.dirty?(socket.assigns.post, socket.assigns.form, content)
+    # Ignore local editor changes for read-only spectators: their content arrives
+    # via remote sync, and marking pending / scheduling autosave here is a write
+    # path that would let a spectator's stale buffer overwrite the lock owner.
+    if socket.assigns[:readonly?] do
+      {:noreply, socket}
+    else
+      has_changes = Forms.dirty?(socket.assigns.post, socket.assigns.form, content)
 
-    socket =
-      socket
-      |> assign(:content, content)
-      |> assign(:has_pending_changes, has_changes)
-      |> push_event("changes-status", %{has_changes: has_changes})
+      socket =
+        socket
+        |> assign(:content, content)
+        |> assign(:has_pending_changes, has_changes)
+        |> push_event("changes-status", %{has_changes: has_changes})
 
-    socket = if has_changes, do: schedule_autosave(socket), else: socket
+      socket = if has_changes, do: schedule_autosave(socket), else: socket
 
-    {:noreply, socket}
+      {:noreply, socket}
+    end
   end
 
   def handle_info({:editor_insert_component, %{type: :image}}, socket) do
@@ -1711,11 +1741,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     assign(socket, :autosave_timer, timer_ref)
   end
 
-  defp re_read_post(socket, language) do
+  defp re_read_post(socket, language, version \\ nil) do
     case socket.assigns[:post] do
-      nil -> {:error, :no_post}
-      %{uuid: nil} -> {:error, :no_uuid}
-      post -> Publishing.read_post_by_uuid(post.uuid, language)
+      nil ->
+        {:error, :no_post}
+
+      %{uuid: nil} ->
+        {:error, :no_uuid}
+
+      post ->
+        # Default to the version the editor is pinned to, not the latest — reloads
+        # (lock acquisition, translation-created updates) run while pinned to an
+        # older version, and reading the latest would load the wrong version's
+        # content under a URL claiming the pinned one and misdirect the next save.
+        version = version || socket.assigns[:current_version]
+        Publishing.read_post_by_uuid(post.uuid, language, version)
     end
   end
 

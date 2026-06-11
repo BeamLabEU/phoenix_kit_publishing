@@ -755,6 +755,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
 
   defp re_read_post(socket, language \\ nil, version \\ nil) do
     post = socket.assigns.post
+    # Default to the editor's pinned version (current_version), not the latest —
+    # reload_post/reload_translated_content/refresh_available_languages all run
+    # while pinned to a specific version, and reading the latest would load the
+    # wrong version's content and misdirect the next save (commit 59381a3's bug,
+    # surviving in these sibling reload paths).
+    version = version || socket.assigns[:current_version]
     Publishing.read_post_by_uuid(post.uuid, language, version)
   end
 
