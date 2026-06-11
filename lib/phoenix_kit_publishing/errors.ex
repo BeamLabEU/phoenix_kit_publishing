@@ -208,16 +208,26 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
     _ -> inspect(value)
   end
 
-  # "active_version_uuid" -> "Active version" — strip the internal *_uuid
-  # suffix and underscores so we don't surface raw column names to users.
+  # Acronyms kept fully uppercased — plain String.capitalize/1 would downcase
+  # them to "Url slug" / "Seo title".
+  @field_acronyms ~w(url seo og ai id api ip html css uuid)
+
+  # "active_version_uuid" -> "Active version"; "url_slug" -> "URL slug" — strip
+  # the internal *_uuid suffix, split on underscores, uppercase known acronyms,
+  # and sentence-case the first word so we surface neither raw column names nor
+  # lowercased acronyms to users.
   defp humanize_field(field) do
     field
     |> to_string()
     |> String.replace_suffix("_uuid", "")
-    |> String.replace("_", " ")
-    |> String.trim()
-    |> String.capitalize()
+    |> String.split("_", trim: true)
+    |> Enum.with_index()
+    |> Enum.map_join(" ", &humanize_word/1)
   end
+
+  defp humanize_word({word, _idx}) when word in @field_acronyms, do: String.upcase(word)
+  defp humanize_word({word, 0}), do: String.capitalize(word)
+  defp humanize_word({word, _idx}), do: word
 
   @doc """
   Renders any error reason as a log-safe string clipped to `max` chars.

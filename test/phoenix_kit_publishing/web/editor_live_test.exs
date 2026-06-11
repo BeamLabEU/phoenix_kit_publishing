@@ -115,6 +115,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(html)
     end
 
+    test "keeps the slug-truncation warning while the title stays over the URL cap",
+         %{conn: conn, group: group, post: post} do
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      long = String.duplicate("word ", 200)
+
+      # First over-cap keystroke surfaces the warning...
+      html = render_change(view, "update_meta", %{"title" => long, "_target" => ["title"]})
+      assert html =~ "the slug was shortened"
+
+      # ...and a further over-cap keystroke must NOT wipe it. `update_meta`
+      # clear_flash's up front, so the warning has to be re-asserted each time
+      # the slug is still truncated (a once-only guard used to drop it here).
+      html =
+        render_change(view, "update_meta", %{"title" => long <> " more", "_target" => ["title"]})
+
+      assert html =~ "the slug was shortened"
+    end
+
     test "switch_language event accepts the target language",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =
@@ -297,8 +319,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       # and the save errors. The flash must carry the reason via Errors.message,
       # never the old bare "Failed to save post". (The apostrophe in "Couldn't"
       # is HTML-escaped in the rendered output, so match the unambiguous tail.)
+      # We deliberately don't assert on the FK error wording itself — that's
+      # PostgreSQL's phrasing and brittle; the two assertions below prove the
+      # behaviour (descriptive flash, not the old bare message).
       assert html =~ "save this post."
-      assert html =~ "does not exist"
       refute html =~ "Failed to save post"
     end
 

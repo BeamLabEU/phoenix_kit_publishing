@@ -304,30 +304,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
 
   defp no_slug_update(socket), do: {socket, socket.assigns.form, []}
 
-  # Auto-generated slugs never error — they truncate to fit. When the title was
-  # too long to fully fit, warn ONCE (a false->true transition on
-  # `:slug_truncated`) so live typing past the cap doesn't spam a flash on every
-  # keystroke. The warning clears when the title shrinks back under the cap.
+  # Auto-generated slugs never error — they truncate to fit. While the title is
+  # over the URL cap, keep the warning present: `update_meta` clear_flash's up
+  # front on every keystroke, so we must re-assert it each time the slug is
+  # still truncated (a once-only false->true guard let an unrelated keystroke
+  # wipe the warning while the slug was still cut). It clears when the title
+  # shrinks back under the cap.
   defp maybe_warn_slug_truncated(socket, title) do
-    truncated? = Publishing.slug_truncated?(title)
-    already? = Map.get(socket.assigns, :slug_truncated, false)
-
-    cond do
-      truncated? and not already? ->
-        socket
-        |> Phoenix.Component.assign(:slug_truncated, true)
-        |> Phoenix.LiveView.put_flash(
-          :warning,
-          gettext(
-            "The title was too long for a URL, so the slug was shortened. Edit it manually if you'd like a different one."
-          )
+    if Publishing.slug_truncated?(title) do
+      socket
+      |> Phoenix.Component.assign(:slug_truncated, true)
+      |> Phoenix.LiveView.put_flash(
+        :warning,
+        gettext(
+          "The title was too long for a URL, so the slug was shortened. Edit it manually if you'd like a different one."
         )
-
-      not truncated? ->
-        Phoenix.Component.assign(socket, :slug_truncated, false)
-
-      true ->
-        socket
+      )
+    else
+      Phoenix.Component.assign(socket, :slug_truncated, false)
     end
   end
 

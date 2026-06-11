@@ -128,6 +128,15 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
       refute msg =~ "uuid"
     end
 
+    test "keeps acronyms uppercased instead of lowercasing them" do
+      # String.capitalize/1 would render these as "Url slug" / "Seo title".
+      assert Errors.message(changeset_with([{:url_slug, "is invalid"}])) ==
+               "URL slug is invalid"
+
+      assert Errors.message(changeset_with([{:seo_title, "is invalid"}])) ==
+               "SEO title is invalid"
+    end
+
     test "interpolates %{...} placeholders from error opts" do
       msg =
         Errors.message(
