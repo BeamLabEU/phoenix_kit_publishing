@@ -38,6 +38,12 @@ defmodule PhoenixKit.Modules.Publishing.FacadeCallbacksTest do
       assert PhoenixKit.Modules.Publishing.Presence in children
     end
 
+    test "children declares the listing-cache lock-table owner (M8)" do
+      # The regeneration-lock ETS table must be owned by a supervised process,
+      # not a transient request process that dies and leaves it dangling.
+      assert PhoenixKit.Modules.Publishing.ListingCache.LockTableOwner in Publishing.children()
+    end
+
     test "children declares the :publishing_posts render cache with a bounded size" do
       # Regression: the render cache (Renderer.render_post_cached/1) was never
       # supervised, so caching silently no-op'd and every published view

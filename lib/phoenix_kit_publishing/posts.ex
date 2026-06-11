@@ -710,7 +710,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   defp read_post_from_db(group_slug, identifier, language, version) do
     # If identifier is a UUID, resolve via UUID lookup (handles both modes)
     if Shared.uuid_format?(identifier) do
-      read_post_by_uuid(identifier, language, version)
+      read_uuid_post_in_group(group_slug, identifier, language, version)
     else
       case Publishing.get_group_mode(group_slug) do
         "timestamp" ->
@@ -719,6 +719,19 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         _ ->
           read_post_from_db_slug(group_slug, identifier, language, version)
       end
+    end
+  end
+
+  # Pin a UUID lookup to the requested group. read_post_by_uuid/3 resolves purely
+  # by UUID, so without this `GET /<any-group>/<uuid>` would serve a post from a
+  # DIFFERENT group under the wrong group's name + canonical URL (M6).
+  defp read_uuid_post_in_group(group_slug, identifier, language, version) do
+    case read_post_by_uuid(identifier, language, version) do
+      {:ok, post} ->
+        if post[:group] == group_slug, do: {:ok, post}, else: {:error, :not_found}
+
+      other ->
+        other
     end
   end
 

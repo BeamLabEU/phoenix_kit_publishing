@@ -241,6 +241,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   defp extract_endpoint_url(_), do: ""
 
+  # Resolve a post by UUID but require it to belong to the group in the URL.
+  # read_post_by_uuid/3 resolves purely by UUID, so without this the editor would
+  # load a post from another group and then validate slug uniqueness against the
+  # wrong group — letting it mint duplicate slugs in the real group (M6).
+  defp read_post_by_uuid_in_group(post_uuid, group_slug, language, version) do
+    case Publishing.read_post_by_uuid(post_uuid, language, version) do
+      {:ok, post} ->
+        if post[:group] == group_slug, do: {:ok, post}, else: {:error, :wrong_group}
+
+      other ->
+        other
+    end
+  end
+
   defp handle_uuid_post_params(socket, post_uuid, params) do
     group_slug = socket.assigns.group_slug
     group_mode = Publishing.get_group_mode(group_slug)
@@ -248,7 +262,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     version = parse_version_param(params["v"])
     language = params["lang"]
 
-    case Publishing.read_post_by_uuid(post_uuid, language, version) do
+    case read_post_by_uuid_in_group(post_uuid, group_slug, language, version) do
       {:ok, post} ->
         all_enabled_languages = Publishing.enabled_language_codes()
 

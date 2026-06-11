@@ -216,6 +216,17 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
       assert updated[:content] == "<p>New body</p>"
     end
 
+    test "read_post by UUID is pinned to the requested group (M6)" do
+      group_a = create_group("slug")
+      group_b = create_group("slug")
+      {:ok, post} = Posts.create_post(group_a["slug"], %{title: "In A"})
+
+      # The post resolves under its own group...
+      assert {:ok, _} = Posts.read_post(group_a["slug"], post[:uuid], nil)
+      # ...but NOT under another group's slug (cross-group UUID access).
+      assert {:error, :not_found} = Posts.read_post(group_b["slug"], post[:uuid], nil)
+    end
+
     test "returns updated post map" do
       group = create_group("slug")
       {:ok, post} = Posts.create_post(group["slug"], %{title: "Check Return"})

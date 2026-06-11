@@ -312,8 +312,15 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     :ets.delete(@lock_table, group_slug)
   end
 
-  # Ensure the ETS table for locks exists (lazy initialization)
-  defp ensure_lock_table_exists do
+  # Ensure the ETS table for locks exists (lazy initialization).
+  #
+  # Public so a supervised owner (LockTableOwner) can create it at startup. The
+  # table is otherwise born in whichever transient request process first misses
+  # the cache, and dies with that process — after which the lock ops here raise
+  # ArgumentError on the vanished table and 500 a public read (M8). The lazy path
+  # stays as a fallback for the brief window before/around an owner restart.
+  @doc false
+  def ensure_lock_table_exists do
     case :ets.whereis(@lock_table) do
       :undefined ->
         # Table doesn't exist - create it
