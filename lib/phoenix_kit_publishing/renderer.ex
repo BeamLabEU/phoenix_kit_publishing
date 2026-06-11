@@ -179,7 +179,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
             render_mixed_content(content)
 
           true ->
-            render_earmark_markdown(content)
+            # Escape code regions on the plain path too, so raw HTML inside a
+            # ```fence``` (e.g. <script>) renders as literal text instead of
+            # executing — matching the mixed path. escape: false makes this the
+            # only thing standing between a fenced <script> and live HTML.
+            render_earmark_markdown(escape_code_regions(content))
         end
       end)
 
@@ -215,7 +219,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   # Detect if markdown content has embedded XML components
   defp has_embedded_components?(content) do
-    String.contains?(content, "<Image ") ||
+    # `<Image` may be followed by a space OR a newline (the format spec's own
+    # examples put the attributes on the next line); match either so multi-line
+    # tags route through the component path instead of being smartypants-mangled.
+    Regex.match?(~r/<Image[\s>]/, content) ||
       String.contains?(content, "<Hero") ||
       String.contains?(content, "<CTA") ||
       String.contains?(content, "<Headline") ||
@@ -272,7 +279,23 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   end
 
   defp normalize_markdown(content) when is_binary(content) do
-    content
+    # Apply the prose normalizers ONLY outside code regions. Run over the whole
+    # document they corrupt code samples: the heading-indent strip deletes the
+    # indentation from `  ## comment` lines inside a fence, and the blank-line
+    # spacer injects literal &nbsp; into runs of blank lines in code. Split on
+    # code regions (delimiters included) — even segments are prose, odd are code
+    # left verbatim — then rejoin.
+    @code_region_regex
+    |> Regex.split(content, include_captures: true)
+    |> Enum.with_index()
+    |> Enum.map_join("", fn
+      {segment, index} when rem(index, 2) == 0 -> normalize_prose(segment)
+      {code_region, _index} -> code_region
+    end)
+  end
+
+  defp normalize_prose(segment) do
+    segment
     # Remove leading indentation before Markdown headings (e.g., "  ## Title")
     |> then(&Regex.replace(~r/^[ \t]+(?=#)/m, &1, ""))
     # Preserve intentional blank lines: convert runs of 2+ blank lines into

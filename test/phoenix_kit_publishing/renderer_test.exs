@@ -563,5 +563,41 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
       # file is absent in test) — NOT left as escaped literal text.
       refute html =~ "&lt;Image"
     end
+
+    test "a multi-line <Image> tag is detected as a component (M11)" do
+      # The format spec puts attributes on the next line. With the old
+      # `<Image ` (trailing-space) detection this routed to the plain path and
+      # smartypants curled the quotes inside the tag, breaking it.
+      html =
+        Renderer.render_markdown(
+          ~s|Before\n\n<Image\n  file_uuid="#{@uuid}"\n  alt="x"/>\n\nAfter|
+        )
+
+      refute html =~ "&lt;Image"
+      # No curly quotes — the tag wasn't fed through smartypants as prose.
+      refute html =~ "“"
+      refute html =~ "”"
+    end
+  end
+
+  describe "render_markdown/1 — code-region integrity" do
+    test "does not corrupt indentation or blank lines inside a fenced code block (M10)" do
+      md = "```\n    ## indented sample\n\n\n\n    more code\n```"
+      html = Renderer.render_markdown(md)
+
+      # The blank-line spacer must not fire inside the fence...
+      refute html =~ "&nbsp;"
+      # ...and the heading-indent strip must leave the indentation intact.
+      assert html =~ "    ## indented sample"
+    end
+
+    test "escapes raw HTML in a fenced block on the plain path too (M12)" do
+      # No PHK components here, so this takes the pure-Earmark path. With
+      # escape: false a raw <script> in a fence would otherwise render live.
+      html = Renderer.render_markdown("Example:\n\n```\n<script>alert(1)</script>\n```\n")
+
+      assert html =~ "&lt;script&gt;"
+      refute html =~ "<script>"
+    end
   end
 end
