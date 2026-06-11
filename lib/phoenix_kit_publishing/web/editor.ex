@@ -906,41 +906,48 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   def handle_event("switch_version", %{"version" => version_str}, socket) do
-    version = String.to_integer(version_str)
+    # Parse defensively — a hand-crafted `?v=abc` would otherwise crash the LV on
+    # String.to_integer/1 (L1). parse_version_param/1 returns nil on junk.
+    version = parse_version_param(version_str)
 
-    if version == socket.assigns.current_version do
-      {:noreply, socket}
-    else
-      case Versions.read_version_post(socket, version) do
-        {:ok, version_post} ->
-          {socket, old_form_key, old_post_slug, new_form_key, actual_language} =
-            Versions.apply_version_switch(
-              socket,
-              version,
-              version_post,
-              &Forms.post_form_with_primary_status/3
-            )
+    cond do
+      is_nil(version) ->
+        {:noreply, put_flash(socket, :error, gettext("Version not found"))}
 
-          socket =
-            socket
-            |> Helpers.assign_current_language(actual_language)
-            |> Collaborative.cleanup_and_setup_collaborative_editing(old_form_key, new_form_key,
-              old_post_slug: old_post_slug
-            )
+      version == socket.assigns.current_version ->
+        {:noreply, socket}
 
-          post = socket.assigns.post
+      true ->
+        case Versions.read_version_post(socket, version) do
+          {:ok, version_post} ->
+            {socket, old_form_key, old_post_slug, new_form_key, actual_language} =
+              Versions.apply_version_switch(
+                socket,
+                version,
+                version_post,
+                &Forms.post_form_with_primary_status/3
+              )
 
-          url =
-            Helpers.build_edit_url(socket.assigns.group_slug, post,
-              version: version,
-              lang: actual_language
-            )
+            socket =
+              socket
+              |> Helpers.assign_current_language(actual_language)
+              |> Collaborative.cleanup_and_setup_collaborative_editing(old_form_key, new_form_key,
+                old_post_slug: old_post_slug
+              )
 
-          {:noreply, push_patch(socket, to: url, replace: true)}
+            post = socket.assigns.post
 
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, gettext("Version not found"))}
-      end
+            url =
+              Helpers.build_edit_url(socket.assigns.group_slug, post,
+                version: version,
+                lang: actual_language
+              )
+
+            {:noreply, push_patch(socket, to: url, replace: true)}
+
+          {:error, _reason} ->
+            {:noreply, put_flash(socket, :error, gettext("Version not found"))}
+        end
     end
   end
 

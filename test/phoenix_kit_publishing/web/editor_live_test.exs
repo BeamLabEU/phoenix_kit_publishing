@@ -313,6 +313,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(html)
     end
 
+    test "switch_version with a non-integer param doesn't crash the LV (L1)",
+         %{conn: conn, group: group, post: post} do
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      # Before the fix this hit String.to_integer/1 and crashed the process.
+      html = render_click(view, "switch_version", %{"version" => "abc"})
+      assert is_binary(html)
+    end
+
     test "create_version_from_source builds a new version via Versions submodule",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =
