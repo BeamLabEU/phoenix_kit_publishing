@@ -194,6 +194,18 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpersDBTest do
                SlugHelpers.validate_url_slug(group_slug, "fresh-slug", "en-US")
     end
 
+    test "rejects claiming another post's previous slug (M13)", %{group_slug: group_slug} do
+      {:ok, post} = Posts.create_post(group_slug, %{title: "Mover", slug: "mover"})
+      {:ok, v1} = Posts.update_post(group_slug, post, %{"url_slug" => "old-address"}, %{})
+      :ok = Versions.publish_version(group_slug, post[:uuid], 1)
+      # old-address -> new-address records "old-address" as the post's previous slug.
+      {:ok, _v2} = Posts.update_post(group_slug, v1, %{"url_slug" => "new-address"}, %{})
+
+      # A different post may NOT claim "old-address" — it would hijack the 301.
+      assert {:error, :conflicts_with_previous_slug} =
+               SlugHelpers.validate_url_slug(group_slug, "old-address", "en-US", "another-post")
+    end
+
     test "exclude_post_slug allows a post to keep its own URL", %{group_slug: group_slug} do
       {:ok, post} = Posts.create_post(group_slug, %{title: "Own URL", slug: "own-url"})
 

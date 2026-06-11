@@ -275,9 +275,30 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpers do
       url_slug_exists?(group_slug, url_slug, language, exclude_post_slug) ->
         {:error, :slug_already_exists}
 
+      claims_other_posts_previous_slug?(group_slug, url_slug, language, exclude_post_slug) ->
+        {:error, :conflicts_with_previous_slug}
+
       true ->
         {:ok, url_slug}
     end
+  end
+
+  # Reject claiming a slug that is another post's PREVIOUS slug — taking it would
+  # hijack that post's 301 redirect (current-slug lookup wins over previous-slug),
+  # silently stealing its old-URL traffic. Advisory: fail OPEN on a DB hiccup so a
+  # transient error doesn't block saves (unlike url_slug_exists?/4, the hard
+  # uniqueness gate, which fails closed).
+  defp claims_other_posts_previous_slug?(group_slug, url_slug, language, exclude_post_slug) do
+    DBStorage.previous_url_slug_taken_by_other_post?(
+      group_slug,
+      language,
+      url_slug,
+      exclude_post_slug
+    )
+  rescue
+    error ->
+      Logger.warning("[Slugs] previous-slug containment check failed: #{inspect(error)}")
+      false
   end
 
   @doc """

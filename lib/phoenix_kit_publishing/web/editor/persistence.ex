@@ -175,6 +175,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   defp url_slug_error_message(:reserved_route_word),
     do: gettext("URL slug cannot be a reserved word (admin, api, assets, etc.)")
 
+  defp url_slug_error_message(:conflicts_with_previous_slug),
+    do:
+      gettext(
+        "URL slug is a previous address of another post — using it would hijack that post's redirect"
+      )
+
   defp do_perform_save(socket, params) do
     is_new_post = Map.get(socket.assigns, :is_new_post, false)
     is_new_translation = Map.get(socket.assigns, :is_new_translation, false)

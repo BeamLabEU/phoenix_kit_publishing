@@ -294,36 +294,36 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageUrlSlugLookupTest do
       {:ok, _} = DBStorage.update_content(newer_content, %{url_slug: "duplicate-slug"})
       :ok = Versions.publish_version(group["slug"], newer_post.uuid, newer_v.version_number)
 
-      # First call: newer post wins (order_by p.inserted_at DESC), older
-      # loses → its url_slug becomes "duplicate-slug-2".
+      # First call: the OLDER (incumbent) post wins (order_by p.uuid ASC), the
+      # newer one loses → its url_slug becomes "duplicate-slug-2".
       winner = DBStorage.find_by_url_slug(group["slug"], "en-US", "duplicate-slug")
       assert winner != nil
-      assert winner.version.post.slug == "newer-collider"
+      assert winner.version.post.slug == "older-collider"
 
-      # Loser's url_slug got renamed in place.
-      reloaded_older = DBStorage.list_contents(older_v.uuid) |> List.first()
-      assert reloaded_older.url_slug == "duplicate-slug-2"
+      # Loser (the NEWER post) got its url_slug renamed in place.
+      reloaded_newer = DBStorage.list_contents(newer_v.uuid) |> List.first()
+      assert reloaded_newer.url_slug == "duplicate-slug-2"
 
       # Subsequent lookup is clean — only one row matches "duplicate-slug".
       assert winner_again =
                DBStorage.find_by_url_slug(group["slug"], "en-US", "duplicate-slug")
 
-      assert winner_again.version.post.slug == "newer-collider"
+      assert winner_again.version.post.slug == "older-collider"
 
       # And the renamed slug now resolves to the loser (still published).
       assert renamed =
                DBStorage.find_by_url_slug(group["slug"], "en-US", "duplicate-slug-2")
 
-      assert renamed.version.post.slug == "older-collider"
+      assert renamed.version.post.slug == "newer-collider"
     end
 
     test "increments suffix when three posts collide on the same slug" do
-      # Three-way collision. Winner stays as-is; loser #1 becomes `-2`;
-      # loser #2 becomes `-3`. Auto-rename's `Enum.with_index(losers, 2)`
-      # produces the suffix sequence.
+      # Three-way collision. Incumbent (oldest) stays as-is; the newer two are
+      # renamed `-2`, `-3`. Auto-rename's `Enum.with_index(losers, 2)` produces
+      # the suffix sequence.
       {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
 
-      [{p1, _, v1}, {p2, _, v2}, {p3, _, _v3}] =
+      [{p1, _, _v1}, {_p2, _, v2}, {_p3, _, v3}] =
         for slug <- ["first", "second", "third"] do
           {:ok, post} =
             Posts.create_post(group["slug"], %{title: "Slug #{slug}", slug: "post-#{slug}"})
@@ -335,18 +335,17 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageUrlSlugLookupTest do
           {post, content, version}
         end
 
-      # `p3` is the newest (UUIDv7 monotonic) → wins.
+      # `p1` is the oldest (UUIDv7 monotonic) → the incumbent wins.
       winner = DBStorage.find_by_url_slug(group["slug"], "en-US", "triple-collide")
-      assert winner.version.post.uuid == p3.uuid
+      assert winner.version.post.uuid == p1.uuid
 
-      # The two older posts had their slugs renamed.
-      [renamed_c1] = DBStorage.list_contents(v1.uuid)
+      # The two NEWER posts had their slugs renamed.
       [renamed_c2] = DBStorage.list_contents(v2.uuid)
+      [renamed_c3] = DBStorage.list_contents(v3.uuid)
 
-      # Both got a suffix; the exact mapping (which got -2 vs -3) depends
-      # on `order_by p.inserted_at DESC` so `p2` (middle age) is `-2` and
-      # `p1` (oldest) is `-3`.
-      renamed_slugs = MapSet.new([renamed_c1.url_slug, renamed_c2.url_slug])
+      # Both got a suffix; with `order_by p.uuid ASC` the losers are `[p2, p3]`,
+      # so `p2` (second) is `-2` and `p3` (third) is `-3`.
+      renamed_slugs = MapSet.new([renamed_c2.url_slug, renamed_c3.url_slug])
       assert renamed_slugs == MapSet.new(["triple-collide-2", "triple-collide-3"])
 
       # Both renamed slugs are now reachable individually, and the
@@ -355,7 +354,7 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageUrlSlugLookupTest do
       assert DBStorage.find_by_url_slug(group["slug"], "en-US", "triple-collide-3") != nil
 
       again = DBStorage.find_by_url_slug(group["slug"], "en-US", "triple-collide")
-      assert again.version.post.uuid == p3.uuid
+      assert again.version.post.uuid == p1.uuid
     end
   end
 
