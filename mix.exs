@@ -1,7 +1,7 @@
 defmodule PhoenixKitPublishing.MixProject do
   use Mix.Project
 
-  @version "0.2.1"
+  @version "0.2.2"
   @source_url "https://github.com/BeamLabEU/phoenix_kit_publishing"
 
   def project do
@@ -93,8 +93,8 @@ defmodule PhoenixKitPublishing.MixProject do
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},
 
-      # Markdown rendering
-      {:earmark, "~> 1.4"},
+      # Markdown rendering (MDEx/comrak; also pulled in by phoenix_kit core)
+      {:mdex, "~> 0.13"},
 
       # XML parsing for PHK page builder components
       {:saxy, "~> 1.5"},

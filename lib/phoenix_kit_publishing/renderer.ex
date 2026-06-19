@@ -27,7 +27,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # v4: escape PHK component tags inside code regions (```/~~~/inline) so they
   #     render as literal text — without the bump, posts cached under v3 keep
   #     rendering the component live from inside the code block.
-  @cache_version "v4"
+  # v5: markdown engine swapped Earmark -> MDEx (comrak). Output HTML differs
+  #     (whitespace, `<img />`, entity normalization, …) for unchanged source,
+  #     so v4 entries must be dropped and re-rendered.
+  @cache_version "v5"
 
   # Matches the internal signed-file route — `<prefix>/file/<uuid>/<variant>/<token>`
   # — embedded as an `<img src>`. The prefix is bounded to plain path segments
@@ -54,7 +57,30 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # CommonMark corners) aren't matched and would still be scanned for components.
   @code_region_regex ~r/```.*?```|~~~.*?~~~|``[^\n]+?``|`[^`\n]*`/s
 
-  # Tailwind/daisyUI classes for post-processing Earmark HTML output.
+  # MDEx (comrak) options chosen to reproduce the prior Earmark behavior:
+  #   * parse smart punctuation — curly quotes, en/em dashes, ellipses
+  #   * GFM extensions — tables, strikethrough, autolinks, task lists
+  #   * render unsafe — pass raw inline/block HTML straight through, the
+  #     documented admin trust boundary (see render_markdown_html/1)
+  # The GFM `tagfilter` extension is deliberately omitted so a pasted `<script>`
+  # still renders live — neutering it would break that trust boundary. comrak
+  # emits fenced code as `<pre><code class="language-x">`, matching the
+  # `language-` prefix the post-processing in style_code_blocks/1 expects.
+  @mdex_options [
+    extension: [strikethrough: true, table: true, autolink: true, tasklist: true],
+    parse: [smart: true],
+    render: [unsafe: true]
+  ]
+
+  # Sentinel for a `<` that sits inside a code span/fence. The component scanner
+  # is plain regex over the source, so without this it would extract a `<Image>`
+  # / `<CTA>` / … shown *literally* inside a code block and render it as a real
+  # component. We mask the `<` before scanning and restore it before MDEx renders
+  # — comrak then HTML-escapes it inside the code, so it shows as literal text. A
+  # NUL-delimited token can't collide with real post content.
+  @code_lt_sentinel "\x00pk-code-lt\x00"
+
+  # Tailwind/daisyUI classes for post-processing the rendered markdown HTML.
   # Code blocks (pre, code) are handled separately in style_code_blocks/1.
   @pre_classes "bg-base-300 p-4 rounded-lg overflow-x-auto my-4"
   @inline_code_classes "bg-base-200 px-1.5 py-0.5 rounded text-sm font-mono"
@@ -162,7 +188,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   Renders markdown or PHK content directly without caching.
 
   Automatically detects PHK XML format and routes to PageBuilder.
-  Falls back to Earmark markdown rendering for non-XML content.
+  Falls back to MDEx markdown rendering for non-XML content.
 
   ## Examples
 
@@ -176,11 +202,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         if has_embedded_components?(content) do
           render_mixed_content(content)
         else
-          # Escape code regions on the plain path too, so raw HTML inside a
-          # ```fence``` (e.g. <script>) renders as literal text instead of
-          # executing — matching the mixed path. escape: false makes this the
-          # only thing standing between a fenced <script> and live HTML.
-          render_earmark_markdown(escape_code_regions(content))
+          # No code-region pre-escaping needed: comrak always HTML-escapes
+          # fenced and inline code content, so a raw <script> inside a
+          # ```fence``` renders as literal text. Raw HTML *outside* code still
+          # passes through live (render: [unsafe: true]) — the admin trust
+          # boundary documented in render_markdown_html/1.
+          render_markdown_html(content)
         end
       end)
 
@@ -221,29 +248,30 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       String.contains?(content, "<EntityForm")
   end
 
-  # Render markdown using Earmark, then inject Tailwind/daisyUI classes on each tag.
-  defp render_earmark_markdown(content) do
-    content = normalize_markdown(content)
+  # Render markdown using MDEx (comrak), then inject Tailwind/daisyUI classes
+  # on each tag.
+  defp render_markdown_html(content) do
+    content =
+      content
+      |> normalize_markdown()
+      # Restore any `<` masked out of code regions for the component scan
+      # (mixed path only); comrak then HTML-escapes it inside the code block.
+      |> unmask_scanned_code()
 
     # Trust model: admin-authored Markdown can include inline HTML
-    # (`<div class="grid">…</div>` is a common authoring affordance).
-    # Earmark's `escape: true` would only cover literal-text HTML, not
-    # block-level passthrough — true XSS protection requires a sanitiser
-    # like html_sanitize_ex on the output. We keep `escape: false`
-    # explicitly so an admin who pastes a `<script>` tag would see it
-    # render as live HTML; this is the documented trust boundary.
-    # Re-evaluate if any non-admin-authored input reaches this path
-    # (API import, AI-translation prompt-injection on rotating roles).
-    case Earmark.as_html(content, %Earmark.Options{
-           code_class_prefix: "language-",
-           smartypants: true,
-           gfm: true,
-           escape: false
-         }) do
-      {:ok, html, _warnings} ->
+    # (`<div class="grid">…</div>` is a common authoring affordance), so we
+    # render with `unsafe: true` — an admin who pastes a `<script>` tag sees it
+    # render as live HTML. This is the documented trust boundary; true XSS
+    # protection would require a sanitiser like html_sanitize_ex on the output.
+    # comrak always escapes code spans/blocks, so fenced examples render as
+    # literal text regardless. Re-evaluate if any non-admin-authored input
+    # reaches this path (API import, AI-translation prompt-injection on
+    # rotating roles).
+    case MDEx.to_html(content, @mdex_options) do
+      {:ok, html} ->
         add_tailwind_classes(html)
 
-      {:error, _html, _errors} ->
+      {:error, _reason} ->
         escaped =
           gettext("Error rendering markdown")
           |> Phoenix.HTML.html_escape()
@@ -364,28 +392,34 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   defp render_mixed_content(content) when content == "" or is_nil(content), do: ""
 
   defp render_mixed_content(content) do
-    # Escape HTML inside fenced/inline code spans BEFORE scanning for components,
-    # so a `<Image>`/`<CTA>`/… shown literally inside a code block (a docs post
-    # demonstrating the PHK syntax) (a) no longer matches the component regex
-    # (it's now `&lt;Image`) and (b) renders as visible code text — `escape:
-    # false` would otherwise leave the raw tag in `<code>`, where the browser
-    # swallows it. Components OUTSIDE code blocks are untouched and still render.
+    # Mask `<` inside fenced/inline code spans BEFORE scanning for components, so
+    # a `<Image>`/`<CTA>`/… shown literally inside a code block (a docs post
+    # demonstrating the PHK syntax) no longer matches the component regex. The
+    # mask is restored right before MDEx renders each markdown segment, where
+    # comrak HTML-escapes it — so it shows as visible code text. Components
+    # OUTSIDE code blocks are untouched and still render.
     content
-    |> escape_code_regions()
+    |> mask_scanned_code()
     |> render_mixed_segments([])
     |> Enum.reverse()
     |> Enum.join()
   end
 
-  # Escape <, >, & inside ```fenced``` and `inline` code spans, leaving the
-  # fence/backtick delimiters intact so the markdown still parses as code.
-  defp escape_code_regions(content) do
+  # Mask every `<` inside ```fenced``` and `inline` code spans with a sentinel so
+  # the component scanner can't match a component shown literally inside code.
+  # Backtick/fence delimiters are left intact so the markdown still parses as
+  # code. Restored by unmask_scanned_code/1 before MDEx renders.
+  defp mask_scanned_code(content) do
     Regex.replace(@code_region_regex, content, fn match ->
-      match
-      |> String.replace("&", "&amp;")
-      |> String.replace("<", "&lt;")
-      |> String.replace(">", "&gt;")
+      String.replace(match, "<", @code_lt_sentinel)
     end)
+  end
+
+  # Restore sentinels back to raw `<`. A no-op on the plain path (which never
+  # masks); on the mixed path the restored `<` re-enters MDEx inside a code span,
+  # where comrak HTML-escapes it to `&lt;`.
+  defp unmask_scanned_code(content) do
+    String.replace(content, @code_lt_sentinel, "<")
   end
 
   defp render_mixed_segments("", acc), do: acc
@@ -393,7 +427,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   defp render_mixed_segments(content, acc) do
     case next_component_match(content) do
       nil ->
-        [render_earmark_markdown(content) | acc]
+        [render_markdown_html(content) | acc]
 
       {:self_closing, [{match_start, match_len}, {tag_start, tag_len}, {attrs_start, attrs_len}]} ->
         before = binary_part(content, 0, match_start)
@@ -454,7 +488,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   defp maybe_add_markdown(acc, ""), do: acc
 
   defp maybe_add_markdown(acc, text) do
-    [render_earmark_markdown(text) | acc]
+    [render_markdown_html(text) | acc]
   end
 
   defp add_component(acc, tag, attrs) do
@@ -462,7 +496,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   end
 
   defp add_block_component(acc, fragment) do
-    [render_block_component(fragment) | acc]
+    # A block component's inner content can hold a code span whose `<` was masked
+    # for the scan; restore it before PageBuilder renders the fragment.
+    [render_block_component(unmask_scanned_code(fragment)) | acc]
   end
 
   # Render individual inline component

@@ -166,7 +166,7 @@ lib/phoenix_kit_publishing/
 | `PhoenixKit.Modules.Publishing` | Main context/facade — delegates to all submodules |
 | `Publishing.DBStorage` | Direct Ecto queries for all CRUD operations |
 | `Publishing.ListingCache` | `:persistent_term` cache with sub-microsecond reads |
-| `Publishing.Renderer` | Earmark markdown + PHK component rendering with ETS cache |
+| `Publishing.Renderer` | MDEx markdown + PHK component rendering with ETS cache |
 | `Publishing.PageBuilder` | XML parser (Saxy) for `<Image>`, `<Hero>`, etc. components |
 | `Publishing.StaleFixer` | Reconciles DB/cache state, auto-cleans empty posts |
 | `Publishing.Presence` | Phoenix.Presence for collaborative editor locking |
@@ -310,7 +310,7 @@ Integration tests are automatically excluded when the database is unavailable. C
 |---------|---------|
 | `phoenix_kit` | Module behaviour, Settings, Auth, Cache, shared components |
 | `phoenix_live_view` | Admin LiveView pages |
-| `earmark` | Markdown rendering |
+| `mdex` | Markdown rendering (comrak) |
 | `saxy` | XML parsing for PHK components |
 | `oban` | Background translation and migration workers |
 

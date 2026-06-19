@@ -167,13 +167,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
     |> Renderer.render_markdown()
     |> then(&{:ok, &1})
   rescue
-    # Narrow: the markdown renderer can legitimately raise on malformed
-    # input or PHK XML it doesn't recognize; we want to surface a friendly
-    # preview error in that case. But programmer errors (ArgumentError on
-    # the wrong content type, MatchError, UndefinedFunctionError, …)
-    # should still crash so the bug isn't silently hidden behind a
+    # Narrow: the renderer can legitimately raise on PHK XML it can't parse
+    # (Saxy.ParseError) or a runtime fault in the component path; we surface a
+    # friendly preview error there. The MDEx markdown path returns an error tuple
+    # instead of raising, so it never reaches here. But programmer errors
+    # (ArgumentError on the wrong content type, MatchError, UndefinedFunctionError,
+    # …) should still crash so the bug isn't silently hidden behind a
     # "Failed to render preview" toast.
-    error in [Earmark.Error, Saxy.ParseError, RuntimeError] ->
+    error in [Saxy.ParseError, RuntimeError] ->
       Logger.error("[Publishing.Preview] Markdown rendering failed: #{inspect(error)}")
       {:error, gettext("Failed to render preview.")}
   end

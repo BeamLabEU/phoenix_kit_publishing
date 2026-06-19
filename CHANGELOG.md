@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.2 - 2026-06-19
+
+Migrates markdown rendering from **Earmark → MDEx (comrak)**. Earmark is retired/unmaintained on Hex, so `mix hex.audit` (part of `precommit`) now reports **no retired packages**. MDEx is already pulled in by `phoenix_kit` core, so this adds no new native footprint. No public API change — `Renderer.render_markdown/1` keeps the same contract; rendered HTML is equivalent (the markdown→HTML output differs only cosmetically: whitespace, `<img />` self-closing, entity normalization).
+
+### Changed
+- **`Renderer` now renders markdown with MDEx** (`render: [unsafe: true]`, smart punctuation, GFM tables/strikethrough/autolinks/task lists). The GFM `tagfilter` extension is intentionally left off to preserve the documented admin trust boundary (a pasted `<script>` still renders live).
+- **Code-fence handling is simpler and safer.** comrak always HTML-escapes fenced/inline code content, so the plain path no longer pre-escapes; a raw `<script>` inside a ```fence``` still renders as literal text. The mixed (component) path masks only the `<` of components shown literally inside code so the component scanner skips them, then restores it before MDEx (which escapes it) — replacing the old entity pre-escaping that MDEx would double-escape.
+- **Render cache version bumped `v4 → v5`** so Earmark-rendered entries are dropped and re-rendered with MDEx instead of served stale.
+- Dependency: dropped `{:earmark, "~> 1.4"}`, added `{:mdex, "~> 0.13"}`.
+
+### Fixed
+- Test harness no longer crashes when `psql` is absent — it now degrades to "integration tests excluded" so the Level 1 (pure) suite still runs.
+
 ## 0.2.1 - 2026-06-18
 
 PR #26 — rewires the post editor onto the core `MarkdownEditor` hook so it renders **zero inline `<script>` and zero `onclick`** (CSP-safe and navigation-safe), plus a post-merge review pass. No public API breaks. Built against `phoenix_kit ~> 1.7.162` / `phoenix_kit_ai ~> 0.9` (existing constraints unchanged; the editor-hook and smart-default behaviors light up on those releases and degrade gracefully on older ones).

@@ -78,7 +78,7 @@ This is a **library** (not a standalone Phoenix app) that provides publishing/CM
 
 - **`Publishing.ListingCache`** (`lib/phoenix_kit_publishing/listing_cache.ex`) — `:persistent_term` cache (~0.1us reads) for post metadata. Invalidated on mutations.
 
-- **`Publishing.Renderer`** (`lib/phoenix_kit_publishing/renderer.ex`) — Markdown→HTML via Earmark with ETS caching (6hr TTL). Detects and renders inline PHK components.
+- **`Publishing.Renderer`** (`lib/phoenix_kit_publishing/renderer.ex`) — Markdown→HTML via MDEx (comrak) with ETS caching (6hr TTL). Detects and renders inline PHK components.
 
 - **`Publishing.PageBuilder`** (`lib/phoenix_kit_publishing/page_builder.ex`) — XML parser (Saxy) for PHK components (`<Image>`, `<Hero>`, `<CTA>`, etc.).
 
@@ -124,7 +124,7 @@ lib/phoenix_kit_publishing/
 ├── shared.ex                  # Cross-module helpers (audit_metadata, parse_timestamp_path)
 ├── stale_fixer.ex             # Self-healing: language normalize, slug uniqueness, active version
 ├── listing_cache.ex           # :persistent_term cache (~0.1us reads)
-├── renderer.ex                # Earmark + ETS render cache (6h TTL)
+├── renderer.ex                # MDEx (comrak) + ETS render cache (6h TTL)
 ├── page_builder.ex            # Saxy XML parser for PHK components
 ├── page_builder/              # Per-component renderers (Image, Hero, CTA, ...)
 ├── metadata.ex                # YAML frontmatter parsing helpers
@@ -552,7 +552,7 @@ PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` direct
   per-language Oban fan-out + the LLM call (`PhoenixKitAI.ask_with_prompt/4`, OpenRouter) are owned
   by this plugin; publishing only contributes the adapter + editor wiring.
 - **Phoenix LiveView** (`~> 1.0`) — Admin LiveViews
-- **Earmark** (`~> 1.4`) — Markdown rendering (GFM)
+- **MDEx** (`~> 0.13`) — Markdown rendering (comrak, GFM)
 - **Saxy** (`~> 1.5`) — XML parsing for PHK page builder components
 - **Oban** (`~> 2.18`) — Background translation and migration workers
 - **Req** (via PhoenixKit) — HTTP client for AI translation
@@ -566,7 +566,7 @@ Publishing is a **full-featured** module: admin tabs, route module, DB-backed sc
 
 Deliberate non-features — surfacing here so future contributors don't try to add them under the assumption they were missed:
 
-- **No HTML sanitiser on Markdown output.** `Renderer` calls Earmark with `escape: false` so admin-authored `<div class="grid">` / inline HTML / `<script>` tags pass through. The trust boundary is "only admins author content"; if untrusted input ever reaches `render_markdown/1` (API import, AI prompt-injection on rotating roles), wire `html_sanitize_ex` in front of it. See `renderer.ex:201-209`.
+- **No HTML sanitiser on Markdown output.** `Renderer` calls MDEx with `render: [unsafe: true]` so admin-authored `<div class="grid">` / inline HTML / `<script>` tags pass through (GFM `tagfilter` is deliberately left off). The trust boundary is "only admins author content"; if untrusted input ever reaches `render_markdown/1` (API import, AI prompt-injection on rotating roles), wire `html_sanitize_ex` in front of it. See `render_markdown_html/1` in `renderer.ex`.
 - **No outbound HTTP from this module.** AI translation dispatches via `phoenix_kit_ai` which owns the `Req` boundary (and its SSRF allowlist). If a future feature adds direct HTTP calls, the Req.Test-via-app-config pattern (see workspace AGENTS.md "Coverage push pattern #6") is the canonical retrofit.
 - **No per-language Mailer or webhook delivery.** Publishing exposes posts via the public Controller; subscriptions / notifications are Newsletters / Emails territory.
 - **No retry layer on AI translation failures.** `TranslationManager` returns `{:error, {:ai_translation_failed, reason}}` on the first failure; the user retries from the UI. Oban-backed retries would need backoff + actor attribution — out of scope.

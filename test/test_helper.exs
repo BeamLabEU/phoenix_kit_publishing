@@ -14,19 +14,25 @@ db_config = Application.get_env(:phoenix_kit_publishing, TestRepo, [])
 db_name = db_config[:database] || "phoenix_kit_publishing_test"
 
 db_check =
-  case System.cmd("psql", ["-lqt"], stderr_to_stdout: true) do
-    {output, 0} ->
-      exists =
-        output
-        |> String.split("\n")
-        |> Enum.any?(fn line ->
-          line |> String.split("|") |> List.first("") |> String.trim() == db_name
-        end)
+  try do
+    case System.cmd("psql", ["-lqt"], stderr_to_stdout: true) do
+      {output, 0} ->
+        exists =
+          output
+          |> String.split("\n")
+          |> Enum.any?(fn line ->
+            line |> String.split("|") |> List.first("") |> String.trim() == db_name
+          end)
 
-      if exists, do: :exists, else: :not_found
+        if exists, do: :exists, else: :not_found
 
-    _ ->
-      :try_connect
+      _ ->
+        :try_connect
+    end
+  rescue
+    # `psql` isn't on PATH — treat as "no database" so the Level 1 (pure)
+    # suite still runs instead of crashing the whole helper on :enoent.
+    ErlangError -> :not_found
   end
 
 repo_available =

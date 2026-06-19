@@ -154,20 +154,21 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
     test "single blank line is a normal paragraph break" do
       html = Renderer.render_markdown("Para 1\n\nPara 2")
       # Should produce exactly 2 paragraphs, no spacers
-      refute html =~ " "
+      refute html =~ "\u00A0"
       assert html =~ "Para 1"
       assert html =~ "Para 2"
     end
 
     test "double blank lines produce one spacer" do
       html = Renderer.render_markdown("Para 1\n\n\nPara 2")
-      assert html =~ "&nbsp;"
+      # MDEx decodes the &nbsp; spacer entity to a non-breaking space (U+00A0).
+      assert html =~ "\u00A0"
     end
 
     test "triple blank lines produce two spacers" do
       html = Renderer.render_markdown("Para 1\n\n\n\nPara 2")
-      # Two extra lines = two &nbsp; spacers
-      count = length(String.split(html, "&nbsp;")) - 1
+      # Two extra blank lines = two non-breaking-space (U+00A0) spacers
+      count = length(String.split(html, "\u00A0")) - 1
       assert count == 2
     end
   end
@@ -186,9 +187,9 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
     end
 
     test "merges classes into existing class attribute" do
-      # Inline code with Earmark's class="inline" should merge
+      # MDEx emits a bare <code> for inline code; merge_class/3 adds our classes
+      # (and would merge into an existing class= if the engine produced one).
       html = Renderer.render_markdown("Use `code` here")
-      # Should have both our classes and Earmark's
       assert html =~ "font-mono"
     end
 
@@ -599,8 +600,9 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
     end
 
     test "escapes raw HTML in a fenced block on the plain path too (M12)" do
-      # No PHK components here, so this takes the pure-Earmark path. With
-      # escape: false a raw <script> in a fence would otherwise render live.
+      # No PHK components here, so this takes the pure-markdown path. comrak
+      # always HTML-escapes fenced code content, so a raw <script> in a fence
+      # renders as literal text even though raw HTML outside code passes through.
       html = Renderer.render_markdown("Example:\n\n```\n<script>alert(1)</script>\n```\n")
 
       assert html =~ "&lt;script&gt;"

@@ -35,8 +35,8 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.RendererTest do
     end
 
     test "passes admin-trusted content through (HTML preserved per trust model)" do
-      # Admin-authored content can include inline HTML — Earmark + page_builder
-      # share the trust boundary documented in renderer.ex:201-209.
+      # Admin-authored content can include inline HTML — MDEx + page_builder
+      # share the trust boundary documented in render_markdown_html/1.
       ast = %{type: :unknown, attributes: %{}, content: "<em>marked up</em>"}
 
       assert {:ok, safe} = Renderer.render(ast, %{})
