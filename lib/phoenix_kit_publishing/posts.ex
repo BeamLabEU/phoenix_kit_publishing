@@ -1142,6 +1142,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       existing_data
       |> preserve_content_data(params, post)
       |> record_previous_url_slug(existing_url_slug, resolved_url_slug)
+      |> put_og_overrides(params)
 
     case DBStorage.upsert_content(%{
            version_uuid: version.uuid,
@@ -1156,7 +1157,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  @content_only_data_keys ~w(previous_url_slugs updated_by_uuid custom_css)
+  @content_only_data_keys ~w(previous_url_slugs updated_by_uuid custom_css og)
+  @og_override_form_keys ~w(og_title og_description og_image_uuid)
   @legacy_promotable_keys ~w(description featured_image_uuid seo_title excerpt)
 
   # Preserve content-row-specific data on save.
@@ -1197,6 +1199,37 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
     Map.put(data, "previous_url_slugs", updated)
   end
+
+  # Write the per-language OpenGraph override into content.data["og"] from the
+  # flat editor form fields (og_title / og_description / og_image_uuid).
+  #
+  # Authoritative only when the save actually carries og_* fields (the editor's
+  # meta form does). A blank field clears that override key; clearing all three
+  # drops the "og" map entirely. Saves that don't include og_* fields at all
+  # (AI translation, programmatic update_post callers) leave the existing
+  # override untouched — it survives via @content_only_data_keys above.
+  defp put_og_overrides(data, params) do
+    if Enum.any?(@og_override_form_keys, &Map.has_key?(params, &1)) do
+      og =
+        %{}
+        |> maybe_put_og("title", Map.get(params, "og_title"))
+        |> maybe_put_og("description", Map.get(params, "og_description"))
+        |> maybe_put_og("image_uuid", Map.get(params, "og_image_uuid"))
+
+      if map_size(og) == 0, do: Map.delete(data, "og"), else: Map.put(data, "og", og)
+    else
+      data
+    end
+  end
+
+  defp maybe_put_og(map, key, value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> map
+      trimmed -> Map.put(map, key, trimmed)
+    end
+  end
+
+  defp maybe_put_og(map, _key, _value), do: map
 
   # Reads the current content row and returns a map of legacy V1 keys that
   # are present on `content.data` but absent from `version.data`. The caller

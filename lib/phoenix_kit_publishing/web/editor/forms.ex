@@ -61,8 +61,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "status" => post.metadata.status || "draft",
       "published_at" => get_published_at(post),
       "featured_image_uuid" => Map.get(post.metadata, :featured_image_uuid, ""),
-      "url_slug" => get_url_slug_for_form(post)
+      "url_slug" => get_url_slug_for_form(post),
+      "og_title" => og_field(post, "title"),
+      "og_description" => og_field(post, "description"),
+      "og_image_uuid" => og_field(post, "image_uuid")
     }
+  end
+
+  # Reads a per-language OpenGraph override field off post.metadata.og, which the
+  # mapper populates from content.data["og"]. `:og` may be nil (no override yet).
+  defp og_field(post, key) do
+    (Map.get(post.metadata, :og) || %{}) |> Map.get(key) |> Kernel.||("")
   end
 
   defp get_title_for_form(post) do
@@ -126,7 +135,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
         "status" => Map.get(form, "status", "draft") || "draft",
         "published_at" => normalize_published_at(Map.get(form, "published_at")),
         "featured_image_uuid" => featured_image_uuid,
-        "url_slug" => url_slug
+        "url_slug" => url_slug,
+        "og_title" => normalize_string(form, "og_title"),
+        "og_description" => normalize_string(form, "og_description"),
+        "og_image_uuid" => normalize_string(form, "og_image_uuid")
       }
 
     case Map.fetch(form, "slug") do
@@ -145,7 +157,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "published_at" => "",
       "slug" => "",
       "featured_image_uuid" => "",
-      "url_slug" => ""
+      "url_slug" => "",
+      "og_title" => "",
+      "og_description" => "",
+      "og_image_uuid" => ""
     }
 
   defp normalize_published_at(nil), do: ""
@@ -430,10 +445,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   end
 
   @doc """
-  Updates form with selected media file.
+  Updates form with selected media file. The field defaults to the featured
+  image; `og_image_uuid` is the other target the media picker writes to.
   """
-  def update_form_with_media(form, file_uuid) do
-    Map.put(form, "featured_image_uuid", file_uuid)
+  def update_form_with_media(form, file_uuid, field \\ "featured_image_uuid") do
+    Map.put(form, field, file_uuid)
   end
 
   # ============================================================================

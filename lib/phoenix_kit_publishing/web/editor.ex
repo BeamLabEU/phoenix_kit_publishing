@@ -97,8 +97,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:group_slug, group_slug)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign(:show_media_selector, false)
+      |> assign(:media_selector_target, "featured_image_uuid")
       |> assign(:media_selection_mode, :single)
       |> assign(:media_selected_uuids, MapSet.new())
+      |> assign(:featured_image_advanced_open, false)
+      |> assign(:og_overrides_open, false)
       |> assign(:is_autosaving, false)
       |> assign(:autosave_timer, nil)
       |> assign(:slug_manually_set, false)
@@ -717,8 +720,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # Handle Events - Media
   # ============================================================================
 
-  def handle_event("open_media_selector", _params, socket) do
-    {:noreply, assign(socket, :show_media_selector, true)}
+  def handle_event("open_media_selector", params, socket) do
+    target = Map.get(params, "field", "featured_image_uuid")
+
+    {:noreply,
+     socket
+     |> assign(:media_selector_target, target)
+     |> assign(:show_media_selector, true)}
   end
 
   def handle_event("open_image_component_selector", _params, socket) do
@@ -761,22 +769,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply, socket}
   end
 
-  def handle_event("clear_featured_image", _params, socket) do
-    if socket.assigns[:readonly?] do
-      {:noreply, socket}
-    else
-      updated_form = Map.put(socket.assigns.form, "featured_image_uuid", "")
+  def handle_event("clear_featured_image", _params, socket),
+    do: clear_image_field(socket, "featured_image_uuid", gettext("Featured image cleared"))
 
-      socket =
-        socket
-        |> assign(:form, updated_form)
-        |> assign(:has_pending_changes, true)
-        |> put_flash(:info, gettext("Featured image cleared"))
-        |> push_event("changes-status", %{has_changes: true})
-        |> schedule_autosave()
+  def handle_event("clear_og_image", _params, socket),
+    do: clear_image_field(socket, "og_image_uuid", gettext("OG image cleared"))
 
-      {:noreply, socket}
-    end
+  # UI-only — open/close state for `<details>` panels. No lock check on purpose;
+  # toggling a panel is not an edit and spectators are free to expand/collapse.
+  def handle_event("toggle_featured_image_advanced", _params, socket) do
+    {:noreply, update(socket, :featured_image_advanced_open, &(!&1))}
+  end
+
+  def handle_event("toggle_og_overrides", _params, socket) do
+    {:noreply, update(socket, :og_overrides_open, &(!&1))}
   end
 
   # ============================================================================
@@ -1284,8 +1290,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # ============================================================================
 
   def handle_info({:media_selected, file_uuids}, socket) do
-    if socket.assigns[:readonly?] do
-      {:noreply, assign(socket, :show_media_selector, false)}
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.readonly? or socket.assigns.translation_locked? do
+      {:noreply,
+       socket
+       |> assign(:show_media_selector, false)
+       |> assign(:media_selector_target, "featured_image_uuid")}
     else
       handle_media_selected(socket, file_uuids)
     end
@@ -1295,7 +1306,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply,
      socket
      |> assign(:show_media_selector, false)
-     |> assign(:inserting_image_component, false)}
+     |> assign(:inserting_image_component, false)
+     |> assign(:media_selector_target, "featured_image_uuid")}
   end
 
   def handle_info({:editor_content_changed, %{content: content}}, socket) do
@@ -1799,6 +1811,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # Mirrors update_meta's wiring (lock reclaim, translation lock guard,
+  # immediate Collaborative.broadcast_form_change + touch_activity) so a
+  # cleared image lands on other editors' screens before autosave fires.
+  defp clear_image_field(socket, form_key, flash_message) do
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.readonly? or socket.assigns.translation_locked? do
+      {:noreply, socket}
+    else
+      new_form = Map.put(socket.assigns.form, form_key, "")
+
+      socket =
+        socket
+        |> assign(:form, new_form)
+        |> assign(:has_pending_changes, true)
+        |> put_flash(:info, flash_message)
+        |> push_event("changes-status", %{has_changes: true})
+        |> schedule_autosave()
+
+      Collaborative.broadcast_form_change(socket, :meta, new_form)
+      socket = Collaborative.touch_activity(socket)
+
+      {:noreply, socket}
+    end
+  end
+
   defp schedule_autosave(socket) do
     if socket.assigns.autosave_timer do
       Process.cancel_timer(socket.assigns.autosave_timer)
@@ -1935,18 +1973,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           }
 
         file_uuid ->
-          {
+          target = socket.assigns[:media_selector_target] || "featured_image_uuid"
+          new_form = Forms.update_form_with_media(socket.assigns.form, file_uuid, target)
+
+          flash =
+            case target do
+              "og_image_uuid" -> gettext("OG image selected")
+              _ -> gettext("Featured image selected")
+            end
+
+          socket =
             socket
-            |> assign(:form, Forms.update_form_with_media(socket.assigns.form, file_uuid))
+            |> assign(:form, new_form)
             |> assign(:has_pending_changes, true)
             |> assign(:show_media_selector, false)
-            |> put_flash(:info, gettext("Featured image selected"))
-            |> push_event("changes-status", %{has_changes: true}),
-            true
-          }
+            |> assign(:media_selector_target, "featured_image_uuid")
+            |> put_flash(:info, flash)
+            |> push_event("changes-status", %{has_changes: true})
+
+          # Immediate live-collab broadcast — without this, spectators only see
+          # the new image after the 500ms autosave fires + an editor_saved
+          # round-trip. Mirrors the wiring update_meta does for text fields.
+          Collaborative.broadcast_form_change(socket, :meta, new_form)
+          socket = Collaborative.touch_activity(socket)
+
+          {socket, true}
 
         true ->
-          {socket |> assign(:show_media_selector, false), false}
+          {socket
+           |> assign(:show_media_selector, false)
+           |> assign(:media_selector_target, "featured_image_uuid"), false}
       end
 
     socket = if autosave?, do: schedule_autosave(socket), else: socket
@@ -2712,12 +2768,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     </button>
                   <% end %>
 
-                  <%!-- Advanced: Manual ID Entry (Collapsed by default) --%>
+                  <%!-- Advanced: Manual ID Entry. `open` is server-state because
+                       LV diffs would otherwise snap a browser-toggled `open` back
+                       to false on every re-render. `phx-click` on the summary
+                       prevents the native toggle so it stays in sync. --%>
                   <details
                     class="bg-base-200/50 mt-3 rounded-lg border border-base-300"
-                    open={false}
+                    open={@featured_image_advanced_open}
                   >
-                    <summary class="cursor-pointer select-none px-3 py-2 rounded-lg hover:bg-base-300/50 transition-colors list-none [&::-webkit-details-marker]:hidden">
+                    <summary
+                      phx-click="toggle_featured_image_advanced"
+                      class="cursor-pointer select-none px-3 py-2 rounded-lg hover:bg-base-300/50 transition-colors list-none [&::-webkit-details-marker]:hidden"
+                    >
                       <div class="flex items-center gap-1.5">
                         <.icon
                           name="hero-chevron-right"
@@ -2743,6 +2805,126 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     </div>
                   </details>
                 </div>
+
+                <%!-- Social / OpenGraph overrides (per-language). See the comment
+                     on the Manual Media ID details above — `open` is server-state. --%>
+                <details
+                  class="bg-base-200/50 rounded-lg border border-base-300"
+                  open={@og_overrides_open}
+                >
+                  <summary
+                    phx-click="toggle_og_overrides"
+                    class="cursor-pointer select-none px-3 py-2 rounded-lg hover:bg-base-300/50 transition-colors list-none [&::-webkit-details-marker]:hidden"
+                  >
+                    <div class="flex items-center gap-1.5">
+                      <.icon
+                        name="hero-chevron-right"
+                        class="w-3 h-3 transition-transform [[open]>&]:rotate-90"
+                      />
+                      <.icon name="hero-share" class="w-3.5 h-3.5 text-base-content/70" />
+                      <span class="text-xs font-medium text-base-content/70">
+                        {gettext("Social / OpenGraph")}
+                      </span>
+                    </div>
+                  </summary>
+                  <div class="px-3 pb-3 pt-2 space-y-3">
+                    <p class="text-xs text-base-content/60">
+                      {gettext(
+                        "Override how this post looks when shared on social media. Leave a field blank to use the post's own title, description, or featured image."
+                      )}
+                    </p>
+
+                    <div>
+                      <label class="label py-1">
+                        <span class="label-text text-xs font-medium">{gettext("OG title")}</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="og_title"
+                        value={@form["og_title"]}
+                        class={"input input-bordered input-sm w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                        placeholder={
+                          Map.get(@post.metadata, :title) || gettext("Defaults to post title")
+                        }
+                        readonly={edit_disabled? or @viewing_older_version}
+                      />
+                    </div>
+
+                    <div>
+                      <label class="label py-1">
+                        <span class="label-text text-xs font-medium">
+                          {gettext("OG description")}
+                        </span>
+                      </label>
+                      <textarea
+                        name="og_description"
+                        rows="2"
+                        class={"textarea textarea-bordered textarea-sm w-full #{if edit_disabled? or @viewing_older_version, do: "textarea-disabled bg-base-200"}"}
+                        placeholder={
+                          Map.get(@post.metadata, :description) ||
+                            gettext("Defaults to post description")
+                        }
+                        readonly={edit_disabled? or @viewing_older_version}
+                      >{@form["og_description"]}</textarea>
+                    </div>
+
+                    <div>
+                      <label class="label py-1">
+                        <span class="label-text text-xs font-medium">{gettext("OG image")}</span>
+                      </label>
+                      <%!-- Hidden field carries the UUID; the picker writes it. --%>
+                      <input type="hidden" name="og_image_uuid" value={@form["og_image_uuid"]} />
+                      <%= if preview_url = featured_image_preview_url(@form["og_image_uuid"]) do %>
+                        <div class="space-y-2">
+                          <img
+                            src={preview_url}
+                            alt={gettext("OG image preview")}
+                            class="w-full rounded-lg border-2 border-base-300 object-cover max-h-40"
+                            loading="lazy"
+                          />
+                          <%= if not (edit_disabled? or @viewing_older_version) do %>
+                            <div class="flex gap-2">
+                              <button
+                                type="button"
+                                phx-click="open_media_selector"
+                                phx-value-field="og_image_uuid"
+                                class="btn btn-outline btn-xs flex-1"
+                              >
+                                <.icon name="hero-arrow-path" class="w-3 h-3 mr-1" />
+                                {gettext("Change")}
+                              </button>
+                              <button
+                                type="button"
+                                phx-click="clear_og_image"
+                                phx-disable-with={gettext("Removing…")}
+                                class="btn btn-outline btn-error btn-xs flex-1"
+                              >
+                                <.icon name="hero-trash" class="w-3 h-3 mr-1" />
+                                {gettext("Remove")}
+                              </button>
+                            </div>
+                          <% end %>
+                        </div>
+                      <% else %>
+                        <%= if edit_disabled? or @viewing_older_version do %>
+                          <p class="text-xs text-base-content/60">
+                            {gettext("No OG image set.")}
+                          </p>
+                        <% else %>
+                          <button
+                            type="button"
+                            phx-click="open_media_selector"
+                            phx-value-field="og_image_uuid"
+                            class="btn btn-outline btn-xs w-full"
+                          >
+                            <.icon name="hero-photo" class="w-3 h-3 mr-1" />
+                            {gettext("Choose OG image")}
+                          </button>
+                        <% end %>
+                      <% end %>
+                    </div>
+                  </div>
+                </details>
 
                 <%!-- Status (version-level, applies to all languages) --%>
                 <div>

@@ -14,6 +14,10 @@ defmodule PhoenixKit.Modules.Publishing.PublishingContent do
   - `excerpt` - Custom excerpt (if different from auto-generated)
   - `custom_css` - Per-language custom CSS
   - `updated_by_uuid` - UUID of last editor for this language
+  - `og` - Per-language OpenGraph overrides (`%{"title" => ..., "description" => ...,
+    "image_uuid" => ...}`). Any subset of keys; an absent/blank field falls back to the
+    derived default. Stored as one namespaced map so a future OG module can read/migrate
+    it wholesale.
   """
 
   use Ecto.Schema
@@ -111,4 +115,17 @@ defmodule PhoenixKit.Modules.Publishing.PublishingContent do
 
   @doc "Returns the UUID of the last editor for this language."
   def get_updated_by_uuid(%__MODULE__{data: data}), do: Map.get(data, "updated_by_uuid")
+
+  @doc """
+  Returns the per-language OpenGraph override map, or `nil` when none is set.
+
+  Shape: `%{"title" => ..., "description" => ..., "image_uuid" => ...}` — any
+  subset of keys may be present. Callers fall back to derived defaults per field.
+  """
+  def get_og(%__MODULE__{data: data}) do
+    case Map.get(data, "og") do
+      og when is_map(og) and map_size(og) > 0 -> og
+      _ -> nil
+    end
+  end
 end

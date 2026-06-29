@@ -160,7 +160,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       url_slug: content.url_slug,
       previous_url_slugs: PublishingContent.get_previous_url_slugs(content),
       published_at: format_datetime(version.published_at),
-      featured_image_uuid: PublishingVersion.get_featured_image_uuid(version)
+      featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
+      og: PublishingContent.get_og(content)
     }
   end
 
