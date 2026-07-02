@@ -102,6 +102,11 @@ defmodule PhoenixKitPublishing.MixProject do
       # Background jobs (translation worker, migration worker)
       {:oban, "~> 2.18"},
 
+      # Optional rustler pin so the transitive `mdex_native` NIF can
+      # source-build on hosts where its precompiled variant doesn't
+      # match the local NIF version. Matches the parent app's pin.
+      {:rustler, ">= 0.0.0", optional: true},
+
       # Code quality (dev/test only)
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
