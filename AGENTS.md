@@ -506,17 +506,23 @@ This module implements `css_sources/0` returning `[:phoenix_kit_publishing]` so 
 
 ### Tagging & GitHub releases
 
-Tags use **bare version numbers** (no `v` prefix):
+Tags use a **`v` prefix** (`git ls-remote --tags` is the source of truth —
+`v0.1.6` through `v0.2.3` all use it; only the earliest releases, `0.1.1`/
+`0.1.3`, predate the switch to bare numbers):
 
 ```bash
-git tag 0.1.0
-git push origin 0.1.0
+git tag -a v0.1.0 -m "Release 0.1.0"
+git push origin v0.1.0
 ```
 
-GitHub releases are created with `gh release create` using the tag as the release name. The title format is `<version> - <date>`, and the body comes from the corresponding `CHANGELOG.md` section:
+GitHub releases have lapsed since `v0.1.7` (2026-05-05) — `0.2.0`–`0.2.3`
+were tagged and published to Hex but have no corresponding `gh release`.
+When creating one, use `gh release create` with the tag as the release
+name, title `<version> - <date>`, and body from the corresponding
+`CHANGELOG.md` section:
 
 ```bash
-gh release create 0.1.0 \
+gh release create v0.1.0 \
   --title "0.1.0 - 2026-03-25" \
   --notes "$(changelog body for this version)"
 ```
@@ -528,8 +534,8 @@ gh release create 0.1.0 \
 3. Run `mix precommit` — ensure zero warnings/errors before proceeding
 4. Commit all changes: `"Bump version to x.y.z"`
 5. Push to main and **verify the push succeeded** before tagging
-6. Create and push git tag: `git tag x.y.z && git push origin x.y.z`
-7. Create GitHub release: `gh release create x.y.z --title "x.y.z - YYYY-MM-DD" --notes "..."`
+6. Create and push git tag: `git tag -a vx.y.z -m "Release x.y.z" && git push origin vx.y.z`
+7. Create GitHub release (optional — see note above; skipped for the last several releases): `gh release create vx.y.z --title "x.y.z - YYYY-MM-DD" --notes "..."`
 
 **IMPORTANT:** Never tag or create a release before all changes are committed and pushed. Tags are immutable pointers — tagging before pushing means the release points to the wrong commit.
 
