@@ -85,7 +85,11 @@ defmodule PhoenixKitPublishing.MixProject do
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, and core infrastructure.
-      pk_dep(:phoenix_kit, "~> 1.7.132"),
+      # 1.7.170 introduces PhoenixKit.Module.reserved_route_prefixes/0 +
+      # ModuleRegistry.all_reserved_route_prefixes/0, which router_dispatch.ex
+      # depends on (falls back to a runtime function_exported?/3 guard on an
+      # older core, but the floor should track what's actually required).
+      pk_dep(:phoenix_kit, "~> 1.7.170"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
       # `AITranslatable` adapter plugs into.
       pk_dep(:phoenix_kit_ai, "~> 0.4"),

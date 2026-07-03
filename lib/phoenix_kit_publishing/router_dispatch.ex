@@ -46,6 +46,8 @@ defmodule PhoenixKitPublishing.RouterDispatch do
     caching is a future optimization (the DB read is small + indexed).
   """
 
+  require Logger
+
   alias PhoenixKit.ModuleRegistry
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
@@ -230,7 +232,24 @@ defmodule PhoenixKitPublishing.RouterDispatch do
   # `PhoenixKit.Module.reserved_route_prefixes/0`.
   @spec reserved_by_other_module?(String.t()) :: boolean()
   defp reserved_by_other_module?(slug) do
-    slug in ModuleRegistry.all_reserved_route_prefixes()
+    if function_exported?(ModuleRegistry, :all_reserved_route_prefixes, 0) do
+      slug in ModuleRegistry.all_reserved_route_prefixes()
+    else
+      # `phoenix_kit` older than the version that introduced this callback —
+      # degrade to "nothing reserved" (the pre-this-feature behavior) rather
+      # than letting `known_group?/1`'s rescue swallow an UndefinedFunctionError,
+      # which would make it return false unconditionally and treat every real
+      # group as unknown (a full public-routing outage, not just a missing
+      # reservation). Logged once per call since this only fires on a version
+      # mismatch that should get fixed, not on ordinary request traffic.
+      Logger.warning(
+        "PhoenixKitPublishing.RouterDispatch: PhoenixKit.ModuleRegistry." <>
+          "all_reserved_route_prefixes/0 is not available — upgrade phoenix_kit " <>
+          "so other modules' reserved routes are respected."
+      )
+
+      false
+    end
   end
 
   @spec rewrite(Plug.Conn.t(), String.t(), [String.t()], [String.t()]) :: Plug.Conn.t()
