@@ -93,6 +93,15 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @doc ~S|Default scrollbar style ("default" — the browser's native bar, untouched).|
   def default_scrollbar_style, do: @default_scrollbar_style
 
+  @timeline_granularities ["auto", "year", "month", "day"]
+  @default_timeline_granularity "auto"
+
+  @doc ~S|Valid date-timeline granularities: "auto" (fit to the posts' date span), "year", "month", or "day".|
+  def timeline_granularities, do: @timeline_granularities
+
+  @doc ~S|Default date-timeline granularity ("auto").|
+  def default_timeline_granularity, do: @default_timeline_granularity
+
   # ---------------------------------------------------------------------------
   # Listing sort order (per-group public-listing config)
   # ---------------------------------------------------------------------------

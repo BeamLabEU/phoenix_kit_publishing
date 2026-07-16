@@ -27,6 +27,8 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `scroll_progress_enabled` - Show a reading-progress bar on post pages (default `false`).
   - `scroll_headings_enabled` - Show a heading-anchor rail on post pages (default `false`).
   - `scroll_timeline_enabled` - Show a date-timeline rail on the listing (default `false`).
+  - `scroll_timeline_granularity` - Timeline marker resolution: `"auto"` (fit to the
+    posts' date span), `"year"`, `"month"`, or `"day"`. Default `"auto"`.
   - `listing_sort` - Public listing order: `"newest"` or `"oldest"` by effective
     publish date (post date for timestamp groups, published-at for slug groups).
     Default `"newest"`.
@@ -131,6 +133,15 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc "Returns whether the date-timeline rail shows on this group's listing page (default false)."
   def scroll_timeline_enabled?(%__MODULE__{data: data}),
     do: Map.get(data, "scroll_timeline_enabled", false)
+
+  @doc ~S|Returns the date-timeline granularity ("auto"/"year"/"month"/"day"; default "auto").|
+  def scroll_timeline_granularity(%__MODULE__{data: data}),
+    do:
+      Map.get(
+        data,
+        "scroll_timeline_granularity",
+        Publishing.Constants.default_timeline_granularity()
+      )
 
   @doc ~S|Returns the public-listing sort order for this group ("newest"/"oldest"; default "newest").|
   def listing_sort(%__MODULE__{data: data}),

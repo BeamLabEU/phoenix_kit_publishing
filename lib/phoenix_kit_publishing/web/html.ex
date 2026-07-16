@@ -249,10 +249,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Built client-side as an accessible `<nav>` of links; hidden on narrow screens.
   """
   attr :enabled, :boolean, default: false
+  attr :granularity, :string, default: "year"
 
   def scroll_timeline(assigns) do
     ~H"""
     <%= if @enabled do %>
+      <div id="pk-timeline-config" data-granularity={@granularity} hidden></div>
       {Phoenix.HTML.raw(scroll_timeline_assets())}
     <% end %>
     """
@@ -261,56 +263,173 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   defp scroll_timeline_assets do
     ~S"""
     <style>
-    .pk-timeline-rail { position: fixed; top: 50%; right: .75rem; transform: translateY(-50%); z-index: 40; display: flex; flex-direction: column; gap: .3rem; max-height: 72vh; overflow-y: auto; padding: .25rem; }
+    .pk-timeline-rail { position: fixed; top: 6vh; right: .5rem; height: 88vh; z-index: 40; }
     @media (max-width: 1024px) { .pk-timeline-rail { display: none; } }
-    .pk-timeline-rail__item { display: flex; align-items: center; justify-content: flex-end; gap: .45rem; text-decoration: none; font-size: .7rem; line-height: 1; color: var(--color-base-content, #6b7280); opacity: .6; transition: all .15s ease; }
-    .pk-timeline-rail__label { font-variant-numeric: tabular-nums; }
-    .pk-timeline-rail__tick { display: block; width: .55rem; height: .55rem; border-radius: 9999px; background: var(--color-base-content, #9ca3af); opacity: .5; transition: all .15s ease; }
-    .pk-timeline-rail__item:hover, .pk-timeline-rail__item.is-active { opacity: 1; color: var(--color-base-content, #111827); }
-    .pk-timeline-rail__item:hover .pk-timeline-rail__tick, .pk-timeline-rail__item.is-active .pk-timeline-rail__tick { background: var(--color-primary, #4f46e5); opacity: 1; transform: scale(1.4); }
-    .pk-timeline-rail__item:focus-visible .pk-timeline-rail__tick { outline: 2px solid var(--color-primary, #4f46e5); outline-offset: 3px; }
+    .pk-timeline-rail__item { position: absolute; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: flex-end; gap: .5rem; text-decoration: none; font-size: .7rem; line-height: 1; color: var(--color-base-content, #6b7280); opacity: .5; padding: .35rem .6rem; border-radius: 9999px; transition: color .15s ease, opacity .15s ease, background-color .15s ease; }
+    .pk-timeline-rail__label { font-variant-numeric: tabular-nums; white-space: nowrap; transition: all .15s ease; }
+    .pk-timeline-rail__tick { display: block; width: .5rem; height: .5rem; border-radius: 9999px; background: var(--color-base-content, #9ca3af); opacity: .5; transition: transform .15s ease, background-color .15s ease, opacity .15s ease; }
+    .pk-timeline-rail__item.is-active { opacity: 1; color: var(--color-base-content, #111827); font-weight: 600; }
+    .pk-timeline-rail__item.is-active .pk-timeline-rail__tick { background: var(--color-primary, #4f46e5); opacity: 1; transform: scale(1.4); }
+    .pk-timeline-rail__item:hover { opacity: 1; background-color: var(--color-base-200, #e5e7eb); z-index: 2; }
+    .pk-timeline-rail__item:hover .pk-timeline-rail__label { font-weight: 700; font-size: .84rem; }
+    .pk-timeline-rail__item:hover .pk-timeline-rail__tick { background: var(--color-primary, #4f46e5); opacity: 1; transform: scale(2); }
+    .pk-timeline-rail__item:focus-visible { outline: 2px solid var(--color-primary, #4f46e5); outline-offset: 1px; }
+    .pk-timeline-rail--dense .pk-timeline-rail__item { padding: .2rem .5rem; }
+    .pk-timeline-rail--dense .pk-timeline-rail__label { max-width: 0; opacity: 0; overflow: hidden; }
+    .pk-timeline-rail--dense .pk-timeline-rail__item:hover .pk-timeline-rail__label { max-width: 12rem; opacity: 1; }
+    .pk-timeline-rail__item.is-current { opacity: 1; color: var(--color-base-content, #111827); font-weight: 600; z-index: 1; }
+    .pk-timeline-rail--dense .pk-timeline-rail__item.is-current { background-color: var(--color-base-200, #e5e7eb); }
+    .pk-timeline-rail--dense .pk-timeline-rail__item.is-current .pk-timeline-rail__label { max-width: 12rem; opacity: 1; }
+    @keyframes pk-timeline-flash { 0% { box-shadow: 0 0 0 0 var(--color-primary, #4f46e5); } 30% { box-shadow: 0 0 0 4px var(--color-primary, #4f46e5); } 100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); } }
+    .pk-timeline-flash { animation: pk-timeline-flash 1.2s ease-out 1; }
+    @media (prefers-reduced-motion: reduce) { .pk-timeline-flash { animation: none; outline: 2px solid var(--color-primary, #4f46e5); } }
     </style>
     <script>
     (function () {
       if (window.__pkTimelineRail) return;
       window.__pkTimelineRail = true;
-      function yearOf(el) { var d = el.getAttribute('data-post-date') || ''; var m = d.match(/(\d{4})/); return m ? m[1] : null; }
+      var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      function parts(el) {
+        var d = el.getAttribute('data-post-date') || '';
+        var m = d.match(/(\d{4})-(\d{2})-(\d{2})/) || d.match(/(\d{4})-(\d{2})/) || d.match(/(\d{4})/);
+        return m ? { y: m[1], mo: m[2] || null, d: m[3] || null } : null;
+      }
+      function keyOf(el, gran) {
+        var p = parts(el); if (!p) return null;
+        if (gran === 'day' && p.d) return p.y + '-' + p.mo + '-' + p.d;
+        if ((gran === 'month' || gran === 'day') && p.mo) return p.y + '-' + p.mo;
+        return p.y;
+      }
+      function labelOf(key, gran) {
+        var s = key.split('-');
+        if (gran === 'day' && s.length === 3) return parseInt(s[2], 10) + ' ' + MONTHS[parseInt(s[1], 10) - 1] + " '" + s[0].slice(2);
+        if (s.length >= 2) return MONTHS[parseInt(s[1], 10) - 1] + ' ' + s[0];
+        return s[0];
+      }
+      // "auto": pick the resolution that fits the posts' date span — a wide range
+      // reads best by year, a few months by month, a short burst by day.
+      function autoGran(cards) {
+        var times = [];
+        cards.forEach(function (c) {
+          var p = parts(c); if (!p) return;
+          times.push(new Date(p.y + '-' + (p.mo || '01') + '-' + (p.d || '01') + 'T00:00:00').getTime());
+        });
+        if (times.length < 2) return 'year';
+        var days = (Math.max.apply(null, times) - Math.min.apply(null, times)) / 86400000;
+        if (days > 730) return 'year';
+        if (days > 90) return 'month';
+        return 'day';
+      }
       function init() {
+        var cfg = document.getElementById('pk-timeline-config');
+        var gran = (cfg && cfg.getAttribute('data-granularity')) || 'year';
         var container = document.querySelector('.group-index-container');
         if (!container) return;
         var cards = Array.prototype.slice.call(container.querySelectorAll('[data-post-date]'));
         if (!cards.length) return;
-        var years = [], firstOf = {};
-        cards.forEach(function (c) { var y = yearOf(c); if (!y) return; if (!(y in firstOf)) { firstOf[y] = c; years.push(y); } });
-        if (years.length < 2) return;
-        years.sort(function (a, b) { return b - a; });
+        if (gran === 'auto') gran = autoGran(cards);
+        var keys = [], firstOf = {};
+        cards.forEach(function (c) { var k = keyOf(c, gran); if (!k) return; if (!(k in firstOf)) { firstOf[k] = c; keys.push(k); } });
+        if (keys.length < 2) return;
+        keys.sort(function (a, b) { return a < b ? 1 : (a > b ? -1 : 0); });
         var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         var nav = document.createElement('nav');
-        nav.className = 'pk-timeline-rail';
+        nav.className = 'pk-timeline-rail' + (keys.length > 24 ? ' pk-timeline-rail--dense' : '');
         nav.setAttribute('aria-label', 'Jump to date');
         var items = {};
-        years.forEach(function (y) {
-          var c = firstOf[y]; if (!c.id) c.id = 'pk-year-' + y;
+        keys.forEach(function (k) {
+          var c = firstOf[k]; if (!c.id) c.id = 'pk-t-' + k.replace(/[^0-9]/g, '');
           var a = document.createElement('a');
-          a.href = '#' + c.id; a.className = 'pk-timeline-rail__item'; a.setAttribute('data-year', y);
-          var label = document.createElement('span'); label.className = 'pk-timeline-rail__label'; label.textContent = y;
+          a.href = '#' + c.id; a.className = 'pk-timeline-rail__item'; a.setAttribute('data-key', k);
+          var label = document.createElement('span'); label.className = 'pk-timeline-rail__label'; label.textContent = labelOf(k, gran);
           var tick = document.createElement('span'); tick.className = 'pk-timeline-rail__tick';
           a.appendChild(label); a.appendChild(tick);
-          nav.appendChild(a); items[y] = a;
+          nav.appendChild(a); items[k] = a;
         });
         document.body.appendChild(nav);
+
+        // Position each marker at the vertical fraction where that year's first
+        // post actually sits in the document, so the rail tracks the content:
+        // empty above the featured band, pressed toward wherever the dated grid
+        // is, and shifting up if a footer/comments push the grid higher. A min-gap
+        // keeps years that share a grid row from overlapping.
+        function position() {
+          var docH = document.documentElement.scrollHeight || 1;
+          var railH = nav.clientHeight || Math.round(window.innerHeight * 0.88);
+          var arr = keys.map(function (k) {
+            var c = firstOf[k];
+            var mid = c.getBoundingClientRect().top + window.scrollY + c.offsetHeight / 2;
+            return { k: k, pos: Math.max(0, Math.min(1, mid / docH)) * railH };
+          });
+          var minGap = nav.classList.contains('pk-timeline-rail--dense') ? 14 : 24;
+          for (var i = 1; i < arr.length; i++) {
+            if (arr[i].pos < arr[i - 1].pos + minGap) arr[i].pos = arr[i - 1].pos + minGap;
+          }
+          var over = arr.length ? arr[arr.length - 1].pos - railH : 0;
+          if (over > 0) arr.forEach(function (p) { p.pos = Math.max(0, p.pos - over); });
+          arr.forEach(function (p) { items[p.k].style.top = p.pos + 'px'; });
+        }
+
         nav.addEventListener('click', function (e) {
           var a = e.target.closest('.pk-timeline-rail__item'); if (!a) return;
           e.preventDefault();
+          var k = a.getAttribute('data-key');
           var el = document.getElementById(a.getAttribute('href').slice(1));
           if (el) el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+          setTimeout(function () {
+            cards.forEach(function (c) {
+              if (keyOf(c, gran) === k) {
+                c.classList.remove('pk-timeline-flash'); void c.offsetWidth; c.classList.add('pk-timeline-flash');
+                setTimeout(function () { c.classList.remove('pk-timeline-flash'); }, 1300);
+              }
+            });
+          }, reduce ? 0 : 400);
         });
+        // Highlight the whole range of years whose posts are currently on screen,
+        // not just one — so scrolling lights up every visible year at once.
+        var visible = {};
+        function refresh() {
+          var active = {};
+          cards.forEach(function (c) { if (visible[c.__pkId]) { var k = keyOf(c, gran); if (k) active[k] = true; } });
+          // Current period tracks scroll position: a reference line runs from the
+          // top of the viewport (scrolled to top) to the bottom (scrolled to bottom),
+          // and the period whose post sits nearest that line is emphasized — so the
+          // last date lights up when you reach the very bottom.
+          var maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+          var pct = maxScroll > 0 ? Math.min(1, Math.max(0, window.scrollY / maxScroll)) : 0;
+          var refY = pct * window.innerHeight;
+          var current = null, best = Infinity;
+          keys.forEach(function (k) {
+            var r = firstOf[k].getBoundingClientRect();
+            var dist = Math.abs(r.top + r.height / 2 - refY);
+            if (dist < best) { best = dist; current = k; }
+          });
+          keys.forEach(function (k) {
+            items[k].classList.toggle('is-active', !!active[k]);
+            items[k].classList.toggle('is-current', k === current);
+          });
+        }
         if ('IntersectionObserver' in window) {
+          cards.forEach(function (c, i) { c.__pkId = 'c' + i; });
           var obs = new IntersectionObserver(function (entries) {
-            entries.forEach(function (en) { if (!en.isIntersecting) return; var y = yearOf(en.target); var a = items[y]; if (!a) return; Object.keys(items).forEach(function (k) { items[k].classList.remove('is-active'); }); a.classList.add('is-active'); });
-          }, { rootMargin: '0px 0px -70% 0px' });
+            entries.forEach(function (en) { visible[en.target.__pkId] = en.isIntersecting; });
+            refresh();
+          }, { threshold: 0 });
           cards.forEach(function (c) { obs.observe(c); });
         }
+
+        refresh();
+        var pkTick = false;
+        window.addEventListener('scroll', function () {
+          if (pkTick) return;
+          pkTick = true;
+          requestAnimationFrame(function () { refresh(); pkTick = false; });
+        }, { passive: true });
+
+        position();
+        window.addEventListener('resize', function () { position(); refresh(); }, { passive: true });
+        window.addEventListener('load', function () { position(); refresh(); });
+        setTimeout(function () { position(); refresh(); }, 600);
       }
       if (document.readyState !== 'loading') init();
       else document.addEventListener('DOMContentLoaded', init);
@@ -403,7 +522,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     >
     <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
     <.scrollbar_style_tag style={(assigns[:group] && @group["scrollbar_style"]) || "default"} />
-    <.scroll_timeline enabled={(assigns[:group] && @group["scroll_timeline_enabled"]) || false} />
+    <.scroll_timeline
+      enabled={(assigns[:group] && @group["scroll_timeline_enabled"]) || false}
+      granularity={(assigns[:group] && @group["scroll_timeline_granularity"]) || "year"}
+    />
     <div class="group-index-container max-w-6xl mx-auto px-6 py-8">
     <%!-- Breadcrumb Navigation --%>
     <div class="breadcrumbs text-sm mb-6">

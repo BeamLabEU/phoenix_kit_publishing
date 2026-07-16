@@ -137,8 +137,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
       "scroll_headings_enabled" => group["scroll_headings_enabled"],
-      "scroll_timeline_enabled" => group["scroll_timeline_enabled"]
+      "scroll_timeline_enabled" => group["scroll_timeline_enabled"],
+      "scroll_timeline_granularity" => group["scroll_timeline_granularity"]
     }
+  end
+
+  # Label/value pairs for the timeline-granularity <select>. Values must match
+  # Publishing.Constants.timeline_granularities/0.
+  defp timeline_granularity_options do
+    [
+      {gettext("Automatic (fit to the posts)"), "auto"},
+      {gettext("By year"), "year"},
+      {gettext("By month"), "month"},
+      {gettext("By day"), "day"}
+    ]
   end
 
   # Label/value pairs for the featured-layout <select>. Values must match
@@ -303,6 +315,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
               <.checkbox
                 field={@form[:scroll_timeline_enabled]}
                 label={gettext("Show a date-timeline rail on the listing")}
+              />
+
+              <.select
+                field={@form[:scroll_timeline_granularity]}
+                label={gettext("Timeline markers")}
+                options={timeline_granularity_options()}
               />
             </div>
 
