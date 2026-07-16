@@ -148,6 +148,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     }
   end
 
+  # A form value is "on" whether it arrives as a boolean (initial mount, from the
+  # group map) or a string (a "validate" round-trip serializes checkboxes to
+  # "true"/"false"). Used to reveal a dependent field only when its toggle is on.
+  defp checked?(value), do: value in [true, "true"]
+
   # Label/value pairs for the timeline-granularity <select>. Values must match
   # Publishing.Constants.timeline_granularities/0.
   defp timeline_granularity_options do
@@ -211,204 +216,228 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   def render(assigns) do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">
-    <%!-- Header Section --%>
-    <.admin_page_header
-      back={Routes.path("/admin/publishing")}
-      title={gettext("Edit Group")}
-    />
+      <%!-- Header Section --%>
+      <.admin_page_header
+        back={Routes.path("/admin/publishing")}
+        title={gettext("Edit Group")}
+      />
 
-    <div class="max-w-2xl mx-auto space-y-6">
-      <div class="card bg-base-100 shadow-xl border border-base-200">
-        <div class="card-body space-y-6">
-          <.form
-            for={@form}
-            id="group-edit-form"
-            phx-change="validate"
-            phx-submit="save"
-            class="space-y-6"
-          >
-            <.input
-              field={@form[:name]}
-              type="text"
-              label={gettext("Group Name")}
-              placeholder={gettext("e.g. Product Updates")}
-              required
-            />
-
-            <div class="space-y-2">
+      <div class="max-w-2xl mx-auto space-y-6">
+        <div class="card bg-base-100 shadow-xl border border-base-200">
+          <div class="card-body space-y-6">
+            <.form
+              for={@form}
+              id="group-edit-form"
+              phx-change="validate"
+              phx-submit="save"
+              class="space-y-6"
+            >
               <.input
-                field={@form[:slug]}
+                field={@form[:name]}
                 type="text"
-                label={gettext("Slug")}
-                placeholder={gettext("e.g. product-updates")}
+                label={gettext("Group Name")}
+                placeholder={gettext("e.g. Product Updates")}
                 required
               />
-              <div class="space-y-1">
-                <p class="text-xs text-base-content/60">
-                  {gettext("The slug is used in URLs for this group's public pages.")}
-                </p>
-                <p class="text-xs font-medium text-base-content/70">
-                  <span class="font-semibold">{gettext("Format")}:</span>
-                  {gettext(
-                    "Only lowercase letters (a-z), numbers (0-9), and hyphens (-) are allowed. Must not start or end with a hyphen."
-                  )}
-                </p>
-                <p class="text-xs text-success">
-                  ✓ {gettext("Valid examples")}: <code class="font-mono">blog</code>, <code class="font-mono">product-updates</code>,
-                  <code class="font-mono">news-2025</code>
-                </p>
-                <p class="text-xs text-error">
-                  ✗ {gettext("Invalid examples")}: <code class="font-mono">Blog</code>, <code class="font-mono">product_updates</code>, <code class="font-mono">-news</code>,
-                  <code class="font-mono">my blog</code>
-                </p>
-              </div>
-            </div>
 
-            <div class="rounded-lg border border-base-200 bg-base-200/40 px-4 py-3 text-sm text-base-content/70">
-              <p>
-                <span class="font-semibold">{gettext("URL mode")}:</span>
-                <%= case @group["mode"] do %>
-                  <% "slug" -> %>
-                    {gettext("Slug-based")} · {gettext(
-                      "Semantic URLs ideal for evergreen content."
+              <div class="space-y-2">
+                <.input
+                  field={@form[:slug]}
+                  type="text"
+                  label={gettext("Slug")}
+                  placeholder={gettext("e.g. product-updates")}
+                  required
+                />
+                <div class="space-y-1">
+                  <p class="text-xs text-base-content/60">
+                    {gettext("The slug is used in URLs for this group's public pages.")}
+                  </p>
+                  <p class="text-xs font-medium text-base-content/70">
+                    <span class="font-semibold">{gettext("Format")}:</span>
+                    {gettext(
+                      "Only lowercase letters (a-z), numbers (0-9), and hyphens (-) are allowed. Must not start or end with a hyphen."
                     )}
-                  <% _ -> %>
-                    {gettext("Timestamp-based")} · {gettext(
-                      "Chronological URLs ideal for news and updates."
+                  </p>
+                  <p class="text-xs text-success">
+                    ✓ {gettext("Valid examples")}: <code class="font-mono">blog</code>, <code class="font-mono">product-updates</code>,
+                    <code class="font-mono">news-2025</code>
+                  </p>
+                  <p class="text-xs text-error">
+                    ✗ {gettext("Invalid examples")}: <code class="font-mono">Blog</code>, <code class="font-mono">product_updates</code>, <code class="font-mono">-news</code>,
+                    <code class="font-mono">my blog</code>
+                  </p>
+                </div>
+              </div>
+
+              <div class="rounded-lg border border-base-200 bg-base-200/40 px-4 py-3 text-sm text-base-content/70">
+                <p>
+                  <span class="font-semibold">{gettext("URL mode")}:</span>
+                  <%= case @group["mode"] do %>
+                    <% "slug" -> %>
+                      {gettext("Slug-based")} · {gettext("Semantic URLs ideal for evergreen content.")}
+                    <% _ -> %>
+                      {gettext("Timestamp-based")} · {gettext(
+                        "Chronological URLs ideal for news and updates."
+                      )}
+                  <% end %>
+                </p>
+              </div>
+
+              <%!-- Listing page: the public index that lists this group's posts --%>
+              <div class="space-y-4 rounded-lg border border-base-200 p-4">
+                <div>
+                  <h3 class="text-sm font-semibold text-base-content">
+                    {gettext("Listing page")}
+                  </h3>
+                  <p class="text-xs text-base-content/60 mt-1">
+                    {gettext("The public page that lists this group's posts (e.g. /blog).")}
+                  </p>
+                </div>
+
+                <.select
+                  field={@form[:listing_sort]}
+                  label={gettext("Post order")}
+                  options={listing_sort_options()}
+                />
+
+                <.checkbox field={@form[:featured_enabled]}>
+                  {gettext("Highlight featured posts")}
+                  <:description>
+                    {gettext(
+                      "Posts marked featured in the editor are pinned to the top and shown larger."
                     )}
-                <% end %>
-              </p>
-            </div>
+                  </:description>
+                </.checkbox>
 
-            <.select
-              field={@form[:listing_sort]}
-              label={gettext("Post order")}
-              options={listing_sort_options()}
-            />
+                <div :if={checked?(@form[:featured_enabled].value)} class="pl-8">
+                  <.select
+                    field={@form[:featured_layout]}
+                    label={gettext("Featured layout")}
+                    options={featured_layout_options()}
+                  />
+                </div>
 
-            <div class="space-y-4 rounded-lg border border-base-200 p-4">
-              <div>
-                <h3 class="text-sm font-semibold text-base-content">
-                  {gettext("Post page")}
-                </h3>
-                <p class="text-xs text-base-content/60 mt-1">
-                  {gettext("Control what shows on individual post pages and how they're laid out.")}
-                </p>
+                <.checkbox field={@form[:scroll_timeline_enabled]}>
+                  {gettext("Show a date-timeline rail")}
+                  <:description>
+                    {gettext("A clickable date rail down the side to jump through the archive.")}
+                  </:description>
+                </.checkbox>
+
+                <div :if={checked?(@form[:scroll_timeline_enabled].value)} class="pl-8">
+                  <.select
+                    field={@form[:scroll_timeline_granularity]}
+                    label={gettext("Timeline markers")}
+                    options={timeline_granularity_options()}
+                  />
+                </div>
               </div>
 
-              <.select
-                field={@form[:post_width]}
-                label={gettext("Content width")}
-                options={post_width_options()}
-              />
+              <%!-- Post page: an individual article --%>
+              <div class="space-y-4 rounded-lg border border-base-200 p-4">
+                <div>
+                  <h3 class="text-sm font-semibold text-base-content">
+                    {gettext("Post page")}
+                  </h3>
+                  <p class="text-xs text-base-content/60 mt-1">
+                    {gettext("What shows on an individual post and how it's laid out.")}
+                  </p>
+                </div>
 
-              <.select
-                field={@form[:post_date_position]}
-                label={gettext("Post date position")}
-                options={post_date_position_options()}
-              />
+                <.select
+                  field={@form[:post_width]}
+                  label={gettext("Content width")}
+                  options={post_width_options()}
+                />
 
-              <.checkbox
-                field={@form[:show_breadcrumbs]}
-                label={gettext("Show the breadcrumb trail")}
-              />
+                <.select
+                  field={@form[:post_date_position]}
+                  label={gettext("Post date position")}
+                  options={post_date_position_options()}
+                />
 
-              <.checkbox
-                field={@form[:show_featured_image]}
-                label={gettext("Show the featured image at the top")}
-              />
+                <.checkbox field={@form[:show_breadcrumbs]}>
+                  {gettext("Show the breadcrumb trail")}
+                  <:description>
+                    {gettext("The 'Home / Blog / …' navigation trail above the title.")}
+                  </:description>
+                </.checkbox>
 
-              <.checkbox
-                field={@form[:show_reading_time]}
-                label={gettext("Show the estimated reading time")}
-              />
+                <.checkbox field={@form[:show_featured_image]}>
+                  {gettext("Show the featured image")}
+                  <:description>
+                    {gettext("A large hero image above the title.")}
+                  </:description>
+                </.checkbox>
 
-              <.checkbox
-                field={@form[:show_tags]}
-                label={gettext("Show the post's tags")}
-              />
-            </div>
+                <.checkbox field={@form[:show_reading_time]}>
+                  {gettext("Show the reading time")}
+                  <:description>
+                    {gettext("An estimated 'N min read' under the title.")}
+                  </:description>
+                </.checkbox>
 
-            <div class="space-y-4 rounded-lg border border-base-200 p-4">
-              <div>
-                <h3 class="text-sm font-semibold text-base-content">
-                  {gettext("Featured posts")}
-                </h3>
-                <p class="text-xs text-base-content/60 mt-1">
+                <.checkbox field={@form[:show_tags]}>
+                  {gettext("Show the post's tags")}
+                  <:description>
+                    {gettext("The post's tags as chips under the header.")}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:scroll_progress_enabled]}>
+                  {gettext("Show a reading-progress bar")}
+                  <:description>
+                    {gettext("A thin bar at the top that fills as the reader scrolls.")}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:scroll_headings_enabled]}>
+                  {gettext("Show a heading navigation rail")}
+                  <:description>
+                    {gettext("A side rail of the post's headings; hidden on short posts.")}
+                  </:description>
+                </.checkbox>
+              </div>
+
+              <%!-- Appearance: applies to every public page in this group --%>
+              <div class="space-y-4 rounded-lg border border-base-200 p-4">
+                <div>
+                  <h3 class="text-sm font-semibold text-base-content">
+                    {gettext("Appearance")}
+                  </h3>
+                  <p class="text-xs text-base-content/60 mt-1">
+                    {gettext("Applies to every public page in this group.")}
+                  </p>
+                </div>
+
+                <.select
+                  field={@form[:scrollbar_style]}
+                  label={gettext("Scrollbar style")}
+                  options={scrollbar_style_options()}
+                />
+                <p class="text-xs text-base-content/60 -mt-2">
                   {gettext(
-                    "Posts marked as featured in the editor are pinned to the top of this group's public listing and shown larger. Use these settings to turn that off or change how they look."
+                    "Only recolors the real scrollbar — keyboard and touch scrolling stay normal."
                   )}
                 </p>
               </div>
 
-              <.checkbox
-                field={@form[:featured_enabled]}
-                label={gettext("Show featured posts on the listing")}
-              />
-
-              <.select
-                field={@form[:featured_layout]}
-                label={gettext("Featured layout")}
-                options={featured_layout_options()}
-              />
-            </div>
-
-            <div class="space-y-4 rounded-lg border border-base-200 p-4">
-              <div>
-                <h3 class="text-sm font-semibold text-base-content">
-                  {gettext("Scroll navigation")}
-                </h3>
-                <p class="text-xs text-base-content/60 mt-1">
-                  {gettext(
-                    "Style this group's scrollbar and add reading aids to its public pages. These never change how scrolling works — they only add visuals — so keyboard and touch scrolling stay intact."
-                  )}
-                </p>
+              <div class="flex flex-wrap gap-3 justify-end">
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-sm"
+                  phx-disable-with={gettext("Saving…")}
+                >
+                  <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save Changes")}
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel">
+                  <.icon name="hero-x-mark" class="w-4 h-4 mr-1" /> {gettext("Cancel")}
+                </button>
               </div>
-
-              <.select
-                field={@form[:scrollbar_style]}
-                label={gettext("Scrollbar style")}
-                options={scrollbar_style_options()}
-              />
-
-              <.checkbox
-                field={@form[:scroll_progress_enabled]}
-                label={gettext("Show a reading-progress bar on posts")}
-              />
-
-              <.checkbox
-                field={@form[:scroll_headings_enabled]}
-                label={gettext("Show a heading navigation rail on posts")}
-              />
-
-              <.checkbox
-                field={@form[:scroll_timeline_enabled]}
-                label={gettext("Show a date-timeline rail on the listing")}
-              />
-
-              <.select
-                field={@form[:scroll_timeline_granularity]}
-                label={gettext("Timeline markers")}
-                options={timeline_granularity_options()}
-              />
-            </div>
-
-            <div class="flex flex-wrap gap-3 justify-end">
-              <button
-                type="submit"
-                class="btn btn-primary btn-sm"
-                phx-disable-with={gettext("Saving…")}
-              >
-                <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save Changes")}
-              </button>
-              <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel">
-                <.icon name="hero-x-mark" class="w-4 h-4 mr-1" /> {gettext("Cancel")}
-              </button>
-            </div>
-          </.form>
+            </.form>
+          </div>
         </div>
       </div>
-    </div>
     </div>
     """
   end
