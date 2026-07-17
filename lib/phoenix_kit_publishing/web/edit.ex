@@ -268,7 +268,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                     to the primary name when blank. All inputs stay in the DOM
                     (only the active language's is visible) so switching tabs
                     never drops a typed translation. --%>
-              <div>
+              <%!-- When multiple languages are active, the group name is
+                    translatable — set it apart in a tinted, bordered region (like
+                    the reference multilang forms) so it's clear which field is
+                    language-scoped and which (slug, settings) are not. --%>
+              <div class={
+                @show_multilang_tabs && "rounded-lg border border-base-200 bg-base-200/40 p-4"
+              }>
                 <.multilang_tabs
                   :if={@show_multilang_tabs}
                   multilang_enabled={@multilang_enabled}
