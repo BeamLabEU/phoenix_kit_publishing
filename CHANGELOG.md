@@ -1,5 +1,71 @@
 # Changelog
 
+## 0.4.0 - 2026-07-17
+
+PR #32 — public-side publishing: featured posts, timeline/headings scroll
+rails, per-group display settings, and a translatable group name. Written
+without access to the quality-sweep playbook or a runnable test environment;
+this release also folds in a full post-merge multi-AI quorum review (Codex,
+Kimi, Grok, ZAI, Vibe) plus a 4-agent playbook triage pass, with every
+confirmed finding fixed before publishing. See
+`dev_docs/pull_requests/2026/32-public-side-display-settings/` for the full
+review and fix log.
+
+### Added
+- **Featured posts** — an editor checkbox flags a post as featured; the
+  public listing renders a hero + secondary featured band ahead of the
+  regular grid, each card carrying `data-post-date` (mirrors
+  `Listing.listing_sort_key/1`) so the timeline rail stays in sync.
+- **Per-group display settings** (`GroupSettings`) — post count visibility
+  (off by default), timeline/headings scroll rails, scrollbar styling,
+  breadcrumbs, sort order, reading time, card width, date position, and a
+  reading-progress bar, all configurable per group with governed string-keyed
+  persistence.
+- **Translatable group name** (`name_i18n`) — an override per language,
+  capped at the primary-name length limit, resolved via
+  `translated_group_name/2` everywhere the name surfaces: listing
+  h1/title/breadcrumb, `og:title`, the post-page breadcrumb and "Back to …"
+  footer, and the all-groups overview cards.
+- 33 new tests covering every setting's public-render toggle, settings/
+  `name_i18n` persistence (including crash-guard, truncation, invalid-enum,
+  atom-key round-trip), and the edit/editor LiveView save paths.
+
+### Fixed (post-merge quorum review)
+- `GroupSettings.validate_params/1` normalized atom-keyed settings but kept
+  the atom key, so `update_group/3` (string-keyed) silently persisted
+  nothing on the documented AI/script path — settings now normalize to their
+  canonical string key.
+- `merge_name_i18n/2` called `to_string/1` on override values — a nested map
+  (crafted params or a programmatic caller) raised `Protocol.UndefinedError`
+  and crashed the edit LiveView; non-binary overrides are now dropped
+  instead of raising.
+- Grid cards preferred `metadata.published_at` over the effective post date
+  used for sorting, so the timeline rail could disagree with the visible
+  order — both now read a shared `effective_post_date/1` helper.
+- The editor's hidden `featured=false` input stayed enabled while its
+  checkbox was disabled, so a still-enabled sibling control could clobber
+  the flag — now disabled in lockstep (defense-in-depth; pinned by test).
+- `name_i18n` overrides bypassed the 255-char primary-name limit.
+- `reading_time_label/1` used `gettext` with `%{count}`, which isn't
+  pluralizable — switched to `ngettext`.
+- Timeline-rail month labels and both rails' aria-labels were hardcoded
+  English inside static JS on otherwise fully-localized public pages — now
+  localized via `data-months`/`data-label` on the config elements.
+- `assign_scroll_config/2` (renamed `assign_group_display_config/2`)
+  re-fetched the group a second time per request and redeclared setting
+  defaults as literals instead of reading `Constants`.
+- Spec-parity and `default_config/0` tests compared against a hardcoded key
+  list instead of the real write path (`Groups.config_setting_keys/0`),
+  which had gone drift-blind and was missing `show_post_count`.
+- Featured vs. grid card markup was near-duplicated in `html.ex` — unified
+  into one `listing_post_card/1` component.
+- `Groups.update_group/3` and the edit LiveView both broadcast
+  `{:group_updated, …}` on save — the LiveView's duplicate removed.
+- `translated_group_name/2` was missing a `@spec`.
+- 57 admin/public strings per locale were never extracted (written on a
+  server without a gettext-capable environment) — all five catalogs
+  re-extracted, merged, and translated (en identity, et/fr/it/ru filled).
+
 ## 0.3.0 - 2026-07-04
 
 Publishing's admin/editor UI strings now translate — previously every
