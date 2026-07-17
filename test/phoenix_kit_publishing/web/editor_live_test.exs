@@ -375,6 +375,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(html)
     end
 
+    test "update_meta without a featured key preserves the flag (clobber guard)",
+         %{conn: conn, group: group, post: post} do
+      # The featured control is a hidden-false + checkbox-true pair; when the
+      # pair is disabled (readonly / viewing an older version) the browser
+      # serializes NO featured key. This pins the merge semantics that make
+      # that safe: an update_meta payload without "featured" must preserve the
+      # form's value — only an explicit featured=false may flip it. (The
+      # markup keeps both inputs' disabled conditions in lockstep; an enabled
+      # hidden input + disabled checkbox would submit featured=false from any
+      # still-enabled sibling control and silently clobber the flag.)
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      checked_re = ~r/<input[^>]*type="checkbox"[^>]*name="featured"[^>]*checked/
+
+      html =
+        render_change(view, "update_meta", %{"featured" => "true", "_target" => ["featured"]})
+
+      assert html =~ checked_re
+
+      # No "featured" key in the payload (what disabled inputs produce) — the
+      # flag must survive the merge.
+      html = render_change(view, "update_meta", %{"title" => "Retitled", "_target" => ["title"]})
+      assert html =~ checked_re
+
+      # An explicit featured=false (the enabled hidden input) flips it.
+      html =
+        render_change(view, "update_meta", %{"featured" => "false", "_target" => ["featured"]})
+
+      refute html =~ checked_re
+    end
+
     test "create_version_from_source builds a new version via Versions submodule",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =

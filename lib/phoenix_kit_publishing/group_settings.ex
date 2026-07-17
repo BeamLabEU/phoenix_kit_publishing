@@ -241,30 +241,41 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
 
   Returns `{:ok, normalized}` — every input key preserved, with keys this module
   owns normalized — or `{:error, errors}` where each error is
-  `%{key: key, reason: reason}`. Keys not in the spec (e.g. `name`, `slug`) pass
-  through untouched so the result can go straight to `update_group/3`.
+  `%{key: key, reason: reason}`. Recognized settings are normalized to their
+  canonical STRING key (so atom-keyed input like `%{post_width: "wide"}` comes
+  back as `%{"post_width" => "wide"}` — `update_group/3` matches string keys
+  only and would silently ignore an atom key). Keys not in the spec (e.g.
+  `name`, `slug`) pass through untouched so the result can go straight to
+  `update_group/3`.
   """
   @spec validate_params(map()) :: {:ok, map()} | {:error, [map()]}
   def validate_params(params) when is_map(params) do
     by_key = Map.new(schema(), fn s -> {s.key, s} end)
 
     {normalized, errors} =
-      Enum.reduce(params, {%{}, []}, fn {key, value}, {acc, errs} ->
-        case Map.get(by_key, to_string(key)) do
-          nil ->
-            # Not a setting this module governs — pass through unchanged.
-            {Map.put(acc, key, value), errs}
-
-          setting ->
-            case cast_value(setting, value) do
-              {:ok, cast} -> {Map.put(acc, key, cast), errs}
-              {:error, reason} -> {acc, [%{key: setting.key, reason: reason} | errs]}
-            end
-        end
+      Enum.reduce(params, {%{}, []}, fn {key, value}, acc ->
+        validate_param(Map.get(by_key, spec_key(key)), key, value, acc)
       end)
 
     if errors == [], do: {:ok, normalized}, else: {:error, Enum.reverse(errors)}
   end
+
+  # Not a setting this module governs — pass through unchanged.
+  defp validate_param(nil, key, value, {acc, errs}), do: {Map.put(acc, key, value), errs}
+
+  # A governed setting: cast the value and store under the canonical string key.
+  defp validate_param(setting, _key, value, {acc, errs}) do
+    case cast_value(setting, value) do
+      {:ok, cast} -> {Map.put(acc, setting.key, cast), errs}
+      {:error, reason} -> {acc, [%{key: setting.key, reason: reason} | errs]}
+    end
+  end
+
+  # Spec keys are strings; accept atom-keyed input for lookup without ever
+  # to_string/1-ing arbitrary terms (a map/list key must not raise).
+  defp spec_key(key) when is_binary(key), do: key
+  defp spec_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp spec_key(_key), do: nil
 
   # Booleans accept the true/false booleans or their common string/toggle forms.
   defp cast_value(%{type: :boolean}, value) when value in [true, "true", "on"], do: {:ok, true}
@@ -275,11 +286,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
   defp cast_value(%{type: :boolean}, _value),
     do: {:error, "must be a boolean (true or false)"}
 
-  defp cast_value(%{type: :enum, allowed: allowed}, value) do
-    str = to_string(value)
-
-    if str in allowed,
-      do: {:ok, str},
+  defp cast_value(%{type: :enum, allowed: allowed}, value) when is_binary(value) do
+    if value in allowed,
+      do: {:ok, value},
       else: {:error, "must be one of: " <> Enum.join(allowed, ", ")}
   end
+
+  defp cast_value(%{type: :enum, allowed: allowed}, value) when is_atom(value),
+    do: cast_value(%{type: :enum, allowed: allowed}, Atom.to_string(value))
+
+  # Anything else (maps, lists, numbers) is invalid for an enum — return an
+  # error instead of letting to_string/1 raise Protocol.UndefinedError.
+  defp cast_value(%{type: :enum, allowed: allowed}, _value),
+    do: {:error, "must be one of: " <> Enum.join(allowed, ", ")}
 end

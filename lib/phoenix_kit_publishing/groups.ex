@@ -282,44 +282,67 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   defp to_string_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
   defp to_string_reason(%Ecto.Changeset{}), do: "changeset_error"
 
-  # Merges per-group public-listing config (the featured toggle + layout) from
-  # the edit form into the group's existing `data` JSONB. Only keys the form
-  # actually submitted are touched, so a caller that updates just name/slug (or
-  # a keyword-list caller) leaves featured config untouched. An unknown layout
-  # value is ignored rather than persisted, keeping the column to the whitelist.
-  defp merge_group_config(existing_data, params) when is_map(params) do
-    (existing_data || %{})
-    |> merge_bool_key(params, "featured_enabled")
-    |> merge_enum_key(params, "featured_layout", @featured_layouts)
-    |> merge_enum_key(params, "scrollbar_style", @scrollbar_styles)
-    |> merge_bool_key(params, "scroll_progress_enabled")
-    |> merge_bool_key(params, "scroll_headings_enabled")
-    |> merge_bool_key(params, "scroll_timeline_enabled")
-    |> merge_enum_key(params, "scroll_timeline_granularity", @timeline_granularities)
-    |> merge_enum_key(params, "listing_sort", @listing_sorts)
-    |> merge_bool_key(params, "show_breadcrumbs")
-    |> merge_enum_key(params, "post_date_position", @post_date_positions)
-    |> merge_enum_key(params, "post_width", @post_widths)
-    |> merge_bool_key(params, "show_featured_image")
-    |> merge_bool_key(params, "show_reading_time")
-    |> merge_bool_key(params, "show_tags")
-    |> merge_bool_key(params, "show_post_count")
-    |> merge_name_i18n(params)
+  # The full set of per-group display settings `update_group/3` persists into
+  # the group's `data` JSONB. `GroupSettings.schema/0` mirrors this list as a
+  # machine-readable spec; the key-parity test in group_settings_test.exs
+  # asserts the two can't drift (it compares against `config_setting_keys/0`,
+  # not a hand-maintained copy).
+  @bool_setting_keys ~w(featured_enabled scroll_progress_enabled scroll_headings_enabled
+                        scroll_timeline_enabled show_breadcrumbs show_featured_image
+                        show_reading_time show_tags show_post_count)
+  @enum_settings [
+    {"featured_layout", @featured_layouts},
+    {"scrollbar_style", @scrollbar_styles},
+    {"scroll_timeline_granularity", @timeline_granularities},
+    {"listing_sort", @listing_sorts},
+    {"post_date_position", @post_date_positions},
+    {"post_width", @post_widths}
+  ]
+
+  @doc false
+  # Source of truth for the settings keys `merge_group_config/2` persists —
+  # exposed (undocumented) so the GroupSettings spec test can assert parity
+  # against the real write path instead of a hardcoded list.
+  def config_setting_keys do
+    @bool_setting_keys ++ Enum.map(@enum_settings, &elem(&1, 0))
   end
 
-  defp merge_group_config(existing_data, _params), do: existing_data || %{}
+  # Merges the per-group display settings from the edit form (or a programmatic
+  # caller) into the group's existing `data` JSONB. Only keys the caller
+  # actually submitted are touched, so a caller that updates just name/slug (or
+  # a keyword-list caller) leaves config untouched. An unknown enum value is
+  # ignored rather than persisted, keeping the column to the whitelist.
+  # `existing_data` is never nil — the schema types `data: map()` (default
+  # `%{}`) and every PublishingGroup accessor already relies on that.
+  defp merge_group_config(existing_data, params) when is_map(params) do
+    data =
+      Enum.reduce(@bool_setting_keys, existing_data, fn key, acc ->
+        merge_bool_key(acc, params, key)
+      end)
+
+    data =
+      Enum.reduce(@enum_settings, data, fn {key, allowed}, acc ->
+        merge_enum_key(acc, params, key, allowed)
+      end)
+
+    merge_name_i18n(data, params)
+  end
+
+  defp merge_group_config(existing_data, _params), do: existing_data
 
   # Per-language display-name overrides arrive as a `%{lang => name}` map (form
   # inputs named `group[name_i18n][<lang>]`). Store the non-blank set wholesale;
   # an all-blank submission clears the key. Only touched when submitted, so
   # callers that don't edit the name (or keyword-list callers) leave it intact.
+  # Entries with a non-binary value (e.g. a nested map from crafted params or a
+  # programmatic caller) are dropped rather than raising, and each override is
+  # capped to the same max length the primary `name` column enforces.
   defp merge_name_i18n(data, params) do
     case Map.fetch(params, "name_i18n") do
       {:ok, translations} when is_map(translations) ->
         cleaned =
           translations
-          |> Enum.map(fn {lang, value} -> {to_string(lang), String.trim(to_string(value))} end)
-          |> Enum.reject(fn {_lang, value} -> value == "" end)
+          |> Enum.flat_map(&clean_name_i18n_entry/1)
           |> Map.new()
 
         if cleaned == %{},
@@ -330,6 +353,16 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
         data
     end
   end
+
+  defp clean_name_i18n_entry({lang, value})
+       when (is_binary(lang) or is_atom(lang)) and is_binary(value) do
+    case value |> String.trim() |> String.slice(0, Constants.max_group_name_length()) do
+      "" -> []
+      trimmed -> [{to_string(lang), trimmed}]
+    end
+  end
+
+  defp clean_name_i18n_entry(_other), do: []
 
   # Only touch a key the form actually submitted, so a caller that updates just
   # name/slug (or a keyword-list caller) leaves config untouched.
@@ -667,6 +700,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   `"name"` when there's no translation. Mirrors
   `PublishingGroup.translated_name/2` for the struct.
   """
+  @spec translated_group_name(map(), String.t() | nil) :: String.t() | nil
   def translated_group_name(group, lang) when is_map(group) do
     translations = name_i18n_map(group)
     PublishingGroup.resolve_name_translation(translations, lang) || group["name"]

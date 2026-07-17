@@ -109,4 +109,56 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     result = render_click(view, "cancel", %{})
     assert match?({:error, {:live_redirect, _}}, result) or is_binary(result)
   end
+
+  test "switch_language event flips the language tab without crashing the LV",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    # The <.multilang_tabs> switcher pushes "switch_language" with a "lang"
+    # payload — an unhandled event here used to crash the LV and reset the
+    # form (the PR-#32 fix added the handler).
+    html = render_click(view, "switch_language", %{"lang" => "en"})
+    assert is_binary(html)
+    assert Process.alive?(view.pid)
+  end
+
+  test "saving persists name_i18n overrides alongside the primary name",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    view
+    |> form("#group-edit-form",
+      group: %{"name" => group["name"], "slug" => group["slug"]}
+    )
+    |> render_submit(%{"group" => %{"name_i18n" => %{"fr-FR" => "Blogue"}}})
+
+    {:ok, saved} = Groups.get_group(group["slug"])
+    assert saved["name_i18n"] == %{"fr-FR" => "Blogue"}
+  end
+
+  test "saving persists display settings from the form",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    view
+    |> form("#group-edit-form",
+      group: %{"name" => group["name"], "slug" => group["slug"]}
+    )
+    |> render_submit(%{
+      "group" => %{"show_reading_time" => "true", "post_width" => "wide"}
+    })
+
+    {:ok, saved} = Groups.get_group(group["slug"])
+    assert saved["show_reading_time"] == true
+    assert saved["post_width"] == "wide"
+  end
 end

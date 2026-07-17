@@ -1,6 +1,7 @@
 defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
   use ExUnit.Case, async: true
 
+  alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.GroupSettings
   alias PhoenixKit.Modules.Publishing.PublishingGroup
 
@@ -20,15 +21,11 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
     end
 
     test "covers exactly the keys update_group/3 persists to group data" do
-      # Mirror of Groups.merge_group_config/2's key list — if a setting is added
-      # to one and not the other, this fails.
-      expected =
-        ~w(listing_sort show_post_count featured_enabled featured_layout
-           scroll_timeline_enabled scroll_timeline_granularity post_width
-           post_date_position show_breadcrumbs show_featured_image show_reading_time
-           show_tags scroll_progress_enabled scroll_headings_enabled scrollbar_style)
-
-      assert Enum.sort(GroupSettings.keys()) == Enum.sort(expected)
+      # Compares against the REAL write path (Groups.config_setting_keys/0 is
+      # the list merge_group_config/2 iterates), not a hand-maintained copy —
+      # adding a setting to the write path without the spec (or vice versa)
+      # fails here.
+      assert Enum.sort(GroupSettings.keys()) == Enum.sort(Groups.config_setting_keys())
     end
 
     test "any dependency references a real setting key" do
@@ -68,6 +65,12 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
       assert defaults["show_featured_image"] == PublishingGroup.show_featured_image?(empty)
       assert defaults["show_reading_time"] == PublishingGroup.show_reading_time?(empty)
       assert defaults["show_tags"] == PublishingGroup.show_tags?(empty)
+      assert defaults["show_post_count"] == PublishingGroup.show_post_count?(empty)
+    end
+
+    test "covers every schema key (no accessor-parity blind spots)" do
+      assert Enum.sort(Map.keys(GroupSettings.default_config())) ==
+               Enum.sort(GroupSettings.keys())
     end
   end
 
@@ -118,6 +121,37 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
 
       assert length(errors) == 2
       assert Enum.map(errors, & &1.key) |> Enum.sort() == ["listing_sort", "post_width"]
+    end
+
+    test "normalizes atom keys to the canonical string keys update_group/3 matches" do
+      # update_group/3 only matches string keys — if the validated result kept
+      # atom keys, feeding it to update_group would silently persist nothing.
+      assert {:ok, out} =
+               GroupSettings.validate_params(%{post_width: "wide", show_tags: true})
+
+      assert out == %{"post_width" => "wide", "show_tags" => true}
+      refute Map.has_key?(out, :post_width)
+    end
+
+    test "accepts atom enum values, normalizing to strings" do
+      assert {:ok, %{"post_width" => "wide"}} =
+               GroupSettings.validate_params(%{"post_width" => :wide})
+    end
+
+    test "returns an error (not a crash) for non-castable enum values" do
+      # A map has no String.Chars impl — must come back as {:error, _}, not
+      # raise Protocol.UndefinedError.
+      assert {:error, [%{key: "post_width"}]} =
+               GroupSettings.validate_params(%{"post_width" => %{"evil" => true}})
+
+      assert {:error, [%{key: "listing_sort"}]} =
+               GroupSettings.validate_params(%{"listing_sort" => [1, 2, 3]})
+    end
+
+    test "passes unknown non-string keys through untouched" do
+      assert {:ok, out} = GroupSettings.validate_params(%{"slug" => "blog", name: "My Blog"})
+      assert out[:name] == "My Blog"
+      assert out["slug"] == "blog"
     end
   end
 end

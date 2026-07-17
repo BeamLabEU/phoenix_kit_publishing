@@ -228,6 +228,117 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
   end
 
   # ============================================================================
+  # update_group/3 — per-group display settings + name_i18n (data JSONB)
+  # ============================================================================
+
+  describe "update_group/3 display settings" do
+    test "persists boolean and enum settings" do
+      {:ok, group} = Groups.add_group(unique_name())
+
+      {:ok, updated} =
+        Groups.update_group(group["slug"], %{
+          "show_tags" => "true",
+          "post_width" => "wide",
+          "listing_sort" => "oldest"
+        })
+
+      assert updated["show_tags"] == true
+      assert updated["post_width"] == "wide"
+      assert updated["listing_sort"] == "oldest"
+    end
+
+    test "ignores an out-of-whitelist enum value, keeping the stored one" do
+      {:ok, group} = Groups.add_group(unique_name())
+      {:ok, _} = Groups.update_group(group["slug"], %{"post_width" => "wide"})
+      {:ok, updated} = Groups.update_group(group["slug"], %{"post_width" => "gigantic"})
+      assert updated["post_width"] == "wide"
+    end
+
+    test "a partial update leaves unrelated settings intact" do
+      {:ok, group} = Groups.add_group(unique_name())
+      {:ok, _} = Groups.update_group(group["slug"], %{"show_reading_time" => "true"})
+      {:ok, updated} = Groups.update_group(group["slug"], %{name: unique_name()})
+      assert updated["show_reading_time"] == true
+    end
+
+    test "the GroupSettings validate → update_group round-trip persists atom-keyed input" do
+      # Regression: validate_params/1 used to keep atom keys, which
+      # merge_group_config (string-keyed) silently ignored.
+      alias PhoenixKit.Modules.Publishing.GroupSettings
+
+      {:ok, group} = Groups.add_group(unique_name())
+
+      assert {:ok, params} =
+               GroupSettings.validate_params(%{post_width: "narrow", show_breadcrumbs: true})
+
+      {:ok, updated} = Groups.update_group(group["slug"], params)
+      assert updated["post_width"] == "narrow"
+      assert updated["show_breadcrumbs"] == true
+    end
+  end
+
+  describe "update_group/3 name_i18n" do
+    test "stores non-blank per-language overrides and drops blank ones" do
+      {:ok, group} = Groups.add_group(unique_name())
+
+      {:ok, updated} =
+        Groups.update_group(group["slug"], %{
+          "name_i18n" => %{"fr-FR" => "  Blogue  ", "et" => ""}
+        })
+
+      assert updated["name_i18n"] == %{"fr-FR" => "Blogue"}
+    end
+
+    test "an all-blank submission clears the overrides" do
+      {:ok, group} = Groups.add_group(unique_name())
+      {:ok, _} = Groups.update_group(group["slug"], %{"name_i18n" => %{"fr" => "Blogue"}})
+      {:ok, updated} = Groups.update_group(group["slug"], %{"name_i18n" => %{"fr" => "  "}})
+      assert updated["name_i18n"] == %{}
+    end
+
+    test "drops non-binary override values instead of raising" do
+      # Crafted params (group[name_i18n][en][x]=y) or a programmatic caller can
+      # hand a nested map — to_string/1 on it used to raise Protocol.UndefinedError.
+      {:ok, group} = Groups.add_group(unique_name())
+
+      {:ok, updated} =
+        Groups.update_group(group["slug"], %{
+          "name_i18n" => %{"en" => %{"x" => "y"}, "fr" => "Blogue", "ru" => 42}
+        })
+
+      assert updated["name_i18n"] == %{"fr" => "Blogue"}
+    end
+
+    test "caps an override at the primary name's max length" do
+      alias PhoenixKit.Modules.Publishing.Constants
+
+      {:ok, group} = Groups.add_group(unique_name())
+      long = String.duplicate("a", Constants.max_group_name_length() + 50)
+
+      {:ok, updated} = Groups.update_group(group["slug"], %{"name_i18n" => %{"fr" => long}})
+
+      assert String.length(updated["name_i18n"]["fr"]) == Constants.max_group_name_length()
+    end
+  end
+
+  describe "translated_group_name/2" do
+    test "resolves exact, base-tolerant, and fallback lookups on the public map" do
+      {:ok, group} = Groups.add_group(unique_name())
+
+      {:ok, updated} =
+        Groups.update_group(group["slug"], %{"name_i18n" => %{"fr-FR" => "Blogue"}})
+
+      # Exact + base-tolerant in both directions.
+      assert Groups.translated_group_name(updated, "fr-FR") == "Blogue"
+      assert Groups.translated_group_name(updated, "fr") == "Blogue"
+      # No translation -> primary name.
+      assert Groups.translated_group_name(updated, "de") == updated["name"]
+      # Nil language -> primary name.
+      assert Groups.translated_group_name(updated, nil) == updated["name"]
+    end
+  end
+
+  # ============================================================================
   # trash_group/1 and restore_group/1
   # ============================================================================
 

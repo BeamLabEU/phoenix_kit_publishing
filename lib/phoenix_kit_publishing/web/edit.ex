@@ -18,7 +18,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   alias Phoenix.Component
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Errors
-  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
@@ -69,9 +68,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
            actor_uuid: Shared.actor_uuid_from_socket(socket)
          ) do
       {:ok, updated_group} ->
-        # Broadcast group updated for live dashboard updates
-        PublishingPubSub.broadcast_group_updated(updated_group)
-
+        # No broadcast here — Groups.update_group/3 already broadcasts
+        # {:group_updated, group} after the DB write; a second one from the LV
+        # made every subscriber refresh twice per save.
         updated_form = Component.to_form(group_form_params(updated_group), as: :group)
 
         {:noreply,

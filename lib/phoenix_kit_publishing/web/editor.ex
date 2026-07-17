@@ -2846,7 +2846,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                      they look) is controlled per-group from the group's settings. --%>
                 <div>
                   <label class="label cursor-pointer justify-start gap-3 py-1">
-                    <input type="hidden" name="featured" value="false" />
+                    <%!-- The hidden "false" must be disabled in lockstep with the
+                         checkbox: a disabled checkbox is excluded from form
+                         serialization while an enabled hidden input is not, so a
+                         still-enabled sibling control (e.g. the status select
+                         while viewing an older version) would submit
+                         featured=false and silently clobber the stored flag. --%>
+                    <input
+                      type="hidden"
+                      name="featured"
+                      value="false"
+                      disabled={edit_disabled? or @viewing_older_version}
+                    />
                     <input
                       type="checkbox"
                       id="post-featured-checkbox"

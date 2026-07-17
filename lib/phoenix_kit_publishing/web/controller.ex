@@ -26,6 +26,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Web.Controller.Fallback
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
@@ -248,7 +249,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:total_pages, assigns.total_pages)
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:og, %{
-          title: assigns.group["name"],
+          # page_title is the language-resolved display name (listing.ex) — keep
+          # the social preview in the same language as the visible <h1>/<title>.
+          title: assigns.page_title,
           url: base_url <> listing_url,
           locale: og_locale(assigns.current_language),
           type: "website"
@@ -292,7 +295,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           edit_post_admin_url(group_slug, assigns.post.uuid, assigns.current_language),
           "Edit Post"
         )
-        |> assign_scroll_config(group_slug)
+        |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> render(:show)
 
       {:redirect_301, url} ->
@@ -324,7 +327,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           :og,
           build_og_data(conn, assigns.post, assigns.canonical_url, assigns.current_language)
         )
-        |> assign_scroll_config(group_slug)
+        |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> render(:show)
 
       {:error, reason} ->
@@ -353,7 +356,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           edit_post_admin_url(group_slug, assigns.post.uuid, assigns.current_language),
           "Edit Post"
         )
-        |> assign_scroll_config(group_slug)
+        |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> render(:show)
 
       {:redirect, url} ->
@@ -539,27 +542,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp og_locale(code) when is_binary(code), do: String.replace(code, "-", "_")
   defp og_locale(code), do: code
 
-  # Assigns the group's per-group scroll-navigation config onto the post-page
-  # conn so Web.HTML.show/1 can style the scrollbar and render reading aids.
-  # The group map (via Groups.db_group_to_map/1) carries these keys; a missing
-  # group degrades to the safe defaults (native bar, all aids off).
-  defp assign_scroll_config(conn, group_slug) do
-    group =
-      case Listing.fetch_group(group_slug) do
-        {:ok, g} -> g
-        _ -> %{}
-      end
+  # The post-page display settings pulled off the group map, with defaults
+  # derived from Constants (same source as db_group_to_map, the PublishingGroup
+  # accessors, and the GroupSettings spec — no per-layer literals to drift).
+  defp post_display_defaults do
+    %{
+      scrollbar_style: Constants.default_scrollbar_style(),
+      scroll_progress_enabled: false,
+      scroll_headings_enabled: false,
+      show_breadcrumbs: false,
+      post_date_position: Constants.default_post_date_position(),
+      post_width: Constants.default_post_width(),
+      show_featured_image: false,
+      show_reading_time: false,
+      show_tags: false
+    }
+  end
 
-    conn
-    |> assign(:scrollbar_style, group["scrollbar_style"] || "default")
-    |> assign(:scroll_progress_enabled, group["scroll_progress_enabled"] || false)
-    |> assign(:scroll_headings_enabled, group["scroll_headings_enabled"] || false)
-    |> assign(:show_breadcrumbs, group["show_breadcrumbs"] || false)
-    |> assign(:post_date_position, group["post_date_position"] || "below")
-    |> assign(:post_width, group["post_width"] || "normal")
-    |> assign(:show_featured_image, group["show_featured_image"] || false)
-    |> assign(:show_reading_time, group["show_reading_time"] || false)
-    |> assign(:show_tags, group["show_tags"] || false)
+  # Assigns the group's per-group display config (scrollbar/reading aids plus
+  # the post-page presentation toggles) onto the post-page conn so
+  # Web.HTML.show/1 can render them. Takes the group map the post-rendering
+  # path already fetched (PostRendering.fetch_group/1) — no second fetch. A
+  # missing group (%{}) degrades to the safe defaults (native bar, aids off).
+  defp assign_group_display_config(conn, group) when is_map(group) do
+    Enum.reduce(post_display_defaults(), conn, fn {key, default}, acc ->
+      assign(acc, key, Map.get(group, Atom.to_string(key)) || default)
+    end)
   end
 
   defp maybe_assign_admin_edit(conn, path, label) do

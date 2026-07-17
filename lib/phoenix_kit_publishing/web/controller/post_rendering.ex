@@ -78,7 +78,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
       {:redirect_301, canonical_url}
     else
       html_content = render_post_content(post)
-      group_name = fetch_group_name(group_slug)
+      group = fetch_group(group_slug)
+      group_name = resolve_group_name(group, group_slug, canonical_language)
       translations = Translations.build_translation_links(group_slug, post, canonical_language)
       breadcrumbs = build_breadcrumbs(group_slug, post, canonical_language, group_name)
       version_dropdown = build_version_dropdown(group_slug, post, canonical_language)
@@ -87,6 +88,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
        %{
          page_title: post.metadata.title || Constants.default_title(),
          group_slug: group_slug,
+         group: group,
          group_name: group_name,
          post: post,
          html_content: html_content,
@@ -125,7 +127,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   defp build_versioned_post_response(group_slug, post, version) do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
     html_content = render_post_content(post)
-    group_name = fetch_group_name(group_slug)
+    group = fetch_group(group_slug)
+    group_name = resolve_group_name(group, group_slug, canonical_language)
 
     translations =
       Translations.build_translation_links(group_slug, post, canonical_language, version: version)
@@ -140,6 +143,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
      %{
        page_title: post.metadata.title || Constants.default_title(),
        group_slug: group_slug,
+       group: group,
        group_name: group_name,
        post: post,
        html_content: html_content,
@@ -367,11 +371,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     ]
   end
 
-  defp fetch_group_name(group_slug) do
+  # Fetches the group's public map once per request — the same map feeds the
+  # language-resolved display name here and the controller's per-group display
+  # config (assign_group_display_config/2), so post pages don't fetch twice.
+  defp fetch_group(group_slug) do
     case Listing.fetch_group(group_slug) do
-      {:ok, group} -> group["name"]
-      {:error, _} -> group_slug
+      {:ok, group} -> group
+      {:error, _} -> %{}
     end
+  end
+
+  # Post pages show the group name in the breadcrumb and the "Back to …"
+  # footer — resolve it in the viewer's language (data["name_i18n"]) the same
+  # way the listing does, falling back to the primary name, then the slug.
+  defp resolve_group_name(group, group_slug, language) do
+    Publishing.translated_group_name(group, language) || group_slug
   end
 
   # ============================================================================
