@@ -38,10 +38,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Utils.Routes
   @admin_edit_helper_mod PhoenixKitWeb.AdminEditHelper
 
-  # Phase 2 seam: a future dedicated OG module exporting `refine_og/4` gets the
-  # final say over the OG map, layering on top of the per-post simple override.
-  # No-op until that module is installed (see build_og_data/4). The module
-  # doesn't exist yet, so tell the compiler not to warn on the remote call.
+  # Phase 2 seam: the `phoenix_kit_og` plugin (PhoenixKitOG) exports `refine_og/4`
+  # and gets the final say over the OG map, layering a rendered image on top of the
+  # per-post simple override (see build_og_data/4). It's an optional dep and may not
+  # be compiled into a given host, so no_warn_undefined keeps the guarded remote
+  # call quiet.
   @og_module PhoenixKitOG
   @compile {:no_warn_undefined, PhoenixKitOG}
 
@@ -500,10 +501,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp maybe_put(map, _key, ""), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  # Phase 2 extension seam: when the dedicated OG module is installed it gets the
-  # final say, layering on top of the per-post simple override resolved above.
-  # No-op until that module ships and exports refine_og/4. Mirrors the guarded
-  # dispatch pattern used by maybe_assign_admin_edit/3.
+  # Phase 2 extension seam: when the `phoenix_kit_og` plugin is installed it gets
+  # the final say, layering a rendered OG image on top of the per-post simple
+  # override resolved above. Guarded so a host without the (optional) plugin falls
+  # back to the override/default map. Mirrors maybe_assign_admin_edit/3.
   defp maybe_refine_og_with_module(og, conn, post, language) do
     mod = @og_module
 
@@ -515,6 +516,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     else
       og
     end
+  rescue
+    # OG refinement must never crash a public post page render — keep the
+    # per-post override/default result if the module raises.
+    _ -> og
   end
 
   defp absolute_url(_base, nil), do: nil

@@ -522,7 +522,7 @@ If the host consumes the assign from `root.html.heex`, the forwarding chain is i
 Publishing assigns a `:og` map on every public response for host root layouts to render `<meta property="og:...">` tags. Two shapes:
 
 - **Listing pages** — `%{title, url, locale, type: "website"}` (4 fields).
-- **Post pages** — `%{title, description, image, url, locale, type: "article"}` (6 fields). `description` and `image` may be `nil` when the post has no SEO metadata or featured image.
+- **Post pages** — `%{title, description, image, url, locale, type: "article"}`, plus up to three `og:image:*` hint fields (`image_width`, `image_height`, `image_type`) added by `maybe_put` when the resolved image has known variant dimensions/mime — so 6–9 fields. `description` and `image` may be `nil` when the post has no SEO metadata or featured image.
 
 `:og` lands on `conn.assigns` AND is forwarded through `LayoutWrapper.app_layout`'s `:module_assigns` map, so hosts can consume it from either `root.html.heex` (the conn assign) OR `Layouts.app/1` (the forwarded `@og` assign). The forwarding happens in publishing's three public render branches (`all_groups/1`, `index/1`, `show/1` in `Web.HTML`) the same way `:phoenix_kit_publishing_translations` does — see the function-component-layout callout above for the boundary mechanism.
 
@@ -531,6 +531,14 @@ Publishing assigns a `:og` map on every public response for host root layouts to
 Meta tags belong in `<head>`, which the **host app owns** — and most hosts ship their own `root.html.heex` that doesn't render the forwarded `:og`, so relying on the host alone left previews broken. So publishing **also renders the og/twitter tags itself**, in-page, via `Web.HTML.og_meta_tags/1` (rendered as the first child inside `LayoutWrapper.app_layout` in all three public branches). This mirrors the in-page language switcher: it works out of the box with zero host setup. Body placement is read by the major scrapers (FB/Slack/Discord/Telegram/LinkedIn); `<head>` is still the strict-standard location, which is what the `module_assigns` pass-along is for.
 
 The `publishing_render_og_tags` setting (default `true`) gates the in-page copy. A host that renders the forwarded `:og` in its own `<head>` (e.g. via core's `root.html.heex`, which renders the full og+twitter+canonical block) should flip it **off** from `/admin/settings/publishing` to avoid duplicate tags. The setting is read per-request in `og_tags_enabled?/0` — it is **not** part of the Markdown render cache (that caches post-body HTML only), so toggling takes effect immediately. The component renders nothing when `:og` is absent (e.g. the groups overview).
+
+### How the post-page `:og` map is built (overrides + `phoenix_kit_og`)
+
+`build_og_data/4` (`web/controller.ex`) resolves each field through three layers, highest precedence last:
+
+1. **Derived defaults** — post title, version description, effective featured image.
+2. **Per-post simple override** — per-language `content.data["og"] = %{"title", "description", "image_uuid"}`, edited in the "Social / OpenGraph" section of the post editor. Each field falls back independently to the default. Read by `PublishingContent.get_og/1`, surfaced as `post.metadata.og` by the mapper.
+3. **`phoenix_kit_og` plugin (optional)** — renders an OG image from an admin-designed template and gets the final say on `image`. Publishing is its first consumer: it implements `og_variables/0` + `og_resolve/2` (in `publishing.ex`) declaring/resolving the template variables (`post_title`, `post_featured_image`, `post_group_name`, `post_first_words`, …), and `build_og_data/4` ends by calling `maybe_refine_og_with_module/4` → `PhoenixKitOG.refine_og/4`. The seam is fully guarded (`Code.ensure_loaded?` + `function_exported?` + `rescue`), so a host without the plugin — or one whose refine call raises — falls back to the override/default map unchanged. The editor shows a live "what the plugin will produce" preview via `PhoenixKitOG.preview_og_image_url/3` (`og_preview_url/2` in `web/editor.ex`), gated on `PhoenixKitOG.enabled?/0`.
 
 ## Testing
 
