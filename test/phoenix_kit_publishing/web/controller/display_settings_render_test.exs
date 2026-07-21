@@ -340,6 +340,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
   # Post page
   # ==========================================================================
 
+  describe "post page: header toolbar row" do
+    test "empty toolbar (no switcher, no admin, no versions) renders no wrapper", %{
+      conn: conn,
+      group_slug: slug,
+      post: post
+    } do
+      # Single language + anonymous viewer — every toolbar child is absent, so
+      # the mt-4 flex row must not render (it left an awkward gap under the
+      # title).
+      refute post_html(conn, slug, post.slug) =~ "flex flex-wrap items-center gap-4 mt-4"
+    end
+  end
+
   describe "post page: show_top_back_link" do
     test "renders top + footer back links by default, footer only when disabled", %{
       conn: conn,

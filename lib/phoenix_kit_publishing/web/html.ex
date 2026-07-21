@@ -1390,10 +1390,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           <div :if={assigns[:show_reading_time]} class="text-sm text-base-content/60 mt-2">
             {reading_time_label(@html_content)}
           </div>
-          <div class="flex flex-wrap items-center gap-4 mt-4">
+          <%!-- Toolbar row renders only when at least one tool does — an empty
+            flex row still costs its mt-4, leaving an awkward gap under the
+            title on single-language public views with no admin session. --%>
+          <% show_switcher? = assigns[:show_language_switcher] != false and length(@translations) > 1 %>
+          <div
+            :if={show_switcher? || assigns[:admin_edit_url] || @version_dropdown}
+            class="flex flex-wrap items-center gap-4 mt-4"
+          >
             <%!-- Language Switcher (gated on `publishing_show_language_switcher` —
               disable when the host renders its own switcher in the layout). --%>
-            <%= if assigns[:show_language_switcher] != false and length(@translations) > 1 do %>
+            <%= if show_switcher? do %>
               <.language_switcher
                 languages={build_public_translations(@translations, @current_language)}
                 current_language={public_current_language(@translations, @current_language)}
