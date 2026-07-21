@@ -467,13 +467,12 @@ uuid-keyed — the public group map exposes `"uuid"` for this). One field
 per-merge `:group_updated` broadcast (see `log_translated/3`). The Edit Group
 LV wires it via `AITranslate.Embed` + `FormGlue` with a params-map
 `GroupAITranslateBinding` (deliberately not `@behaviour` — the callbacks type
-an Ecto changeset). ⚠️ The tabs render through a **forward-compat dodge**
-(`ai_tabs/1` in `web/edit.ex`): phoenix_kit_ai's `ai_multilang_tabs/1` is
-unreleased — the dodge dispatches to it when exported and otherwise renders
-the identical hand-placed layout from components that exist in the published
-0.16.0, so the Hex pin keeps compiling. **TODO(floor-bump): when the
-phoenix_kit_ai floor includes the release shipping `ai_multilang_tabs`, delete
-the dodge and import the component directly.**
+an Ecto changeset). ⚠️ **Release-gated on phoenix_kit_ai**: the editor imports
+`ai_multilang_tabs/1`, which ships in the phoenix_kit_ai release AFTER 0.16.0
+— until that release is cut and `mix deps.update phoenix_kit_ai` runs (the
+`~> 0.4` pin floats, no mix.exs change), the standalone build only compiles
+with `PHOENIX_KIT_AI_PATH=../phoenix_kit_ai`. The maintainer coordinates the
+merge/release ordering (stated in the PR).
 
 Two write-path behaviors to know: `update_group/3` is **lenient** (an
 out-of-whitelist enum value is ignored, a non-truthy bool becomes `false` — the

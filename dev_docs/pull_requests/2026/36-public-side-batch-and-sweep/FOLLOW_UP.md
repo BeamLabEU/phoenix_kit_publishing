@@ -9,7 +9,7 @@ records what they found and what happened to each finding.
 
 | Finding | Severity | Outcome |
 |---|---|---|
-| Group editor imported unreleased `ai_multilang_tabs` — hard compile error against published phoenix_kit_ai 0.16.0 | CRITICAL | Fixed — forward-compat dodge (`ai_tabs/1`, function_exported? + apply per the document_creator/projects precedent). Standalone suite green against the Hex pin. Delete at floor bump (AGENTS.md TODO) |
+| Group editor imported unreleased `ai_multilang_tabs` — hard compile error against published phoenix_kit_ai 0.16.0 | CRITICAL | Resolved per the maintainer's workflow: the requirement is stated in the PR (merge ai#14 → release → deps.update); a forward-compat dodge was built then removed at the boss's direction ("assume they will be published; put requirements in the PR"). Until the release, checks run with `PHOENIX_KIT_AI_PATH` |
 | `GroupAITranslatable.put_translation` logged nothing, dropped the actor | HIGH | Fixed — `publishing.group.updated` (mode auto, actor from opts, locale-agnostic metadata) per merged language; pinned |
 | Per-merge `:group_updated` broadcast → N full listing reloads per translation run | MEDIUM | Fixed by removal — matches sibling adapters; core's `:translation_completed` carries the signal |
 | `broadcast_updated` bare rescue swallowed exceptions silently | MEDIUM | Moot — the broadcast (and its rescue) was removed |
@@ -38,9 +38,11 @@ records what they found and what happened to each finding.
 
 ## Gates
 
-`mix precommit` clean; **1237 tests / 0 failures** against BOTH the published
-phoenix_kit_ai 0.16.0 (no overrides) and the local checkout; features
-browser-verified in the parent app throughout the session.
+`mix precommit` clean; **1237 tests / 0 failures** against the local
+phoenix_kit_ai checkout (`PHOENIX_KIT_AI_PATH=../phoenix_kit_ai` — the
+standalone Hex build compiles only after the gating ai release, per the PR's
+merge requirements); features browser-verified in the parent app throughout
+the session.
 
 ## Open
 
