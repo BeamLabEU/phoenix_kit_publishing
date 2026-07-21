@@ -184,6 +184,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "newest_style" => group["newest_style"],
       "show_top_back_link" => group["show_top_back_link"],
       "listing_image_links" => group["listing_image_links"],
+      "listing_animations" => group["listing_animations"],
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
       "scroll_headings_enabled" => group["scroll_headings_enabled"],
@@ -484,6 +485,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   {gettext("Clickable card images")}
                   <:description>
                     {gettext("A post card's image clicks through to the post, same as the title.")}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:listing_animations]}>
+                  {gettext("Card hover animations")}
+                  <:description>
+                    {gettext("Cards lift slightly on hover as a click cue.")}
                   </:description>
                 </.checkbox>
 

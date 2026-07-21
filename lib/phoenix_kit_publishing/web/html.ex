@@ -686,6 +686,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <% newest_layout = assigns[:newest_layout] || "hero" %>
         <% newest_style = assigns[:newest_style] || "classic" %>
         <% image_links = (assigns[:group] && @group["listing_image_links"]) != false %>
+        <% animations = (assigns[:group] && @group["listing_animations"]) != false %>
         <%!-- Prefer the controller's group-wide counts (all pages + pinned
           bands); the visible-set fallback covers direct template renders. --%>
         <% date_counts =
@@ -711,6 +712,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 layout={featured_layout}
                 style={featured_style}
                 image_links={image_links}
+                animations={animations}
               />
             </div>
           </section>
@@ -738,6 +740,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 layout={newest_layout}
                 style={newest_style}
                 image_links={image_links}
+                animations={animations}
               />
             </div>
           </section>
@@ -754,6 +757,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               date_counts={date_counts}
               variant={:grid}
               image_links={image_links}
+              animations={animations}
             />
           </div>
           <%!-- Pagination --%>
@@ -837,6 +841,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     values: [:featured_hero, :featured_card, :newest_hero, :newest_card, :grid]
 
   attr :image_links, :boolean, default: true
+  attr :animations, :boolean, default: true
 
   defp listing_post_card(assigns) do
     highlight? = assigns.variant != :grid
@@ -864,10 +869,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     ~H"""
     <article
       class={[
-        "card bg-base-200 transition-shadow",
-        @highlight? && "shadow-lg ring-1 hover:shadow-xl overflow-hidden",
+        "card bg-base-200",
+        @animations && "transition motion-safe:hover:-translate-y-1",
+        @highlight? && "shadow-lg ring-1 overflow-hidden",
+        @animations && @highlight? && "hover:shadow-xl",
         @highlight? && ((@newest? && "ring-secondary/20") || "ring-primary/20"),
-        !@highlight? && "shadow-md hover:shadow-lg",
+        !@highlight? && "shadow-md",
+        @animations && !@highlight? && "hover:shadow-lg",
         @variant in [:featured_hero, :newest_hero] && "lg:card-side"
       ]}
       data-post-date={effective_post_date(@post)}
@@ -882,7 +890,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               <img
                 src={@img}
                 alt={@post.metadata.title || gettext("Featured image")}
-                class="h-full w-full object-cover transition-opacity hover:opacity-90"
+                class={[
+                  "h-full w-full object-cover",
+                  @animations && "transition-opacity hover:opacity-90"
+                ]}
                 loading="lazy"
               />
             </.link>
@@ -961,6 +972,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   attr :layout, :string, required: true
   attr :style, :string, required: true
   attr :image_links, :boolean, default: true
+  attr :animations, :boolean, default: true
 
   defp listing_band_card(%{style: style} = assigns)
        when style in ["cover", "cover_panel", "minimal", "top"] do
@@ -1007,6 +1019,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       date_counts={@date_counts}
       variant={@variant}
       image_links={@image_links}
+      animations={@animations}
     />
     """
   end
@@ -1020,7 +1033,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     ~H"""
     <article
       class={[
-        "relative flex items-end overflow-hidden rounded-2xl shadow-lg ring-1 transition-shadow hover:shadow-xl",
+        "relative flex items-end overflow-hidden rounded-2xl shadow-lg ring-1",
+        @animations && "transition hover:shadow-xl motion-safe:hover:-translate-y-1",
         (@band == :featured && "ring-primary/20") || "ring-secondary/20",
         (@layout == "card" && "min-h-64") || "min-h-80 lg:min-h-96"
       ]}
@@ -1106,7 +1120,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     ~H"""
     <article
       class={[
-        "relative flex items-end overflow-hidden rounded-2xl bg-base-200 shadow-lg ring-1 transition-shadow hover:shadow-xl",
+        "relative flex items-end overflow-hidden rounded-2xl bg-base-200 shadow-lg ring-1",
+        @animations && "transition hover:shadow-xl motion-safe:hover:-translate-y-1",
         (@band == :featured && "ring-primary/20") || "ring-secondary/20",
         (@layout == "card" && "min-h-64") || "min-h-80 lg:min-h-96"
       ]}
@@ -1155,6 +1170,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     <article
       class={[
         "rounded-e-2xl border-s-4 bg-base-100 shadow-sm",
+        @animations && "transition hover:shadow-md motion-safe:hover:-translate-y-1",
         (@band == :featured && "border-primary") || "border-secondary",
         (@layout == "card" && "px-5 py-6") || "px-6 py-8 lg:px-10"
       ]}
@@ -1181,7 +1197,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     ~H"""
     <article
       class={[
-        "card overflow-hidden bg-base-200 shadow-lg ring-1 transition-shadow hover:shadow-xl",
+        "card overflow-hidden bg-base-200 shadow-lg ring-1",
+        @animations && "transition hover:shadow-xl motion-safe:hover:-translate-y-1",
         (@band == :featured && "ring-primary/20") || "ring-secondary/20"
       ]}
       data-post-date={effective_post_date(@post)}
@@ -1192,7 +1209,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <img
               src={@img}
               alt={@post.metadata.title || gettext("Featured image")}
-              class="h-full w-full object-cover transition-opacity hover:opacity-90"
+              class={[
+                "h-full w-full object-cover",
+                @animations && "transition-opacity hover:opacity-90"
+              ]}
               loading="lazy"
             />
           </.link>

@@ -195,6 +195,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
     end
   end
 
+  describe "listing: listing_animations" do
+    test "hover lift on by default, gone when disabled", %{conn: conn, group_slug: slug} do
+      assert listing_html(conn, slug) =~ "motion-safe:hover:-translate-y-1"
+
+      set!(slug, %{"listing_animations" => "false"})
+      html = listing_html(conn, slug)
+      refute html =~ "motion-safe:hover:-translate-y-1"
+      refute html =~ "hover:shadow"
+    end
+  end
+
   describe "listing: band styles (featured_style / newest_style)" do
     test "classic by default — no style markers", %{conn: conn, group_slug: slug} do
       set!(slug, %{"newest_enabled" => "true"})

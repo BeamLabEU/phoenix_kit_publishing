@@ -57,6 +57,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
     the post page, mirroring the footer button (default `true`).
   - `listing_image_links` - Make the post-card images on the public listing
     click through to the post, same as the title (default `true`).
+  - `listing_animations` - Hover animations on listing cards (a subtle lift +
+    shadow cue that the card is clickable; default `true`). Motion-reduce
+    users never see the lift regardless.
   - `name_i18n` - Per-language overrides for the group's display name, keyed by
     language code (e.g. `%{"et" => "Blogi"}`). The primary-language name lives in
     the `name` column; secondary languages fall back to it when absent. The slug
@@ -222,6 +225,10 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc "Returns whether listing card images click through to the post (default true)."
   def listing_image_links?(%__MODULE__{data: data}),
     do: Map.get(data, "listing_image_links", true)
+
+  @doc "Returns whether listing cards animate on hover (default true)."
+  def listing_animations?(%__MODULE__{data: data}),
+    do: Map.get(data, "listing_animations", true)
 
   @doc "Returns the per-language display-name overrides map (language code => name)."
   def name_translations(%__MODULE__{data: data}) do

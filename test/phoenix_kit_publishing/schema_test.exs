@@ -121,6 +121,7 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       assert PublishingGroup.show_post_count?(group) == false
       assert PublishingGroup.show_top_back_link?(group) == true
       assert PublishingGroup.listing_image_links?(group) == true
+      assert PublishingGroup.listing_animations?(group) == true
     end
 
     test "public-side display accessors return custom values" do
@@ -146,7 +147,8 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
           "show_tags" => true,
           "show_post_count" => true,
           "show_top_back_link" => false,
-          "listing_image_links" => false
+          "listing_image_links" => false,
+          "listing_animations" => false
         }
       }
 
@@ -171,6 +173,7 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       assert PublishingGroup.show_post_count?(group) == true
       assert PublishingGroup.show_top_back_link?(group) == false
       assert PublishingGroup.listing_image_links?(group) == false
+      assert PublishingGroup.listing_animations?(group) == false
     end
 
     test "translated_name/2 falls back to the primary name with no override" do

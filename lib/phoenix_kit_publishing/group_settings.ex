@@ -155,6 +155,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "listing_animations",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: true,
+        scope: :listing,
+        label: "Card hover animations",
+        description:
+          "When true (the default), listing cards lift slightly on hover as a click cue. Reduced-motion users never see the lift.",
+        depends_on: nil
+      },
+      %{
         key: "scroll_timeline_enabled",
         type: :boolean,
         allowed: @boolean_allowed,
