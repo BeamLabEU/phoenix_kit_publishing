@@ -195,6 +195,79 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
     end
   end
 
+  describe "listing: listing_animations" do
+    test "hover lift on by default, gone when disabled", %{conn: conn, group_slug: slug} do
+      assert listing_html(conn, slug) =~ "motion-safe:hover:-translate-y-1"
+
+      set!(slug, %{"listing_animations" => "false"})
+      html = listing_html(conn, slug)
+      refute html =~ "motion-safe:hover:-translate-y-1"
+      refute html =~ "hover:shadow"
+    end
+  end
+
+  describe "listing: band styles (featured_style / newest_style)" do
+    test "classic by default — no style markers", %{conn: conn, group_slug: slug} do
+      set!(slug, %{"newest_enabled" => "true"})
+      html = listing_html(conn, slug)
+      refute html =~ "from-black/80"
+      refute html =~ "border-s-4"
+      refute html =~ "bg-base-100/95"
+    end
+
+    test "cover renders the scrim and, with no image, the branded gradient fallback", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"newest_enabled" => "true", "newest_style" => "cover"})
+      html = listing_html(conn, slug)
+      # Hardcoded scrim + the Latest band's secondary-leaning no-image gradient.
+      assert html =~ "from-black/80"
+      assert html =~ "from-secondary to-primary"
+      assert html =~ "✦"
+      # The whole background clicks through to the post…
+      assert html =~ "pk-band-cover-link"
+
+      # …gated on the same setting as card-image links.
+      set!(slug, %{"listing_image_links" => "false"})
+      refute listing_html(conn, slug) =~ "pk-band-cover-link"
+    end
+
+    test "featured cover uses the primary-leaning fallback gradient", %{
+      conn: conn,
+      group_slug: slug,
+      post: post
+    } do
+      {:ok, _} = Posts.update_post(slug, post, %{"featured" => "true"}, %{})
+      set!(slug, %{"featured_style" => "cover"})
+      html = listing_html(conn, slug)
+      assert html =~ "from-primary to-secondary"
+    end
+
+    test "cover_panel renders the opaque text panel", %{conn: conn, group_slug: slug} do
+      set!(slug, %{"newest_enabled" => "true", "newest_style" => "cover_panel"})
+      assert listing_html(conn, slug) =~ "bg-base-100/95"
+    end
+
+    test "minimal renders the accent-border editorial band", %{conn: conn, group_slug: slug} do
+      set!(slug, %{"newest_enabled" => "true", "newest_style" => "minimal"})
+      html = listing_html(conn, slug)
+      assert html =~ "border-s-4"
+      assert html =~ "border-secondary"
+    end
+
+    test "top drops the image banner cleanly when the post has none", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"newest_enabled" => "true", "newest_style" => "top"})
+      html = listing_html(conn, slug)
+      # Badge + body render; the 16:9 banner is absent without an image.
+      assert html =~ "badge-secondary badge-sm"
+      refute html =~ "aspect-video"
+    end
+  end
+
   describe "listing: group-wide date counts with a pinned Latest post" do
     test "a page-2 same-day sibling of the pinned newest post keeps its time-segment URL", %{
       conn: conn
@@ -266,6 +339,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
   # ==========================================================================
   # Post page
   # ==========================================================================
+
+  describe "post page: header toolbar row" do
+    test "empty toolbar (no switcher, no admin, no versions) renders no wrapper", %{
+      conn: conn,
+      group_slug: slug,
+      post: post
+    } do
+      # Single language + anonymous viewer — every toolbar child is absent, so
+      # the mt-4 flex row must not render (it left an awkward gap under the
+      # title).
+      refute post_html(conn, slug, post.slug) =~ "flex flex-wrap items-center gap-4 mt-4"
+    end
+  end
 
   describe "post page: show_top_back_link" do
     test "renders top + footer back links by default, footer only when disabled", %{

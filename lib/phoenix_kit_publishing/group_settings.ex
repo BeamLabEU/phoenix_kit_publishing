@@ -101,6 +101,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: "featured_enabled"
       },
       %{
+        key: "featured_style",
+        type: :enum,
+        allowed: Constants.band_styles(),
+        default: Constants.default_band_style(),
+        scope: :listing,
+        label: "Featured style",
+        description:
+          "The paint of featured cards, orthogonal to the layout: \"classic\" (image beside/above the text), \"cover\" (the featured image is the background, text overlaid), \"cover_panel\" (background image with a solid text panel), \"minimal\" (text only), or \"top\" (16:9 image banner above the text).",
+        depends_on: "featured_enabled"
+      },
+      %{
         key: "newest_enabled",
         type: :boolean,
         allowed: @boolean_allowed,
@@ -123,6 +134,16 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: "newest_enabled"
       },
       %{
+        key: "newest_style",
+        type: :enum,
+        allowed: Constants.band_styles(),
+        default: Constants.default_band_style(),
+        scope: :listing,
+        label: "Latest style",
+        description: "The paint of the Latest-band card — same vocabulary as featured_style.",
+        depends_on: "newest_enabled"
+      },
+      %{
         key: "listing_image_links",
         type: :boolean,
         allowed: @boolean_allowed,
@@ -131,6 +152,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         label: "Clickable card images",
         description:
           "When true (the default), a post card's image clicks through to the post, same as the title.",
+        depends_on: nil
+      },
+      %{
+        key: "listing_animations",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: true,
+        scope: :listing,
+        label: "Card hover animations",
+        description:
+          "When true (the default), listing cards lift slightly on hover as a click cue. Reduced-motion users never see the lift.",
         depends_on: nil
       },
       %{

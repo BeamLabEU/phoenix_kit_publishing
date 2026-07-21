@@ -30,8 +30,14 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       ) do
     available_languages = Enum.map(all_contents, & &1.language) |> Enum.sort()
 
-    # Derive status from active_version_uuid
+    # Derive status from active_version_uuid. `:effective_status` (when the
+    # caller mapped a NEWER revision of a post whose active version is live)
+    # overrides only the post-level metadata.status below — never the
+    # per-language/per-version maps, which stay version-accurate.
     status = derive_status(post, version)
+
+    {effective_status, effective_published_at} =
+      effective_overrides(opts, status, version.published_at)
 
     # All languages share the version's status (status is version-level, not per-language)
     language_statuses =
@@ -70,7 +76,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       version_dates: version_dates,
       content: content.content,
       content_updated_at: content.updated_at,
-      metadata: build_metadata(post, version, content, status)
+      metadata: build_metadata(post, version, content, effective_status, effective_published_at)
     }
   end
 
@@ -84,6 +90,9 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
     group_slug = get_group_slug(post)
     current_version = if version, do: version.version_number, else: 1
     status = if version, do: derive_status(post, version), else: "draft"
+
+    {effective_status, effective_published_at} =
+      effective_overrides(opts, status, version && version.published_at)
 
     # All languages share the version's status (status is version-level, not per-language)
     language_statuses =
@@ -123,7 +132,14 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       version_statuses: version_statuses,
       version_dates: version_dates,
       content: primary_content && extract_excerpt(primary_content),
-      metadata: build_listing_metadata(post, version, primary_content, status),
+      metadata:
+        build_listing_metadata(
+          post,
+          version,
+          primary_content,
+          effective_status,
+          effective_published_at
+        ),
       # Per-language data for listing pages (so language switching shows correct titles)
       language_titles: Map.new(all_contents, fn c -> {c.language, c.title} end),
       language_excerpts: Map.new(all_contents, fn c -> {c.language, extract_excerpt(c)} end)
@@ -133,6 +149,16 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   # ===========================================================================
   # Private Helpers
   # ===========================================================================
+
+  # The caller-supplied LIVE overrides (admin listing: a live post mapped by
+  # its newest DRAFT revision still reports the live status AND the live
+  # publish date at post level — without the date half, "Unsaved draft"
+  # rendered beside a Published badge). Never touches the per-language /
+  # per-version maps, which stay version-accurate.
+  defp effective_overrides(opts, status, published_at) do
+    {Keyword.get(opts, :effective_status) || status,
+     Keyword.get(opts, :effective_published_at) || published_at}
+  end
 
   defp get_group_slug(%PublishingPost{group: %{slug: slug}}), do: slug
   defp get_group_slug(%PublishingPost{} = _post), do: nil
@@ -149,7 +175,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
     end
   end
 
-  defp build_metadata(post, version, content, status) do
+  defp build_metadata(post, version, content, status, published_at) do
     %{
       title: content.title,
       description: PublishingVersion.get_description(version),
@@ -159,7 +185,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       allow_version_access: PublishingVersion.get_allow_version_access(version),
       url_slug: content.url_slug,
       previous_url_slugs: PublishingContent.get_previous_url_slugs(content),
-      published_at: format_datetime(version.published_at),
+      published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
       featured: PublishingVersion.get_featured(version),
       tags: PublishingVersion.get_tags(version),
@@ -167,7 +193,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
     }
   end
 
-  defp build_listing_metadata(_post, nil, _content, status) do
+  defp build_listing_metadata(_post, nil, _content, status, _published_at) do
     %{
       title: nil,
       description: nil,
@@ -181,30 +207,30 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
     }
   end
 
-  defp build_listing_metadata(post, version, nil, status) do
+  defp build_listing_metadata(post, version, nil, status, published_at) do
     %{
       title: nil,
       description: PublishingVersion.get_description(version),
       status: status,
       slug: post.slug,
-      # Must mirror build_metadata/4 — the public version dropdown reads this
+      # Must mirror build_metadata/5 — the public version dropdown reads this
       # from the cached listing map; omitting it hid the dropdown on a warm cache.
       allow_version_access: PublishingVersion.get_allow_version_access(version),
-      published_at: format_datetime(version.published_at),
+      published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
       featured: PublishingVersion.get_featured(version)
     }
   end
 
-  defp build_listing_metadata(post, version, content, status) do
+  defp build_listing_metadata(post, version, content, status, published_at) do
     %{
       title: content.title,
       description: PublishingVersion.get_description(version),
       status: status,
       slug: post.slug,
-      # Must mirror build_metadata/4 — see the clause above.
+      # Must mirror build_metadata/5 — see the clause above.
       allow_version_access: PublishingVersion.get_allow_version_access(version),
-      published_at: format_datetime(version.published_at),
+      published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
       featured: PublishingVersion.get_featured(version)
     }

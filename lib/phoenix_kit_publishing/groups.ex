@@ -27,6 +27,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @featured_layouts Constants.featured_layouts()
   @default_newest_layout Constants.default_newest_layout()
   @newest_layouts Constants.newest_layouts()
+  @default_band_style Constants.default_band_style()
+  @band_styles Constants.band_styles()
   @default_scrollbar_style Constants.default_scrollbar_style()
   @scrollbar_styles Constants.scrollbar_styles()
   @default_listing_sort Constants.default_listing_sort()
@@ -292,10 +294,12 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @bool_setting_keys ~w(featured_enabled newest_enabled scroll_progress_enabled
                         scroll_headings_enabled scroll_timeline_enabled show_breadcrumbs
                         show_featured_image show_reading_time show_tags show_post_count
-                        show_top_back_link listing_image_links)
+                        show_top_back_link listing_image_links listing_animations)
   @enum_settings [
     {"featured_layout", @featured_layouts},
+    {"featured_style", @band_styles},
     {"newest_layout", @newest_layouts},
+    {"newest_style", @band_styles},
     {"scrollbar_style", @scrollbar_styles},
     {"scroll_timeline_granularity", @timeline_granularities},
     {"listing_sort", @listing_sorts},
@@ -662,8 +666,18 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     end
   end
 
-  defp db_group_to_map(%{name: name, slug: slug, mode: mode, status: status, data: data}) do
+  defp db_group_to_map(%{
+         uuid: uuid,
+         name: name,
+         slug: slug,
+         mode: mode,
+         status: status,
+         data: data
+       }) do
     %{
+      # Row identity — needed by uuid-keyed consumers (the AI-translation
+      # pipeline validates resource_uuid as a real UUID; slugs can be renamed).
+      "uuid" => uuid,
       "name" => name,
       "slug" => slug,
       "mode" => mode || @default_group_mode,
@@ -673,8 +687,10 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "item_plural" => Map.get(data, "item_plural", @default_item_plural),
       "featured_enabled" => Map.get(data, "featured_enabled", true),
       "featured_layout" => Map.get(data, "featured_layout", @default_featured_layout),
+      "featured_style" => Map.get(data, "featured_style", @default_band_style),
       "newest_enabled" => Map.get(data, "newest_enabled", false),
       "newest_layout" => Map.get(data, "newest_layout", @default_newest_layout),
+      "newest_style" => Map.get(data, "newest_style", @default_band_style),
       "scrollbar_style" => Map.get(data, "scrollbar_style", @default_scrollbar_style),
       "scroll_progress_enabled" => Map.get(data, "scroll_progress_enabled", false),
       "scroll_headings_enabled" => Map.get(data, "scroll_headings_enabled", false),
@@ -691,6 +707,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "show_post_count" => Map.get(data, "show_post_count", false),
       "show_top_back_link" => Map.get(data, "show_top_back_link", true),
       "listing_image_links" => Map.get(data, "listing_image_links", true),
+      "listing_animations" => Map.get(data, "listing_animations", true),
       "name_i18n" => name_i18n_map(data)
     }
   end

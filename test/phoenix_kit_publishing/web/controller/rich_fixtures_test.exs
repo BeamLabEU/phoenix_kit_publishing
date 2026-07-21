@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RichFixturesTest do
 
   use PhoenixKitPublishing.ConnCase, async: false
 
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.TranslationManager
@@ -90,6 +91,70 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RichFixturesTest do
          %{conn: conn, group_slug: group_slug} do
       conn = get(conn, "/en/#{group_slug}")
       assert conn.status in [200, 301, 302]
+    end
+  end
+
+  describe "per-language url_slug on the public listing" do
+    setup do
+      setup_languages()
+
+      group_slug = "langslug-#{System.unique_integer([:positive])}"
+      {:ok, group} = Groups.add_group(group_slug, mode: "slug")
+
+      {:ok, post} =
+        Posts.create_post(group["slug"], %{title: "Hello", slug: "hello", content: "# Hello"})
+
+      {:ok, _} =
+        TranslationManager.add_language_to_post(group["slug"], post.uuid, "de-DE", nil)
+
+      # Give the German content its own custom URL slug, then publish (which
+      # regenerates the listing cache with both languages' slugs).
+      [version] = DBStorage.list_versions(post.uuid)
+
+      de_content =
+        version.uuid
+        |> DBStorage.list_contents()
+        |> Enum.find(&(&1.language == "de-DE"))
+
+      {:ok, _} =
+        DBStorage.update_content(de_content, %{
+          url_slug: "hallo-welt"
+        })
+
+      :ok = Versions.publish_version(group["slug"], post.uuid, version.version_number)
+
+      %{group_slug: group["slug"], post: post}
+    end
+
+    test "the German listing links cards with the German slug, not the primary one",
+         %{conn: conn, group_slug: group_slug} do
+      html = conn |> get("/de/#{group_slug}") |> html_response(200)
+
+      assert html =~ "/de/#{group_slug}/hallo-welt"
+      # The card link must not fall back to the primary/internal slug.
+      refute html =~ ~s(href="/de/#{group_slug}/hello")
+    end
+
+    test "the German post is reachable at its custom slug",
+         %{conn: conn, group_slug: group_slug} do
+      conn = get(conn, "/de/#{group_slug}/hallo-welt")
+      assert conn.status in [200, 301, 302]
+
+      # A redirect must stay on the custom slug (canonicalizing the locale is
+      # fine); rendering must be the actual post. Either way the slug holds.
+      if conn.status in [301, 302] do
+        assert redirected_to(conn, conn.status) =~ "hallo-welt"
+      else
+        # The DE translation's content is blank in this fixture — assert the
+        # rendered page's canonical URL keeps the custom slug instead.
+        assert html_response(conn, 200) =~ "/de/#{group_slug}/hallo-welt"
+      end
+    end
+
+    test "the English listing still uses the internal slug",
+         %{conn: conn, group_slug: group_slug} do
+      html = conn |> get("/en/#{group_slug}") |> html_response(200)
+      assert html =~ "/en/#{group_slug}/hello"
     end
   end
 

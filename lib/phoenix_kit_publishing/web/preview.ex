@@ -303,12 +303,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
             {raw(@html_content)}
           </div>
 
-          <%!-- Post Footer --%>
-          <footer class="mt-12 pt-6 border-t">
-            <span class="btn btn-ghost btn-sm opacity-60 cursor-not-allowed">
-              <.icon name="hero-arrow-left" class="w-4 h-4 mr-2" /> {gettext("Back to %{group}",
-                group: @group_name
-              )}
+          <%!-- Post Footer — mirrors the public post page's compact back
+            link (name-only text, aria-carried action), inert in preview. --%>
+          <footer class="mt-6 border-t pt-2">
+            <span
+              class="inline-flex items-center gap-1 text-xs text-base-content/50 opacity-60 cursor-not-allowed"
+              aria-label={gettext("Back to %{group}", group: @group_name)}
+            >
+              <.icon name="hero-arrow-left" class="w-3 h-3" /> {@group_name}
             </span>
           </footer>
         </article>

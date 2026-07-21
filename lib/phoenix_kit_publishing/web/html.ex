@@ -681,9 +681,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         </header>
         <% featured_posts = assigns[:featured_posts] || [] %>
         <% featured_layout = assigns[:featured_layout] || "hero" %>
+        <% featured_style = assigns[:featured_style] || "classic" %>
         <% newest_posts = assigns[:newest_posts] || [] %>
         <% newest_layout = assigns[:newest_layout] || "hero" %>
+        <% newest_style = assigns[:newest_style] || "classic" %>
         <% image_links = (assigns[:group] && @group["listing_image_links"]) != false %>
+        <% animations = (assigns[:group] && @group["listing_animations"]) != false %>
         <%!-- Prefer the controller's group-wide counts (all pages + pinned
           bands); the visible-set fallback covers direct template renders. --%>
         <% date_counts =
@@ -699,14 +702,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 do: "grid gap-6 md:grid-cols-2",
                 else: "flex flex-col gap-6"
             }>
-              <.listing_post_card
+              <.listing_band_card
                 :for={post <- featured_posts}
                 post={post}
                 group_slug={@group["slug"]}
                 current_language={@current_language}
                 date_counts={date_counts}
-                variant={if featured_layout == "card", do: :featured_card, else: :featured_hero}
+                band={:featured}
+                layout={featured_layout}
+                style={featured_style}
                 image_links={image_links}
+                animations={animations}
               />
             </div>
           </section>
@@ -724,14 +730,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 do: "grid gap-6 md:grid-cols-2",
                 else: "flex flex-col gap-6"
             }>
-              <.listing_post_card
+              <.listing_band_card
                 :for={post <- newest_posts}
                 post={post}
                 group_slug={@group["slug"]}
                 current_language={@current_language}
                 date_counts={date_counts}
-                variant={if newest_layout == "card", do: :newest_card, else: :newest_hero}
+                band={:newest}
+                layout={newest_layout}
+                style={newest_style}
                 image_links={image_links}
+                animations={animations}
               />
             </div>
           </section>
@@ -748,6 +757,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               date_counts={date_counts}
               variant={:grid}
               image_links={image_links}
+              animations={animations}
             />
           </div>
           <%!-- Pagination --%>
@@ -831,6 +841,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     values: [:featured_hero, :featured_card, :newest_hero, :newest_card, :grid]
 
   attr :image_links, :boolean, default: true
+  attr :animations, :boolean, default: true
 
   defp listing_post_card(assigns) do
     highlight? = assigns.variant != :grid
@@ -858,10 +869,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     ~H"""
     <article
       class={[
-        "card bg-base-200 transition-shadow",
-        @highlight? && "shadow-lg ring-1 hover:shadow-xl overflow-hidden",
+        "card bg-base-200",
+        @animations && "transition motion-safe:hover:-translate-y-1",
+        @highlight? && "shadow-lg ring-1 overflow-hidden",
+        @animations && @highlight? && "hover:shadow-xl",
         @highlight? && ((@newest? && "ring-secondary/20") || "ring-primary/20"),
-        !@highlight? && "shadow-md hover:shadow-lg",
+        !@highlight? && "shadow-md",
+        @animations && !@highlight? && "hover:shadow-lg",
         @variant in [:featured_hero, :newest_hero] && "lg:card-side"
       ]}
       data-post-date={effective_post_date(@post)}
@@ -876,7 +890,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               <img
                 src={@img}
                 alt={@post.metadata.title || gettext("Featured image")}
-                class="h-full w-full object-cover transition-opacity hover:opacity-90"
+                class={[
+                  "h-full w-full object-cover",
+                  @animations && "transition-opacity hover:opacity-90"
+                ]}
                 loading="lazy"
               />
             </.link>
@@ -939,6 +956,332 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   defp card_figure_class(variant) when variant in [:featured_hero, :newest_hero],
     do: "lg:w-2/5 h-56 lg:h-auto overflow-hidden bg-base-300"
 
+  # ---------------------------------------------------------------------------
+  # Band cards — the Featured/Latest bands' style-aware wrapper.
+  #
+  # `layout` stays size/placement (hero band vs card in a 2-col grid); `style`
+  # owns the paint. "classic" (and any unknown value — defensive, the write
+  # path whitelists) delegates to the original listing_post_card variants so
+  # pre-styles groups render pixel-identical.
+  # ---------------------------------------------------------------------------
+  attr :post, :map, required: true
+  attr :group_slug, :string, required: true
+  attr :current_language, :string, required: true
+  attr :date_counts, :map, required: true
+  attr :band, :atom, required: true, values: [:featured, :newest]
+  attr :layout, :string, required: true
+  attr :style, :string, required: true
+  attr :image_links, :boolean, default: true
+  attr :animations, :boolean, default: true
+
+  defp listing_band_card(%{style: style} = assigns)
+       when style in ["cover", "cover_panel", "minimal", "top"] do
+    assigns =
+      assigns
+      |> assign(:img, featured_image_url(assigns.post, "large"))
+      |> assign(:excerpt, post_card_excerpt(assigns.post))
+      |> assign(
+        :post_url,
+        build_post_url(
+          assigns.group_slug,
+          assigns.post,
+          assigns.current_language,
+          assigns.date_counts
+        )
+      )
+
+    case assigns.style do
+      "cover" -> band_cover(assigns)
+      "cover_panel" -> band_cover_panel(assigns)
+      "minimal" -> band_minimal(assigns)
+      "top" -> band_top(assigns)
+    end
+  end
+
+  defp listing_band_card(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :variant,
+        case {assigns.band, assigns.layout} do
+          {:featured, "card"} -> :featured_card
+          {:featured, _} -> :featured_hero
+          {:newest, "card"} -> :newest_card
+          {:newest, _} -> :newest_hero
+        end
+      )
+
+    ~H"""
+    <.listing_post_card
+      post={@post}
+      group_slug={@group_slug}
+      current_language={@current_language}
+      date_counts={@date_counts}
+      variant={@variant}
+      image_links={@image_links}
+      animations={@animations}
+    />
+    """
+  end
+
+  # The full-bleed decorative image layer, the (optional) contrast scrim, and
+  # the stretched click-through link shared by band_cover and
+  # band_cover_panel. Rendered as ONE block so the stacking order can't drift:
+  # img UNDER scrim UNDER link (positioned siblings stack by DOM order — the
+  # link must sit above the scrim to receive background clicks, and the z-10
+  # text strip above them all still wins on its own links).
+  # aria-hidden/tabindex=-1 on the link: the title link is the accessible route.
+  attr :img, :string, default: nil
+  attr :post_url, :string, required: true
+  attr :image_links, :boolean, required: true
+  attr :scrim, :boolean, required: true
+
+  defp band_cover_media(assigns) do
+    ~H"""
+    <img
+      :if={@img}
+      src={@img}
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      class="absolute inset-0 h-full w-full object-cover"
+    />
+    <div
+      :if={@scrim}
+      aria-hidden="true"
+      class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10"
+    >
+    </div>
+    <.link
+      :if={@image_links}
+      navigate={@post_url}
+      class="pk-band-cover-link absolute inset-0"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+    </.link>
+    """
+  end
+
+  # Per-band accent ring + per-layout band height — shared by the image-backed
+  # band styles so the stanzas can't drift apart.
+  defp band_ring_class(:featured), do: "ring-primary/20"
+  defp band_ring_class(:newest), do: "ring-secondary/20"
+
+  defp band_minh_class("card"), do: "min-h-64"
+  defp band_minh_class(_hero), do: "min-h-80 lg:min-h-96"
+
+  # Cover — the featured image fills the card; text overlaid in the dark zone
+  # of a hardcoded bottom-heavy scrim (the accessibility guarantee — never an
+  # option). No image degrades to a branded gradient banner, scrim on top, so
+  # the fixed light text keeps contrast either way. A real <img> (not a CSS
+  # background) so the browser can lazy-load it.
+  defp band_cover(assigns) do
+    ~H"""
+    <article
+      class={[
+        "relative flex items-end overflow-hidden rounded-2xl shadow-lg ring-1",
+        @animations && "transition hover:shadow-xl motion-safe:hover:-translate-y-1",
+        band_ring_class(@band),
+        band_minh_class(@layout)
+      ]}
+      data-post-date={effective_post_date(@post)}
+    >
+      <div
+        :if={!@img}
+        aria-hidden="true"
+        class={[
+          "absolute inset-0",
+          (@band == :featured && "bg-gradient-to-br from-primary to-secondary") ||
+            "bg-gradient-to-br from-secondary to-primary"
+        ]}
+      >
+      </div>
+      <.band_cover_media img={@img} post_url={@post_url} image_links={@image_links} scrim={true} />
+      <%!-- pointer-events-none + auto on the links: empty space in the text
+        strip falls through to the stretched link, so the WHOLE band is
+        clickable, while the title/Read More links still win on their own
+        pixels. --%>
+      <div class={[
+        "relative z-10 flex w-full flex-col gap-2 p-6 lg:p-8 text-white",
+        @image_links && "pointer-events-none"
+      ]}>
+        <.band_badge band={@band} />
+        <h3 class={["font-bold", (@layout == "card" && "text-2xl") || "text-2xl lg:text-3xl"]}>
+          <.link
+            navigate={@post_url}
+            class="pointer-events-auto text-white hover:text-white/80 focus-visible:outline-white"
+          >
+            {@post.metadata.title}
+          </.link>
+        </h3>
+        <p :if={@excerpt && @excerpt != ""} class="line-clamp-2 max-w-3xl text-white/80">
+          {@excerpt}
+        </p>
+        <div class="mt-2 flex items-center justify-between gap-4">
+          <%= if has_publication_date?(@post) do %>
+            <time class="text-xs text-white/70" datetime={@post.metadata.published_at || ""}>
+              {format_post_date(@post, @group_slug, @date_counts)}
+            </time>
+          <% else %>
+            <span></span>
+          <% end %>
+          <.link navigate={@post_url} class="pointer-events-auto btn btn-sm btn-primary">
+            {gettext("Read More →")}
+          </.link>
+        </div>
+      </div>
+    </article>
+    """
+  end
+
+  # Cover panel — full-bleed image with an opaque theme panel for the text:
+  # the a11y-safe cover (contrast comes from the panel, not a scrim, so any
+  # uploaded photo works). No image reads as a normal panel on bg-base-200.
+  defp band_cover_panel(assigns) do
+    ~H"""
+    <article
+      class={[
+        "relative flex items-end overflow-hidden rounded-2xl bg-base-200 shadow-lg ring-1",
+        @animations && "transition hover:shadow-xl motion-safe:hover:-translate-y-1",
+        band_ring_class(@band),
+        band_minh_class(@layout)
+      ]}
+      data-post-date={effective_post_date(@post)}
+    >
+      <%!-- No scrim — this style's contrast comes from the opaque panel. --%>
+      <.band_cover_media img={@img} post_url={@post_url} image_links={@image_links} scrim={false} />
+      <%!-- Wrapper falls through to the stretched link; the opaque panel
+        itself keeps normal pointer behavior. --%>
+      <div class={["relative z-10 w-full p-5 lg:p-8", @image_links && "pointer-events-none"]}>
+        <div class="pointer-events-auto flex max-w-xl flex-col gap-2 rounded-2xl bg-base-100/95 p-6 shadow-xl">
+          <.band_badge band={@band} />
+          <h3 class="text-2xl font-bold">
+            <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
+          </h3>
+          <p :if={@excerpt && @excerpt != ""} class="line-clamp-2 text-base-content/70">
+            {@excerpt}
+          </p>
+          <.band_card_footer post={@post} group_slug={@group_slug} date_counts={@date_counts} post_url={@post_url} />
+        </div>
+      </div>
+    </article>
+    """
+  end
+
+  # Minimal — typography-first editorial band; the image is deliberately
+  # ignored, so it doubles as the canonical no-image look.
+  defp band_minimal(assigns) do
+    ~H"""
+    <article
+      class={[
+        "rounded-e-2xl border-s-4 bg-base-100 shadow-sm",
+        @animations && "transition hover:shadow-md motion-safe:hover:-translate-y-1",
+        (@band == :featured && "border-primary") || "border-secondary",
+        (@layout == "card" && "px-5 py-6") || "px-6 py-8 lg:px-10"
+      ]}
+      data-post-date={effective_post_date(@post)}
+    >
+      <div class="flex flex-col gap-2">
+        <.band_badge band={@band} />
+        <h3 class="text-2xl font-bold tracking-tight lg:text-3xl">
+          <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
+        </h3>
+        <p :if={@excerpt && @excerpt != ""} class="line-clamp-3 max-w-2xl text-base-content/70">
+          {@excerpt}
+        </p>
+        <.band_card_footer post={@post} group_slug={@group_slug} date_counts={@date_counts} post_url={@post_url} />
+      </div>
+    </article>
+    """
+  end
+
+  # Top — a wide 16:9 image banner stacked above the text, even at hero
+  # width. The one style that gets native lazy-loading for free; no image
+  # simply drops the banner.
+  defp band_top(assigns) do
+    ~H"""
+    <article
+      class={[
+        "card overflow-hidden bg-base-200 shadow-lg ring-1",
+        @animations && "transition hover:shadow-xl motion-safe:hover:-translate-y-1",
+        band_ring_class(@band)
+      ]}
+      data-post-date={effective_post_date(@post)}
+    >
+      <figure :if={@img} class="aspect-video w-full overflow-hidden bg-base-300">
+        <%= if @image_links do %>
+          <.link navigate={@post_url} class="block h-full w-full" tabindex="-1" aria-hidden="true">
+            <img
+              src={@img}
+              alt={@post.metadata.title || gettext("Featured image")}
+              class={[
+                "h-full w-full object-cover",
+                @animations && "transition-opacity hover:opacity-90"
+              ]}
+              loading="lazy"
+            />
+          </.link>
+        <% else %>
+          <img
+            src={@img}
+            alt={@post.metadata.title || gettext("Featured image")}
+            class="h-full w-full object-cover"
+            loading="lazy"
+          />
+        <% end %>
+      </figure>
+      <div class="card-body">
+        <.band_badge band={@band} />
+        <h3 class="card-title text-2xl">
+          <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
+        </h3>
+        <p :if={@excerpt && @excerpt != ""} class="text-base line-clamp-3 text-base-content/70">
+          {@excerpt}
+        </p>
+        <.band_card_footer post={@post} group_slug={@group_slug} date_counts={@date_counts} post_url={@post_url} />
+      </div>
+    </article>
+    """
+  end
+
+  attr :band, :atom, required: true, values: [:featured, :newest]
+
+  defp band_badge(assigns) do
+    ~H"""
+    <span :if={@band == :featured} class="badge badge-primary badge-sm w-fit gap-1">
+      ★ {gettext("Featured")}
+    </span>
+    <span :if={@band == :newest} class="badge badge-secondary badge-sm w-fit gap-1">
+      ✦ {gettext("Latest")}
+    </span>
+    """
+  end
+
+  # Date + Read More row shared by the theme-surface band styles (cover has
+  # its own light-text variant inline).
+  attr :post, :map, required: true
+  attr :group_slug, :string, required: true
+  attr :date_counts, :map, required: true
+  attr :post_url, :string, required: true
+
+  defp band_card_footer(assigns) do
+    ~H"""
+    <div class="mt-2 flex items-center justify-between gap-4">
+      <%= if has_publication_date?(@post) do %>
+        <time class="text-xs text-base-content/60" datetime={@post.metadata.published_at || ""}>
+          {format_post_date(@post, @group_slug, @date_counts)}
+        </time>
+      <% else %>
+        <span class="text-xs text-base-content/60"></span>
+      <% end %>
+      <.link navigate={@post_url} class="btn btn-sm btn-primary">
+        {gettext("Read More →")}
+      </.link>
+    </div>
+    """
+  end
+
   # An explicit description wins; otherwise derive an excerpt from the content.
   defp post_card_excerpt(post) do
     if desc = Map.get(post.metadata, :description) do
@@ -987,16 +1330,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       <.reading_headings enabled={assigns[:scroll_headings_enabled] || false} />
       <article class={["post-container mx-auto px-6 py-8", post_width_class(assigns[:post_width])]}>
         <%!-- Top back link (gated on the group's show_top_back_link setting,
-          default on) — the footer has the full button; this is its subtle twin
-          so a reader who lands mid-archive can leave without scrolling. --%>
-        <nav :if={assigns[:show_top_back_link] != false} class="mb-6">
+          default on) — a compact muted twin of the footer link, hugging the
+          title so it doesn't cost the page a band of empty space. --%>
+        <nav :if={assigns[:show_top_back_link] != false} class="mb-1">
+          <%!-- Visible text is just the group name (boss call) — the arrow
+            carries the "back" meaning visually; aria-label keeps it explicit
+            for screen readers. --%>
           <.link
             navigate={group_listing_path(@current_language, @group_slug)}
-            class="inline-flex items-center gap-1.5 text-sm text-base-content/60 hover:text-primary transition-colors"
+            class="inline-flex items-center gap-1 text-xs text-base-content/50 hover:text-primary transition-colors"
+            aria-label={gettext("Back to %{group}", group: @group_name)}
           >
-            <.icon name="hero-arrow-left" class="w-3.5 h-3.5" /> {gettext("Back to %{group}",
-              group: @group_name
-            )}
+            <.icon name="hero-arrow-left" class="w-3 h-3" /> {@group_name}
           </.link>
         </nav>
         <%!-- Breadcrumb Navigation (gated on the group's show_breadcrumbs setting) --%>
@@ -1053,10 +1398,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           <div :if={assigns[:show_reading_time]} class="text-sm text-base-content/60 mt-2">
             {reading_time_label(@html_content)}
           </div>
-          <div class="flex flex-wrap items-center gap-4 mt-4">
+          <%!-- Toolbar row renders only when at least one tool does — an empty
+            flex row still costs its mt-4, leaving an awkward gap under the
+            title on single-language public views with no admin session. --%>
+          <% show_switcher? = assigns[:show_language_switcher] != false and length(@translations) > 1 %>
+          <div
+            :if={show_switcher? || assigns[:admin_edit_url] || @version_dropdown}
+            class="flex flex-wrap items-center gap-4 mt-4"
+          >
             <%!-- Language Switcher (gated on `publishing_show_language_switcher` —
               disable when the host renders its own switcher in the layout). --%>
-            <%= if assigns[:show_language_switcher] != false and length(@translations) > 1 do %>
+            <%= if show_switcher? do %>
               <.language_switcher
                 languages={build_public_translations(@translations, @current_language)}
                 current_language={public_current_language(@translations, @current_language)}
@@ -1124,15 +1476,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <div class="markdown-content max-w-none">
           {raw(@html_content)}
         </div>
-        <%!-- Post Footer --%>
-        <footer class="mt-12 pt-6 border-t">
+        <%!-- Post Footer — same compact muted link as the top, no button chrome. --%>
+        <footer class="mt-6 border-t pt-2">
           <.link
             navigate={group_listing_path(@current_language, @group_slug)}
-            class="btn btn-ghost btn-sm"
+            class="inline-flex items-center gap-1 text-xs text-base-content/50 hover:text-primary transition-colors"
+            aria-label={gettext("Back to %{group}", group: @group_name)}
           >
-            <.icon name="hero-arrow-left" class="w-4 h-4 mr-2" /> {gettext("Back to %{group}",
-              group: @group_name
-            )}
+            <.icon name="hero-arrow-left" class="w-3 h-3" /> {@group_name}
           </.link>
         </footer>
       </article>
@@ -1232,22 +1583,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
   # Gets the URL slug for a specific language
   # Priority:
-  # 1. Direct url_slug field on post (set by controller for specific language)
-  # 2. language_slugs map (from cache, contains all languages)
+  # 1. language_slugs map (from cache/mapper — the per-language slugs) when
+  #    the requested language resolves to one of its keys
+  # 2. Direct url_slug field on post (set by controller for specific language)
   # 3. metadata.url_slug (from content record, current language only)
   # 4. post.slug (post slug fallback)
+  #
+  # The per-language map MUST outrank the top-level :url_slug: listing maps
+  # (Mapper.to_listing_map/5) always fill :url_slug with the PRIMARY
+  # language's slug, so checking it first made a custom slug set in any other
+  # language unreachable from listing links — cards on /de/... linked the
+  # primary slug. When the language does NOT resolve (post has no content in
+  # it), the old chain applies unchanged.
   defp get_url_slug_for_language(post, language) do
+    language_slugs = Map.get(post, :language_slugs) || %{}
+
+    resolved_key =
+      if map_size(language_slugs) > 0 do
+        LanguageHelpers.resolve_language_key(language, Map.keys(language_slugs))
+      end
+
     cond do
-      # Direct url_slug on post (highest priority, set by controller)
+      # Per-language slug for the requested (resolved) language
+      resolved_key != nil and Map.get(language_slugs, resolved_key) not in [nil, ""] ->
+        Map.get(language_slugs, resolved_key)
+
+      # Direct url_slug on post (set by controller)
       Map.get(post, :url_slug) not in [nil, ""] ->
         post.url_slug
-
-      # language_slugs map from cache
-      map_size(Map.get(post, :language_slugs, %{})) > 0 ->
-        resolved_key =
-          LanguageHelpers.resolve_language_key(language, Map.keys(post.language_slugs))
-
-        Map.get(post.language_slugs, resolved_key, post.slug)
 
       # metadata.url_slug
       is_map(Map.get(post, :metadata)) and Map.get(post.metadata, :url_slug) not in [nil, ""] ->

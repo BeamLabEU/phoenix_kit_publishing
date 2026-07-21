@@ -1030,29 +1030,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
           </p>
         </div>
       <% end %>
+      <:actions>
+        <button
+          type="button"
+          class="btn btn-outline btn-sm shadow-none"
+          phx-click="refresh"
+          phx-disable-with={gettext("Refreshing…")}
+        >
+          <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" /> {gettext("Refresh")}
+        </button>
+        <.link
+          navigate={Routes.path("/admin/publishing/edit-group/#{group_slug}")}
+          class="btn btn-outline btn-sm shadow-none"
+        >
+          <.icon name="hero-cog-6-tooth" class="w-4 h-4 mr-1" /> {gettext("Settings")}
+        </.link>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          phx-click="create_post"
+          phx-disable-with={gettext("Creating…")}
+        >
+          <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Create Post")}
+        </button>
+      </:actions>
     </.admin_page_header>
 
     <div class="space-y-4">
       <div class="flex-1">
-        <div class="flex flex-wrap gap-2 items-center justify-end mb-2">
-          <button
-            type="button"
-            class="btn btn-outline btn-sm shadow-none"
-            phx-click="refresh"
-            phx-disable-with={gettext("Refreshing…")}
-          >
-            <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" /> {gettext("Refresh")}
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            phx-click="create_post"
-            phx-disable-with={gettext("Creating…")}
-          >
-            <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Create Post")}
-          </button>
-        </div>
-
         <%!-- Status Tabs — only show tabs that have posts, hide if only 1 tab --%>
         <% all_tabs = [
           {"published", gettext("Published"), nil},

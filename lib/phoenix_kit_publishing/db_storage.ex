@@ -1052,6 +1052,19 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         {post_uuid, Enum.find(versions, fn v -> v.status == "published" end)}
       end)
 
+    # The post-level status must reflect what's LIVE, not the newest revision:
+    # a published post with newer draft edits maps its latest (draft) version
+    # for editing context, but it is still a published post — the same
+    # active-version rule the public listing applies (list_posts_for_listing).
+    # Without this the admin files a live post under the Draft tab while the
+    # public keeps rendering it.
+    live_by_post =
+      Map.new(posts, fn post ->
+        versions = Map.get(all_versions_by_post, post.uuid, [])
+        active = find_active_version(versions, Map.get(post, :active_version_uuid))
+        {post.uuid, if(active != nil and active.status == "published", do: active)}
+      end)
+
     # Collect all version UUIDs we need contents for (latest + published if different)
     version_uuids_needed =
       Enum.flat_map(posts, fn post ->
@@ -1070,13 +1083,21 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     Enum.map(posts, fn post ->
       all_versions = Map.get(all_versions_by_post, post.uuid, [])
       version = latest_by_post[post.uuid]
+      live = live_by_post[post.uuid]
 
       build_post_or_listing_map(
         post,
         all_versions,
         version,
         all_contents_by_version,
-        published_by_post
+        published_by_post,
+        # The live (active, published) version drives both the post-level
+        # status AND the visible publish date — the mapped latest revision
+        # of a live post is a draft with a nil published_at.
+        if(live,
+          do: [effective_status: "published", effective_published_at: live.published_at],
+          else: []
+        )
       )
     end)
   end
@@ -1129,24 +1150,35 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   # Private Helpers
   # ===========================================================================
 
-  defp build_post_or_listing_map(post, all_versions, nil, _all_contents, _published_by_post) do
+  defp build_post_or_listing_map(
+         post,
+         all_versions,
+         nil,
+         _all_contents,
+         _published_by_post,
+         _opts
+       ) do
     Mapper.to_listing_map(post, nil, [], all_versions)
   end
 
-  defp build_post_or_listing_map(post, all_versions, version, all_contents, published_by_post) do
+  defp build_post_or_listing_map(
+         post,
+         all_versions,
+         version,
+         all_contents,
+         published_by_post,
+         effective_opts
+       ) do
     contents = Map.get(all_contents, version.uuid, [])
     published_version = published_by_post[post.uuid]
     published_statuses = build_published_statuses(published_version, version, all_contents)
     primary_content = resolve_content(contents, nil)
+    opts = [published_language_statuses: published_statuses] ++ effective_opts
 
     if primary_content do
-      Mapper.to_post_map(post, version, primary_content, contents, all_versions,
-        published_language_statuses: published_statuses
-      )
+      Mapper.to_post_map(post, version, primary_content, contents, all_versions, opts)
     else
-      Mapper.to_listing_map(post, version, contents, all_versions,
-        published_language_statuses: published_statuses
-      )
+      Mapper.to_listing_map(post, version, contents, all_versions, opts)
     end
   end
 

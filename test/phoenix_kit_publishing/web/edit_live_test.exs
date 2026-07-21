@@ -99,6 +99,65 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     assert match?({:error, {:live_redirect, _}}, result) or is_binary(result)
   end
 
+  test "plain Save persists and stays on the settings page", %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    html =
+      view
+      |> form("#group-edit-form", group: %{"name" => "Stayed Name", "slug" => group["slug"]})
+      |> render_submit()
+
+    # No redirect — the form re-renders in place with the success flash and
+    # the persisted value.
+    assert is_binary(html)
+    assert html =~ "Group updated"
+    assert html =~ "Stayed Name"
+    {:ok, persisted} = Groups.get_group(group["slug"])
+    assert persisted["name"] == "Stayed Name"
+  end
+
+  test "Save and exit navigates to the group page", %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    result =
+      view
+      |> form("#group-edit-form", group: %{"name" => "Exited Name", "slug" => group["slug"]})
+      |> render_submit(%{"exit" => "true"})
+
+    assert {:error, {:live_redirect, %{to: to}}} = result
+    assert to =~ "/admin/publishing/#{group["slug"]}"
+    {:ok, persisted} = Groups.get_group(group["slug"])
+    assert persisted["name"] == "Exited Name"
+  end
+
+  test "plain Save after a slug change remounts the editor at the new address", %{
+    conn: conn,
+    group: group
+  } do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    new_slug = group["slug"] <> "-moved"
+
+    result =
+      view
+      |> form("#group-edit-form", group: %{"name" => group["name"], "slug" => new_slug})
+      |> render_submit()
+
+    # Staying on a URL that embeds the old slug would 404 on reload — the LV
+    # remounts the editor at the renamed group's settings page instead.
+    assert {:error, {:live_redirect, %{to: to}}} = result
+    assert to =~ "/admin/publishing/edit-group/#{new_slug}"
+  end
+
   test "cancel event navigates back to the publishing index",
        %{conn: conn, group: group} do
     {:ok, view, _html} =

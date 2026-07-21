@@ -4,6 +4,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   """
   use PhoenixKitWeb, :live_view
   use Gettext, backend: PhoenixKitPublishing.Gettext
+  # Injects the six ai_* handle_event delegates + the {:ai_translation, …}
+  # handle_info as composing lifecycle hooks (see the Embed moduledoc).
+  use PhoenixKitAI.Components.AITranslate.Embed
+
+  import PhoenixKitAI.Components.AITranslate,
+    only: [
+      ai_translate_button: 1,
+      ai_translate_hint: 1,
+      ai_translate_modal: 1,
+      ai_translate_progress: 1
+    ]
 
   import PhoenixKitWeb.Components.MultilangForm,
     only: [
@@ -21,6 +32,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
+  alias PhoenixKitAI.Components.AITranslate.FormGlue
 
   @impl true
   def mount(%{"group" => group_slug} = _params, _session, socket) do
@@ -44,8 +56,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          )
          |> assign(:group, group)
          |> assign(:form, form)
-         |> mount_multilang()}
+         |> mount_multilang()
+         |> FormGlue.assign_ai_translation(
+           "publishing_group",
+           # The glue only reads .uuid; a minimal struct satisfies its
+           # struct-typed contract without a second group fetch.
+           %Publishing.PublishingGroup{uuid: group["uuid"]},
+           PhoenixKitPublishing.GroupAITranslateBinding
+         )}
     end
+  end
+
+  # The AITranslate.Embed hook re-syncs the form after a translation merges.
+  # This form is a plain params map behind `to_form(as: :group)` (no Ecto
+  # changeset), so override the default changeset-shaped re-assign.
+  def ai_translate_assign_form(socket, params) when is_map(params) do
+    Component.assign(socket, :form, Component.to_form(params, as: :group))
   end
 
   @impl true
@@ -56,15 +82,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, assign(socket, :form, Component.to_form(params, as: :group))}
   end
 
-  # Language tab switch from <.multilang_tabs>. handle_switch_language/2 debounces
+  # Language tab switch from the tabs component. handle_switch_language/2 debounces
   # and, via the hook mount_multilang/1 attached, flips :current_lang — which
   # re-renders the name inputs so the active language's field is shown.
   def handle_event("switch_language", %{"lang" => lang_code}, socket) do
     {:noreply, handle_switch_language(socket, lang_code)}
   end
 
-  def handle_event("save", %{"group" => params}, socket) do
-    case Publishing.update_group(socket.assigns.group["slug"], params,
+  def handle_event("save", %{"group" => params} = all_params, socket) do
+    # The "Save and exit" submit button rides `name="exit" value="true"` into
+    # the params (entities-form pattern); the plain Save button omits it.
+    exit? = all_params["exit"] == "true"
+    previous_slug = socket.assigns.group["slug"]
+
+    case Publishing.update_group(previous_slug, params,
            actor_uuid: Shared.actor_uuid_from_socket(socket)
          ) do
       {:ok, updated_group} ->
@@ -73,12 +104,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
         # made every subscriber refresh twice per save.
         updated_form = Component.to_form(group_form_params(updated_group), as: :group)
 
-        {:noreply,
-         socket
-         |> assign(:group, updated_group)
-         |> assign(:form, updated_form)
-         |> put_flash(:info, gettext("Group updated"))
-         |> push_navigate(to: Routes.path("/admin/publishing/#{updated_group["slug"]}"))}
+        socket =
+          socket
+          |> assign(:group, updated_group)
+          |> assign(:form, updated_form)
+          |> put_flash(:info, gettext("Group updated"))
+
+        cond do
+          exit? ->
+            {:noreply,
+             push_navigate(socket, to: Routes.path("/admin/publishing/#{updated_group["slug"]}"))}
+
+          updated_group["slug"] != previous_slug ->
+            # Staying, but this page's URL embeds the (now old) slug — remount
+            # the editor at its new address so a reload doesn't 404.
+            {:noreply,
+             push_navigate(socket,
+               to: Routes.path("/admin/publishing/edit-group/#{updated_group["slug"]}")
+             )}
+
+          true ->
+            {:noreply, socket}
+        end
 
       {:error, :invalid_name} ->
         {:noreply,
@@ -137,6 +184,59 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, socket}
   end
 
+  # Forward-compat dodge (the document_creator/projects `function_exported?`
+  # pattern): `ai_multilang_tabs/1` ships in the NEXT phoenix_kit_ai release —
+  # the published 0.16.0 this module's `~> 0.4` pin can resolve does not have
+  # it, and importing a missing function is a hard compile error for Hex
+  # consumers. Until the floor includes the release, dispatch at runtime and
+  # fall back to the identical hand-placed layout built from components that
+  # DO exist in 0.16.0.
+  #
+  # Cleanup at floor-bump (tracked in AGENTS.md): when mix.exs raises the
+  # phoenix_kit_ai floor past the release that ships ai_multilang_tabs, delete
+  # ai_tabs/1 + ai_tabs_fallback/1 and call <.ai_multilang_tabs> directly
+  # (import it in `only:`). The dynamic-module call keeps the compiler from
+  # warning about the function's absence in the published 0.16.0.
+  defp ai_tabs(assigns) do
+    mod = PhoenixKitAI.Components.AITranslate
+
+    if Code.ensure_loaded?(mod) and function_exported?(mod, :ai_multilang_tabs, 1) do
+      # apply/3, not a direct call — the compiler would warn (and
+      # warnings-as-errors fail) on the function's absence in the published
+      # phoenix_kit_ai 0.16.0. Same shape as the document_creator/projects
+      # forward-compat dodges.
+      # credo:disable-for-next-line Credo.Check.Refactor.Apply
+      apply(mod, :ai_multilang_tabs, [assigns])
+    else
+      ai_tabs_fallback(assigns)
+    end
+  end
+
+  # Mirrors ai_multilang_tabs' anatomy 1:1 (tabs + button/progress/hint row
+  # gated on the tabs' own visibility condition) so both dispatch paths render
+  # identically.
+  defp ai_tabs_fallback(assigns) do
+    ~H"""
+    <.multilang_tabs
+      multilang_enabled={@multilang_enabled}
+      language_tabs={@language_tabs}
+      current_lang={@current_lang}
+      class={@class}
+    />
+    <div
+      :if={
+        @ai_translate[:enabled] == true and @multilang_enabled and
+          match?([_, _ | _], @language_tabs)
+      }
+      class={@ai_row_class}
+    >
+      <.ai_translate_button ai_translate={@ai_translate} />
+      <.ai_translate_progress ai_translate={@ai_translate} />
+      <.ai_translate_hint ai_translate={@ai_translate} />
+    </div>
+    """
+  end
+
   defp find_group(slug) do
     Publishing.list_groups()
     |> Enum.find(&(&1["slug"] == slug))
@@ -157,10 +257,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "show_tags" => group["show_tags"],
       "featured_enabled" => group["featured_enabled"],
       "featured_layout" => group["featured_layout"],
+      "featured_style" => group["featured_style"],
       "newest_enabled" => group["newest_enabled"],
       "newest_layout" => group["newest_layout"],
+      "newest_style" => group["newest_style"],
       "show_top_back_link" => group["show_top_back_link"],
       "listing_image_links" => group["listing_image_links"],
+      "listing_animations" => group["listing_animations"],
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
       "scroll_headings_enabled" => group["scroll_headings_enabled"],
@@ -210,6 +313,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   # Same vocabulary for the latest-post <select> — values must match
   # Publishing.Constants.newest_layouts/0, which mirrors featured_layouts/0.
   defp newest_layout_options, do: featured_layout_options()
+
+  # Label/value pairs for the band-style <select>s (Featured + Latest share
+  # the vocabulary). Values must match Publishing.Constants.band_styles/0.
+  defp band_style_options do
+    [
+      {gettext("Classic — image beside or above the text"), "classic"},
+      {gettext("Cover — the image is the background, text overlaid"), "cover"},
+      {gettext("Cover panel — background image with a solid text panel"), "cover_panel"},
+      {gettext("Minimal — text only, no image"), "minimal"},
+      {gettext("Top image — a wide image banner above the text"), "top"}
+    ]
+  end
 
   # Label/value pairs for the listing-sort <select>. Values must match
   # Publishing.Constants.listing_sorts/0.
@@ -283,12 +398,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
               <div class={
                 @show_multilang_tabs && "rounded-lg border border-base-200 bg-base-200/40 p-4"
               }>
-                <.multilang_tabs
+                <%!-- Bundled tabs + AI-translate row (canonical placement:
+                  a compact row tucked under the tabs). Rendered through a
+                  forward-compat dodge — see ai_tabs/1. --%>
+                <.ai_tabs
                   :if={@show_multilang_tabs}
                   multilang_enabled={@multilang_enabled}
                   language_tabs={@language_tabs}
                   current_lang={@current_lang}
-                  class="pb-3"
+                  class=""
+                  ai_row_class="flex items-center gap-3 -mt-3"
+                  ai_translate={FormGlue.ai_translate_config(assigns)}
                 />
 
                 <.multilang_fields_wrapper
@@ -410,11 +530,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   </:description>
                 </.checkbox>
 
-                <div :if={checked?(@form[:featured_enabled].value)} class="pl-8">
+                <div :if={checked?(@form[:featured_enabled].value)} class="pl-8 space-y-4">
                   <.select
                     field={@form[:featured_layout]}
                     label={gettext("Featured layout")}
                     options={featured_layout_options()}
+                  />
+                  <.select
+                    field={@form[:featured_style]}
+                    label={gettext("Featured style")}
+                    options={band_style_options()}
                   />
                 </div>
 
@@ -427,11 +552,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   </:description>
                 </.checkbox>
 
-                <div :if={checked?(@form[:newest_enabled].value)} class="pl-8">
+                <div :if={checked?(@form[:newest_enabled].value)} class="pl-8 space-y-4">
                   <.select
                     field={@form[:newest_layout]}
                     label={gettext("Latest layout")}
                     options={newest_layout_options()}
+                  />
+                  <.select
+                    field={@form[:newest_style]}
+                    label={gettext("Latest style")}
+                    options={band_style_options()}
                   />
                 </div>
 
@@ -439,6 +569,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   {gettext("Clickable card images")}
                   <:description>
                     {gettext("A post card's image clicks through to the post, same as the title.")}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:listing_animations]}>
+                  {gettext("Card hover animations")}
+                  <:description>
+                    {gettext("Cards lift slightly on hover as a click cue.")}
                   </:description>
                 </.checkbox>
 
@@ -558,18 +695,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
               </div>
 
               <div class="flex flex-wrap gap-3 justify-end">
+                <%!-- Two submits, entities-form pattern: the exit button rides a
+                  name/value pair into the params; plain Save stays on the page. --%>
                 <button
                   type="submit"
+                  class="btn btn-primary btn-outline btn-sm"
+                  phx-disable-with={gettext("Saving…")}
+                >
+                  <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save")}
+                </button>
+                <button
+                  type="submit"
+                  name="exit"
+                  value="true"
                   class="btn btn-primary btn-sm"
                   phx-disable-with={gettext("Saving…")}
                 >
-                  <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save Changes")}
+                  <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save and exit")}
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel">
                   <.icon name="hero-x-mark" class="w-4 h-4 mr-1" /> {gettext("Cancel")}
                 </button>
               </div>
             </.form>
+            <%!-- Outside the group form — the modal carries its own selector
+              <form>s and HTML forbids nesting them. --%>
+            <.ai_translate_modal ai_translate={FormGlue.ai_translate_config(assigns)} />
           </div>
         </div>
       </div>

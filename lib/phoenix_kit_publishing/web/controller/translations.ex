@@ -131,7 +131,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
       # Get the URL slug for this specific language
       # This enables SEO-friendly localized URLs (e.g., /es/docs/primeros-pasos)
       url_slug_for_lang = Map.get(language_slugs, lang, post.slug)
-      post_with_url_slug = Map.put(post, :url_slug, url_slug_for_lang)
+
+      # Pin BOTH the direct slug and the per-language map to this exact
+      # language: build_post_url consults :language_slugs first, and letting
+      # it base-resolve display_code over the FULL map could pick a sibling
+      # or legacy dialect's slug (map-order dependent) instead of the exact
+      # value looked up above.
+      post_with_url_slug =
+        post
+        |> Map.put(:url_slug, url_slug_for_lang)
+        |> Map.put(:language_slugs, %{lang => url_slug_for_lang})
 
       # Build URL with version if viewing a specific version
       url =

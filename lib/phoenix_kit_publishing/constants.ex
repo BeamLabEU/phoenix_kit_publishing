@@ -94,6 +94,27 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   def default_newest_layout, do: @default_newest_layout
 
   # ---------------------------------------------------------------------------
+  # Band styles (shared vocabulary for the Featured and Latest bands)
+  # ---------------------------------------------------------------------------
+
+  @band_styles ["classic", "cover", "cover_panel", "minimal", "top"]
+  @default_band_style "classic"
+
+  @doc ~S"""
+  Valid band styles for the Featured/Latest bands — the PAINT of a band card,
+  orthogonal to its layout (which stays size/placement: hero band vs card in
+  grid): "classic" (image beside/above the text — the original variants),
+  "cover" (the featured image is the card's background, text overlaid on a
+  gradient scrim), "cover_panel" (background image with an opaque text panel),
+  "minimal" (text-only editorial band, image ignored), "top" (16:9 image
+  banner stacked above the text).
+  """
+  def band_styles, do: @band_styles
+
+  @doc ~S|Default band style ("classic" — the pre-styles rendering, unchanged).|
+  def default_band_style, do: @default_band_style
+
+  # ---------------------------------------------------------------------------
   # Scroll navigation (per-group public-side config)
   # ---------------------------------------------------------------------------
 
