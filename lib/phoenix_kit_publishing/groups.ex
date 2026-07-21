@@ -666,8 +666,18 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     end
   end
 
-  defp db_group_to_map(%{name: name, slug: slug, mode: mode, status: status, data: data}) do
+  defp db_group_to_map(%{
+         uuid: uuid,
+         name: name,
+         slug: slug,
+         mode: mode,
+         status: status,
+         data: data
+       }) do
     %{
+      # Row identity — needed by uuid-keyed consumers (the AI-translation
+      # pipeline validates resource_uuid as a real UUID; slugs can be renamed).
+      "uuid" => uuid,
       "name" => name,
       "slug" => slug,
       "mode" => mode || @default_group_mode,

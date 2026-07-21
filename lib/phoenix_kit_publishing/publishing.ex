@@ -234,7 +234,11 @@ defmodule PhoenixKit.Modules.Publishing do
 
   @spec ai_translatables() :: [{String.t(), module()}]
   def ai_translatables do
-    [{PhoenixKitPublishing.AITranslatable.resource_type(), PhoenixKitPublishing.AITranslatable}]
+    [
+      {PhoenixKitPublishing.AITranslatable.resource_type(), PhoenixKitPublishing.AITranslatable},
+      {PhoenixKitPublishing.GroupAITranslatable.resource_type(),
+       PhoenixKitPublishing.GroupAITranslatable}
+    ]
   end
 
   @impl PhoenixKit.Module

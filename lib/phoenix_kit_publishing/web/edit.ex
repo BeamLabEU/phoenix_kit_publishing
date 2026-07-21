@@ -4,6 +4,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   """
   use PhoenixKitWeb, :live_view
   use Gettext, backend: PhoenixKitPublishing.Gettext
+  # Injects the six ai_* handle_event delegates + the {:ai_translation, …}
+  # handle_info as composing lifecycle hooks (see the Embed moduledoc).
+  use PhoenixKitAI.Components.AITranslate.Embed
+
+  import PhoenixKitAI.Components.AITranslate,
+    only: [
+      ai_translate_button: 1,
+      ai_translate_modal: 1,
+      ai_translate_progress: 1,
+      ai_translate_hint: 1
+    ]
 
   import PhoenixKitWeb.Components.MultilangForm,
     only: [
@@ -21,6 +32,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
+  alias PhoenixKitAI.Components.AITranslate.FormGlue
 
   @impl true
   def mount(%{"group" => group_slug} = _params, _session, socket) do
@@ -44,8 +56,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          )
          |> assign(:group, group)
          |> assign(:form, form)
-         |> mount_multilang()}
+         |> mount_multilang()
+         |> FormGlue.assign_ai_translation(
+           "publishing_group",
+           # The glue only reads .uuid; a minimal struct satisfies its
+           # struct-typed contract without a second group fetch.
+           %Publishing.PublishingGroup{uuid: group["uuid"]},
+           PhoenixKitPublishing.GroupAITranslateBinding
+         )}
     end
+  end
+
+  # The AITranslate.Embed hook re-syncs the form after a translation merges.
+  # This form is a plain params map behind `to_form(as: :group)` (no Ecto
+  # changeset), so override the default changeset-shaped re-assign.
+  def ai_translate_assign_form(socket, params) when is_map(params) do
+    Component.assign(socket, :form, Component.to_form(params, as: :group))
   end
 
   @impl true
@@ -319,13 +345,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
               <div class={
                 @show_multilang_tabs && "rounded-lg border border-base-200 bg-base-200/40 p-4"
               }>
-                <.multilang_tabs
-                  :if={@show_multilang_tabs}
-                  multilang_enabled={@multilang_enabled}
-                  language_tabs={@language_tabs}
-                  current_lang={@current_lang}
-                  class="pb-3"
-                />
+                <div :if={@show_multilang_tabs} class="flex flex-wrap items-center gap-2">
+                  <.multilang_tabs
+                    multilang_enabled={@multilang_enabled}
+                    language_tabs={@language_tabs}
+                    current_lang={@current_lang}
+                    class="pb-3 grow"
+                  />
+                  <.ai_translate_button ai_translate={FormGlue.ai_translate_config(assigns)} />
+                </div>
+                <div :if={@show_multilang_tabs}>
+                  <.ai_translate_progress ai_translate={FormGlue.ai_translate_config(assigns)} />
+                  <.ai_translate_hint ai_translate={FormGlue.ai_translate_config(assigns)} />
+                </div>
 
                 <.multilang_fields_wrapper
                   multilang_enabled={@multilang_enabled}
@@ -634,6 +666,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                 </button>
               </div>
             </.form>
+            <%!-- Outside the group form — the modal carries its own selector
+              <form>s and HTML forbids nesting them. --%>
+            <.ai_translate_modal ai_translate={FormGlue.ai_translate_config(assigns)} />
           </div>
         </div>
       </div>
