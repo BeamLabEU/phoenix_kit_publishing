@@ -139,6 +139,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RichFixturesTest do
          %{conn: conn, group_slug: group_slug} do
       conn = get(conn, "/de/#{group_slug}/hallo-welt")
       assert conn.status in [200, 301, 302]
+
+      # A redirect must stay on the custom slug (canonicalizing the locale is
+      # fine); rendering must be the actual post. Either way the slug holds.
+      if conn.status in [301, 302] do
+        assert redirected_to(conn, conn.status) =~ "hallo-welt"
+      else
+        # The DE translation's content is blank in this fixture — assert the
+        # rendered page's canonical URL keeps the custom slug instead.
+        assert html_response(conn, 200) =~ "/de/#{group_slug}/hallo-welt"
+      end
     end
 
     test "the English listing still uses the internal slug",

@@ -258,7 +258,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   defp split_newest([], true), do: {[], []}
 
   defp split_newest(posts, true) do
-    newest = Enum.max_by(posts, &listing_sort_key/1)
+    # uuid tie-break: same-second effective dates would otherwise pin
+    # whichever post enumerates first in the current sort order, so a sort
+    # toggle or cache regen could swap the Latest band between ties.
+    newest = Enum.max_by(posts, &{listing_sort_key(&1), &1[:uuid] || ""})
     # List.delete removes by structural equality — safe because post maps
     # carry distinct uuids, so two entries can never be structurally equal.
     {[newest], List.delete(posts, newest)}

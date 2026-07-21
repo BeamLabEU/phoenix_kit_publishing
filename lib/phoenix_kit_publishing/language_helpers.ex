@@ -416,12 +416,21 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
     content_exists = lang_code in available
     post_status = post[:metadata] && post.metadata.status
 
+    # Per-language accuracy beats the post-level status: a live post with a
+    # newer draft revision classifies "published" post-level (the effective
+    # rule), but a language that exists ONLY in the draft is not public yet —
+    # its pill must say draft, not inherit the post's published. The
+    # language_statuses map already carries the version-accurate value with
+    # the published overlay merged; post_status is the fallback for DB-shaped
+    # maps that lack it.
+    lang_status = get_in(post, [:language_statuses, lang_code]) || post_status
+
     %{
       code: lang_code,
       display_code: get_display_code(lang_code, enabled_languages),
       name: if(lang_info, do: lang_info.name, else: lang_code),
       flag: if(lang_info, do: lang_info.flag, else: ""),
-      status: if(content_exists, do: post_status, else: nil),
+      status: if(content_exists, do: lang_status, else: nil),
       exists: content_exists,
       enabled: language_enabled?(lang_code, enabled_languages),
       known: lang_info != nil,

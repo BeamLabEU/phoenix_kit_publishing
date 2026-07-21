@@ -58,6 +58,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     assert listed.metadata.status == "published"
     # The newest revision itself stays an honest draft in the version map.
     assert listed.version_statuses[listed.metadata.version] == "draft"
+    # The visible publish date comes from the LIVE version too — the mapped
+    # draft's published_at is nil, which used to render "Unsaved draft"
+    # beside the Published badge (panel finding A1).
+    assert is_binary(listed.metadata.published_at)
+    # The published overlay keeps the live language accurate in the pill map
+    # (panel finding A2) — key derived from the fixture's actual language.
+    [lang] = listed.available_languages
+    assert listed.language_statuses[lang] == "published"
 
     {:ok, _view, html} =
       conn
