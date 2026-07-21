@@ -63,8 +63,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, handle_switch_language(socket, lang_code)}
   end
 
-  def handle_event("save", %{"group" => params}, socket) do
-    case Publishing.update_group(socket.assigns.group["slug"], params,
+  def handle_event("save", %{"group" => params} = all_params, socket) do
+    # The "Save and exit" submit button rides `name="exit" value="true"` into
+    # the params (entities-form pattern); the plain Save button omits it.
+    exit? = all_params["exit"] == "true"
+    previous_slug = socket.assigns.group["slug"]
+
+    case Publishing.update_group(previous_slug, params,
            actor_uuid: Shared.actor_uuid_from_socket(socket)
          ) do
       {:ok, updated_group} ->
@@ -73,12 +78,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
         # made every subscriber refresh twice per save.
         updated_form = Component.to_form(group_form_params(updated_group), as: :group)
 
-        {:noreply,
-         socket
-         |> assign(:group, updated_group)
-         |> assign(:form, updated_form)
-         |> put_flash(:info, gettext("Group updated"))
-         |> push_navigate(to: Routes.path("/admin/publishing/#{updated_group["slug"]}"))}
+        socket =
+          socket
+          |> assign(:group, updated_group)
+          |> assign(:form, updated_form)
+          |> put_flash(:info, gettext("Group updated"))
+
+        cond do
+          exit? ->
+            {:noreply,
+             push_navigate(socket, to: Routes.path("/admin/publishing/#{updated_group["slug"]}"))}
+
+          updated_group["slug"] != previous_slug ->
+            # Staying, but this page's URL embeds the (now old) slug — remount
+            # the editor at its new address so a reload doesn't 404.
+            {:noreply,
+             push_navigate(socket,
+               to: Routes.path("/admin/publishing/edit-group/#{updated_group["slug"]}")
+             )}
+
+          true ->
+            {:noreply, socket}
+        end
 
       {:error, :invalid_name} ->
         {:noreply,
@@ -558,12 +579,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
               </div>
 
               <div class="flex flex-wrap gap-3 justify-end">
+                <%!-- Two submits, entities-form pattern: the exit button rides a
+                  name/value pair into the params; plain Save stays on the page. --%>
                 <button
                   type="submit"
+                  class="btn btn-primary btn-outline btn-sm"
+                  phx-disable-with={gettext("Saving…")}
+                >
+                  <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save")}
+                </button>
+                <button
+                  type="submit"
+                  name="exit"
+                  value="true"
                   class="btn btn-primary btn-sm"
                   phx-disable-with={gettext("Saving…")}
                 >
-                  <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save Changes")}
+                  <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save and exit")}
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel">
                   <.icon name="hero-x-mark" class="w-4 h-4 mr-1" /> {gettext("Cancel")}
