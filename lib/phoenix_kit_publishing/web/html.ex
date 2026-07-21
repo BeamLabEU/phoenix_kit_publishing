@@ -1050,12 +1050,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10"
       >
       </div>
-      <div class="relative z-10 flex w-full flex-col gap-2 p-6 lg:p-8 text-white">
+      <%!-- Stretched link — the whole background clicks through to the post
+        (same listing_image_links gate as card images). Sits after the scrim
+        and before the z-10 content, so the title/Read More links still win
+        in the text strip. Decorative for a11y: the title link is the route. --%>
+      <.link
+        :if={@image_links}
+        navigate={@post_url}
+        class="pk-band-cover-link absolute inset-0"
+        tabindex="-1"
+        aria-hidden="true"
+      >
+      </.link>
+      <%!-- pointer-events-none + auto on the links: empty space in the text
+        strip falls through to the stretched link, so the WHOLE band is
+        clickable, while the title/Read More links still win on their own
+        pixels. --%>
+      <div class={[
+        "relative z-10 flex w-full flex-col gap-2 p-6 lg:p-8 text-white",
+        @image_links && "pointer-events-none"
+      ]}>
         <.band_badge band={@band} />
         <h3 class={["font-bold", (@layout == "card" && "text-2xl") || "text-2xl lg:text-3xl"]}>
           <.link
             navigate={@post_url}
-            class="text-white hover:text-white/80 focus-visible:outline-white"
+            class="pointer-events-auto text-white hover:text-white/80 focus-visible:outline-white"
           >
             {@post.metadata.title}
           </.link>
@@ -1071,7 +1090,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           <% else %>
             <span></span>
           <% end %>
-          <.link navigate={@post_url} class="btn btn-sm btn-primary">
+          <.link navigate={@post_url} class="pointer-events-auto btn btn-sm btn-primary">
             {gettext("Read More →")}
           </.link>
         </div>
@@ -1101,8 +1120,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         loading="lazy"
         class="absolute inset-0 h-full w-full object-cover"
       />
-      <div class="relative z-10 w-full p-5 lg:p-8">
-        <div class="flex max-w-xl flex-col gap-2 rounded-2xl bg-base-100/95 p-6 shadow-xl">
+      <%!-- Same stretched-link treatment as band_cover — the image area
+        outside the text panel clicks through to the post. --%>
+      <.link
+        :if={@image_links}
+        navigate={@post_url}
+        class="pk-band-cover-link absolute inset-0"
+        tabindex="-1"
+        aria-hidden="true"
+      >
+      </.link>
+      <%!-- Wrapper falls through to the stretched link; the opaque panel
+        itself keeps normal pointer behavior. --%>
+      <div class={["relative z-10 w-full p-5 lg:p-8", @image_links && "pointer-events-none"]}>
+        <div class="pointer-events-auto flex max-w-xl flex-col gap-2 rounded-2xl bg-base-100/95 p-6 shadow-xl">
           <.band_badge band={@band} />
           <h3 class="text-2xl font-bold">
             <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>

@@ -214,6 +214,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
       assert html =~ "from-black/80"
       assert html =~ "from-secondary to-primary"
       assert html =~ "✦"
+      # The whole background clicks through to the post…
+      assert html =~ "pk-band-cover-link"
+
+      # …gated on the same setting as card-image links.
+      set!(slug, %{"listing_image_links" => "false"})
+      refute listing_html(conn, slug) =~ "pk-band-cover-link"
     end
 
     test "featured cover uses the primary-leaning fallback gradient", %{
