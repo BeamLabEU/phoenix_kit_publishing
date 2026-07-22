@@ -447,7 +447,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @impl PhoenixKit.Module
-  def version, do: "0.4.2"
+  def version, do: "0.4.3"
 
   @impl PhoenixKit.Module
   def get_config do

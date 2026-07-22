@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.4.3 - 2026-07-22
+
+PR #36 — sixteen-commit boss-directed batch: a public "Latest" post band,
+four band styles (`classic`/`cover`/`cover_panel`/`minimal`/`top`) for both
+Featured and Latest, hover-lift listing animations, an admin group-page
+header/save overhaul, an admin post-status classification fix, a
+per-language URL slug fix for listing links, and group-name AI translation.
+Two review rounds ran pre-merge (a 4-agent quality sweep, then a 5-AI
+adversarial panel); all confirmed findings were fixed and pinned with tests
+before merge — see
+`dev_docs/pull_requests/2026/36-public-side-batch-and-sweep/FOLLOW_UP.md`
+for the full findings/outcomes table. This release re-verified the key
+fixes against current code and re-ran the full gate before publishing; no
+further changes were needed. Also bumps the `phoenix_kit` dependency pin to
+1.7.208.
+
+### Added
+- **Latest post band** (`newest_enabled`/`newest_layout` group settings) —
+  the chronologically newest post is pulled out of the grid into its own
+  "Latest" band under any Featured band; a post that is both featured and
+  newest stays in Featured, Latest takes the next-newest. Ties on the same
+  effective date break on post UUID for deterministic ordering.
+- **Band styles** (`featured_style`/`newest_style`, default `classic`,
+  orthogonal to layout): `cover` (featured image as the card background
+  under a gradient scrim, branded gradient fallback when no image),
+  `cover_panel` (image with an opaque text panel), `minimal` (text-only
+  accent-border), `top` (16:9 banner above the text).
+- **Listing hover-lift animations** (`listing_animations` group setting,
+  default on, motion-safe).
+- **Group-name AI translation** — a second AI-translatable adapter
+  (`publishing_group`) merges translated names into `data["name_i18n"]`
+  under a row lock, with its own `publishing.group.updated` audit trail.
+- **Admin group page** — header actions moved into the shared
+  `admin_page_header` actions slot with a Settings link to the group
+  editor; Save / Save-and-exit split on the group editor.
+
+### Fixed
+- **Admin post-status classification** — the admin group page now classifies
+  each post by its live (active-version) state, the same rule the public
+  listing uses, instead of the latest version's status; a published post
+  with a newer draft revision no longer misfiles under Drafts. The visible
+  publish date and per-language pills now read the same version-accurate
+  data as the status badge.
+- **Per-language listing links** — group listing links now use the
+  requested language's own custom URL slug instead of the primary
+  language's; the language switcher pins the exact-language slug so
+  base-code resolution can no longer leak a sibling dialect's slug.
+- Public post page: compact name-only back links (`show_top_back_link`,
+  top and bottom), an empty toolbar row no longer renders when there are no
+  tools, and group-wide `date_counts` now disambiguate timestamp URLs
+  correctly on page 2+.
+
 ## 0.4.2 - 2026-07-21
 
 PR #34 — public-side listing polish: a "Latest" post band, a top back-link
