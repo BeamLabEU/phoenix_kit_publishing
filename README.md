@@ -233,6 +233,49 @@ When `publishing_default_language_no_prefix` is enabled, the default-language UR
 - All fallbacks include a flash message explaining the redirect
 - Invalid group slugs fall back to 404 only after exhausting all alternatives
 
+### How Dispatch Works (and how it interacts with host routes)
+
+Public URLs are dynamic — the group slug is a database row, not a compile-time
+literal — so these routes can't be declared normally. Publishing registers its
+catch-all under an internal prefix and overrides the host router's `call/2`
+(`RouterDispatch`): on each `GET`/`HEAD`, if the first non-locale path segment
+matches a known group slug, the path is rewritten to the internal prefix and
+Phoenix matches it there. Otherwise the request passes through untouched.
+
+Two consequences worth knowing:
+
+- **A host route whose first segment equals a group slug will never match.** The
+  rewrite happens in `call/2`, before route matching — declaration order in
+  `router.ex` doesn't help. Only `GET`/`HEAD` are rewritten, so a `POST /blog/...`
+  still reaches the host.
+- **`mix phx.routes` shows these routes under `__phoenix_kit_publishing_dispatch`**,
+  not at their public paths.
+
+### Reserved Route Prefixes
+
+Another PhoenixKit module can claim a top-level segment by implementing
+`PhoenixKit.Module.reserved_route_prefixes/0` (added in `phoenix_kit` 1.7.170):
+
+```elixir
+@impl PhoenixKit.Module
+def reserved_route_prefixes, do: ["shop"]
+```
+
+`RouterDispatch.known_group?/1` consults
+`PhoenixKit.ModuleRegistry.all_reserved_route_prefixes/0` and refuses to claim a
+reserved segment **even when a group with that exact slug exists in publishing's
+own data**. On `phoenix_kit` older than 1.7.170 the callback is absent and nothing
+is reserved.
+
+Reserve a prefix only if your module actually renders that route — a reservation
+removes the path from publishing's dispatch, and if nothing takes over, the result
+is a 404. `phoenix_kit_legal` reserved `"legal"` in its 0.1.6 without shipping a
+renderer and 404'd public legal pages on every host app; it was reverted in 0.1.7,
+and legal pages are once again served here as an ordinary group. If your module
+stores its content as publishing posts, letting publishing render them is usually
+the right call — you inherit languages, translations, canonical/`og:*`/hreflang,
+and the editor for free.
+
 ## Caching
 
 ### Listing Cache
