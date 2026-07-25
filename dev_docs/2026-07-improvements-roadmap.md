@@ -47,6 +47,19 @@ makes sense.)
 - **phoenix_kit_newsletters** — thin seam later; BeamLab-side, keep our half minimal.
 - **dashboards / ai** — no changes needed (we implement `phoenix_kit_widgets/0`; `speak/3` + Translatable patterns already shipped).
 
+## Execution log (2026-07-25 session)
+
+- **Done, committed on fork main** (each gate: precommit clean + full suite + quorum round):
+  - `f640b7b` step 1 — listing_layout (grid/list/minimal) + card-footer mt-auto pin.
+  - `9e5e8eb` step 2 — RSS feeds (/­<group>/feed.xml, Feed module, reserved segment), JSON-LD Article, prev/next nav (show_prev_next), settings toggles.
+  - `d8afe84` step 3 — public search (?q=, search_enabled, DBStorage.search_published_post_uuids + cache intersect) + admin in-memory post filter.
+  - core `848f5dab` — restore_path before locale validation (fixed internal-prefix leak in language redirects, found in C0).
+  - core `9b17027b` — **V159** publishing categories + post_categories + post_views (authored V157, renumbered after upstream sync; prefix oracle green).
+  - `bb8425d` step 5 slice 1 — category/post-category schemas + Categories context, public category/tag archives (+descendants rule), term feeds, linked chips (show_categories), cache carries category_uuids + tags.
+- **Step 5 remaining**: admin categories management LV (tree list + inline form, link from group page header; route in Publishing.Routes admin(_locale)_routes + tab), editor assignment UI (checkbox tree in post editor; save → replace_post_categories), AI-translatable category names (follow-up), related-posts block (follow-up).
+- **Environment notes**: parent server restart needed per publishing/core change (hot-reload misses path deps). Playwright screenshots wedge after first capture — kill `pgrep -f mcp-chrome` + relaunch; geometry probes + curl are the reliable verification. Quorum diffs must include untracked files (`git add -N` first). zai CLI currently errors (ANTHROPIC_API_KEY conflict); agy+grok reliable.
+- **Cross-repo state**: core fork merged upstream 1.7.211 (V157/V158 upstream); publishing needs PHOENIX_KIT_PATH=../phoenix_kit until a core release carries V159. Parent dev DB migrates on next boot.
+
 ## Sequencing (PR-shaped, order = dependency + value)
 
 1. **Quick wins** — card footer pin (item 3) + `listing_layout` family with minimal date—title (item 2).
