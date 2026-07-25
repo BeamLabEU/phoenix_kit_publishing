@@ -91,8 +91,9 @@ defmodule PhoenixKitPublishing.MixProject do
       # older core, but the floor should track what's actually required).
       pk_dep(:phoenix_kit, "~> 1.7.189"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
-      # `AITranslatable` adapter plugs into.
-      pk_dep(:phoenix_kit_ai, "~> 0.4"),
+      # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
+      # which the group editor imports directly.
+      pk_dep(:phoenix_kit_ai, "~> 0.17"),
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},

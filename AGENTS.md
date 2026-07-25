@@ -467,12 +467,10 @@ uuid-keyed — the public group map exposes `"uuid"` for this). One field
 per-merge `:group_updated` broadcast (see `log_translated/3`). The Edit Group
 LV wires it via `AITranslate.Embed` + `FormGlue` with a params-map
 `GroupAITranslateBinding` (deliberately not `@behaviour` — the callbacks type
-an Ecto changeset). ⚠️ **Release-gated on phoenix_kit_ai**: the editor imports
-`ai_multilang_tabs/1`, which ships in the phoenix_kit_ai release AFTER 0.16.0
-— until that release is cut and `mix deps.update phoenix_kit_ai` runs (the
-`~> 0.4` pin floats, no mix.exs change), the standalone build only compiles
-with `PHOENIX_KIT_AI_PATH=../phoenix_kit_ai`. The maintainer coordinates the
-merge/release ordering (stated in the PR).
+an Ecto changeset). The editor imports `ai_multilang_tabs/1` directly —
+shipped in phoenix_kit_ai **0.17.0** (2026-07-21), and the mix.exs floor is
+`~> 0.17` accordingly. (The interim forward-compat dodge that let 0.4.3 build
+against 0.16.0 was dropped once the release landed.)
 
 Two write-path behaviors to know: `update_group/3` is **lenient** (an
 out-of-whitelist enum value is ignored, a non-truthy bool becomes `false` — the
@@ -680,8 +678,8 @@ PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` direct
 
 ## External Dependencies
 
-- **PhoenixKit** (`~> 1.7.132`) — Module behaviour, Settings API, shared components, RepoHelper
-- **PhoenixKitAI** (`~> 0.3`) — the AI-translation pipeline lives here (moved out of core): the
+- **PhoenixKit** (`~> 1.7.189`) — Module behaviour, Settings API, shared components, RepoHelper
+- **PhoenixKitAI** (`~> 0.17`) — the AI-translation pipeline lives here (moved out of core): the
   `PhoenixKitAI.Translatable` adapter behaviour (publishing's `AITranslatable` implements it),
   `PhoenixKitAI.{Translations,TranslateWorker,Translation}`, and the `AITranslate` modal UI. The
   per-language Oban fan-out + the LLM call (`PhoenixKitAI.ask_with_prompt/4`, OpenRouter) are owned

@@ -8,8 +8,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   # handle_info as composing lifecycle hooks (see the Embed moduledoc).
   use PhoenixKitAI.Components.AITranslate.Embed
 
-  # Requires the phoenix_kit_ai release that ships ai_multilang_tabs (>0.16.0)
-  # — stated in the PR; the maintainer coordinates the release + deps.update.
   import PhoenixKitAI.Components.AITranslate,
     only: [
       ai_multilang_tabs: 1,
@@ -183,14 +181,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, socket}
   end
 
-  # Forward-compat dodge (the document_creator/projects `function_exported?`
-  # pattern): `ai_multilang_tabs/1` ships in the NEXT phoenix_kit_ai release —
-  # the published 0.16.0 this module's `~> 0.4` pin can resolve does not have
-  # it, and importing a missing function is a hard compile error for Hex
-  # consumers. Until the floor includes the release, dispatch at runtime and
-  # fall back to the identical hand-placed layout built from components that
-  # DO exist in 0.16.0.
-  #
   defp find_group(slug) do
     Publishing.list_groups()
     |> Enum.find(&(&1["slug"] == slug))
