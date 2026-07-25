@@ -233,7 +233,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # ============================================================================
 
   defp handle_group_listing(conn, group_slug, language) do
-    case Listing.render_group_listing(conn, group_slug, language, conn.params) do
+    result =
+      case search_param(conn) do
+        nil -> Listing.render_group_listing(conn, group_slug, language, conn.params)
+        query -> Listing.render_search_results(conn, group_slug, language, query, conn.params)
+      end
+
+    case result do
       {:ok, assigns} ->
         listing_url = PublishingHTML.group_listing_path(assigns.current_language, group_slug)
         base_url = base_url(conn)
@@ -256,6 +262,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
         |> assign(:breadcrumbs, assigns.breadcrumbs)
+        |> assign(:search_query, Map.get(assigns, :search_query))
         |> assign(:og, %{
           # page_title is the language-resolved display name (listing.ex) — keep
           # the social preview in the same language as the visible <h1>/<title>.
@@ -317,6 +324,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # (a catch-up reader misses posts), unbounded is abuse-prone. 50 mirrors
   # the common default of major feed generators.
   defp feed_item_limit, do: 50
+
+  # The trimmed, length-capped ?q= search param — nil when absent/blank, so
+  # the listing branch only enters search mode on a real query. The 100-char
+  # cap bounds the ILIKE pattern a client can make the DB scan for.
+  defp search_param(conn) do
+    # fetch_query_params (idempotent) rather than conn.params — ?q= is a
+    # query param by definition, and a minimal host/test endpoint without
+    # Plug.Parsers never merges the query string into conn.params.
+    case Plug.Conn.fetch_query_params(conn).query_params["q"] do
+      q when is_binary(q) ->
+        case String.trim(q) do
+          "" -> nil
+          trimmed -> String.slice(trimmed, 0, 100)
+        end
+
+      _ ->
+        nil
+    end
+  end
 
   defp base_url(conn) do
     "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"

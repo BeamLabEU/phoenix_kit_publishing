@@ -66,6 +66,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
     users never see the lift regardless.
   - `show_prev_next` - Chronological "newer / older" post navigation at the
     bottom of the post page, within the same group + language (default `false`).
+  - `search_enabled` - A search box on the public listing (`?q=`, plain GET —
+    no JS required); matches are a case-insensitive substring over the active
+    published version's per-language title + body (default `false`).
   - `name_i18n` - Per-language overrides for the group's display name, keyed by
     language code (e.g. `%{"et" => "Blogi"}`). The primary-language name lives in
     the `name` column; secondary languages fall back to it when absent. The slug
@@ -242,6 +245,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
 
   @doc "Returns whether the post page shows chronological prev/next links (default false)."
   def show_prev_next?(%__MODULE__{data: data}), do: Map.get(data, "show_prev_next", false)
+
+  @doc "Returns whether the public listing shows a search box (default false)."
+  def search_enabled?(%__MODULE__{data: data}), do: Map.get(data, "search_enabled", false)
 
   @doc "Returns the per-language display-name overrides map (language code => name)."
   def name_translations(%__MODULE__{data: data}) do

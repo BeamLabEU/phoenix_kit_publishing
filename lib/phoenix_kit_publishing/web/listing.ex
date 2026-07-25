@@ -57,6 +57,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       |> assign(:translating_posts, %{})
       |> assign(:pending_post_updates, %{})
       |> assign(:visible_count, 20)
+      |> assign(:post_search, "")
       |> assign(:post_view_mode, default_mode)
       |> assign(:post_status_counts, status_counts)
       |> assign(:mount_group_slug, group_slug)
@@ -116,6 +117,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   def handle_event("load_more", _params, socket) do
     {:noreply, assign(socket, :visible_count, socket.assigns.visible_count + 20)}
+  end
+
+  def handle_event("search_posts", %{"q" => q}, socket) do
+    {:noreply,
+     socket
+     |> assign(:post_search, String.slice(q, 0, 100))
+     |> assign(:visible_count, 20)}
   end
 
   def handle_event("refresh", _params, socket) do
@@ -674,6 +682,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
+  # Case-insensitive substring over the primary title, slug, and every
+  # per-language title — an admin searching "Blogi" finds the post whose
+  # Estonian translation carries it even while the list shows English.
+  defp filter_posts_by_search(posts, query) do
+    case String.trim(query) do
+      "" ->
+        posts
+
+      trimmed ->
+        needle = String.downcase(trimmed)
+
+        Enum.filter(posts, fn post ->
+          haystack =
+            [
+              post.metadata.title || "",
+              post[:slug] || "",
+              post[:language_titles] |> Kernel.||(%{}) |> Map.values() |> Enum.join(" ")
+            ]
+            |> Enum.join(" ")
+            |> String.downcase()
+
+          String.contains?(haystack, needle)
+        end)
+    end
+  end
+
   defp load_date_time_settings do
     Settings.get_settings_cached(
       ["date_format", "time_format", "time_zone"],
@@ -719,6 +753,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     |> assign(:posts, filtered_posts)
     |> assign(:post_view_mode, default_mode)
     |> assign(:visible_count, 20)
+    |> assign(:post_search, "")
     |> assign(:endpoint_url, extract_endpoint_url(uri))
     |> assign(:post_status_counts, status_counts)
     |> assign(:loading, false)
@@ -1088,6 +1123,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
           </div>
         <% end %>
 
+        <%!-- Admin post filter — in-memory over the already-loaded set (all
+          posts live in assigns; visible_count only truncates display), so it
+          matches across every language title + slug instantly. --%>
+        <form :if={not @loading} phx-change="search_posts" class="mb-3" onsubmit="return false">
+          <label class="input input-sm input-bordered flex w-full max-w-xs items-center gap-2">
+            <.icon name="hero-magnifying-glass" class="w-4 h-4 opacity-50" />
+            <input
+              type="search"
+              name="q"
+              value={@post_search}
+              placeholder={gettext("Filter posts…")}
+              phx-debounce="200"
+              maxlength="100"
+              class="grow"
+            />
+          </label>
+        </form>
+
         <%= if @loading do %>
           <%!-- Skeleton placeholders matching post card layout.
                Uses bg-base-200 instead of DaisyUI skeleton class because
@@ -1115,19 +1168,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
             <% end %>
           </div>
         <% else %>
-          <%= if @posts == [] do %>
+          <% filtered_posts = filter_posts_by_search(@posts, @post_search) %>
+          <%= if filtered_posts == [] do %>
             <div class="text-center py-8 text-base-content/60">
-              <%= if @post_view_mode == "trashed" do %>
-                <.icon name="hero-trash" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p class="text-sm">{gettext("Trash is empty")}</p>
-              <% else %>
-                <.icon name="hero-document-text" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p class="text-sm">{gettext("No posts found")}</p>
+              <%= cond do %>
+                <% @post_search != "" and @posts != [] -> %>
+                  <.icon name="hero-magnifying-glass" class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p class="text-sm">{gettext("No posts match your filter")}</p>
+                <% @post_view_mode == "trashed" -> %>
+                  <.icon name="hero-trash" class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p class="text-sm">{gettext("Trash is empty")}</p>
+                <% true -> %>
+                  <.icon name="hero-document-text" class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p class="text-sm">{gettext("No posts found")}</p>
               <% end %>
             </div>
           <% else %>
             <% date_counts = PublishingHTML.build_date_counts(@posts) %>
-            <% visible_posts = Enum.take(@posts, @visible_count) %>
+            <% visible_posts = Enum.take(filtered_posts, @visible_count) %>
             <div class="grid gap-4">
               <%= for post <- visible_posts do %>
                 <% group_slug =
@@ -1338,7 +1396,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                 </div>
               <% end %>
             </div>
-            <%= if length(@posts) > @visible_count do %>
+            <%= if length(filtered_posts) > @visible_count do %>
               <div class="flex justify-center mt-4">
                 <button
                   type="button"

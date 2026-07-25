@@ -764,7 +764,46 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               />
             </div>
           <% end %>
+          <%!-- Search (gated on the group's search_enabled setting). Plain GET
+            form — dead views, works without JS; the controller reads ?q=. --%>
+          <form
+            :if={assigns[:group] && @group["search_enabled"]}
+            method="get"
+            action={group_listing_path(@current_language, @group["slug"])}
+            class="mt-4 flex max-w-md items-center gap-2"
+          >
+            <label class="input input-sm input-bordered flex flex-1 items-center gap-2">
+              <.icon name="hero-magnifying-glass" class="w-4 h-4 opacity-50" />
+              <input
+                type="search"
+                name="q"
+                value={assigns[:search_query]}
+                placeholder={gettext("Search posts…")}
+                class="grow"
+                maxlength="100"
+              />
+            </label>
+            <button type="submit" class="btn btn-sm btn-primary">{gettext("Search")}</button>
+          </form>
         </header>
+        <%!-- Search-results heading — the bands are suppressed in search mode,
+          matches render in the group's regular listing layout below. --%>
+        <div :if={assigns[:search_query]} class="mb-6 flex flex-wrap items-center gap-3">
+          <h2 class="text-lg font-semibold">
+            {ngettext(
+              "%{count} result for “%{query}”",
+              "%{count} results for “%{query}”",
+              @total_count,
+              query: @search_query
+            )}
+          </h2>
+          <.link
+            navigate={group_listing_path(@current_language, @group["slug"])}
+            class="link text-sm text-base-content/60"
+          >
+            {gettext("Clear search")}
+          </.link>
+        </div>
         <% featured_posts = assigns[:featured_posts] || [] %>
         <% featured_layout = assigns[:featured_layout] || "hero" %>
         <% featured_style = assigns[:featured_style] || "classic" %>
@@ -910,7 +949,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               >
               </path>
             </svg>
-            <span>{gettext("No published posts yet.")}</span>
+            <span>
+              <%= if assigns[:search_query] do %>
+                {gettext("No posts match your search.")}
+              <% else %>
+                {gettext("No published posts yet.")}
+              <% end %>
+            </span>
           </div>
         <% end %>
       </div>

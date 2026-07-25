@@ -90,6 +90,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "search_enabled",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :listing,
+        label: "Search box",
+        description:
+          "Show a search box on the public listing (?q= GET form, no JS needed). Matches are a case-insensitive substring over each post's published title and body in the reader's language.",
+        depends_on: nil
+      },
+      %{
         key: "featured_enabled",
         type: :boolean,
         allowed: @boolean_allowed,

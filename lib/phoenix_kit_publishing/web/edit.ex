@@ -210,6 +210,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "listing_image_links" => group["listing_image_links"],
       "listing_animations" => group["listing_animations"],
       "show_prev_next" => group["show_prev_next"],
+      "search_enabled" => group["search_enabled"],
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
       "scroll_headings_enabled" => group["scroll_headings_enabled"],
@@ -474,6 +475,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   label={gettext("Listing layout")}
                   options={listing_layout_options()}
                 />
+
+                <.checkbox field={@form[:search_enabled]}>
+                  {gettext("Show a search box")}
+                  <:description>
+                    {gettext("Readers can search this group's published posts by title and text.")}
+                  </:description>
+                </.checkbox>
 
                 <.checkbox field={@form[:show_post_count]}>
                   {gettext("Show the post count")}

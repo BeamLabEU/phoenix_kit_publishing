@@ -267,6 +267,44 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   defp filter_by_status(query, _), do: where(query, [p], is_nil(p.trashed_at))
 
+  @doc """
+  Post uuids in a group whose ACTIVE PUBLISHED version has content matching
+  `query` — a case-insensitive substring over per-language title + body — in
+  any of the candidate languages. ILIKE wildcards in the user's input are
+  escaped, so a search for "50%" matches the literal text. Capped at `limit`.
+
+  Returns bare uuids (not post maps) by design: the public search path
+  filters the listing-cache's chronological maps by this set, reusing all the
+  title/URL/language resolution the listing already does.
+  """
+  @spec search_published_post_uuids(String.t(), [String.t()], String.t(), pos_integer()) ::
+          [String.t()]
+  def search_published_post_uuids(group_slug, language_candidates, query, limit) do
+    pattern = "%" <> escape_like(query) <> "%"
+
+    from(p in PublishingPost,
+      join: g in assoc(p, :group),
+      join: v in PublishingVersion,
+      on: v.uuid == p.active_version_uuid,
+      join: c in PublishingContent,
+      on: c.version_uuid == v.uuid,
+      where: g.slug == ^group_slug and is_nil(p.trashed_at),
+      where: v.status == "published",
+      where: c.language in ^language_candidates,
+      where: ilike(c.title, ^pattern) or ilike(c.content, ^pattern),
+      distinct: true,
+      select: p.uuid,
+      limit: ^limit
+    )
+    |> repo().all()
+  end
+
+  # Prefix every LIKE metacharacter (backslash first, then % and _) so user
+  # input is always a literal substring match.
+  defp escape_like(query) do
+    String.replace(query, ~r/[\\%_]/, fn match -> "\\" <> match end)
+  end
+
   @doc "Counts non-trashed posts in a group."
   @spec count_posts(String.t()) :: non_neg_integer()
   def count_posts(group_slug) do

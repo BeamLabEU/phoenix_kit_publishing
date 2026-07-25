@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
 
   @timestamp_modes Constants.timestamp_modes()
@@ -204,6 +205,124 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
        total_pages: total_pages,
        breadcrumbs: breadcrumbs
      }}
+  end
+
+  @search_limit 50
+
+  @doc """
+  Renders the group listing as SEARCH RESULTS for `query`. Falls back to the
+  normal listing when the group's `search_enabled` setting is off — a `?q=`
+  on a search-disabled group is ignored, not an error. The `:ok` shape
+  matches `render_group_index/3` plus `:search_query`, with the
+  Featured/Latest bands suppressed and a single results page (capped at 50
+  matches, newest first).
+  """
+  def render_search_results(conn, group_slug, language, query, params) do
+    case fetch_group(group_slug) do
+      {:ok, group} ->
+        if Map.get(group, "search_enabled", false) do
+          do_render_search(group, group_slug, language, query)
+        else
+          render_group_listing(conn, group_slug, language, params)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp do_render_search(group, group_slug, language, query) do
+    canonical_language = Language.get_canonical_url_language(language)
+    {posts, date_counts} = search_posts(group_slug, canonical_language, query)
+    display_name = Publishing.translated_group_name(group, canonical_language) || group_slug
+
+    translations =
+      Translations.build_listing_translations(
+        group_slug,
+        canonical_language,
+        PostFetching.fetch_posts_with_cache(group_slug)
+      )
+
+    {:ok,
+     %{
+       page_title: display_name,
+       group: group,
+       posts: posts,
+       featured_posts: [],
+       featured_layout: Map.get(group, "featured_layout", "hero"),
+       featured_style: Map.get(group, "featured_style", "classic"),
+       newest_posts: [],
+       newest_layout: Map.get(group, "newest_layout", "hero"),
+       newest_style: Map.get(group, "newest_style", "classic"),
+       date_counts: date_counts,
+       current_language: canonical_language,
+       translations: translations,
+       page: 1,
+       per_page: @search_limit,
+       total_count: length(posts),
+       total_pages: if(posts == [], do: 0, else: 1),
+       breadcrumbs: [%{label: display_name, url: nil}],
+       search_query: query
+     }}
+  end
+
+  @doc """
+  Search matches for a group's public listing: a DB substring pass (title +
+  body of active PUBLISHED versions, candidate languages, ILIKE-escaped)
+  intersected with the chronological cache maps — so results carry the same
+  resolved titles/URLs/order as the listing. Returns `{posts, date_counts}`,
+  the counts computed over the WHOLE published set so a matched timestamp
+  post's URL keeps its time segment when non-matched same-day siblings exist.
+  """
+  # The DB uuid pass is capped far above the visible result count, NOT at it:
+  # LIMIT without ORDER BY returns an arbitrary subset, so truncating to 50 in
+  # SQL would drop newest matches for high-frequency substrings. The wide cap
+  # only bounds abuse; the newest-50 selection happens after the chronological
+  # intersect. Known limit: the intersect runs over the listing cache (most
+  # recent ~5,000 posts), so matches older than the cache horizon don't
+  # surface — same horizon the listing itself has.
+  @db_match_cap 2000
+
+  def search_posts(group_slug, language, query) do
+    uuids =
+      group_slug
+      |> DBStorage.search_published_post_uuids(
+        language_candidates(language),
+        query,
+        @db_match_cap
+      )
+      |> MapSet.new()
+
+    all = chronological_posts(group_slug, language)
+
+    matches =
+      all
+      |> Enum.filter(&MapSet.member?(uuids, &1[:uuid]))
+      |> Enum.take(@search_limit)
+
+    {matches, PublishingHTML.build_date_counts(all)}
+  end
+
+  # Content-language candidates for the DB search. A full-dialect request
+  # ("en-GB") matches that dialect plus a legacy base-code row ONLY — widening
+  # to sibling dialects would surface en-US-only matches on the en-GB listing.
+  # A base-code request ("en") is the ambiguous form: any enabled dialect of
+  # the base can be what the listing resolves to, so all of them qualify.
+  defp language_candidates(language) do
+    base = LanguageHelpers.url_language_code(language) || language
+
+    if language == base do
+      dialects =
+        Enum.filter(Publishing.enabled_language_codes(), fn code ->
+          LanguageHelpers.url_language_code(code) == base
+        end)
+
+      Enum.uniq([base | dialects])
+    else
+      [language, base]
+    end
+  rescue
+    _ -> [language]
   end
 
   @doc """
