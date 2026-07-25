@@ -73,6 +73,83 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     _ -> true
   end
 
+  @doc """
+  Whether group RSS feeds are served (`publishing_feeds_enabled`, default on).
+  Read by the controller's feed branch and by the listing's autodiscovery link.
+  """
+  def feeds_enabled? do
+    Settings.get_boolean_setting("publishing_feeds_enabled", true)
+  rescue
+    _ -> true
+  end
+
+  # Whether the post page emits the JSON-LD Article script (default on).
+  # Invisible to readers; a host that builds its own structured data can
+  # disable it site-wide.
+  defp jsonld_enabled? do
+    Settings.get_boolean_setting("publishing_render_jsonld", true)
+  rescue
+    _ -> true
+  end
+
+  @doc """
+  Renders the JSON-LD `Article` structured-data script for a post page, built
+  from the same `:og` map the meta tags use (title/description/image/url are
+  already override- and plugin-refined there) plus the post's publish date.
+  Rendered in-page for the same reason as the OG tags: search engines read
+  body placement, and the host owns `<head>`.
+  """
+  attr :og, :map, default: nil
+  attr :post, :map, required: true
+  attr :language, :string, required: true
+
+  def jsonld_script(assigns) do
+    data = article_jsonld(assigns.og, assigns.post, assigns.language)
+    # escape: :html_safe encodes angle brackets as unicode escapes inside
+    # JSON strings, so no value can smuggle a closing script tag and break
+    # out of the element.
+    assigns = assign(assigns, :json, data && Jason.encode!(data, escape: :html_safe))
+
+    ~H"""
+    <script :if={@json} type="application/ld+json">
+      <%= Phoenix.HTML.raw(@json) %>
+    </script>
+    """
+  end
+
+  defp article_jsonld(og, post, language) do
+    if og && og[:title] do
+      %{
+        "@context" => "https://schema.org",
+        "@type" => "Article",
+        "headline" => og[:title],
+        "inLanguage" => language
+      }
+      |> maybe_put_jsonld("description", og[:description])
+      |> maybe_put_jsonld("image", og[:image])
+      |> maybe_put_jsonld("mainEntityOfPage", og[:url])
+      |> maybe_put_jsonld("datePublished", jsonld_date_published(post))
+      |> maybe_put_jsonld("publisher", %{
+        "@type" => "Organization",
+        "name" => Settings.get_project_title()
+      })
+    end
+  end
+
+  # The effective publish date, matching the feed/listing notion: post_date for
+  # timestamp-mode posts, the version's published_at otherwise. Safe access —
+  # a post map may lack either field.
+  defp jsonld_date_published(post) do
+    case post[:date] do
+      %Date{} = date -> Date.to_iso8601(date)
+      _ -> get_in(post, [:metadata, :published_at])
+    end
+  end
+
+  defp maybe_put_jsonld(map, _key, nil), do: map
+  defp maybe_put_jsonld(map, _key, ""), do: map
+  defp maybe_put_jsonld(map, key, value), do: Map.put(map, key, value)
+
   # ===========================================================================
   # Scroll navigation (per-group). Additive visuals only — never replaces native
   # scroll, so keyboard/touch/screen-reader behaviour stays intact. See
@@ -622,6 +699,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       }
     >
       <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
+      <%!-- Feed autodiscovery — body placement for the same reason as the OG
+        tags (the host owns <head>); feed readers scan the whole document. --%>
+      <link
+        :if={feeds_enabled?() && assigns[:group]}
+        rel="alternate"
+        type="application/rss+xml"
+        title={Publishing.translated_group_name(@group, @current_language)}
+        href={feed_path(@current_language, @group["slug"])}
+      />
       <.scrollbar_style_tag style={(assigns[:group] && @group["scrollbar_style"]) || "default"} />
       <.scroll_timeline
         enabled={(assigns[:group] && @group["scroll_timeline_enabled"]) || false}
@@ -1493,6 +1579,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       }
     >
       <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
+      <.jsonld_script
+        :if={jsonld_enabled?()}
+        og={assigns[:og]}
+        post={@post}
+        language={@current_language}
+      />
       <.scrollbar_style_tag style={assigns[:scrollbar_style] || "default"} />
       <.reading_progress enabled={assigns[:scroll_progress_enabled] || false} />
       <.reading_headings enabled={assigns[:scroll_headings_enabled] || false} />
@@ -1644,6 +1736,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <div class="markdown-content max-w-none">
           {raw(@html_content)}
         </div>
+        <%!-- Chronological neighbors (gated on the group's show_prev_next
+          setting; either side absent at the chronology's edge). Newer on the
+          left mirrors the newest-first listing order. --%>
+        <nav
+          :if={assigns[:newer_post] || assigns[:older_post]}
+          class="mt-8 grid gap-4 sm:grid-cols-2"
+          aria-label={gettext("More posts")}
+        >
+          <.link
+            :if={assigns[:newer_post]}
+            navigate={@newer_post.url}
+            class="group flex flex-col gap-1 rounded-lg border border-base-200 p-4 transition-colors hover:border-primary/40"
+          >
+            <span class="inline-flex items-center gap-1 text-xs text-base-content/50">
+              <.icon name="hero-arrow-left" class="w-3 h-3" /> {gettext("Newer")}
+            </span>
+            <span class="font-medium group-hover:text-primary">{@newer_post.title}</span>
+          </.link>
+          <.link
+            :if={assigns[:older_post]}
+            navigate={@older_post.url}
+            class="group flex flex-col gap-1 rounded-lg border border-base-200 p-4 text-right transition-colors hover:border-primary/40 sm:col-start-2"
+          >
+            <span class="inline-flex items-center justify-end gap-1 text-xs text-base-content/50">
+              {gettext("Older")} <.icon name="hero-arrow-right" class="w-3 h-3" />
+            </span>
+            <span class="font-medium group-hover:text-primary">{@older_post.title}</span>
+          </.link>
+        </nav>
         <%!-- Post Footer — same compact muted link as the top, no button chrome. --%>
         <footer class="mt-6 border-t pt-2">
           <.link
@@ -1684,6 +1805,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       "" -> base_path
       encoded -> base_path <> "?" <> encoded
     end
+  end
+
+  @doc """
+  Builds the public URL for a group's RSS feed (`…/<group>/feed.xml`), with the
+  same locale-prefix rules as `group_listing_path/3`.
+  """
+  def feed_path(language, group_slug) do
+    language =
+      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+
+    segments =
+      if LanguageHelpers.use_language_prefix?(language),
+        do: [language, group_slug, "feed.xml"],
+        else: [group_slug, "feed.xml"]
+
+    build_public_path(segments)
   end
 
   @doc """

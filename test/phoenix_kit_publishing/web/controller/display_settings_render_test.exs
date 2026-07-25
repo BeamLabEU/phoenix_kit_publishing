@@ -393,6 +393,61 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
     end
   end
 
+  describe "post page: show_prev_next" do
+    setup %{group_slug: slug} do
+      {:ok, second} =
+        Posts.create_post(slug, %{
+          title: "Second Post",
+          slug: "second-post",
+          content: "Newer content."
+        })
+
+      :ok = Versions.publish_version(slug, second.uuid, 1)
+      {:ok, _} = Posts.update_post(slug, second, %{"published_at" => "2031-06-01T00:00:00Z"}, %{})
+      :ok
+    end
+
+    test "off by default", %{conn: conn, group_slug: slug} do
+      html = post_html(conn, slug, "display-post")
+      refute html =~ "Newer"
+      refute html =~ "Older"
+    end
+
+    test "on: the older post links its newer neighbor and vice versa", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"show_prev_next" => "true"})
+
+      older_page = post_html(conn, slug, "display-post")
+      assert older_page =~ "Newer"
+      assert older_page =~ "Second Post"
+      refute older_page =~ ">Older<"
+
+      newer_page = post_html(conn, slug, "second-post")
+      assert newer_page =~ "Older"
+      assert newer_page =~ "Display Post"
+      refute newer_page =~ ">Newer<"
+    end
+  end
+
+  describe "post page: JSON-LD structured data" do
+    test "Article script on by default, off via the site setting", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      html = post_html(conn, slug, "display-post")
+      assert html =~ ~s(type="application/ld+json")
+      assert html =~ ~s("@type":"Article")
+      assert html =~ "Display Post"
+
+      {:ok, _} = Settings.update_boolean_setting("publishing_render_jsonld", false)
+      html = post_html(conn, slug, "display-post")
+      refute html =~ ~s(type="application/ld+json")
+      {:ok, _} = Settings.update_boolean_setting("publishing_render_jsonld", true)
+    end
+  end
+
   # ==========================================================================
   # Post page
   # ==========================================================================

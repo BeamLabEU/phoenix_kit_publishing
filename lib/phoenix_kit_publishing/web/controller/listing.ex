@@ -206,6 +206,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
      }}
   end
 
+  @doc """
+  The group's published posts for the requested language, title/excerpt-resolved
+  and sorted newest-first — the shared source for the RSS feed and the post
+  page's prev/next navigation. Deliberately independent of the group's
+  `listing_sort`: feeds and chronological neighbors always mean "newest first".
+  """
+  def chronological_posts(group_slug, language, limit \\ nil) do
+    posts =
+      group_slug
+      |> PostFetching.fetch_posts_with_cache()
+      |> filter_published()
+      |> filter_by_exact_language(group_slug, language)
+      |> resolve_posts_for_language(language)
+      # uuid tie-break (same rationale as split_newest/2): published_at has
+      # second precision, so same-second publishes would otherwise order
+      # non-deterministically across cache rebuilds — flipping feed order
+      # and swapping prev/next neighbors.
+      |> Enum.sort_by(&{listing_sort_key(&1), &1[:uuid] || ""}, :desc)
+
+    if limit, do: Enum.take(posts, limit), else: posts
+  end
+
+  @doc """
+  The chronological neighbors of a post within its group + language, as
+  `%{newer:, older:, date_counts:}` — either neighbor `nil` at the chronology's
+  edge (or when the post isn't in the published set, e.g. a draft preview).
+  `date_counts` covers the WHOLE published set, so a timestamp neighbor's URL
+  correctly includes its time segment when the date has same-day siblings.
+  """
+  def neighbor_posts(group_slug, language, post_uuid) do
+    posts = chronological_posts(group_slug, language)
+    date_counts = PublishingHTML.build_date_counts(posts)
+
+    {newer, older} =
+      case Enum.find_index(posts, &(&1[:uuid] == post_uuid)) do
+        # Sorted newest-first: the entry before is newer, the one after is older.
+        nil -> {nil, nil}
+        idx -> {if(idx > 0, do: Enum.at(posts, idx - 1)), Enum.at(posts, idx + 1)}
+      end
+
+    %{newer: newer, older: older, date_counts: date_counts}
+  end
+
   # Orders the published posts by effective publish date, newest or oldest first
   # per the group's `listing_sort`. The effective date is post_date/post_time for
   # timestamp-mode posts and the version's published_at for slug-mode posts (which

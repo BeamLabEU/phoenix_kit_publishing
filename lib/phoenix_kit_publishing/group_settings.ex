@@ -254,6 +254,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "show_prev_next",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Previous/next navigation",
+        description:
+          "Show chronological \"newer / older\" post links at the bottom of the post page, within the same group and language.",
+        depends_on: nil
+      },
+      %{
         key: "show_reading_time",
         type: :boolean,
         allowed: @boolean_allowed,

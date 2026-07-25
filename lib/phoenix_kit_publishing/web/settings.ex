@@ -20,6 +20,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @render_cache_key "publishing_render_cache_enabled"
   @show_language_switcher_key "publishing_show_language_switcher"
   @render_og_tags_key "publishing_render_og_tags"
+  @feeds_enabled_key "publishing_feeds_enabled"
+  @render_jsonld_key "publishing_render_jsonld"
   @slug_style_key "publishing_slug_style"
   @valid_slug_styles ~w(transliterate unicode ascii)
 
@@ -58,6 +60,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
         :render_og_tags,
         Settings.get_boolean_setting(@render_og_tags_key, true)
       )
+      |> assign(:feeds_enabled, Settings.get_boolean_setting(@feeds_enabled_key, true))
+      |> assign(:render_jsonld, Settings.get_boolean_setting(@render_jsonld_key, true))
       |> assign(:slug_style, Settings.get_setting(@slug_style_key, "transliterate"))
       |> assign(
         :memory_cache_enabled,
@@ -182,6 +186,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
            gettext(
              "In-page OpenGraph tags disabled — your host layout should render the forwarded :og assign in <head>"
            )
+       )
+     )}
+  end
+
+  def handle_event("toggle_feeds_enabled", _params, socket) do
+    new_value = !socket.assigns.feeds_enabled
+    Settings.update_boolean_setting(@feeds_enabled_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:feeds_enabled, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do: gettext("RSS feeds enabled — every group serves /<group>/feed.xml"),
+         else: gettext("RSS feeds disabled — feed URLs return 404")
+       )
+     )}
+  end
+
+  def handle_event("toggle_render_jsonld", _params, socket) do
+    new_value = !socket.assigns.render_jsonld
+    Settings.update_boolean_setting(@render_jsonld_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:render_jsonld, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do: gettext("JSON-LD structured data enabled on post pages"),
+         else: gettext("JSON-LD structured data disabled")
        )
      )}
   end
@@ -443,6 +479,46 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               class="toggle toggle-primary"
               checked={@render_og_tags}
               phx-click="toggle_render_og_tags"
+            />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-rss" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("RSS Feeds")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "Serve an RSS 2.0 feed for every group at /<group>/feed.xml (newest 50 published posts, per language)."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@feeds_enabled}
+              phx-click="toggle_feeds_enabled"
+            />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-code-bracket" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("JSON-LD Structured Data")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "Emit a schema.org Article script on post pages for richer search results. Disable if your host builds its own structured data."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@render_jsonld}
+              phx-click="toggle_render_jsonld"
             />
           </div>
 

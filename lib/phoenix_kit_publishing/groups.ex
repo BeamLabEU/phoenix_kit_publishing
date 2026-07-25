@@ -296,7 +296,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @bool_setting_keys ~w(featured_enabled newest_enabled scroll_progress_enabled
                         scroll_headings_enabled scroll_timeline_enabled show_breadcrumbs
                         show_featured_image show_reading_time show_tags show_post_count
-                        show_top_back_link listing_image_links listing_animations)
+                        show_top_back_link listing_image_links listing_animations
+                        show_prev_next)
   @enum_settings [
     {"featured_layout", @featured_layouts},
     {"featured_style", @band_styles},
@@ -712,6 +713,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "show_top_back_link" => Map.get(data, "show_top_back_link", true),
       "listing_image_links" => Map.get(data, "listing_image_links", true),
       "listing_animations" => Map.get(data, "listing_animations", true),
+      "show_prev_next" => Map.get(data, "show_prev_next", false),
       "name_i18n" => name_i18n_map(data)
     }
   end

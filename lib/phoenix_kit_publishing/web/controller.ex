@@ -28,6 +28,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Web.Controller.Fallback
+  alias PhoenixKit.Modules.Publishing.Web.Controller.Feed
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
@@ -188,6 +189,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         {:listing, group_slug} ->
           handle_group_listing(conn, group_slug, language)
 
+        {:feed, group_slug} ->
+          handle_feed(conn, group_slug, language)
+
         {:slug_post, group_slug, post_slug} ->
           handle_post(conn, group_slug, {:slug, post_slug}, language)
 
@@ -232,9 +236,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     case Listing.render_group_listing(conn, group_slug, language, conn.params) do
       {:ok, assigns} ->
         listing_url = PublishingHTML.group_listing_path(assigns.current_language, group_slug)
-
-        base_url =
-          "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
+        base_url = base_url(conn)
 
         conn
         |> assign(:page_title, assigns.page_title)
@@ -277,6 +279,50 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   end
 
   # ============================================================================
+  # Feed Handler
+  # ============================================================================
+
+  # RSS 2.0 for a group. A missing/trashed group or the feeds kill-switch both
+  # 404 — a feed URL must never smart-fallback into an HTML redirect (readers
+  # would ingest the listing page as a broken feed).
+  defp handle_feed(conn, group_slug, language) do
+    with true <- PublishingHTML.feeds_enabled?(),
+         {:ok, group} <- Publishing.get_group(group_slug) do
+      # date_counts over the WHOLE published set, not the 50-item window —
+      # a same-day sibling outside the window must still force the
+      # time-segment URL form for timestamp items.
+      all_posts = Listing.chronological_posts(group_slug, language)
+      posts = Enum.take(all_posts, feed_item_limit())
+
+      xml =
+        Feed.render_rss(group, posts,
+          base_url: base_url(conn),
+          language: language,
+          date_counts: PublishingHTML.build_date_counts(all_posts)
+        )
+
+      conn
+      |> put_resp_content_type("application/rss+xml")
+      |> send_resp(200, IO.iodata_to_binary(xml))
+    else
+      _ ->
+        conn
+        |> put_status(:not_found)
+        |> put_view(html: PhoenixKitWeb.ErrorHTML)
+        |> render(:"404")
+    end
+  end
+
+  # Feeds serve the reader's backlog: one page of the listing is too little
+  # (a catch-up reader misses posts), unbounded is abuse-prone. 50 mirrors
+  # the common default of major feed generators.
+  defp feed_item_limit, do: 50
+
+  defp base_url(conn) do
+    "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
+  end
+
+  # ============================================================================
   # Post Handlers
   # ============================================================================
 
@@ -302,6 +348,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           "Edit Post"
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
+        |> assign_post_neighbors(
+          Map.get(assigns, :group, %{}),
+          group_slug,
+          assigns.current_language,
+          assigns.post
+        )
         |> render(:show)
 
       {:redirect_301, url} ->
@@ -363,6 +415,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           "Edit Post"
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
+        |> assign_post_neighbors(
+          Map.get(assigns, :group, %{}),
+          group_slug,
+          assigns.current_language,
+          assigns.post
+        )
         |> render(:show)
 
       {:redirect, url} ->
@@ -566,7 +624,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       show_featured_image: false,
       show_reading_time: false,
       show_tags: false,
-      show_top_back_link: true
+      show_top_back_link: true,
+      show_prev_next: false
+    }
+  end
+
+  # Chronological prev/next links for the post page, gated on the group's
+  # show_prev_next setting so the (cache-backed) whole-group pass only runs
+  # for groups that display the nav. Neighbors are same-group + same-language.
+  defp assign_post_neighbors(conn, group, group_slug, language, post) do
+    if Map.get(group, "show_prev_next", false) do
+      %{newer: newer, older: older, date_counts: date_counts} =
+        Listing.neighbor_posts(group_slug, language, post.uuid)
+
+      conn
+      |> assign(:newer_post, neighbor_link(newer, group_slug, language, date_counts))
+      |> assign(:older_post, neighbor_link(older, group_slug, language, date_counts))
+    else
+      conn
+      |> assign(:newer_post, nil)
+      |> assign(:older_post, nil)
+    end
+  end
+
+  defp neighbor_link(nil, _group_slug, _language, _date_counts), do: nil
+
+  defp neighbor_link(post, group_slug, language, date_counts) do
+    %{
+      title: get_in(post, [:metadata, :title]) || Constants.default_title(),
+      url: PublishingHTML.build_post_url(group_slug, post, language, date_counts)
     }
   end
 

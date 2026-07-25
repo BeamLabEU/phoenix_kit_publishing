@@ -64,6 +64,8 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `listing_animations` - Hover animations on listing cards (a subtle lift +
     shadow cue that the card is clickable; default `true`). Motion-reduce
     users never see the lift regardless.
+  - `show_prev_next` - Chronological "newer / older" post navigation at the
+    bottom of the post page, within the same group + language (default `false`).
   - `name_i18n` - Per-language overrides for the group's display name, keyed by
     language code (e.g. `%{"et" => "Blogi"}`). The primary-language name lives in
     the `name` column; secondary languages fall back to it when absent. The slug
@@ -237,6 +239,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc "Returns whether listing cards animate on hover (default true)."
   def listing_animations?(%__MODULE__{data: data}),
     do: Map.get(data, "listing_animations", true)
+
+  @doc "Returns whether the post page shows chronological prev/next links (default false)."
+  def show_prev_next?(%__MODULE__{data: data}), do: Map.get(data, "show_prev_next", false)
 
   @doc "Returns the per-language display-name overrides map (language code => name)."
   def name_translations(%__MODULE__{data: data}) do

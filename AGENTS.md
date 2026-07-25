@@ -409,6 +409,8 @@ Add new error atoms by extending `@type error_atom`, the doctest example, and ad
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group override for the render cache |
 | `publishing_show_language_switcher` | `true` | Render the in-page language switcher on listing + post pages. Disable when the host layout already provides one (see "Language switcher integration" below) |
 | `publishing_render_og_tags` | `true` | Render OpenGraph + Twitter Card meta tags **in-page** (inside the public body) so social previews work even when the host root layout doesn't render the forwarded `:og` assign in `<head>`. Disable when the host renders `:og` in `<head>` itself, to avoid duplicate tags (see "OpenGraph metadata" below) |
+| `publishing_feeds_enabled` | `true` | Serve an RSS 2.0 feed per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the requested language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → feed URLs 404 (never the smart fallback — a feed URL must not redirect to HTML) |
+| `publishing_render_jsonld` | `true` | Emit a schema.org `Article` JSON-LD script in-page on post pages (same body-placement rationale as the OG tags; built from the same refined `:og` map). `escape: :html_safe` on the encode so no value can close the script tag early |
 
 ### Per-group display settings (group `data` JSONB)
 

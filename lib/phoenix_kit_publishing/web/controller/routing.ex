@@ -36,6 +36,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
 
   Returns one of:
   - `{:listing, group_slug}`
+  - `{:feed, group_slug}`
   - `{:slug_post, group_slug, post_slug}`
   - `{:timestamp_post, group_slug, date, time}`
   - `{:date_only_post, group_slug, date}`
@@ -44,6 +45,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
   """
   def parse_path([]), do: {:error, :invalid_path}
   def parse_path([group_slug]), do: {:listing, group_slug}
+
+  # RSS feed for the group. "feed.xml" is a reserved tail segment — it can
+  # never resolve as a post slug (this clause matches before the generic
+  # [group, segment] one below).
+  def parse_path([group_slug, "feed.xml"]), do: {:feed, group_slug}
 
   def parse_path([group_slug, segment1, segment2]) do
     # Check if this is timestamp mode: segment1 matches date, segment2 matches time

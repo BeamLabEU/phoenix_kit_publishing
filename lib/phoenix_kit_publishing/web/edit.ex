@@ -209,6 +209,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "show_top_back_link" => group["show_top_back_link"],
       "listing_image_links" => group["listing_image_links"],
       "listing_animations" => group["listing_animations"],
+      "show_prev_next" => group["show_prev_next"],
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
       "scroll_headings_enabled" => group["scroll_headings_enabled"],
@@ -598,6 +599,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                     {gettext(
                       "A subtle 'Back to %{group}' link above the post, mirroring the footer button.",
                       group: @group["name"]
+                    )}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:show_prev_next]}>
+                  {gettext("Show previous/next navigation")}
+                  <:description>
+                    {gettext(
+                      "Chronological newer/older post links at the bottom of the post page."
                     )}
                   </:description>
                 </.checkbox>
