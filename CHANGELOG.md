@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.4 - 2026-07-25
+
+Documentation-only release. No code changes — published so the new README
+sections reach HexDocs.
+
+### Added
+- **README: "How Dispatch Works"** — documents that public routes are served by
+  overriding the host router's `call/2` and rewriting `path_info` to an internal
+  prefix, with the two consequences that surprise people: a host route whose first
+  segment equals a group slug will never match (the rewrite precedes route
+  matching, so declaration order in `router.ex` doesn't help; only `GET`/`HEAD` are
+  rewritten), and `mix phx.routes` lists these under
+  `__phoenix_kit_publishing_dispatch` rather than their public paths.
+- **README: "Reserved Route Prefixes"** — documents
+  `PhoenixKit.Module.reserved_route_prefixes/0` (`phoenix_kit` >= 1.7.170), how
+  `RouterDispatch.known_group?/1` honours it even when a same-named group exists in
+  publishing's own data, and the behaviour on older `phoenix_kit`. Includes a
+  warning that reserving a prefix without shipping a renderer yields a 404, citing
+  the `phoenix_kit_legal` 0.1.6 incident where reserving `"legal"` 404'd public
+  legal pages on every host app until it was reverted in 0.1.7.
+
+Both mechanisms previously existed only in source comments and moduledocs, which is
+why that regression was diagnosed from a user bug report rather than from docs.
+
 ## 0.4.3 - 2026-07-22
 
 PR #36 — sixteen-commit boss-directed batch: a public "Latest" post band,
