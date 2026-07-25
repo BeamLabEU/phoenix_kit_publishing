@@ -41,6 +41,10 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `listing_sort` - Public listing order: `"newest"` or `"oldest"` by effective
     publish date (post date for timestamp groups, published-at for slug groups).
     Default `"newest"`.
+  - `listing_layout` - How the public listing renders its (non-band) posts:
+    `"grid"` (card grid), `"list"` (horizontal thumbnail rows), or `"minimal"`
+    (date — title lines, no images). The Featured/Latest bands are unaffected —
+    they have their own layout/style settings. Default `"grid"`.
   - `show_breadcrumbs` - Show the breadcrumb trail on this group's public listing
     and post pages (default `false`).
   - `post_date_position` - Where a post's date renders relative to the title on the
@@ -193,6 +197,10 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc ~S|Returns the public-listing sort order for this group ("newest"/"oldest"; default "newest").|
   def listing_sort(%__MODULE__{data: data}),
     do: Map.get(data, "listing_sort", Publishing.Constants.default_listing_sort())
+
+  @doc ~S|Returns the public-listing layout ("grid"/"list"/"minimal"; default "grid").|
+  def listing_layout(%__MODULE__{data: data}),
+    do: Map.get(data, "listing_layout", Publishing.Constants.default_listing_layout())
 
   @doc "Returns whether the breadcrumb trail shows on this group's public pages (default false)."
   def show_breadcrumbs?(%__MODULE__{data: data}), do: Map.get(data, "show_breadcrumbs", false)

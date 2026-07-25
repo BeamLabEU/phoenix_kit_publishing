@@ -33,6 +33,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @scrollbar_styles Constants.scrollbar_styles()
   @default_listing_sort Constants.default_listing_sort()
   @listing_sorts Constants.listing_sorts()
+  @default_listing_layout Constants.default_listing_layout()
+  @listing_layouts Constants.listing_layouts()
   @default_timeline_granularity Constants.default_timeline_granularity()
   @timeline_granularities Constants.timeline_granularities()
   @default_post_date_position Constants.default_post_date_position()
@@ -303,6 +305,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     {"scrollbar_style", @scrollbar_styles},
     {"scroll_timeline_granularity", @timeline_granularities},
     {"listing_sort", @listing_sorts},
+    {"listing_layout", @listing_layouts},
     {"post_date_position", @post_date_positions},
     {"post_width", @post_widths}
   ]
@@ -698,6 +701,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "scroll_timeline_granularity" =>
         Map.get(data, "scroll_timeline_granularity", @default_timeline_granularity),
       "listing_sort" => Map.get(data, "listing_sort", @default_listing_sort),
+      "listing_layout" => Map.get(data, "listing_layout", @default_listing_layout),
       "show_breadcrumbs" => Map.get(data, "show_breadcrumbs", false),
       "post_date_position" => Map.get(data, "post_date_position", @default_post_date_position),
       "post_width" => Map.get(data, "post_width", @default_post_width),

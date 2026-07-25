@@ -336,6 +336,63 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
     end
   end
 
+  describe "listing: listing_layout" do
+    test "grid by default, with the bottom-pinned card footer", %{conn: conn, group_slug: slug} do
+      html = listing_html(conn, slug)
+      assert html =~ "md:grid-cols-2 lg:grid-cols-3"
+      # The date + Read More row pins to the card bottom (mt-auto, not a
+      # content-following margin) so buttons line up across a grid row.
+      assert html =~ "card-actions justify-between items-center mt-auto pt-4"
+      assert html =~ "Read More"
+    end
+
+    test "minimal renders date — title lines: no grid, no images, no buttons", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"listing_layout" => "minimal"})
+      html = listing_html(conn, slug)
+
+      assert html =~ "divide-y divide-base-200"
+      assert html =~ "Display Post"
+      refute html =~ "md:grid-cols-2 lg:grid-cols-3"
+      refute html =~ "Read More"
+      # The whole line links to the post; the date cell renders even with no
+      # date so titles stay aligned.
+      assert html =~ ~r/<time[^>]*class="w-44 shrink-0/
+    end
+
+    test "list renders horizontal row cards with the Read More footer", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"listing_layout" => "list"})
+      html = listing_html(conn, slug)
+
+      assert html =~ "sm:card-side"
+      refute html =~ "md:grid-cols-2 lg:grid-cols-3"
+      assert html =~ "Read More"
+    end
+
+    test "an out-of-whitelist layout value is ignored (stays grid)", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"listing_layout" => "carousel"})
+      assert listing_html(conn, slug) =~ "md:grid-cols-2 lg:grid-cols-3"
+    end
+
+    test "minimal leaves the Featured band untouched", %{conn: conn, group_slug: slug, post: post} do
+      {:ok, _} = Posts.update_post(slug, post, %{"featured" => "true"}, %{})
+      set!(slug, %{"listing_layout" => "minimal"})
+      html = listing_html(conn, slug)
+
+      assert html =~ "Featured"
+      # The band card renders normally; the (empty) minimal list renders no rows.
+      refute html =~ "divide-y divide-base-200\"><li"
+    end
+  end
+
   # ==========================================================================
   # Post page
   # ==========================================================================

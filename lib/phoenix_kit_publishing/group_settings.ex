@@ -69,6 +69,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "listing_layout",
+        type: :enum,
+        allowed: Constants.listing_layouts(),
+        default: Constants.default_listing_layout(),
+        scope: :listing,
+        label: "Listing layout",
+        description:
+          "How the listing renders its (non-band) posts: \"grid\" (card grid), \"list\" (horizontal thumbnail rows), or \"minimal\" (date — title lines, no images). The Featured/Latest bands keep their own layout/style.",
+        depends_on: nil
+      },
+      %{
         key: "show_post_count",
         type: :boolean,
         allowed: @boolean_allowed,

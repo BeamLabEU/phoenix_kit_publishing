@@ -571,7 +571,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                     )}</span>
                   </div>
 
-                  <div class="card-actions justify-end mt-4">
+                  <div class="card-actions justify-end mt-auto pt-4">
                     <.link
                       navigate={group_listing_path(@current_language, group["slug"])}
                       class="btn btn-sm btn-primary"
@@ -746,20 +746,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           </section>
         <% end %>
 
-        <%!-- Posts Grid --%>
+        <%!-- Posts — layout per the group's listing_layout setting. The
+          Featured/Latest bands above are deliberately unaffected: they carry
+          their own layout/style settings. --%>
+        <% listing_layout = (assigns[:group] && @group["listing_layout"]) || "grid" %>
         <%= if @posts != [] do %>
-          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <.listing_post_card
-              :for={post <- @posts}
-              post={post}
-              group_slug={@group["slug"]}
-              current_language={@current_language}
-              date_counts={date_counts}
-              variant={:grid}
-              image_links={image_links}
-              animations={animations}
-            />
-          </div>
+          <%= case listing_layout do %>
+            <% "minimal" -> %>
+              <ul class="divide-y divide-base-200">
+                <.listing_post_line
+                  :for={post <- @posts}
+                  post={post}
+                  group_slug={@group["slug"]}
+                  current_language={@current_language}
+                  date_counts={date_counts}
+                  animations={animations}
+                />
+              </ul>
+            <% "list" -> %>
+              <div class="flex flex-col gap-4">
+                <.listing_post_row
+                  :for={post <- @posts}
+                  post={post}
+                  group_slug={@group["slug"]}
+                  current_language={@current_language}
+                  date_counts={date_counts}
+                  image_links={image_links}
+                  animations={animations}
+                />
+              </div>
+            <% _ -> %>
+              <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <.listing_post_card
+                  :for={post <- @posts}
+                  post={post}
+                  group_slug={@group["slug"]}
+                  current_language={@current_language}
+                  date_counts={date_counts}
+                  variant={:grid}
+                  image_links={image_links}
+                  animations={animations}
+                />
+              </div>
+          <% end %>
           <%!-- Pagination --%>
           <%= if @total_pages > 1 do %>
             <div class="join mt-8 flex justify-center">
@@ -930,7 +959,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           </p>
         <% end %>
 
-        <div class="card-actions justify-between items-center mt-4">
+        <%!-- mt-auto (not a content-following margin) pins the date + button
+          row to the card bottom, so cards whose content differs in height
+          still line their buttons up across a grid row. --%>
+        <div class="card-actions justify-between items-center mt-auto pt-4">
           <%= if has_publication_date?(@post) do %>
             <time class="text-xs text-base-content/60" datetime={@post.metadata.published_at || ""}>
               {format_post_date(@post, @group_slug, @date_counts)}
@@ -955,6 +987,140 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
   defp card_figure_class(variant) when variant in [:featured_hero, :newest_hero],
     do: "lg:w-2/5 h-56 lg:h-auto overflow-hidden bg-base-300"
+
+  # ---------------------------------------------------------------------------
+  # Minimal listing line — the "minimal" listing_layout: one date — title row
+  # per post, no image, no excerpt, no button. The whole row links to the post.
+  # The fixed-width date cell keeps titles left-aligned down the list; it
+  # renders (empty) even for date-less posts for the same reason.
+  # ---------------------------------------------------------------------------
+  attr :post, :map, required: true
+  attr :group_slug, :string, required: true
+  attr :current_language, :string, required: true
+  attr :date_counts, :map, required: true
+  attr :animations, :boolean, default: true
+
+  defp listing_post_line(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :post_url,
+        build_post_url(
+          assigns.group_slug,
+          assigns.post,
+          assigns.current_language,
+          assigns.date_counts
+        )
+      )
+
+    ~H"""
+    <li data-post-date={effective_post_date(@post)}>
+      <.link
+        navigate={@post_url}
+        class={[
+          "group -mx-2 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 rounded-lg px-2 py-3 sm:flex-nowrap",
+          @animations && "transition-colors hover:bg-base-200/60"
+        ]}
+      >
+        <%!-- w-44 fits the full "%B %d, %Y" dates format_post_date/3 emits
+          ("September 15, 2024"); the ellipsis guards the rare same-day
+          "… at HH:MM" suffix instead of letting it overlap the title. --%>
+        <time
+          class="w-44 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm tabular-nums text-base-content/60"
+          datetime={@post.metadata.published_at || ""}
+        >
+          {if has_publication_date?(@post), do: format_post_date(@post, @group_slug, @date_counts)}
+        </time>
+        <h2 class="min-w-0 text-base font-medium group-hover:text-primary">
+          {@post.metadata.title}
+        </h2>
+      </.link>
+    </li>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # List row — the "list" listing_layout: a horizontal card per post with a
+  # left thumbnail (when the post has one), title + excerpt, and the shared
+  # bottom-pinned date/Read-More footer.
+  # ---------------------------------------------------------------------------
+  attr :post, :map, required: true
+  attr :group_slug, :string, required: true
+  attr :current_language, :string, required: true
+  attr :date_counts, :map, required: true
+  attr :image_links, :boolean, default: true
+  attr :animations, :boolean, default: true
+
+  defp listing_post_row(assigns) do
+    assigns =
+      assigns
+      |> assign(:img, featured_image_url(assigns.post, "medium"))
+      |> assign(:excerpt, post_card_excerpt(assigns.post))
+      |> assign(
+        :post_url,
+        build_post_url(
+          assigns.group_slug,
+          assigns.post,
+          assigns.current_language,
+          assigns.date_counts
+        )
+      )
+
+    ~H"""
+    <article
+      class={[
+        "card sm:card-side bg-base-200 shadow-md",
+        @animations && "transition hover:shadow-lg motion-safe:hover:-translate-y-0.5"
+      ]}
+      data-post-date={effective_post_date(@post)}
+    >
+      <%= if @img do %>
+        <figure class="h-40 w-full shrink-0 overflow-hidden bg-base-300 sm:h-auto sm:w-48">
+          <%= if @image_links do %>
+            <.link navigate={@post_url} class="block h-full w-full" tabindex="-1" aria-hidden="true">
+              <img
+                src={@img}
+                alt={@post.metadata.title || gettext("Featured image")}
+                class={[
+                  "h-full w-full object-cover",
+                  @animations && "transition-opacity hover:opacity-90"
+                ]}
+                loading="lazy"
+              />
+            </.link>
+          <% else %>
+            <img
+              src={@img}
+              alt={@post.metadata.title || gettext("Featured image")}
+              class="h-full w-full object-cover"
+              loading="lazy"
+            />
+          <% end %>
+        </figure>
+      <% end %>
+      <div class="card-body p-5">
+        <h2 class="card-title text-lg">
+          <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
+        </h2>
+        <p :if={@excerpt && @excerpt != ""} class="line-clamp-2 text-sm text-base-content/70">
+          {@excerpt}
+        </p>
+        <div class="card-actions mt-auto items-center justify-between pt-2">
+          <%= if has_publication_date?(@post) do %>
+            <time class="text-xs text-base-content/60" datetime={@post.metadata.published_at || ""}>
+              {format_post_date(@post, @group_slug, @date_counts)}
+            </time>
+          <% else %>
+            <span class="text-xs text-base-content/60"></span>
+          <% end %>
+          <.link navigate={@post_url} class="btn btn-sm btn-primary">
+            {gettext("Read More →")}
+          </.link>
+        </div>
+      </div>
+    </article>
+    """
+  end
 
   # ---------------------------------------------------------------------------
   # Band cards — the Featured/Latest bands' style-aware wrapper.
@@ -1182,7 +1348,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       ]}
       data-post-date={effective_post_date(@post)}
     >
-      <div class="flex flex-col gap-2">
+      <%!-- h-full so the footer's mt-auto can pin to the bottom when this
+        card is grid-stretched next to a taller sibling. --%>
+      <div class="flex h-full flex-col gap-2">
         <.band_badge band={@band} />
         <h3 class="text-2xl font-bold tracking-tight lg:text-3xl">
           <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
@@ -1267,7 +1435,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
   defp band_card_footer(assigns) do
     ~H"""
-    <div class="mt-2 flex items-center justify-between gap-4">
+    <div class="mt-auto flex items-center justify-between gap-4 pt-2">
       <%= if has_publication_date?(@post) do %>
         <time class="text-xs text-base-content/60" datetime={@post.metadata.published_at || ""}>
           {format_post_date(@post, @group_slug, @date_counts)}

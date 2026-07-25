@@ -192,6 +192,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "name_i18n" => group["name_i18n"] || %{},
       "slug" => group["slug"],
       "listing_sort" => group["listing_sort"],
+      "listing_layout" => group["listing_layout"],
       "show_post_count" => group["show_post_count"],
       "show_breadcrumbs" => group["show_breadcrumbs"],
       "post_date_position" => group["post_date_position"],
@@ -276,6 +277,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     [
       {gettext("Newest first (by publish date)"), "newest"},
       {gettext("Oldest first (by publish date)"), "oldest"}
+    ]
+  end
+
+  # Label/value pairs for the listing-layout <select>. Values must match
+  # Publishing.Constants.listing_layouts/0.
+  defp listing_layout_options do
+    [
+      {gettext("Grid — cards with images"), "grid"},
+      {gettext("List — horizontal rows with a thumbnail"), "list"},
+      {gettext("Minimal — date and title only, no images"), "minimal"}
     ]
   end
 
@@ -455,6 +466,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   field={@form[:listing_sort]}
                   label={gettext("Post order")}
                   options={listing_sort_options()}
+                />
+
+                <.select
+                  field={@form[:listing_layout]}
+                  label={gettext("Listing layout")}
+                  options={listing_layout_options()}
                 />
 
                 <.checkbox field={@form[:show_post_count]}>

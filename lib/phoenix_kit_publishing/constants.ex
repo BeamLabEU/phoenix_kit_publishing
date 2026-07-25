@@ -149,6 +149,15 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @doc ~S|Default public-listing sort order ("newest" first).|
   def default_listing_sort, do: @default_listing_sort
 
+  @listing_layouts ["grid", "list", "minimal"]
+  @default_listing_layout "grid"
+
+  @doc ~S|Valid public-listing layouts: "grid" (card grid), "list" (thumbnail rows), or "minimal" (date — title lines, no images).|
+  def listing_layouts, do: @listing_layouts
+
+  @doc ~S|Default public-listing layout ("grid").|
+  def default_listing_layout, do: @default_listing_layout
+
   @post_date_positions ["above", "below", "hidden"]
   @default_post_date_position "below"
 
