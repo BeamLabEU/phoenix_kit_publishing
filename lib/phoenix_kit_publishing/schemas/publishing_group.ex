@@ -66,6 +66,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
     users never see the lift regardless.
   - `show_prev_next` - Chronological "newer / older" post navigation at the
     bottom of the post page, within the same group + language (default `false`).
+  - `show_categories` - Linked category chips on the post page (default `false`).
   - `search_enabled` - A search box on the public listing (`?q=`, plain GET —
     no JS required); matches are a case-insensitive substring over the active
     published version's per-language title + body (default `false`).
@@ -245,6 +246,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
 
   @doc "Returns whether the post page shows chronological prev/next links (default false)."
   def show_prev_next?(%__MODULE__{data: data}), do: Map.get(data, "show_prev_next", false)
+
+  @doc "Returns whether the post page shows linked category chips (default false)."
+  def show_categories?(%__MODULE__{data: data}), do: Map.get(data, "show_categories", false)
 
   @doc "Returns whether the public listing shows a search box (default false)."
   def search_enabled?(%__MODULE__{data: data}), do: Map.get(data, "search_enabled", false)

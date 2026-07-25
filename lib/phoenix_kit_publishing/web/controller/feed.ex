@@ -35,12 +35,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
   def render_rss(group, posts, opts) do
     base_url = Keyword.fetch!(opts, :base_url)
     language = Keyword.fetch!(opts, :language)
+    scope = Keyword.get(opts, :scope)
 
     group_slug = group["slug"]
     date_counts = Keyword.get(opts, :date_counts) || PublishingHTML.build_date_counts(posts)
     listing_url = base_url <> PublishingHTML.group_listing_path(language, group_slug)
-    self_url = base_url <> PublishingHTML.feed_path(language, group_slug)
-    title = Publishing.translated_group_name(group, language)
+    self_url = base_url <> PublishingHTML.feed_path(language, group_slug, scope)
+
+    title =
+      case scope do
+        {_type, value} -> "#{Publishing.translated_group_name(group, language)} · #{value}"
+        nil -> Publishing.translated_group_name(group, language)
+      end
+
     description = feed_description(group, title)
 
     items =

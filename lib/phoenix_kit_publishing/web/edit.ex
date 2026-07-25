@@ -211,6 +211,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "listing_animations" => group["listing_animations"],
       "show_prev_next" => group["show_prev_next"],
       "search_enabled" => group["search_enabled"],
+      "show_categories" => group["show_categories"],
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
       "scroll_headings_enabled" => group["scroll_headings_enabled"],
@@ -608,6 +609,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                       "A subtle 'Back to %{group}' link above the post, mirroring the footer button.",
                       group: @group["name"]
                     )}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:show_categories]}>
+                  {gettext("Show category chips")}
+                  <:description>
+                    {gettext("Linked category badges above the post content.")}
                   </:description>
                 </.checkbox>
 

@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   import Ecto.Query
 
+  alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.DBStorage.Mapper
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingContent
@@ -1173,6 +1174,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
     all_contents_by_version = batch_load_contents(version_uuids_needed)
 
+    # One query for the whole group's category assignments — the cached maps
+    # carry :category_uuids so archive filtering never joins per request.
+    categories_by_post = Categories.categories_for_posts(post_uuids)
+
     posts
     |> Enum.filter(fn post -> active_by_post[post.uuid] != nil end)
     |> Enum.map(fn post ->
@@ -1180,7 +1185,9 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       version = active_by_post[post.uuid]
       contents = Map.get(all_contents_by_version, version.uuid, [])
 
-      Mapper.to_listing_map(post, version, contents, all_versions)
+      post
+      |> Mapper.to_listing_map(version, contents, all_versions)
+      |> Map.put(:category_uuids, Map.get(categories_by_post, post.uuid, []))
     end)
   end
 

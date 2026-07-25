@@ -276,6 +276,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "show_categories",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Category chips",
+        description:
+          "Show the post's categories as linked chips above the content, each leading to its archive page.",
+        depends_on: nil
+      },
+      %{
         key: "show_reading_time",
         type: :boolean,
         allowed: @boolean_allowed,

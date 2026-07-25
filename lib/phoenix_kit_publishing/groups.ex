@@ -297,7 +297,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
                         scroll_headings_enabled scroll_timeline_enabled show_breadcrumbs
                         show_featured_image show_reading_time show_tags show_post_count
                         show_top_back_link listing_image_links listing_animations
-                        show_prev_next search_enabled)
+                        show_prev_next search_enabled show_categories)
   @enum_settings [
     {"featured_layout", @featured_layouts},
     {"featured_style", @band_styles},
@@ -715,6 +715,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "listing_animations" => Map.get(data, "listing_animations", true),
       "show_prev_next" => Map.get(data, "show_prev_next", false),
       "search_enabled" => Map.get(data, "search_enabled", false),
+      "show_categories" => Map.get(data, "show_categories", false),
       "name_i18n" => name_i18n_map(data)
     }
   end

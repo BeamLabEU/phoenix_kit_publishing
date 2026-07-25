@@ -26,6 +26,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Web.Controller.Fallback
   alias PhoenixKit.Modules.Publishing.Web.Controller.Feed
@@ -189,8 +190,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         {:listing, group_slug} ->
           handle_group_listing(conn, group_slug, language)
 
-        {:feed, group_slug} ->
-          handle_feed(conn, group_slug, language)
+        {:feed, group_slug, scope} ->
+          handle_feed(conn, group_slug, language, scope)
+
+        {:category, group_slug, category_slug} ->
+          handle_term_archive(conn, group_slug, language, {:category, category_slug})
+
+        {:tag, group_slug, tag} ->
+          handle_term_archive(conn, group_slug, language, {:tag, tag})
 
         {:slug_post, group_slug, post_slug} ->
           handle_post(conn, group_slug, {:slug, post_slug}, language)
@@ -289,23 +296,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # Feed Handler
   # ============================================================================
 
-  # RSS 2.0 for a group. A missing/trashed group or the feeds kill-switch both
-  # 404 — a feed URL must never smart-fallback into an HTML redirect (readers
+  # RSS 2.0 for a group (scope nil) or a category/tag archive within it. A
+  # missing/trashed group, an unknown term, or the feeds kill-switch all 404
+  # — a feed URL must never smart-fallback into an HTML redirect (readers
   # would ingest the listing page as a broken feed).
-  defp handle_feed(conn, group_slug, language) do
+  defp handle_feed(conn, group_slug, language, scope) do
     with true <- PublishingHTML.feeds_enabled?(),
-         {:ok, group} <- Publishing.get_group(group_slug) do
-      # date_counts over the WHOLE published set, not the 50-item window —
+         {:ok, group} <- Publishing.get_group(group_slug),
+         {:ok, all_posts, _term_label} <-
+           Listing.scoped_chronological_posts(group_slug, language, scope) do
+      # date_counts over the WHOLE scoped set, not the 50-item window —
       # a same-day sibling outside the window must still force the
       # time-segment URL form for timestamp items.
-      all_posts = Listing.chronological_posts(group_slug, language)
       posts = Enum.take(all_posts, feed_item_limit())
 
       xml =
         Feed.render_rss(group, posts,
           base_url: base_url(conn),
           language: language,
-          date_counts: PublishingHTML.build_date_counts(all_posts)
+          date_counts: PublishingHTML.build_date_counts(all_posts),
+          scope: scope
         )
 
       conn
@@ -317,6 +327,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> put_status(:not_found)
         |> put_view(html: PhoenixKitWeb.ErrorHTML)
         |> render(:"404")
+    end
+  end
+
+  # Category / tag archive: the listing template with the term's posts and a
+  # results heading; the Featured/Latest bands are suppressed. An unknown
+  # category 404s via the fallback (the group exists, so it redirects to the
+  # listing with the "closest match" flash — same policy as a missing post).
+  defp handle_term_archive(conn, group_slug, language, term) do
+    case Listing.render_term_archive(conn, group_slug, language, term) do
+      {:ok, assigns} ->
+        listing_url = PublishingHTML.group_listing_path(assigns.current_language, group_slug)
+        base_url = base_url(conn)
+
+        conn
+        |> assign(:page_title, assigns.page_title)
+        |> assign(:group, assigns.group)
+        |> assign(:posts, assigns.posts)
+        |> assign(:featured_posts, assigns.featured_posts)
+        |> assign(:featured_layout, assigns.featured_layout)
+        |> assign(:featured_style, assigns.featured_style)
+        |> assign(:newest_posts, assigns.newest_posts)
+        |> assign(:newest_layout, assigns.newest_layout)
+        |> assign(:newest_style, assigns.newest_style)
+        |> assign(:date_counts, assigns.date_counts)
+        |> assign(:current_language, assigns.current_language)
+        |> assign_publishing_render_context(assigns.translations)
+        |> assign(:page, assigns.page)
+        |> assign(:per_page, assigns.per_page)
+        |> assign(:total_count, assigns.total_count)
+        |> assign(:total_pages, assigns.total_pages)
+        |> assign(:breadcrumbs, assigns.breadcrumbs)
+        |> assign(:search_query, nil)
+        |> assign(:term_filter, assigns.term_filter)
+        |> assign(:og, %{
+          title: assigns.page_title,
+          url: base_url <> listing_url,
+          locale: og_locale(assigns.current_language),
+          type: "website"
+        })
+        |> render(:index)
+
+      {:error, reason} ->
+        handle_not_found(conn, reason)
     end
   end
 
@@ -380,6 +433,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           assigns.current_language,
           assigns.post
         )
+        |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect_301, url} ->
@@ -447,6 +501,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           assigns.current_language,
           assigns.post
         )
+        |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect, url} ->
@@ -651,8 +706,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       show_reading_time: false,
       show_tags: false,
       show_top_back_link: true,
-      show_prev_next: false
+      show_prev_next: false,
+      show_categories: false
     }
+  end
+
+  # The post's categories for the chips row — only fetched when the group
+  # shows them.
+  defp assign_post_categories(conn, group, post) do
+    if Map.get(group, "show_categories", false) do
+      assign(conn, :post_categories, Categories.categories_of_post(post.uuid))
+    else
+      assign(conn, :post_categories, [])
+    end
   end
 
   # Chronological prev/next links for the post page, gated on the group's

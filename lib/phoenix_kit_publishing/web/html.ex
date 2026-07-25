@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
@@ -802,6 +803,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             class="link text-sm text-base-content/60"
           >
             {gettext("Clear search")}
+          </.link>
+        </div>
+        <%!-- Category/tag archive heading — same shape as the search heading. --%>
+        <div :if={assigns[:term_filter]} class="mb-6 flex flex-wrap items-center gap-3">
+          <h2 class="text-lg font-semibold">
+            <%= if @term_filter.type == :category do %>
+              {gettext("Category: %{name}", name: @term_filter.label)}
+            <% else %>
+              {gettext("Tag: %{name}", name: @term_filter.label)}
+            <% end %>
+            <span class="ml-1 text-sm font-normal text-base-content/60">
+              {ngettext("%{count} post", "%{count} posts", @term_filter.count)}
+            </span>
+          </h2>
+          <.link
+            navigate={group_listing_path(@current_language, @group["slug"])}
+            class="link text-sm text-base-content/60"
+          >
+            {gettext("All posts")}
           </.link>
         </div>
         <% featured_posts = assigns[:featured_posts] || [] %>
@@ -1772,10 +1792,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <% end %>
           </div>
         </header>
-        <%!-- Tags (gated on the group's show_tags setting) --%>
+        <%!-- Categories (gated on show_categories) + tags (show_tags) —
+          chips link to their archives since the category/tag routes exist. --%>
+        <% post_categories = assigns[:post_categories] || [] %>
         <% post_tags = if assigns[:show_tags], do: post_tag_list(@post), else: [] %>
-        <div :if={post_tags != []} class="flex flex-wrap gap-2 mb-8">
-          <span :for={tag <- post_tags} class="badge badge-outline badge-sm">{tag}</span>
+        <div :if={post_categories != [] or post_tags != []} class="flex flex-wrap gap-2 mb-8">
+          <.link
+            :for={category <- post_categories}
+            navigate={term_archive_path(@current_language, @group_slug, {:category, category.slug})}
+            class="badge badge-primary badge-outline badge-sm hover:badge-primary"
+          >
+            {PublishingCategory.translated_name(category, @current_language)}
+          </.link>
+          <.link
+            :for={tag <- post_tags}
+            navigate={term_archive_path(@current_language, @group_slug, {:tag, tag})}
+            class="badge badge-outline badge-sm hover:text-primary"
+          >
+            {tag}
+          </.link>
         </div>
         <%!-- Post Content --%>
         <div class="markdown-content max-w-none">
@@ -1853,17 +1888,43 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   @doc """
-  Builds the public URL for a group's RSS feed (`…/<group>/feed.xml`), with the
-  same locale-prefix rules as `group_listing_path/3`.
+  Builds the public URL for a group's RSS feed (`…/<group>/feed.xml`) or a
+  term archive's (`…/<group>/category/<slug>/feed.xml`, `…/tag/<tag>/feed.xml`),
+  with the same locale-prefix rules as `group_listing_path/3`.
   """
-  def feed_path(language, group_slug) do
+  def feed_path(language, group_slug, scope \\ nil) do
     language =
       LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
 
+    tail =
+      case scope do
+        {:category, slug} -> ["category", slug, "feed.xml"]
+        {:tag, tag} -> ["tag", tag, "feed.xml"]
+        nil -> ["feed.xml"]
+      end
+
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug, "feed.xml"],
-        else: [group_slug, "feed.xml"]
+        do: [language, group_slug | tail],
+        else: [group_slug | tail]
+
+    build_public_path(segments)
+  end
+
+  @doc """
+  Public URL for a category archive (`…/<group>/category/<slug>`) or tag
+  archive (`…/<group>/tag/<tag>`).
+  """
+  def term_archive_path(language, group_slug, {type, value}) do
+    language =
+      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+
+    tail = [to_string(type), value]
+
+    segments =
+      if LanguageHelpers.use_language_prefix?(language),
+        do: [language, group_slug | tail],
+        else: [group_slug | tail]
 
     build_public_path(segments)
   end

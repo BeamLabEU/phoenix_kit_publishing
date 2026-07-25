@@ -218,7 +218,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       allow_version_access: PublishingVersion.get_allow_version_access(version),
       published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
-      featured: PublishingVersion.get_featured(version)
+      featured: PublishingVersion.get_featured(version),
+      tags: PublishingVersion.get_tags(version)
     }
   end
 
@@ -232,7 +233,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       allow_version_access: PublishingVersion.get_allow_version_access(version),
       published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
-      featured: PublishingVersion.get_featured(version)
+      featured: PublishingVersion.get_featured(version),
+      tags: PublishingVersion.get_tags(version)
     }
   end
 

@@ -10,9 +10,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
 
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.PublishingCategory
 
   @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
@@ -323,6 +325,97 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     end
   rescue
     _ -> [language]
+  end
+
+  @doc """
+  `chronological_posts/3` narrowed to a term scope: `nil` (whole group),
+  `{:category, slug}` (the category AND its descendants — WordPress archive
+  rule), or `{:tag, tag}` (case-insensitive tag match). Returns
+  `{:ok, posts, label}` where label is the category's translated name (nil
+  for the whole group, the raw tag for tags), or `{:error, :not_found}` for
+  an unknown category / a tag no published post carries.
+  """
+  def scoped_chronological_posts(group_slug, language, nil) do
+    {:ok, chronological_posts(group_slug, language), nil}
+  end
+
+  def scoped_chronological_posts(group_slug, language, {:category, category_slug}) do
+    with {:ok, category} <- Categories.by_slug(group_slug, category_slug) do
+      subtree = Categories.subtree_uuids(group_slug, category.uuid)
+
+      posts =
+        group_slug
+        |> chronological_posts(language)
+        |> Enum.filter(fn post ->
+          Enum.any?(post[:category_uuids] || [], &MapSet.member?(subtree, &1))
+        end)
+
+      {:ok, posts, PublishingCategory.translated_name(category, language)}
+    end
+  end
+
+  def scoped_chronological_posts(group_slug, language, {:tag, tag}) do
+    needle = String.downcase(tag)
+
+    posts =
+      group_slug
+      |> chronological_posts(language)
+      |> Enum.filter(fn post ->
+        (get_in(post, [:metadata, :tags]) || [])
+        |> Enum.any?(&(String.downcase(to_string(&1)) == needle))
+      end)
+
+    # A tag exists only through use — an unmatched tag is a 404, not an
+    # empty archive (mirrors WordPress).
+    if posts == [], do: {:error, :not_found}, else: {:ok, posts, tag}
+  end
+
+  @doc """
+  Renders a category/tag archive: the listing shape (`render_group_index/3`
+  fields) with the term's posts, the bands suppressed, and a `:term_filter`
+  map (`%{type:, label:, count:}`) for the heading. Single results page,
+  newest first, capped like search.
+  """
+  def render_term_archive(_conn, group_slug, language, term) do
+    with {:ok, group} <- fetch_group(group_slug),
+         canonical_language = Language.get_canonical_url_language(language),
+         {:ok, posts, label} <- scoped_chronological_posts(group_slug, canonical_language, term) do
+      display_name = Publishing.translated_group_name(group, canonical_language) || group_slug
+      {type, raw} = term
+      term_label = label || raw
+
+      translations =
+        Translations.build_listing_translations(
+          group_slug,
+          canonical_language,
+          PostFetching.fetch_posts_with_cache(group_slug)
+        )
+
+      {:ok,
+       %{
+         page_title: "#{display_name} · #{term_label}",
+         group: group,
+         posts: Enum.take(posts, @search_limit),
+         featured_posts: [],
+         featured_layout: Map.get(group, "featured_layout", "hero"),
+         featured_style: Map.get(group, "featured_style", "classic"),
+         newest_posts: [],
+         newest_layout: Map.get(group, "newest_layout", "hero"),
+         newest_style: Map.get(group, "newest_style", "classic"),
+         # Full-group counts — a same-day sibling outside this archive must
+         # still force the time-segment URL form for timestamp posts.
+         date_counts:
+           PublishingHTML.build_date_counts(chronological_posts(group_slug, canonical_language)),
+         current_language: canonical_language,
+         translations: translations,
+         page: 1,
+         per_page: @search_limit,
+         total_count: length(posts),
+         total_pages: if(posts == [], do: 0, else: 1),
+         breadcrumbs: [%{label: display_name, url: nil}],
+         term_filter: %{type: type, label: term_label, count: length(posts)}
+       }}
+    end
   end
 
   @doc """
