@@ -1301,6 +1301,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       |> maybe_put_version_field("tags", Map.get(params, "tags"))
       |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
       |> maybe_put_version_field("featured", normalize_featured(Map.get(params, "featured")))
+      |> maybe_put_version_field("audio_uuid", Map.get(params, "audio_uuid"))
 
     # Also update version-level status and published_at if provided.
     # "published" is NEVER written here — it is set atomically with

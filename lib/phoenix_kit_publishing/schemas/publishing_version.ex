@@ -100,6 +100,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   def get_featured_image_uuid(%__MODULE__{data: data}),
     do: Map.get(data, "featured_image_uuid")
 
+  @doc "Returns the post's audio-version file uuid (nil when none)."
+  def get_audio_uuid(%__MODULE__{data: data}), do: Map.get(data, "audio_uuid")
+
   @doc "Returns the post tags."
   def get_tags(%__MODULE__{data: data}), do: Map.get(data, "tags", [])
 

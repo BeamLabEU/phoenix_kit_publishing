@@ -44,6 +44,9 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
   defp resolve_component(:image), do: {:ok, PhoenixKit.Modules.Shared.Components.Image}
   defp resolve_component(:video), do: {:ok, PhoenixKit.Modules.Shared.Components.Video}
 
+  defp resolve_component(:audio),
+    do: {:ok, PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio}
+
   defp resolve_component(:entityform),
     do: {:ok, PhoenixKitEntities.Components.EntityForm}
 
@@ -83,7 +86,10 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
   @max_stretch 100
   @wide_preset 30
 
-  defp wrap_stretch(html, attributes) do
+  @doc false
+  # Public for the inline (self-closing) component path in
+  # Publishing.Renderer, which bypasses this module's render_component/3.
+  def wrap_stretch(html, attributes) do
     case stretch_style(attributes) do
       nil ->
         html

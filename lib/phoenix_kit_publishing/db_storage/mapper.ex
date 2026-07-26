@@ -189,6 +189,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
       featured: PublishingVersion.get_featured(version),
       tags: PublishingVersion.get_tags(version),
+      audio_uuid: PublishingVersion.get_audio_uuid(version),
       og: PublishingContent.get_og(content)
     }
   end
@@ -219,7 +220,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
       featured: PublishingVersion.get_featured(version),
-      tags: PublishingVersion.get_tags(version)
+      tags: PublishingVersion.get_tags(version),
+      audio_uuid: PublishingVersion.get_audio_uuid(version)
     }
   end
 
@@ -234,7 +236,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
       featured: PublishingVersion.get_featured(version),
-      tags: PublishingVersion.get_tags(version)
+      tags: PublishingVersion.get_tags(version),
+      audio_uuid: PublishingVersion.get_audio_uuid(version)
     }
   end
 

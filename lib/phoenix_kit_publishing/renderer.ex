@@ -45,8 +45,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @global_cache_key "publishing_render_cache_enabled"
   @per_group_cache_prefix "publishing_render_cache_enabled_"
 
-  @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|EntityForm)\s+([^>]*?)\/>/s
-  @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|EntityForm)\s*([^>]*)>(.*?)<\/\1>/s
+  @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|Audio|EntityForm)\s+([^>]*?)\/>/s
+  @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|Audio|EntityForm)\s*([^>]*)>(.*?)<\/\1>/s
 
   # Fenced code blocks, double-backtick inline code, and single-backtick
   # inline code spans — masked out before the component scan so a literal
@@ -340,6 +340,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       String.contains?(content, "<Headline") ||
       String.contains?(content, "<Subheadline") ||
       String.contains?(content, "<Video") ||
+      String.contains?(content, "<Audio") ||
       String.contains?(content, "<EntityForm")
   end
 
@@ -610,6 +611,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     }
 
     Image.render(assigns)
+    |> PageBuilder.Renderer.wrap_stretch(attr_map)
     |> Safe.to_iodata()
     |> IO.iodata_to_binary()
   rescue
@@ -630,12 +632,34 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     }
 
     Video.render(assigns)
+    |> PageBuilder.Renderer.wrap_stretch(attr_map)
     |> Safe.to_iodata()
     |> IO.iodata_to_binary()
   rescue
     error ->
       Logger.warning("Error rendering Video component: #{inspect(error)}")
       "<div class='error'>Error rendering video</div>"
+  end
+
+  defp render_inline_component("Audio", attrs) do
+    attr_map = parse_xml_attributes(attrs)
+
+    assigns = %{
+      __changed__: nil,
+      attributes: attr_map,
+      variant: Map.get(attr_map, "variant", "default"),
+      content: nil,
+      children: []
+    }
+
+    PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio.render(assigns)
+    |> PageBuilder.Renderer.wrap_stretch(attr_map)
+    |> Safe.to_iodata()
+    |> IO.iodata_to_binary()
+  rescue
+    error ->
+      Logger.warning("Error rendering Audio component: #{inspect(error)}")
+      "<div class='error'>Error rendering audio</div>"
   end
 
   defp render_inline_component("EntityForm", attrs) do
@@ -652,6 +676,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     mod = @entity_form_mod
 
     mod.render(assigns)
+    |> PageBuilder.Renderer.wrap_stretch(attr_map)
     |> Safe.to_iodata()
     |> IO.iodata_to_binary()
   rescue

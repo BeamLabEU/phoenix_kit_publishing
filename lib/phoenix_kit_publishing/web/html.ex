@@ -1815,6 +1815,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             {tag}
           </.link>
         </div>
+        <%!-- Audio version — present whenever the live version carries one. --%>
+        <% audio_uuid = Map.get(@post.metadata, :audio_uuid) %>
+        <figure :if={audio_uuid} class="mb-8">
+          <audio
+            controls
+            preload="none"
+            class="w-full"
+            src={PhoenixKit.Modules.Storage.URLSigner.signed_url(audio_uuid, "original")}
+          >
+            {gettext("Your browser does not support the audio element.")}
+          </audio>
+          <figcaption class="mt-1 text-xs text-base-content/60">
+            {gettext("Listen to this post")}
+          </figcaption>
+        </figure>
         <%!-- Post Content --%>
         <div class="markdown-content max-w-none">
           {raw(@html_content)}

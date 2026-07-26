@@ -91,6 +91,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
       ~s(<guid isPermaLink="true">#{escape(url)}</guid>\n),
       pub_date(post),
       item_description(post),
+      enclosure(post, base_url),
       "</item>\n"
     ]
   end
@@ -113,6 +114,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
     case post[:content] do
       t when is_binary(t) -> t
       _ -> nil
+    end
+  end
+
+  # Podcast-style enclosure when the post carries an audio version. The RSS
+  # spec requires a length attribute; 0 is the accepted "unknown" convention
+  # (podcast clients tolerate it). Mime defaults to audio/mpeg — precise
+  # types would need a Storage metadata read per item.
+  defp enclosure(post, base_url) do
+    case get_in(post, [:metadata, :audio_uuid]) do
+      uuid when is_binary(uuid) and uuid != "" ->
+        url = base_url <> PhoenixKit.Modules.Storage.URLSigner.signed_url(uuid, "original")
+        [~s(<enclosure url="), escape(url), ~s(" length="0" type="audio/mpeg"/>), "\n"]
+
+      _ ->
+        []
     end
   end
 

@@ -64,6 +64,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "featured" => Map.get(post.metadata, :featured, false),
       "url_slug" => get_url_slug_for_form(post),
       "tags" => post.metadata |> Map.get(:tags) |> Kernel.||([]) |> Enum.join(", "),
+      "audio_uuid" => Map.get(post.metadata, :audio_uuid) || "",
       "og_title" => og_field(post, "title"),
       "og_description" => og_field(post, "description"),
       "og_image_uuid" => og_field(post, "image_uuid")
@@ -140,6 +141,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
         "featured" => normalize_featured_flag(form),
         "url_slug" => url_slug,
         "tags" => normalize_string(form, "tags"),
+        "audio_uuid" => normalize_string(form, "audio_uuid"),
         "og_title" => normalize_string(form, "og_title"),
         "og_description" => normalize_string(form, "og_description"),
         "og_image_uuid" => normalize_string(form, "og_image_uuid")
@@ -164,6 +166,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "featured" => false,
       "url_slug" => "",
       "tags" => "",
+      "audio_uuid" => "",
       "og_title" => "",
       "og_description" => "",
       "og_image_uuid" => ""

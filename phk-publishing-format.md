@@ -238,6 +238,27 @@ Rules of thumb:
 
 ---
 
+## Audio — `<Audio>` and the post audio version
+
+Inline audio in the body:
+
+```markdown
+<Audio file_uuid="018e3c4a-…" title="Episode 12" caption="42 min" />
+<Audio src="https://cdn.example.com/ep12.mp3" />
+```
+
+Renders a native `<audio controls preload="none">` player — no JavaScript,
+streamed on demand. `file_uuid` resolves through Storage's signed URLs (same
+as `<Image>`); `src` accepts http(s) or root-relative URLs only.
+
+Separately, the post editor's **Audio version** field (a Media ID) attaches
+an audio rendition of the whole post — e.g. a narration. It renders as a
+player above the content, and the group's RSS feed carries it as a podcast
+`<enclosure>`, so a group whose posts have audio versions is subscribable in
+podcast apps.
+
+---
+
 ## Author notes — `<Note>`
 
 Annotate a phrase to clarify it for readers:

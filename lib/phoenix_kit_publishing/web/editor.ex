@@ -2912,6 +2912,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </p>
                 </div>
 
+                <%!-- Audio version — a player renders above the post content
+                     when set; the RSS feed carries it as an enclosure. --%>
+                <div>
+                  <label class="label py-1" for="post-audio-input">
+                    <span class="label-text text-sm font-semibold text-base-content">
+                      {gettext("Audio version")}
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    id="post-audio-input"
+                    name="audio_uuid"
+                    value={@form["audio_uuid"]}
+                    class={"input input-bordered input-sm w-full font-mono text-xs #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                    placeholder="018e3c4a-9f6b-7890-abcd-ef1234567890"
+                    readonly={edit_disabled? or @viewing_older_version}
+                  />
+                  <p class="text-xs text-base-content/60 mt-1">
+                    {gettext(
+                      "A Media ID of an audio file (e.g. a narration). Shows a player above the post and rides the RSS feed as a podcast enclosure."
+                    )}
+                  </p>
+                </div>
+
                 <%!-- Social / OpenGraph overrides (per-language). See the comment
                      on the Manual Media ID details above — `open` is server-state. --%>
                 <details
