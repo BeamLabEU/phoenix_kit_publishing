@@ -287,6 +287,27 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "views_enabled",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Count views",
+        description:
+          "Track post views as per-day counts. Bot-filtered and session-deduped; no reader data is stored beyond the counts.",
+        depends_on: nil
+      },
+      %{
+        key: "show_view_counts",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Show view counts",
+        description: "Show a \"N views\" line on the post page.",
+        depends_on: "views_enabled"
+      },
+      %{
         key: "show_reading_time",
         type: :boolean,
         allowed: @boolean_allowed,

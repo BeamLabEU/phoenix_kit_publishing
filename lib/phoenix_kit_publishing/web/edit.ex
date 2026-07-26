@@ -212,6 +212,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "show_prev_next" => group["show_prev_next"],
       "search_enabled" => group["search_enabled"],
       "show_categories" => group["show_categories"],
+      "views_enabled" => group["views_enabled"],
+      "show_view_counts" => group["show_view_counts"],
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
       "scroll_headings_enabled" => group["scroll_headings_enabled"],
@@ -618,6 +620,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                     {gettext("Linked category badges above the post content.")}
                   </:description>
                 </.checkbox>
+
+                <.checkbox field={@form[:views_enabled]}>
+                  {gettext("Count views")}
+                  <:description>
+                    {gettext(
+                      "Per-day view counts; bot-filtered and session-deduped, no reader data stored."
+                    )}
+                  </:description>
+                </.checkbox>
+
+                <div :if={checked?(@form[:views_enabled].value)} class="pl-8">
+                  <.checkbox field={@form[:show_view_counts]}>
+                    {gettext("Show view counts")}
+                    <:description>
+                      {gettext("A subtle 'N views' line on the post page.")}
+                    </:description>
+                  </.checkbox>
+                </div>
 
                 <.checkbox field={@form[:show_prev_next]}>
                   {gettext("Show previous/next navigation")}

@@ -1723,6 +1723,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           <div :if={assigns[:show_reading_time]} class="text-sm text-base-content/60 mt-2">
             {reading_time_label(@html_content)}
           </div>
+          <div :if={(assigns[:view_count] || 0) > 0} class="text-sm text-base-content/60 mt-2">
+            {ngettext("%{count} view", "%{count} views", @view_count)}
+          </div>
           <%!-- Toolbar row renders only when at least one tool does — an empty
             flex row still costs its mt-4, leaving an awkward gap under the
             title on single-language public views with no admin session. --%>

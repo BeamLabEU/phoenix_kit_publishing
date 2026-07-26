@@ -61,6 +61,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       |> assign(:post_view_mode, default_mode)
       |> assign(:post_status_counts, status_counts)
       |> assign(:mount_group_slug, group_slug)
+      |> assign_view_totals()
 
     {:ok, socket}
   end
@@ -265,6 +266,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     |> assign(:posts, posts)
     |> assign(:post_status_counts, build_status_counts(all_posts, trashed_count))
     |> assign(:loading, false)
+    |> assign_view_totals()
   end
 
   defp build_status_counts(posts, trashed_count) do
@@ -495,6 +497,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         socket
         |> assign(:posts, filtered_posts)
         |> assign(:post_status_counts, build_status_counts(all_posts, trashed_count))
+        |> assign_view_totals()
     end
   end
 
@@ -682,6 +685,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
+  # Batched all-time view totals for the loaded posts — %{} when the group
+  # doesn't count views, so the card meta renders nothing.
+  defp assign_view_totals(socket) do
+    group = socket.assigns[:current_group]
+    posts = socket.assigns[:posts] || []
+
+    totals =
+      if group && group["views_enabled"] && posts != [] do
+        PhoenixKit.Modules.Publishing.Views.totals(Enum.map(posts, & &1.uuid))
+      else
+        %{}
+      end
+
+    assign(socket, :view_totals, totals)
+  end
+
   # Case-insensitive substring over the primary title, slug, and every
   # per-language title — an admin searching "Blogi" finds the post whose
   # Estonian translation carries it even while the list shows English.
@@ -754,6 +773,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     |> assign(:post_view_mode, default_mode)
     |> assign(:visible_count, 20)
     |> assign(:post_search, "")
+    |> assign_view_totals()
     |> assign(:endpoint_url, extract_endpoint_url(uri))
     |> assign(:post_status_counts, status_counts)
     |> assign(:loading, false)
@@ -1219,6 +1239,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                       <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-base-content/60">
                         <span>
                           {format_datetime(post, @phoenix_kit_current_user, @date_time_settings)}
+                        </span>
+                        <span :if={@view_totals[post.uuid]} class="inline-flex items-center gap-1">
+                          <.icon name="hero-eye" class="w-3 h-3" />
+                          {@view_totals[post.uuid]}
                         </span>
                         <%!-- Version info (show published version and count) --%>
                         <%= if is_versioned do %>

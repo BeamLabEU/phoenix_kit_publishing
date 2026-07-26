@@ -34,6 +34,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
   alias PhoenixKit.Modules.Publishing.Web.Controller.Routing
+  alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
@@ -434,6 +435,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           assigns.post
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
+        |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect_301, url} ->
@@ -502,6 +504,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           assigns.post
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
+        |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect, url} ->
@@ -707,8 +710,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       show_tags: false,
       show_top_back_link: true,
       show_prev_next: false,
-      show_categories: false
+      show_categories: false,
+      show_view_counts: false
     }
+  end
+
+  # View counting + the optional count chip. Recording mutates the session
+  # (the dedup marker), so it must run before render. Recording is async —
+  # the displayed count may lag the reader's own visit by a beat, which is
+  # why the chip hides at zero instead of greeting the first reader with
+  # "0 views".
+  defp track_post_view(conn, group, post) do
+    if Map.get(group, "views_enabled", false) do
+      conn = Views.maybe_record_view(conn, post.uuid)
+
+      if Map.get(group, "show_view_counts", false) do
+        assign(conn, :view_count, Views.total(post.uuid))
+      else
+        assign(conn, :view_count, nil)
+      end
+    else
+      assign(conn, :view_count, nil)
+    end
   end
 
   # The post's categories for the chips row — only fetched when the group

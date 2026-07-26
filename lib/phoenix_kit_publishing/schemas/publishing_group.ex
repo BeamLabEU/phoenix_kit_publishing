@@ -67,6 +67,10 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `show_prev_next` - Chronological "newer / older" post navigation at the
     bottom of the post page, within the same group + language (default `false`).
   - `show_categories` - Linked category chips on the post page (default `false`).
+  - `views_enabled` - Count post views (per-day rollups; session-deduped,
+    bot-filtered, no reader PII — see `Publishing.Views`). Default `false`.
+  - `show_view_counts` - Show the "N views" line on the post page (needs
+    `views_enabled`; default `false`).
   - `search_enabled` - A search box on the public listing (`?q=`, plain GET —
     no JS required); matches are a case-insensitive substring over the active
     published version's per-language title + body (default `false`).
@@ -249,6 +253,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
 
   @doc "Returns whether the post page shows linked category chips (default false)."
   def show_categories?(%__MODULE__{data: data}), do: Map.get(data, "show_categories", false)
+
+  @doc ~S|Returns whether the post page shows the "N views" line (default false).|
+  def show_view_counts?(%__MODULE__{data: data}), do: Map.get(data, "show_view_counts", false)
 
   @doc "Returns whether the public listing shows a search box (default false)."
   def search_enabled?(%__MODULE__{data: data}), do: Map.get(data, "search_enabled", false)
