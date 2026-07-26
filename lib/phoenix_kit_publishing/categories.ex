@@ -67,7 +67,11 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     end)
   end
 
-  @doc "Flat category list for a group, ordered by position then name."
+  @doc """
+  Flat category list for a group, ordered by position then name. Degrades to
+  `[]` when the backing table is missing (host core < V159) — every public
+  read path must survive the release-gated window.
+  """
   def list_categories(group_slug) do
     from(c in PublishingCategory,
       join: g in PublishingGroup,
@@ -76,6 +80,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       order_by: [asc: c.position, asc: c.name]
     )
     |> repo().all()
+  rescue
+    _ -> []
   end
 
   @doc "A group's category by slug."
@@ -90,6 +96,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       nil -> {:error, :not_found}
       category -> {:ok, category}
     end
+  rescue
+    _ -> {:error, :not_found}
   end
 
   @doc "A category by uuid."
@@ -266,6 +274,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       select: c
     )
     |> repo().all()
+  rescue
+    _ -> []
   end
 
   @doc "Category uuids assigned to a post."
@@ -289,6 +299,11 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     )
     |> repo().all()
     |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+  rescue
+    # Table missing (host core < V159): the listing-cache regen calls this on
+    # EVERY group rebuild — it must degrade to "no categories", never take
+    # the whole public listing down.
+    _ -> %{}
   end
 
   @doc """
@@ -337,6 +352,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     )
     |> repo().all()
     |> Map.new()
+  rescue
+    _ -> %{}
   end
 
   # ===========================================================================

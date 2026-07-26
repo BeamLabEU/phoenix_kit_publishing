@@ -56,7 +56,27 @@ makes sense.)
   - core `848f5dab` — restore_path before locale validation (fixed internal-prefix leak in language redirects, found in C0).
   - core `9b17027b` — **V159** publishing categories + post_categories + post_views (authored V157, renumbered after upstream sync; prefix oracle green).
   - `bb8425d` step 5 slice 1 — category/post-category schemas + Categories context, public category/tag archives (+descendants rule), term feeds, linked chips (show_categories), cache carries category_uuids + tags.
-- **Step 5 remaining**: admin categories management LV (tree list + inline form, link from group page header; route in Publishing.Routes admin(_locale)_routes + tab), editor assignment UI (checkbox tree in post editor; save → replace_post_categories), AI-translatable category names (follow-up), related-posts block (follow-up).
+- `91ae88d` step 5 slice 2 — CategoriesLive admin page (+ group-header link, LV tests), editor CategoriesPicker LC (persists on toggle) + Tags input through the form pipeline.
+- `4fe8be1` step 6 — Views: daily rollups, session-cookie dedup (cap = viewed), bot filter, EXIT-safe async record, admin card totals, show_view_counts chip, top_posts window API.
+- `87f1739` step 7 — stretch/align on every PHK component (renderer-level negative-margin lanes, viewport-clamped); step 9 extended it to the self-closing inline path.
+- `a5a11f9` step 8 — author notes: <Note note="…">phrase</Note> → numbered refs + collected Notes section (no-JS) + CSS-only popovers; code-fence immune; document-sequential.
+- `128dac6` step 9 — audio: <Audio> component (signed Storage/https srcs), post audio-version slot (editor field → player above content), RSS podcast enclosures.
+- `071fd4f` step 10 — comments over an optional seam: dead-view thread + POST form (honeypot + signed 3s time-trap + CSRF), logged-in only, core POST routes in the dispatch scope; comments module admin = the moderation surface for now.
+- core `5838f766` — POST routes in the publishing dispatch scope.
+
+### Follow-ups (surfaced, not silently dropped)
+- **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
+- **Publishing-scoped moderation page** — a filtered surface over comments' status machinery ("maybe" per boss; comments admin covers it today).
+- **AI narration (audio tier 2)** — PhoenixKitAI.speak/3 per language + Oban worker + editor action; endpoint-selection UX to design.
+- **AI-translatable category names** — third Translatable adapter (group-name pattern) + multilang tabs on the category form.
+- **Dashboard widgets** (Top posts / Views this week via Views.top_posts) — publishing implements phoenix_kit_widgets/0 (hello_world reference pair).
+- **Popular listing sort** — "popular" in listing_sorts backed by Views window counts.
+- **Related posts** — same-category/tag heuristic over the cached maps.
+- **PullQuote / Gallery / TOC components** — ride the stretch lanes.
+- **Editor annotate-selection toolbar action** — core MarkdownEditor hook change.
+- **Restore-path e2e pin** — a publishing test through a real phoenix_kit_routes()-built router (core fix 848f5dab's regression test).
+- **Step 11 extras** (scheduled publishing, draft share links, author pages, year/month archives, newsletters subscribe seam, sitemap verification) — opportunistic as planned.
+- **i18n catch-up** — ~85 new gettext messages across the wave are extracted but untranslated (et/ru/fr…).
 - **Environment notes**: parent server restart needed per publishing/core change (hot-reload misses path deps). Playwright screenshots wedge after first capture — kill `pgrep -f mcp-chrome` + relaunch; geometry probes + curl are the reliable verification. Quorum diffs must include untracked files (`git add -N` first). zai CLI currently errors (ANTHROPIC_API_KEY conflict); agy+grok reliable.
 - **Cross-repo state**: core fork merged upstream 1.7.211 (V157/V158 upstream); publishing needs PHOENIX_KIT_PATH=../phoenix_kit until a core release carries V159. Parent dev DB migrates on next boot.
 
