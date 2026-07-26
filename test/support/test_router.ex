@@ -45,6 +45,7 @@ defmodule PhoenixKitPublishing.Test.Router do
       live("/", Index, :index, as: :publishing_index)
       live("/new-group", New, :new, as: :publishing_new)
       live("/edit-group/:group", Edit, :edit, as: :publishing_edit_group)
+      live("/categories/:group", CategoriesLive, :index, as: :publishing_categories)
       live("/:group", Listing, :group, as: :publishing_listing)
       live("/:group/edit", Editor, :edit, as: :publishing_editor_root)
       live("/:group/new", Editor, :new, as: :publishing_editor_new)

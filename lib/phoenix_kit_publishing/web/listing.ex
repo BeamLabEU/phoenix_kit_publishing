@@ -1075,6 +1075,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
           <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" /> {gettext("Refresh")}
         </button>
         <.link
+          navigate={Routes.path("/admin/publishing/categories/#{group_slug}")}
+          class="btn btn-outline btn-sm shadow-none"
+        >
+          <.icon name="hero-tag" class="w-4 h-4 mr-1" /> {gettext("Categories")}
+        </.link>
+        <.link
           navigate={Routes.path("/admin/publishing/edit-group/#{group_slug}")}
           class="btn btn-outline btn-sm shadow-none"
         >

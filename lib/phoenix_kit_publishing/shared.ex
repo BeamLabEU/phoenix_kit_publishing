@@ -91,11 +91,12 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   def actor_uuid_from_socket(%{assigns: assigns}), do: actor_uuid_from_assigns(assigns)
   def actor_uuid_from_socket(_), do: nil
 
-  defp actor_uuid_from_assigns(%{phoenix_kit_current_scope: %{user: %{uuid: uuid}}})
-       when is_binary(uuid),
-       do: uuid
+  @doc "Like `actor_uuid_from_socket/1` but for a template's assigns map."
+  def actor_uuid_from_assigns(%{phoenix_kit_current_scope: %{user: %{uuid: uuid}}})
+      when is_binary(uuid),
+      do: uuid
 
-  defp actor_uuid_from_assigns(_), do: nil
+  def actor_uuid_from_assigns(_), do: nil
 
   # ============================================================================
   # Post Reading (shared by Posts, Versions, TranslationManager)
