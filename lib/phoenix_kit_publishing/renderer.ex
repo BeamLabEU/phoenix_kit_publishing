@@ -201,6 +201,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   """
   @spec render_markdown(String.t() | any()) :: String.t()
   def render_markdown(content) when is_binary(content) do
+    # Author notes are a document-level feature (sequential numbering + a
+    # collected section), so they're extracted before the per-segment
+    # component pipeline runs.
+    {content, notes} = extract_notes(content)
+
     {time, result} =
       :timer.tc(fn ->
         if has_embedded_components?(content) do
@@ -217,10 +222,96 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
     # credo:disable-for-lines:2 Credo.Check.Warning.MissingMetadataKeyInLoggerConfig
     Logger.debug("Content render time: #{time}μs", content_size: byte_size(content))
-    heal_signed_file_urls(result)
+    heal_signed_file_urls(result) <> notes_section(notes)
   end
 
   def render_markdown(_), do: ""
+
+  # ===========================================================================
+  # Author notes (<Note note="…">phrase</Note>)
+  #
+  # The writer annotates a phrase to clarify it for readers. Renders as the
+  # phrase with a superscript number linking to a collected Notes section at
+  # the bottom (plain-HTML footnote UX — the no-JS baseline), plus a
+  # CSS-only hover/focus popover carrying the note text (progressive
+  # enhancement via `content: attr(data-note)` — still no JS). Numbering is
+  # sequential through the document; a literal <Note> inside a code fence is
+  # ignored (the code mask runs first). Named "notes", not "annotations" —
+  # core already uses that word for Etcher media markup.
+  # ===========================================================================
+
+  @note_regex ~r/<Note\s+note="([^"]*)"\s*>(.*?)<\/Note>/s
+
+  defp extract_notes(content) do
+    masked = mask_scanned_code(content)
+
+    if masked =~ @note_regex do
+      parts = Regex.split(@note_regex, masked, include_captures: true)
+
+      {iodata, notes} =
+        Enum.reduce(parts, {[], []}, fn part, {out, notes} ->
+          case Regex.run(@note_regex, part) do
+            [^part, body, phrase] ->
+              number = length(notes) + 1
+              {[note_ref_html(number, body, phrase) | out], [body | notes]}
+
+            _ ->
+              {[part | out], notes}
+          end
+        end)
+
+      # Content stays masked here: the plain path unmasks inside
+      # render_markdown_html/1, and the mixed path's re-mask is a no-op on
+      # already-masked code regions.
+      {iodata |> Enum.reverse() |> IO.iodata_to_binary(), Enum.reverse(notes)}
+    else
+      {content, []}
+    end
+  end
+
+  defp note_ref_html(number, body, phrase) do
+    [
+      ~s(<a class="pk-note-ref" id="pk-note-ref-#{number}" href="#pk-note-#{number}" data-note="),
+      escape_html(body),
+      ~s(">),
+      phrase,
+      ~s(<sup>#{number}</sup></a>)
+    ]
+  end
+
+  defp notes_section([]), do: ""
+
+  defp notes_section(notes) do
+    items =
+      notes
+      |> Enum.with_index(1)
+      |> Enum.map_join(fn {body, number} ->
+        ~s(<li id="pk-note-#{number}">) <>
+          escape_html(body) <>
+          ~s( <a href="#pk-note-ref-#{number}" aria-label="Back to text">↩</a></li>)
+      end)
+
+    """
+    <section class="pk-notes mt-10 border-t border-base-200 pt-4 text-sm text-base-content/70">
+    <h2 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">Notes</h2>
+    <ol class="list-decimal space-y-1 pl-5">#{items}</ol>
+    </section>
+    <style>
+    .pk-note-ref{text-decoration:underline dotted;text-underline-offset:3px;position:relative;color:inherit}
+    .pk-note-ref sup{color:oklch(var(--p));font-weight:600;margin-left:1px}
+    .pk-note-ref:hover::after,.pk-note-ref:focus-visible::after{content:attr(data-note);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(20rem,80vw);white-space:normal;background:var(--color-base-200,#eee);color:var(--color-base-content,#111);border:1px solid var(--color-base-300,#ddd);border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;line-height:1.35;z-index:20;box-shadow:0 4px 12px rgb(0 0 0/.08)}
+    .pk-notes li:target{background:var(--color-base-200,#eee);border-radius:.25rem}
+    </style>
+    """
+  end
+
+  defp escape_html(text) do
+    text
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
+    |> String.replace("\"", "&quot;")
+  end
 
   # Re-resolves embedded signed-file URLs against the CURRENT url_prefix and
   # secret. Legacy inline images stored a fully-resolved `<old-prefix>/file/...`

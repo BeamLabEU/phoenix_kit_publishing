@@ -238,6 +238,25 @@ Rules of thumb:
 
 ---
 
+## Author notes — `<Note>`
+
+Annotate a phrase to clarify it for readers:
+
+```markdown
+The design uses <Note note="Content-addressed: the key is a hash of the bytes.">CAS storage</Note> under the hood.
+```
+
+Renders as the phrase with a superscript number that links to a collected
+**Notes** section at the bottom of the post (works with no JavaScript), plus
+a hover/focus popover showing the note text (pure CSS).
+
+- Numbering is automatic and sequential through the document.
+- The `note` text is plain text; it cannot contain double quotes (use
+  apostrophes) and HTML in it is shown literally, never executed.
+- A literal `<Note>` inside a code fence is left as code.
+
+---
+
 ## Best practices
 
 - **Let Markdown do the heavy lifting.** Use inline components only when you need structured UI blocks.
