@@ -212,6 +212,32 @@ There is no longer a pure-XML PageBuilder flow; Markdown is the primary content 
 
 ---
 
+## Stretch / align — breaking out of the text column
+
+Every PHK component accepts two optional layout attributes, applied by the
+renderer (no per-component support needed):
+
+| Attribute | Values | Effect |
+|-----------|--------|--------|
+| `stretch` | `1`–`100` | The element renders that many percent **wider than the text column**, centered — `stretch="20"` is 20% wider (10% overhang each side). |
+| `align` | `wide` \| `full` | Presets: `wide` = +30%; `full` = full-bleed to the viewport edge (1rem gutter). |
+
+```markdown
+<Image src="hero.jpg" alt="Skyline" stretch="20" />
+<Headline align="wide">A title that escapes the column</Headline>
+<Video src="launch.mp4" align="full" />
+```
+
+Rules of thumb:
+
+- An explicit `stretch` wins when both are given.
+- The overhang is automatically clamped to the space between the column and
+  the viewport — on phones the element simply stays in the column. No JS.
+- Invalid values (`0`, `>100`, non-numbers, unknown `align`) are ignored and
+  the component renders normally.
+
+---
+
 ## Best practices
 
 - **Let Markdown do the heavy lifting.** Use inline components only when you need structured UI blocks.

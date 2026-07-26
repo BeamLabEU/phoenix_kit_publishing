@@ -12,7 +12,7 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.RendererTest do
 
   alias PhoenixKit.Modules.Publishing.PageBuilder.Renderer
 
-  defp html(safe), do: safe |> Phoenix.HTML.safe_to_string()
+  defp html(safe), do: safe |> Phoenix.HTML.Safe.to_iodata() |> IO.iodata_to_binary()
 
   describe "render/2 — unknown components" do
     test "wraps unknown component AST in <div class=\"unknown-component\">" do
@@ -42,6 +42,51 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.RendererTest do
       assert {:ok, safe} = Renderer.render(ast, %{})
       rendered = html(safe)
       assert rendered =~ "<em>marked up</em>"
+    end
+  end
+
+  describe "render/2 — stretch / align lanes" do
+    defp headline_ast(attributes) do
+      %{type: :headline, attributes: attributes, content: "Big Title", children: []}
+    end
+
+    test "stretch=20 wraps the component with clamped negative margins" do
+      {:ok, safe} = Renderer.render(headline_ast(%{"stretch" => "20"}), %{})
+      out = html(safe)
+
+      assert out =~ ~s(class="pk-stretch")
+      # 20% total = 10% per side, clamped to the column↔viewport gap.
+      assert out =~ "min(10.0%, max(0px, (100vw - 100%) / 2 - 1rem))"
+      assert out =~ "Big Title"
+    end
+
+    test "align=wide applies the preset; align=full goes full-bleed" do
+      {:ok, wide} = Renderer.render(headline_ast(%{"align" => "wide"}), %{})
+      assert html(wide) =~ "min(15.0%,"
+
+      {:ok, full} = Renderer.render(headline_ast(%{"align" => "full"}), %{})
+      out = html(full)
+      assert out =~ ~s(class="pk-stretch")
+      assert out =~ "margin-inline: calc(-1 * max(0px, (100vw - 100%) / 2 - 1rem))"
+      refute out =~ "min("
+    end
+
+    test "an explicit stretch wins over an align preset" do
+      {:ok, safe} = Renderer.render(headline_ast(%{"stretch" => "40", "align" => "full"}), %{})
+      assert html(safe) =~ "min(20.0%,"
+    end
+
+    test "invalid values render unwrapped" do
+      for attrs <- [
+            %{"stretch" => "0"},
+            %{"stretch" => "150"},
+            %{"stretch" => "20; background:red"},
+            %{"align" => "sideways"},
+            %{}
+          ] do
+        {:ok, safe} = Renderer.render(headline_ast(attrs), %{})
+        refute html(safe) =~ "pk-stretch"
+      end
     end
   end
 
