@@ -213,6 +213,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "search_enabled" => group["search_enabled"],
       "show_categories" => group["show_categories"],
       "views_enabled" => group["views_enabled"],
+      "comments_enabled" => group["comments_enabled"],
       "show_view_counts" => group["show_view_counts"],
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
@@ -618,6 +619,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   {gettext("Show category chips")}
                   <:description>
                     {gettext("Linked category badges above the post content.")}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:comments_enabled]}>
+                  {gettext("Enable comments")}
+                  <:description>
+                    {gettext(
+                      "A comment thread under each post. Requires the Comments module; logged-in readers can post."
+                    )}
                   </:description>
                 </.checkbox>
 

@@ -1601,6 +1601,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     """
   end
 
+  # Comment author display: full name, else the email's local part.
+  defp comment_author_name(%{user: %{} = user}) do
+    name =
+      [Map.get(user, :first_name), Map.get(user, :last_name)]
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.join(" ")
+
+    cond do
+      name != "" -> name
+      is_binary(Map.get(user, :email)) -> user.email |> String.split("@") |> List.first()
+      true -> gettext("Reader")
+    end
+  end
+
+  defp comment_author_name(_), do: gettext("Reader")
+
   # An explicit description wins; otherwise derive an excerpt from the content.
   defp post_card_excerpt(post) do
     if desc = Map.get(post.metadata, :description) do
@@ -1863,6 +1879,70 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <span class="font-medium group-hover:text-primary">{@older_post.title}</span>
           </.link>
         </nav>
+        <%!-- Comments (gated on comments_enabled + the optional comments
+          module). Dead-view thread + plain POST form — works with no JS;
+          the controller handles honeypot/time-trap/auth and redirects back
+          here with a flash. --%>
+        <section :if={assigns[:comments_enabled]} id="comments" class="mt-10 border-t pt-6">
+          {Publishing.Comments.content_styles()}
+          <h2 class="mb-4 text-lg font-semibold">
+            {ngettext("%{count} comment", "%{count} comments", length(@post_comments))}
+          </h2>
+          <div :if={@post_comments == []} class="mb-6 text-sm text-base-content/60">
+            {gettext("No comments yet — be the first.")}
+          </div>
+          <ol class="mb-8 space-y-5">
+            <li :for={comment <- @post_comments} id={"comment-#{comment.uuid}"}>
+              <div class="flex items-baseline gap-2 text-sm">
+                <span class="font-semibold">{comment_author_name(comment)}</span>
+                <time
+                  class="text-xs text-base-content/50"
+                  datetime={DateTime.to_iso8601(comment.inserted_at)}
+                >
+                  {Calendar.strftime(comment.inserted_at, "%Y-%m-%d %H:%M")}
+                </time>
+              </div>
+              <div class="mt-1 text-sm">
+                {Publishing.Comments.render_content(comment.content)}
+              </div>
+            </li>
+          </ol>
+          <%= if assigns[:phoenix_kit_current_scope] && assigns.phoenix_kit_current_scope.user do %>
+            <form
+              method="post"
+              action={build_post_url(@group_slug, @post, @current_language) <> "#comments"}
+              class="space-y-3"
+            >
+              <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+              <input type="hidden" name="post_uuid" value={@post.uuid} />
+              <input type="hidden" name="ft" value={assigns[:comment_form_token]} />
+              <%!-- Honeypot — visually hidden; anything typed here is a bot. --%>
+              <div class="hidden" aria-hidden="true">
+                <label>
+                  Website <input type="text" name="website" tabindex="-1" autocomplete="off" />
+                </label>
+              </div>
+              <textarea
+                name="content"
+                rows="4"
+                required
+                maxlength="10000"
+                placeholder={gettext("Write a comment… (Markdown supported)")}
+                class="textarea textarea-bordered w-full"
+              ></textarea>
+              <button type="submit" class="btn btn-primary btn-sm">
+                {gettext("Post comment")}
+              </button>
+            </form>
+          <% else %>
+            <div class="rounded-lg border border-dashed border-base-300 p-4 text-sm text-base-content/60">
+              <.link navigate={PhoenixKit.Utils.Routes.path("/users/log-in")} class="link">
+                {gettext("Log in")}
+              </.link>
+              {gettext("to join the conversation.")}
+            </div>
+          <% end %>
+        </section>
         <%!-- Post Footer — same compact muted link as the top, no button chrome. --%>
         <footer class="mt-6 border-t pt-2">
           <.link

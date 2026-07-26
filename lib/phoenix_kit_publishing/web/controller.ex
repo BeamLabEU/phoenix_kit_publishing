@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Categories
+  alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Web.Controller.Fallback
   alias PhoenixKit.Modules.Publishing.Web.Controller.Feed
@@ -143,6 +144,113 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       end
     else
       handle_not_found(conn, :module_disabled)
+    end
+  end
+
+  @doc """
+  Public comment submission (the dead-view POST form on post pages).
+
+  Guards, in order: module+public on, the group exists and has
+  comments_enabled, the comments seam is available, honeypot empty, the
+  signed form token is 3s–1day old (bots submit instantly; stale tabs
+  re-render), the post uuid belongs to the group's published set, and the
+  reader is logged in. Every outcome redirects back to the post (or the
+  group listing when the post can't be resolved) with a flash — no JSON,
+  no dead ends.
+  """
+  def create_comment(conn, params) do
+    group_slug = params["group"]
+
+    with true <- Publishing.enabled?() and public_enabled?(),
+         {:ok, group} <- Publishing.get_group(group_slug),
+         true <- Map.get(group, "comments_enabled", false),
+         true <- PublishingComments.available?() do
+      handle_comment_submission(conn, group, params)
+    else
+      _ -> handle_not_found(conn, :group_not_found)
+    end
+  end
+
+  defp handle_comment_submission(conn, group, params) do
+    group_slug = group["slug"]
+    language = params["language"] || Language.get_default_language()
+    post_uuid = params["post_uuid"]
+
+    post =
+      Listing.chronological_posts(group_slug, language)
+      |> Enum.find(&(&1[:uuid] == post_uuid))
+
+    back_path =
+      case post do
+        nil -> PublishingHTML.group_listing_path(language, group_slug)
+        post -> PublishingHTML.build_post_url(group_slug, post, language) <> "#comments"
+      end
+
+    cond do
+      is_nil(post) ->
+        conn
+        |> put_flash(:error, gettext("That post is no longer available."))
+        |> redirect(to: PublishingHTML.group_listing_path(language, group_slug))
+
+      # Honeypot: a filled "website" field is a bot — pretend success.
+      params["website"] not in [nil, ""] ->
+        redirect(conn, to: back_path)
+
+      not comment_token_valid?(conn, params["ft"]) ->
+        conn
+        |> put_flash(:error, gettext("The form expired — please try again."))
+        |> redirect(to: back_path)
+
+      is_nil(current_user_uuid(conn)) ->
+        conn
+        |> put_flash(:error, gettext("Please log in to comment."))
+        |> redirect(to: back_path)
+
+      true ->
+        submit_comment(conn, post, params, back_path)
+    end
+  end
+
+  defp submit_comment(conn, post, params, back_path) do
+    content = params["content"] |> to_string() |> String.trim()
+
+    case PublishingComments.create(post[:uuid], current_user_uuid(conn), content) do
+      {:ok, _comment} ->
+        conn
+        |> put_flash(:info, gettext("Comment posted."))
+        |> redirect(to: back_path)
+
+      {:error, :empty_comment} ->
+        conn
+        |> put_flash(:error, gettext("The comment can't be empty."))
+        |> redirect(to: back_path)
+
+      {:error, :content_too_long} ->
+        conn
+        |> put_flash(:error, gettext("That comment is too long."))
+        |> redirect(to: back_path)
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, gettext("Couldn't post your comment — please try again."))
+        |> redirect(to: back_path)
+    end
+  end
+
+  # 3s minimum (instant submits are bots), 1 day maximum (stale tabs).
+  defp comment_token_valid?(conn, token) when is_binary(token) do
+    case Phoenix.Token.verify(conn, "pk_pub_comment", token, max_age: 86_400) do
+      {:ok, signed_at} -> System.system_time(:second) - signed_at >= 3
+      _ -> false
+    end
+  end
+
+  defp comment_token_valid?(_conn, _), do: false
+
+  defp current_user_uuid(conn) do
+    case conn.assigns[:phoenix_kit_current_scope] do
+      %{user: %{uuid: uuid}} when is_binary(uuid) -> uuid
+      _ -> nil
     end
   end
 
@@ -436,6 +544,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect_301, url} ->
@@ -505,6 +614,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect, url} ->
@@ -731,6 +841,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       end
     else
       assign(conn, :view_count, nil)
+    end
+  end
+
+  # Comment-thread assigns for the post page: the published thread + a signed
+  # time-trap token for the form (a bot that posts instantly fails the age
+  # check). Only fetched when the group's comments_enabled is on AND the
+  # optional comments module is present+enabled.
+  defp assign_post_comments(conn, group, post) do
+    if Map.get(group, "comments_enabled", false) and PublishingComments.available?() do
+      conn
+      |> assign(:comments_enabled, true)
+      |> assign(:post_comments, PublishingComments.list(post.uuid))
+      |> assign(
+        :comment_form_token,
+        Phoenix.Token.sign(conn, "pk_pub_comment", System.system_time(:second))
+      )
+    else
+      assign(conn, :comments_enabled, false)
     end
   end
 

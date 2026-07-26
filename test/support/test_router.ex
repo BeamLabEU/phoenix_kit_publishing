@@ -74,6 +74,11 @@ defmodule PhoenixKitPublishing.Test.Router do
     get("/:language/:group/*path", PhoenixKit.Modules.Publishing.Web.Controller, :show)
     get("/:group", PhoenixKit.Modules.Publishing.Web.Controller, :show)
     get("/:group/*path", PhoenixKit.Modules.Publishing.Web.Controller, :show)
+    # Root-form only: production's RouterDispatch discriminator decides
+    # localized-vs-root per request; this flat router can't, and a
+    # "/:language/:group/*path" POST here would swallow 2-segment root
+    # posts as language+group. Tests submit prefixless.
+    post("/:group/*path", PhoenixKit.Modules.Publishing.Web.Controller, :create_comment)
   end
 
   # Pulls a test-configured scope out of the calling test process's

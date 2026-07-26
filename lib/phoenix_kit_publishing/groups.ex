@@ -298,7 +298,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
                         show_featured_image show_reading_time show_tags show_post_count
                         show_top_back_link listing_image_links listing_animations
                         show_prev_next search_enabled show_categories
-                        views_enabled show_view_counts)
+                        views_enabled show_view_counts comments_enabled)
   @enum_settings [
     {"featured_layout", @featured_layouts},
     {"featured_style", @band_styles},
@@ -719,6 +719,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "show_categories" => Map.get(data, "show_categories", false),
       "views_enabled" => Map.get(data, "views_enabled", false),
       "show_view_counts" => Map.get(data, "show_view_counts", false),
+      "comments_enabled" => Map.get(data, "comments_enabled", false),
       "name_i18n" => name_i18n_map(data)
     }
   end

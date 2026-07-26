@@ -94,6 +94,10 @@ defmodule PhoenixKitPublishing.MixProject do
       # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
       # which the group editor imports directly.
       pk_dep(:phoenix_kit_ai, "~> 0.17"),
+      # Test-only: exercises the OPTIONAL comments seam (public thread + POST
+      # form). Production installs opt in by adding the package themselves —
+      # publishing runs fine without it.
+      {:phoenix_kit_comments, "~> 0.2", only: :test},
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},

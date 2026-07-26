@@ -287,6 +287,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "comments_enabled",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Comments",
+        description:
+          "Show a comment thread under posts (requires the phoenix_kit_comments module; logged-in readers can post).",
+        depends_on: nil
+      },
+      %{
         key: "views_enabled",
         type: :boolean,
         allowed: @boolean_allowed,

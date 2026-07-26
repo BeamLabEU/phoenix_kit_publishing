@@ -531,6 +531,26 @@ same fetched group map also feeds the controller's
 overview cards. Admin surfaces intentionally show the canonical primary-language
 name. `display_settings_render_test.exs` pins the reach.
 
+## Comments (optional seam)
+
+`PhoenixKit.Modules.Publishing.Comments` is a guarded seam to the optional
+`phoenix_kit_comments` package (same posture as the `phoenix_kit_og` seam —
+no dep in mix.exs except `only: :test`; every call `Code.ensure_loaded?` +
+rescued). When the module is installed AND enabled AND a group's
+`comments_enabled` setting is on, post pages render a dead-view comment
+thread (`resource_type "publishing_post"`, sanitized markdown via the
+comments module's renderer) and a plain POST form — Phoenix-first, no JS.
+Submission rides new POST routes in core's publishing dispatch scope
+(method-agnostic rewrite) to `Controller.create_comment/2`, guarded in
+order: module/public/group gates → honeypot (`website` field; filled =
+pretend success) → signed time-trap (`Phoenix.Token`, 3s–1day window) →
+post-in-published-set check → logged-in user. Every outcome redirects back
+with a flash. **Logged-in only for now** — the comments schema
+`validate_required`s `user_uuid`; guest commenting is a cross-repo
+follow-up (nullable user + author fields in BeamLab's comments module).
+Moderation uses the comments module's own admin (statuses + bulk updates);
+a publishing-scoped moderation surface is a follow-up.
+
 ## Language switcher integration
 
 Publishing renders an in-page language switcher on group-listing and post pages by default. Most host apps already have one in their header, in which case the in-page switcher is duplicate UI. Three integration points:
