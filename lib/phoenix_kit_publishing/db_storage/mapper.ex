@@ -78,6 +78,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       content_updated_at: content.updated_at,
       metadata: build_metadata(post, version, content, effective_status, effective_published_at)
     }
+    |> maybe_override_title(opts)
   end
 
   @doc """
@@ -144,6 +145,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       language_titles: Map.new(all_contents, fn c -> {c.language, c.title} end),
       language_excerpts: Map.new(all_contents, fn c -> {c.language, extract_excerpt(c)} end)
     }
+    |> maybe_override_title(opts)
   end
 
   # ===========================================================================
@@ -158,6 +160,20 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   defp effective_overrides(opts, status, published_at) do
     {Keyword.get(opts, :effective_status) || status,
      Keyword.get(opts, :effective_published_at) || published_at}
+  end
+
+  # The admin listing's live-title override (see the caller in DBStorage):
+  # applied AFTER the map is built so the per-language/per-version maps stay
+  # version-accurate — only the card-level metadata.title follows the live
+  # version. A no-op when the opt is absent (every non-admin path).
+  defp maybe_override_title(map, opts) do
+    case Keyword.get(opts, :effective_title) do
+      title when is_binary(title) and title != "" ->
+        put_in(map, [:metadata, :title], title)
+
+      _ ->
+        map
+    end
   end
 
   defp get_group_slug(%PublishingPost{group: %{slug: slug}}), do: slug

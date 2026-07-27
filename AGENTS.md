@@ -450,13 +450,16 @@ a11y-safe cover); `minimal` = text-only accent-border editorial band; `top` =
 strength, band height, and text placement are deliberately hardcoded (5-AI
 panel consensus: good defaults over option bloat).
 
-**Admin post-status classification** (2026-07-21): the admin group page
-classifies each post by its LIVE state — `list_posts_with_metadata` passes an
-`:effective_status` override ("published" iff the post's ACTIVE version exists
-and is published, the same rule the public `list_posts_for_listing` applies) —
-while still mapping the LATEST version for editing context. Deliberate split:
-`metadata.status` is the post-level truth (tabs/counts/status select), the
-per-language/per-version maps stay version-accurate. Versions are an ARCHIVAL
+**Admin post-status classification** (2026-07-21; title added 2026-07-27):
+the admin group page shows each post by its LIVE state —
+`list_posts_with_metadata` passes `:effective_status`,
+`:effective_published_at`, AND `:effective_title` overrides (all read from
+the ACTIVE published version, the same rule the public
+`list_posts_for_listing` applies) — while still mapping the LATEST version
+for editing context. Deliberate split: `metadata.status`/`title`/publish
+date are the card-level truth (what readers see), the
+per-language/per-version maps stay version-accurate so the editor lands on
+the newest draft. Versions are an ARCHIVAL
 tool here (retain old legal text, branch a rewrite) — do not surface
 "unpublished edits" style pending-work flags in listings (boss call).
 

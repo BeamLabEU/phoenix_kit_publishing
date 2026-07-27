@@ -1130,15 +1130,39 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         version,
         all_contents_by_version,
         published_by_post,
-        # The live (active, published) version drives both the post-level
-        # status AND the visible publish date — the mapped latest revision
-        # of a live post is a draft with a nil published_at.
-        if(live,
-          do: [effective_status: "published", effective_published_at: live.published_at],
-          else: []
-        )
+        # The live (active, published) version drives the post-level status,
+        # the visible publish date, AND the card title — the mapped latest
+        # revision of a live post is a draft whose title/date may differ
+        # from what readers see. (Maintainer call 2026-07-27: the admin card
+        # must read like the public post; the per-language/per-version maps
+        # stay latest-version for editing context.)
+        live_effective_opts(live, all_contents_by_version)
       )
     end)
+  end
+
+  # Effective-override opts for a post whose ACTIVE version is published:
+  # status, publish date, and title all follow the live version. The title
+  # picks the live version's primary-language content (the same rule the
+  # mapper's primary_content uses), falling back to its first content row.
+  defp live_effective_opts(nil, _all_contents_by_version), do: []
+
+  defp live_effective_opts(live, all_contents_by_version) do
+    base = [effective_status: "published", effective_published_at: live.published_at]
+
+    live_contents = Map.get(all_contents_by_version, live.uuid, [])
+
+    primary =
+      Enum.find(live_contents, &(&1.language == LanguageHelpers.get_primary_language())) ||
+        List.first(live_contents)
+
+    case primary do
+      %{title: title} when is_binary(title) and title != "" ->
+        [effective_title: title] ++ base
+
+      _ ->
+        base
+    end
   end
 
   @doc """
