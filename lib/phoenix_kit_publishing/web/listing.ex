@@ -201,7 +201,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     group_slug = socket.assigns.group_slug
 
     uuid = params["uuid"]
-    url = Helpers.build_edit_url(group_slug, %{uuid: uuid}, lang: lang_code)
+
+    url =
+      Helpers.build_edit_url(group_slug, %{uuid: uuid},
+        lang: lang_code,
+        version: live_version_for(socket, uuid)
+      )
 
     {:noreply, push_navigate(socket, to: url)}
   end
@@ -211,7 +216,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
     case params["uuid"] do
       uuid when is_binary(uuid) and uuid != "" ->
-        url = Helpers.build_edit_url(group_slug, %{uuid: uuid}, lang: lang_code)
+        url =
+          Helpers.build_edit_url(group_slug, %{uuid: uuid},
+            lang: lang_code,
+            version: live_version_for(socket, uuid)
+          )
+
         {:noreply, push_navigate(socket, to: url)}
 
       _ ->
@@ -683,6 +693,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     else
       assign(socket, :group_slug, new_slug)
     end
+  end
+
+  # The live (published) version number for an admin-card edit link — nil for
+  # unpublished posts, which then open the newest revision (build_edit_url
+  # drops a nil version param).
+  defp live_version_for(socket, uuid) do
+    Enum.find_value(socket.assigns[:posts] || [], fn post ->
+      if post[:uuid] == uuid, do: post[:live_version]
+    end)
   end
 
   # Batched all-time view totals for the loaded posts — %{} when the group
@@ -1267,10 +1286,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                         <%= if @post_view_mode == "trashed" do %>
                           {post.metadata.title || gettext("Untitled post")}
                         <% else %>
+                          <%!-- Published posts open pinned to the LIVE version
+                            (what readers see); drafts open the newest revision.
+                            All versions stay editable (variant versioning). --%>
                           <.link
                             href={
-                              PhoenixKit.Utils.Routes.path(
-                                "/admin/publishing/#{group_slug}/#{post.uuid}/edit?lang=#{post_primary_lang}"
+                              Helpers.build_edit_url(group_slug, post,
+                                lang: post_primary_lang,
+                                version: post[:live_version]
                               )
                             }
                             class="hover:text-primary transition-colors"

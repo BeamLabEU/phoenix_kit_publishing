@@ -167,12 +167,20 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   # version-accurate — only the card-level metadata.title follows the live
   # version. A no-op when the opt is absent (every non-admin path).
   defp maybe_override_title(map, opts) do
-    case Keyword.get(opts, :effective_title) do
-      title when is_binary(title) and title != "" ->
-        put_in(map, [:metadata, :title], title)
+    map =
+      case Keyword.get(opts, :effective_title) do
+        title when is_binary(title) and title != "" ->
+          put_in(map, [:metadata, :title], title)
 
-      _ ->
-        map
+        _ ->
+          map
+      end
+
+    # Present only for published posts: the version number the admin card's
+    # edit links pin (published → open the live version; drafts → newest).
+    case Keyword.get(opts, :effective_live_version) do
+      n when is_integer(n) -> Map.put(map, :live_version, n)
+      _ -> map
     end
   end
 

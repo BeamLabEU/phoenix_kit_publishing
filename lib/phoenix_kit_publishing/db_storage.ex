@@ -1148,7 +1148,11 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   defp live_effective_opts(nil, _all_contents_by_version), do: []
 
   defp live_effective_opts(live, all_contents_by_version) do
-    base = [effective_status: "published", effective_published_at: live.published_at]
+    base = [
+      effective_status: "published",
+      effective_published_at: live.published_at,
+      effective_live_version: live.version_number
+    ]
 
     live_contents = Map.get(all_contents_by_version, live.uuid, [])
 

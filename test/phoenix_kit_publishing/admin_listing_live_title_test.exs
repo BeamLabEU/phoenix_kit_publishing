@@ -42,6 +42,8 @@ defmodule PhoenixKit.Modules.Publishing.AdminListingLiveTitleTest do
     # Card-level truth = the live version.
     assert mapped.metadata.title == "Live Title"
     assert mapped.metadata.status == "published"
+    # Edit links pin this: published posts open the live version.
+    assert mapped.live_version == 1
 
     # Editing context stays latest-version: the mapped revision and the
     # per-language titles reflect the draft.
@@ -58,5 +60,7 @@ defmodule PhoenixKit.Modules.Publishing.AdminListingLiveTitleTest do
     [mapped] = DBStorage.list_posts_with_metadata(group["slug"])
     assert mapped.metadata.title == "Only Draft"
     assert mapped.metadata.status == "draft"
+    # No live version → edit links open the newest revision (no ?v= pin).
+    refute Map.has_key?(mapped, :live_version)
   end
 end
