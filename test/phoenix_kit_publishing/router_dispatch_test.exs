@@ -296,19 +296,38 @@ defmodule PhoenixKitPublishing.RouterDispatchIntegrationTest do
       assert RouterDispatch.maybe_rewrite(conn) == :pass
     end
 
-    test "passes through a non-GET request even when a segment is a group (H3)" do
-      # Public publishing is read-only; a host `POST /<group>/...` must not be
-      # diverted into the GET-only internal scope.
+    test "rewrites a POST on a known-group path (the public comment form)" do
+      # The comment form posts to the post URL; the internal scope carries
+      # matching `post` routes. (Before comments this passed as read-only —
+      # regression: the form 404'd with NoRouteError.)
       {:ok, real_group} = Groups.add_group(unique_name())
 
       conn = %Plug.Conn{
         method: "POST",
-        path_info: [real_group["slug"], "submit"],
-        request_path: "/" <> real_group["slug"] <> "/submit",
+        path_info: [real_group["slug"], "2026-03-09"],
+        request_path: "/" <> real_group["slug"] <> "/2026-03-09",
         private: %{}
       }
 
-      assert RouterDispatch.maybe_rewrite(conn) == :pass
+      assert {:rewrite, rewritten} = RouterDispatch.maybe_rewrite(conn)
+      assert "__phoenix_kit_publishing_dispatch" in rewritten.path_info
+    end
+
+    test "still passes non-GET/POST methods even when a segment is a group (H3)" do
+      # Publishing serves no PUT/DELETE/PATCH shapes — a host route on a
+      # group-colliding path keeps working for those methods.
+      {:ok, real_group} = Groups.add_group(unique_name())
+
+      for method <- ["PUT", "DELETE", "PATCH"] do
+        conn = %Plug.Conn{
+          method: method,
+          path_info: [real_group["slug"], "submit"],
+          request_path: "/" <> real_group["slug"] <> "/submit",
+          private: %{}
+        }
+
+        assert RouterDispatch.maybe_rewrite(conn) == :pass
+      end
     end
   end
 
