@@ -31,6 +31,15 @@ config :phoenix_kit_publishing, PhoenixKitPublishing.Test.Endpoint,
   render_errors: [formats: [html: PhoenixKitPublishing.Test.Layouts]],
   live_view: [signing_salt: "publishing-test-live-view-salt-1234567890ab"]
 
+# Endpoint for the real-macro dispatch harness (Test.DispatchRouter —
+# phoenix_kit_routes() end-to-end; see dispatch_e2e_test.exs).
+config :phoenix_kit_publishing, PhoenixKitPublishing.Test.DispatchEndpoint,
+  secret_key_base: String.duplicate("d", 64),
+  server: false,
+  url: [host: "localhost"],
+  render_errors: [formats: [html: PhoenixKitPublishing.Test.Layouts]],
+  live_view: [signing_salt: "publishing-dispatch-live-view-salt-123456"]
+
 config :phoenix, :json_library, Jason
 
 config :logger, level: :warning

@@ -132,6 +132,7 @@ Application.put_env(:phoenix_kit_publishing, :test_repo_available, repo_availabl
 # via `elixirc_paths(:test)` so we don't need to load them explicitly.
 if repo_available do
   {:ok, _} = PhoenixKitPublishing.Test.Endpoint.start_link()
+  {:ok, _} = PhoenixKitPublishing.Test.DispatchEndpoint.start_link()
 end
 
 # Exclude integration tests when DB is not available
