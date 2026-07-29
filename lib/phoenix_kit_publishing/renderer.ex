@@ -13,6 +13,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias Phoenix.HTML.Safe
   alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.PageBuilder
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Shared.Components.Image
   alias PhoenixKit.Modules.Shared.Components.Video
@@ -34,7 +35,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   #     so v4 entries must be dropped and re-rendered.
   # v6: body hashtags render as tag-archive links — any cached post containing
   #     a #word would keep rendering it as plain text without the bump.
-  @cache_version "v6"
+  # v7: <Showcase> renders as a band instead of falling through to the unknown-
+  #     component fallback, and its stylesheet is appended per document.
+  @cache_version "v7"
 
   # Matches the internal signed-file route — `<prefix>/file/<uuid>/<variant>/<token>`
   # — embedded as an `<img src>`. The prefix is bounded to plain path segments
@@ -50,7 +53,49 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @per_group_cache_prefix "publishing_render_cache_enabled_"
 
   @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|Audio|EntityForm)\s+([^>]*?)\/>/s
-  @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|Audio|EntityForm)\s*([^>]*)>(.*?)<\/\1>/s
+  @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|Audio|EntityForm|Showcase)\s*([^>]*)>(.*?)<\/\1>/s
+
+  @showcase_regex ~r/^<Showcase\s*([^>]*)>(.*)<\/Showcase>$/s
+  @showcase_default_overlap 15
+  @showcase_max_overlap 40
+
+  # Named grid lines make the overlap literal: the media spans
+  # [edge → overlap-end] and the text [overlap-start → edge], so the middle
+  # track belongs to both. Mirrored for side="right".
+  @showcase_css """
+  <style>
+  .pk-showcase{display:grid;grid-template-columns:[sc-edge-start] 1fr [sc-mid-start] var(--pk-sc-overlap,15%) [sc-mid-end] 1fr [sc-edge-end];align-items:center;margin:2.5rem 0;overflow:hidden}
+  .pk-showcase--dark{background:#0b0b0d;color:#fff}
+  .pk-showcase--light{background:#fafafa;color:#111}
+  .pk-showcase__media{grid-row:1;position:relative;align-self:stretch;min-height:0}
+  .pk-showcase__media img{display:block;width:100%;height:100%;min-height:14rem;object-fit:cover;margin:0;border-radius:0}
+  .pk-showcase__text{grid-row:1;position:relative;z-index:1;padding:clamp(1rem,4vw,3rem)}
+  .pk-showcase__text > :first-child{margin-top:0}
+  .pk-showcase__text > :last-child{margin-bottom:0}
+  .pk-showcase--left .pk-showcase__media{grid-column:sc-edge-start / sc-mid-end}
+  .pk-showcase--left .pk-showcase__text{grid-column:sc-mid-start / sc-edge-end}
+  .pk-showcase--right .pk-showcase__media{grid-column:sc-mid-start / sc-edge-end}
+  .pk-showcase--right .pk-showcase__text{grid-column:sc-edge-start / sc-mid-end}
+  /* Scrim: fades the image into the band on the side the text comes from. */
+  .pk-showcase__media::after{content:"";position:absolute;inset:0;pointer-events:none}
+  .pk-showcase--left.pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to right,transparent 45%,rgb(11 11 13 / var(--pk-sc-shade,.55)))}
+  .pk-showcase--right.pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to left,transparent 45%,rgb(11 11 13 / var(--pk-sc-shade,.55)))}
+  .pk-showcase--left.pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to right,transparent 45%,rgb(250 250 250 / var(--pk-sc-shade,.55)))}
+  .pk-showcase--right.pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to left,transparent 45%,rgb(250 250 250 / var(--pk-sc-shade,.55)))}
+  /* Narrow screens: the two stack, so the overlap is total and the scrim
+     becomes a full vertical wash — the boss's "as the overlap increases the
+     image gets darkened or lightened as needed". */
+  @media (max-width:767px){
+    .pk-showcase{grid-template-columns:1fr}
+    .pk-showcase--left .pk-showcase__media,.pk-showcase--right .pk-showcase__media,
+    .pk-showcase--left .pk-showcase__text,.pk-showcase--right .pk-showcase__text{grid-column:1;grid-row:1}
+    .pk-showcase__text{align-self:end}
+    .pk-showcase__media img{min-height:22rem}
+    .pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to bottom,rgb(11 11 13 / .2) 30%,rgb(11 11 13 / .85))}
+    .pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to bottom,rgb(250 250 250 / .2) 30%,rgb(250 250 250 / .9))}
+  }
+  </style>
+  """
 
   # Fenced code blocks, double-backtick inline code, and single-backtick
   # inline code spans — masked out before the component scan so a literal
@@ -256,13 +301,25 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     # credo:disable-for-lines:2 Credo.Check.Warning.MissingMetadataKeyInLoggerConfig
     Logger.debug("Content render time: #{time}μs", content_size: byte_size(content))
 
-    case notes_style do
-      "panel" -> heal_signed_file_urls(result) <> notes_ref_styles(notes)
-      _ -> heal_signed_file_urls(result) <> notes_section(notes)
-    end
+    notes_html =
+      case notes_style do
+        "panel" -> notes_ref_styles(notes)
+        _ -> notes_section(notes)
+      end
+
+    healed = heal_signed_file_urls(result)
+    healed <> notes_html <> showcase_styles(healed)
   end
 
   def render_markdown(_, _opts), do: ""
+
+  # One stylesheet per document, appended only when a band actually RENDERED.
+  # Keyed off the output rather than the source: a <Showcase> shown inside a
+  # code fence, or one whose src was rejected, produces no band and must not
+  # drag the stylesheet along with it.
+  defp showcase_styles(html) do
+    if String.contains?(html, ~s(class="pk-showcase )), do: @showcase_css, else: ""
+  end
 
   defp normalize_notes_style("panel"), do: "panel"
   defp normalize_notes_style(_), do: "footnotes"
@@ -459,6 +516,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       String.contains?(content, "<Subheadline") ||
       String.contains?(content, "<Video") ||
       String.contains?(content, "<Audio") ||
+      String.contains?(content, "<Showcase") ||
       String.contains?(content, "<EntityForm")
   end
 
@@ -810,6 +868,16 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   end
 
   defp render_block_component(fragment) do
+    case Regex.run(@showcase_regex, fragment) do
+      [_full, attrs, body] ->
+        render_showcase(parse_xml_attributes(attrs), body)
+
+      _ ->
+        render_page_builder_block(fragment)
+    end
+  end
+
+  defp render_page_builder_block(fragment) do
     fragment
     |> PageBuilder.render_content()
     |> case do
@@ -822,6 +890,117 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         Logger.warning("Error rendering block component: #{inspect(reason)}")
         "<div class='error'>Error rendering component</div>"
     end
+  end
+
+  # ===========================================================================
+  # <Showcase> — image bled to one edge, text on the other, sharing an overlap
+  #
+  #     <Showcase file_uuid="018e…" side="left" overlap="18">
+  #     ### Paintings, reconstructed
+  #     Excitingly recreated and brought to life.
+  #     </Showcase>
+  #
+  # A self-contained band: it paints its OWN background and text colour rather
+  # than inheriting the host theme's, because the text sits partly over the
+  # image and partly over the band — one colour has to work for both, and the
+  # host's base-100 could be anything. `tone` picks which ("dark" = dark band,
+  # light text; "light" = the inverse; "none" = inherit and no scrim).
+  #
+  # The overlap is a real grid track shared by the image and the text, so the
+  # browser does the layout — no absolute positioning, no JS. The scrim over
+  # the image strengthens with the overlap (more text over image = more tint),
+  # and on narrow screens, where the two stack and the overlap is total, it
+  # becomes a full vertical gradient.
+  # ===========================================================================
+
+  defp render_showcase(attrs, body) do
+    text_html = render_markdown_html(body)
+
+    case showcase_src(attrs) do
+      # No usable image — degrade to the prose alone rather than an empty band.
+      nil ->
+        text_html
+
+      src ->
+        side = if Map.get(attrs, "side") == "right", do: "right", else: "left"
+        tone = showcase_tone(Map.get(attrs, "tone"))
+        overlap = showcase_overlap(Map.get(attrs, "overlap"))
+        alt = attrs |> Map.get("alt", "") |> escape_html()
+
+        html = """
+        <figure class="pk-showcase pk-showcase--#{side} pk-showcase--#{tone}" \
+        style="--pk-sc-overlap:#{overlap}%;--pk-sc-shade:#{showcase_shade(overlap)}">
+        <div class="pk-showcase__media"><img src="#{src}" alt="#{alt}" loading="lazy" decoding="async"></div>
+        <div class="pk-showcase__text">#{text_html}</div>
+        </figure>
+        """
+
+        html
+        |> Phoenix.HTML.raw()
+        |> PageBuilder.Renderer.wrap_stretch(showcase_lane(attrs))
+        |> Safe.to_iodata()
+        |> IO.iodata_to_binary()
+    end
+  rescue
+    error ->
+      Logger.warning("Error rendering Showcase component: #{inspect(error)}")
+      "<div class='error'>Error rendering showcase</div>"
+  end
+
+  # Full-bleed by default — the look is the image running off the page edge —
+  # but an author can dial it back with the same align/stretch attrs every
+  # other component takes.
+  defp showcase_lane(attrs) do
+    if Map.has_key?(attrs, "align") or Map.has_key?(attrs, "stretch") do
+      attrs
+    else
+      Map.put(attrs, "align", "full")
+    end
+  end
+
+  defp showcase_src(attrs) do
+    file_uuid = Map.get(attrs, "file_uuid")
+    src = Map.get(attrs, "src")
+
+    cond do
+      is_binary(file_uuid) and Shared.uuid_format?(file_uuid) ->
+        URLSigner.signed_url(file_uuid, Map.get(attrs, "file_variant", "large"))
+
+      is_binary(src) and showcase_safe_src?(src) ->
+        escape_html(src)
+
+      true ->
+        nil
+    end
+  end
+
+  # http(s) or root-relative only — same posture as <Audio>/<Image>; a
+  # javascript:/data: src never reaches the element.
+  defp showcase_safe_src?("/" <> _), do: true
+  defp showcase_safe_src?("http://" <> _), do: true
+  defp showcase_safe_src?("https://" <> _), do: true
+  defp showcase_safe_src?(_), do: false
+
+  defp showcase_tone("light"), do: "light"
+  defp showcase_tone("none"), do: "none"
+  defp showcase_tone(_), do: "dark"
+
+  defp showcase_overlap(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} when n >= 0 and n <= @showcase_max_overlap -> n
+      _ -> @showcase_default_overlap
+    end
+  end
+
+  defp showcase_overlap(_), do: @showcase_default_overlap
+
+  # The more the text sits over the image, the more the image is tinted
+  # toward the band colour so the text stays readable. Capped so the image
+  # never washes out entirely.
+  defp showcase_shade(overlap) do
+    (0.35 + overlap * 0.012)
+    |> min(0.8)
+    |> Float.round(2)
   end
 
   # Parse XML attribute string into a map

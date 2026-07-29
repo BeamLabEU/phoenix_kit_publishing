@@ -162,6 +162,20 @@ makes sense.)
   links while missing from those archives until something re-saved it. The
   editor's create-then-save flow hid it. Fixed at the create transaction.
 
+### `<Showcase>` band (2026-07-29, boss's alternative image look)
+- Image bled to one edge, Markdown text on the other, sharing an `overlap`
+  grid track; `side`, `overlap` (0–40), `tone` (dark/light/none),
+  `file_uuid`/`src`, full-bleed by default with align/stretch passthrough.
+- The band paints its OWN background/text colour rather than inheriting the
+  host theme — the text sits partly over the image and partly beside it, and
+  one colour has to work for both.
+- Scrim strength scales with `overlap` (more text over image ⇒ more tint);
+  narrow screens stack, overlap goes total, and the scrim becomes a vertical
+  wash. Pure CSS, no JS. Render cache → v7.
+- Known house-wide limit pinned by a test: a `>` inside any component
+  attribute value ends the opening tag early (every component scans with
+  `[^>]*`). It degrades to an empty attribute, never raw markup.
+
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
 - **Publishing-scoped moderation page** — a filtered surface over comments' status machinery ("maybe" per boss; comments admin covers it today).
