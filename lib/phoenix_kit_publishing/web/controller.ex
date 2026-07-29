@@ -895,7 +895,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       post_width: Constants.default_post_width(),
       show_featured_image: false,
       show_reading_time: false,
-      show_tags: false,
       show_top_back_link: true,
       show_prev_next: false,
       show_categories: false,

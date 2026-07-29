@@ -200,7 +200,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "notes_style" => group["notes_style"],
       "show_featured_image" => group["show_featured_image"],
       "show_reading_time" => group["show_reading_time"],
-      "show_tags" => group["show_tags"],
       "featured_enabled" => group["featured_enabled"],
       "featured_layout" => group["featured_layout"],
       "featured_style" => group["featured_style"],
@@ -679,13 +678,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   {gettext("Show the reading time")}
                   <:description>
                     {gettext("An estimated 'N min read' under the title.")}
-                  </:description>
-                </.checkbox>
-
-                <.checkbox field={@form[:show_tags]}>
-                  {gettext("Show the post's tags")}
-                  <:description>
-                    {gettext("The post's tags as chips under the header.")}
                   </:description>
                 </.checkbox>
 

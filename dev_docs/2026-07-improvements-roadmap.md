@@ -137,6 +137,20 @@ makes sense.)
   the CSS-only dialog has no focus trap/aria-modal (inherent no-JS
   limits; panel aside is focusable via tabindex).
 
+### Boss feedback round 4 (2026-07-29)
+- **Categories moved below the post body** — they're filing metadata, not
+  something a reader needs before the first paragraph. Chips unchanged
+  (still gated on `show_categories`, still link to the archives); only the
+  position moved. Pinned by an ordering assertion, not just presence.
+- **Tags are no longer listed on the post page** — and the `show_tags`
+  group setting is retired end-to-end (constants/spec/form/accessor/
+  template/defaults) rather than left as a control that does nothing.
+  Rationale: since tags became body hashtags, the chip row repeated links
+  the prose already renders. Tag ARCHIVES, feeds and the content-less
+  `"tags"` API path are untouched. Consequence worth knowing: a post whose
+  tags were set through the API path (no hashtags in its body) now shows
+  no tags anywhere on its page.
+
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
 - **Publishing-scoped moderation page** — a filtered surface over comments' status machinery ("maybe" per boss; comments admin covers it today).

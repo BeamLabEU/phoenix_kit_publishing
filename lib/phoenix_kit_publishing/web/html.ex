@@ -2096,26 +2096,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <% end %>
           </div>
         </header>
-        <%!-- Categories (gated on show_categories) + tags (show_tags) —
-          chips link to their archives since the category/tag routes exist. --%>
-        <% post_categories = assigns[:post_categories] || [] %>
-        <% post_tags = if assigns[:show_tags], do: post_tag_list(@post), else: [] %>
-        <div :if={post_categories != [] or post_tags != []} class="flex flex-wrap gap-2 mb-8">
-          <.link
-            :for={category <- post_categories}
-            navigate={term_archive_path(@current_language, @group_slug, {:category, category.slug})}
-            class="badge badge-primary badge-outline badge-sm hover:badge-primary"
-          >
-            {PublishingCategory.translated_name(category, @current_language)}
-          </.link>
-          <.link
-            :for={tag <- post_tags}
-            navigate={term_archive_path(@current_language, @group_slug, {:tag, tag})}
-            class="badge badge-outline badge-sm hover:text-primary"
-          >
-            {tag}
-          </.link>
-        </div>
         <%!-- Audio version — present whenever the live version carries one. --%>
         <% audio_uuid = Map.get(@post.metadata, :audio_uuid) %>
         <figure :if={audio_uuid} class="mb-8">
@@ -2134,6 +2114,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <%!-- Post Content --%>
         <div class="markdown-content max-w-none">
           {raw(@html_content)}
+        </div>
+        <%!-- Categories (gated on show_categories) — chips link to their
+          archives. They sit BELOW the content: they're filing metadata, not
+          something a reader needs before the first paragraph. Tags aren't
+          listed at all any more — they live inline in the prose as #hashtags,
+          already rendered as links to the same archives, so a chip row just
+          repeated them. --%>
+        <% post_categories = assigns[:post_categories] || [] %>
+        <div :if={post_categories != []} class="mt-8 flex flex-wrap gap-2">
+          <.link
+            :for={category <- post_categories}
+            navigate={term_archive_path(@current_language, @group_slug, {:category, category.slug})}
+            class="badge badge-primary badge-outline badge-sm hover:badge-primary"
+          >
+            {PublishingCategory.translated_name(category, @current_language)}
+          </.link>
         </div>
         <%!-- Chronological neighbors (gated on the group's show_prev_next
           setting; either side absent at the chronology's edge). Newer on the
@@ -2626,16 +2622,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   defp reading_time_label(_), do: ""
-
-  # Extracts a clean list of tag strings from a post's metadata.
-  defp post_tag_list(%{metadata: %{tags: tags}}) when is_list(tags) do
-    tags
-    |> Enum.map(&to_string/1)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
-  end
-
-  defp post_tag_list(_), do: []
 
   # Formats a timestamp post's date for display (e.g., "December 31, 2025")
   defp format_timestamp_date(post) do

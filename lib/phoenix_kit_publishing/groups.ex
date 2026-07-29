@@ -297,7 +297,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # not a hand-maintained copy).
   @bool_setting_keys ~w(featured_enabled newest_enabled scroll_progress_enabled
                         scroll_headings_enabled scroll_timeline_enabled show_breadcrumbs
-                        show_featured_image show_reading_time show_tags show_post_count
+                        show_featured_image show_reading_time show_post_count
                         show_top_back_link listing_image_links listing_animations
                         show_prev_next search_enabled show_categories
                         views_enabled show_view_counts comments_enabled)
@@ -713,7 +713,6 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "notes_style" => Map.get(data, "notes_style", @default_notes_style),
       "show_featured_image" => Map.get(data, "show_featured_image", false),
       "show_reading_time" => Map.get(data, "show_reading_time", false),
-      "show_tags" => Map.get(data, "show_tags", false),
       "show_post_count" => Map.get(data, "show_post_count", false),
       "show_top_back_link" => Map.get(data, "show_top_back_link", true),
       "listing_image_links" => Map.get(data, "listing_image_links", true),

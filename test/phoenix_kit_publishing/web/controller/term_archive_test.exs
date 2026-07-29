@@ -111,7 +111,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.TermArchiveTest do
     refute body =~ "Advanced Guide"
   end
 
-  test "post page shows linked category chips when enabled", %{conn: conn, slug: slug} do
+  test "post page shows linked category chips when enabled, BELOW the content",
+       %{conn: conn, slug: slug} do
     html = get(conn, "/#{slug}/parent-guide") |> html_response(200)
     refute html =~ "/category/guides"
 
@@ -119,11 +120,42 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.TermArchiveTest do
     html = get(conn, "/#{slug}/parent-guide") |> html_response(200)
     assert html =~ "/#{slug}/category/guides"
     assert html =~ "Guides"
+
+    # Boss call 2026-07-29: categories are filing metadata, so they belong
+    # after the post body rather than between the header and the first
+    # paragraph.
+    [content_at, chips_at] =
+      Enum.map(
+        ["markdown-content", "/#{slug}/category/guides"],
+        fn needle -> :binary.match(html, needle) |> elem(0) end
+      )
+
+    assert chips_at > content_at
   end
 
-  test "tag chips link to the tag archive when show_tags is on", %{conn: conn, slug: slug} do
-    {:ok, _} = Groups.update_group(slug, %{"show_tags" => "true"})
+  test "the post page never lists tags as chips; body hashtags carry the links",
+       %{conn: conn, slug: slug} do
+    # Boss call 2026-07-29: tags aren't listed separately any more. They live
+    # inline in the prose as #hashtags, already rendered as links to the same
+    # archive, so a chip row only repeated them. This fixture's tags were set
+    # through the content-less API path, so its body has no hashtags at all —
+    # and the page must therefore show no tag links.
     html = get(conn, "/#{slug}/parent-guide") |> html_response(200)
+    refute html =~ "/#{slug}/tag/howto"
+
+    # A post whose body carries the hashtag links to the same archive, which
+    # still exists and still serves.
+    {:ok, post} =
+      Posts.create_post(slug, %{
+        title: "Inline Tagged",
+        slug: "inline-tagged",
+        content: "Filed under #howto today."
+      })
+
+    :ok = Versions.publish_version(slug, post.uuid, 1)
+
+    html = get(conn, "/#{slug}/inline-tagged") |> html_response(200)
     assert html =~ "/#{slug}/tag/howto"
+    assert html =~ ">#howto</a>"
   end
 end

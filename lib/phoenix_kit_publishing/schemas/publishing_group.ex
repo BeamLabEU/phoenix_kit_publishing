@@ -58,7 +58,6 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `show_featured_image` - Show the post's featured image at the top of the post
     page (default `false`).
   - `show_reading_time` - Show an estimated reading time on the post page (default `false`).
-  - `show_tags` - Show the post's tags on the post page (default `false`).
   - `show_post_count` - Show the total post count under the title on the group's
     public listing (default `false`).
   - `show_top_back_link` - Show the subtle "Back to <group>" link at the top of
@@ -237,9 +236,6 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
 
   @doc "Returns whether an estimated reading time shows on the post page (default false)."
   def show_reading_time?(%__MODULE__{data: data}), do: Map.get(data, "show_reading_time", false)
-
-  @doc "Returns whether a post's tags show on the post page (default false)."
-  def show_tags?(%__MODULE__{data: data}), do: Map.get(data, "show_tags", false)
 
   @doc "Returns whether the post count shows on the group's public listing (default false)."
   def show_post_count?(%__MODULE__{data: data}), do: Map.get(data, "show_post_count", false)

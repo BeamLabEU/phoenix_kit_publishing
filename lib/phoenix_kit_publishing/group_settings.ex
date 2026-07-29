@@ -343,16 +343,6 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
-        key: "show_tags",
-        type: :boolean,
-        allowed: @boolean_allowed,
-        default: false,
-        scope: :post,
-        label: "Tags",
-        description: "Show the post's tags as chips under the header.",
-        depends_on: nil
-      },
-      %{
         key: "scroll_progress_enabled",
         type: :boolean,
         allowed: @boolean_allowed,
