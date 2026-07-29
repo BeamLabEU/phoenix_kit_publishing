@@ -88,6 +88,107 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
     end
   end
 
+  describe "reorder_categories/3" do
+    test "renumbers within each sibling group from the flattened DOM order", %{slug: slug} do
+      {:ok, a} = Categories.create_category(slug, %{"name" => "A", "position" => 0})
+      {:ok, b} = Categories.create_category(slug, %{"name" => "B", "position" => 1})
+      {:ok, c1} = Categories.create_category(slug, %{"name" => "C1", "parent_uuid" => a.uuid})
+      {:ok, c2} = Categories.create_category(slug, %{"name" => "C2", "parent_uuid" => a.uuid})
+
+      # B before A at the root; children swapped within A.
+      {:ok, changed} =
+        Categories.reorder_categories(slug, [b.uuid, c2.uuid, c1.uuid, a.uuid])
+
+      assert changed > 0
+
+      assert [{%{name: "B"}, 0}, {%{name: "A"}, 0}, {%{name: "C2"}, 1}, {%{name: "C1"}, 1}] =
+               Categories.list_tree(slug)
+    end
+
+    test "a cross-parent drop position cannot re-parent", %{slug: slug} do
+      {:ok, a} = Categories.create_category(slug, %{"name" => "A"})
+      {:ok, child} = Categories.create_category(slug, %{"name" => "Kid", "parent_uuid" => a.uuid})
+
+      {:ok, _} = Categories.reorder_categories(slug, [child.uuid, a.uuid])
+
+      {:ok, reloaded} = Categories.get_category(child.uuid)
+      assert reloaded.parent_uuid == a.uuid
+    end
+
+    test "unknown and foreign uuids are ignored", %{slug: slug} do
+      {:ok, other_group} = Groups.add_group(unique_name(), mode: "slug")
+      {:ok, foreign} = Categories.create_category(other_group["slug"], %{"name" => "Foreign"})
+      {:ok, a} = Categories.create_category(slug, %{"name" => "A"})
+
+      {:ok, _} =
+        Categories.reorder_categories(slug, [
+          Ecto.UUID.generate(),
+          foreign.uuid,
+          a.uuid,
+          "not-a-uuid"
+        ])
+
+      {:ok, foreign_reloaded} = Categories.get_category(foreign.uuid)
+      assert foreign_reloaded.position == 0
+    end
+
+    test "rejects a non-list or oversized payload", %{slug: slug} do
+      assert {:error, :invalid_order} = Categories.reorder_categories(slug, "bogus")
+
+      too_many = Enum.map(1..501, fn _ -> Ecto.UUID.generate() end)
+      assert {:error, :invalid_order} = Categories.reorder_categories(slug, too_many)
+    end
+
+    test "a partial (stale) payload still renumbers the full sibling group", %{slug: slug} do
+      {:ok, a} = Categories.create_category(slug, %{"name" => "A", "position" => 0})
+      {:ok, b} = Categories.create_category(slug, %{"name" => "B", "position" => 1})
+      {:ok, c} = Categories.create_category(slug, %{"name" => "C", "position" => 2})
+
+      # A stale client that never saw C sends only [B, A]: sent rows lead,
+      # unsent siblings follow — no position collisions.
+      {:ok, _} = Categories.reorder_categories(slug, [b.uuid, a.uuid])
+
+      positions =
+        Map.new(Categories.list_categories(slug), fn cat -> {cat.uuid, cat.position} end)
+
+      assert positions == %{b.uuid => 0, a.uuid => 1, c.uuid => 2}
+    end
+  end
+
+  describe "move_category/3" do
+    test "appends the moved category at the end of the new sibling group", %{slug: slug} do
+      {:ok, parent} = Categories.create_category(slug, %{"name" => "Parent"})
+
+      {:ok, first} =
+        Categories.create_category(slug, %{
+          "name" => "First",
+          "parent_uuid" => parent.uuid,
+          "position" => 5
+        })
+
+      {:ok, mover} = Categories.create_category(slug, %{"name" => "Mover", "position" => 0})
+
+      {:ok, moved} = Categories.move_category(mover.uuid, parent.uuid)
+      assert moved.parent_uuid == parent.uuid
+      assert moved.position == 6
+
+      assert [{%{name: "Parent"}, 0}, {%{name: "First"}, 1}, {%{name: "Mover"}, 1}] =
+               Categories.list_tree(slug)
+
+      # Moving to the root appends after the root's max position too.
+      {:ok, rooted} = Categories.move_category(first.uuid, "")
+      assert rooted.parent_uuid == nil
+      assert rooted.position == parent.position + 1
+    end
+
+    test "keeps the cycle guard", %{slug: slug} do
+      {:ok, a} = Categories.create_category(slug, %{"name" => "A"})
+      {:ok, b} = Categories.create_category(slug, %{"name" => "B", "parent_uuid" => a.uuid})
+
+      assert {:error, :category_cycle} = Categories.move_category(a.uuid, b.uuid)
+    end
+  end
+
   describe "post assignments" do
     setup %{slug: slug} do
       {:ok, post} =

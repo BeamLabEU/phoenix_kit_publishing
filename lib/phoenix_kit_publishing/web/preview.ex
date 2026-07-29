@@ -166,9 +166,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
     # Same tag-link context as the public page — preview must match
     # production output (hashtags render as tag-archive links).
     content
-    |> Renderer.render_markdown(
-      tag_links: {Map.get(post, :group), Map.get(post, :language)}
-    )
+    |> Renderer.render_markdown(tag_links: {Map.get(post, :group), Map.get(post, :language)})
     |> then(&{:ok, &1})
   rescue
     # Narrow: the renderer can legitimately raise on PHK XML it can't parse

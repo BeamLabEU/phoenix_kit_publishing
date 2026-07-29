@@ -76,9 +76,24 @@ makes sense.)
 - **Pending on the editor developer**: popup-suggestion API in the core
   MarkdownEditor — when it lands, feed it group-level tag suggestions
   (distinct tags across the group's posts) for `#` autocomplete.
-- **Category page modernization** — next slice: rebuild CategoriesLive in the
-  catalogue/entities style (SortableGrid sibling reorder + kebab row menus +
-  drag-onto-row nesting via the MediaDragDrop-style native DnD).
+- **Category page modernization (this commit)** — CategoriesLive rebuilt in
+  the catalogue/entities house style: full-width indented tree table
+  (folder/tag icons, per-depth padding), SortableGrid handle-only drag
+  reorder among siblings (server groups by EXISTING parent and renumbers
+  the FULL sibling group — drag can never re-parent; stale partial payloads
+  can't collide positions), kebab `<.table_row_menu>` (Edit / New
+  subcategory / Move to… / Delete), Move-to dialog (depth-indented picker,
+  self+descendants excluded, preselects the current parent,
+  `move_category/3` appends at the end of the new sibling group), modal
+  add/edit form. Every uuid event is page-group-scoped (foreign uuids
+  rejected). Deliberately NOT drag-onto-row nesting: catalogue/entities
+  both use menu/dialog re-parenting; mixing SortableJS with native HTML5
+  DnD on the same rows conflicts.
+- **Core follow-up (surfaced, not fixed here)**: core MarkdownEditor's
+  textarea syncs content via `phx-keyup` — value changes without key
+  events (paste via context menu, drag-dropped text, automation `fill`)
+  never reach the server and silently save empty. Should be `phx-change`
+  (input event). Found while browser-verifying hashtags.
 
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.

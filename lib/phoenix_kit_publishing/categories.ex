@@ -207,6 +207,123 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     end
   end
 
+  @doc """
+  Persists a drag-reorder. `ordered_uuids` is the client's DOM order of
+  the whole flattened tree; rows are grouped by their EXISTING parent and
+  renumbered within each sibling group — a sortable drop can only reorder
+  siblings, never reparent (reparenting is `update_category/3`, which
+  cycle-checks). Unknown/foreign uuids are ignored rather than erroring.
+  Capped at 500 rows (client-misbehavior guard, same convention as the
+  assignment cap). Returns `{:ok, changed_count}`.
+  """
+  def reorder_categories(group_slug, ordered_uuids, opts \\ [])
+
+  def reorder_categories(group_slug, ordered_uuids, opts)
+      when is_list(ordered_uuids) and length(ordered_uuids) <= 500 do
+    # Read inside the transaction: a concurrent create/move between read and
+    # write would otherwise renumber from a stale parent map.
+    repo().transaction(fn ->
+      categories = list_categories(group_slug)
+      by_uuid = Map.new(categories, &{&1.uuid, &1})
+      by_parent = Enum.group_by(categories, & &1.parent_uuid)
+
+      sibling_orders =
+        ordered_uuids
+        |> Enum.uniq()
+        |> Enum.filter(&(is_binary(&1) and is_map_key(by_uuid, &1)))
+        |> Enum.group_by(&by_uuid[&1].parent_uuid)
+
+      changed =
+        sibling_orders
+        |> Enum.map(fn {parent, sent} ->
+          # Renumber the FULL sibling group, not just the sent subset — a
+          # stale client (concurrent create) must not leave position
+          # collisions: unsent siblings keep their relative order, after
+          # the sent ones.
+          sent_set = MapSet.new(sent)
+
+          unsent =
+            by_parent
+            |> Map.get(parent, [])
+            |> Enum.map(& &1.uuid)
+            |> Enum.reject(&MapSet.member?(sent_set, &1))
+
+          renumber_siblings(sent ++ unsent, by_uuid)
+        end)
+        |> Enum.sum()
+
+      if changed > 0 do
+        group_uuid = hd(categories).group_uuid
+
+        ActivityLog.log_manual(
+          "publishing.category.reordered",
+          ActivityLog.actor_uuid(opts),
+          "publishing_group",
+          group_uuid,
+          %{"group" => group_slug, "changed" => changed}
+        )
+
+        invalidate_group_cache(group_uuid)
+      end
+
+      changed
+    end)
+  end
+
+  def reorder_categories(_group_slug, _ordered_uuids, _opts), do: {:error, :invalid_order}
+
+  @doc """
+  Re-parents a category, appending it at the END of the new sibling group
+  (the catalogue `move_folder` convention) — keeping its old position would
+  drop it mid-group unpredictably. Cycle/scope rules are
+  `update_category/3`'s.
+  """
+  def move_category(uuid, new_parent_uuid, opts \\ []) do
+    with {:ok, category} <- get_category(uuid) do
+      parent = if new_parent_uuid in [nil, ""], do: nil, else: new_parent_uuid
+
+      next_position =
+        from(c in PublishingCategory,
+          where: c.group_uuid == ^category.group_uuid,
+          where: ^parent_condition(parent),
+          select: max(c.position)
+        )
+        |> repo().one()
+        |> case do
+          nil -> 0
+          max -> max + 1
+        end
+
+      update_category(
+        uuid,
+        %{"parent_uuid" => new_parent_uuid, "position" => next_position},
+        opts
+      )
+    end
+  end
+
+  defp parent_condition(nil), do: dynamic([c], is_nil(c.parent_uuid))
+  defp parent_condition(parent), do: dynamic([c], c.parent_uuid == ^parent)
+
+  defp renumber_siblings(uuids, by_uuid) do
+    uuids
+    |> Enum.with_index()
+    |> Enum.count(fn {uuid, index} ->
+      category = by_uuid[uuid]
+
+      if category.position != index do
+        case category
+             |> PublishingCategory.changeset(%{"position" => index})
+             |> repo().update() do
+          {:ok, _} -> true
+          {:error, changeset} -> repo().rollback(changeset)
+        end
+      else
+        false
+      end
+    end)
+  end
+
   # ===========================================================================
   # Post assignments
   # ===========================================================================
