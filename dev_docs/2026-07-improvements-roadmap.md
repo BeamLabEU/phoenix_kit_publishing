@@ -64,6 +64,22 @@ makes sense.)
 - `071fd4f` step 10 — comments over an optional seam: dead-view thread + POST form (honeypot + signed 3s time-trap + CSRF), logged-in only, core POST routes in the dispatch scope; comments module admin = the moderation surface for now.
 - core `5838f766` — POST routes in the publishing dispatch scope.
 
+### Boss feedback round 2 (2026-07-29)
+- **Hashtag tags (this commit)** — tags moved INTO the body: `#elixir` in the
+  prose is the tag system; the sidebar Tags input is gone. Save derives
+  `version.data.tags` from the union of hashtags across the version's language
+  bodies (explicit `"tags"` list still honored — normalized — for content-less
+  API callers; content wins when both are sent). Public + preview render
+  hashtags as tag-archive links (mask: code, unclosed fences, markdown links,
+  PHK components/attributes; notes' `#` entity-encoded). Cache v6. Public
+  tag archives/feeds/chips unchanged.
+- **Pending on the editor developer**: popup-suggestion API in the core
+  MarkdownEditor — when it lands, feed it group-level tag suggestions
+  (distinct tags across the group's posts) for `#` autocomplete.
+- **Category page modernization** — next slice: rebuild CategoriesLive in the
+  catalogue/entities style (SortableGrid sibling reorder + kebab row menus +
+  drag-onto-row nesting via the MediaDragDrop-style native DnD).
+
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
 - **Publishing-scoped moderation page** — a filtered surface over comments' status machinery ("maybe" per boss; comments admin covers it today).

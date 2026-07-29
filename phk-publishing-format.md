@@ -278,6 +278,32 @@ a hover/focus popover showing the note text (pure CSS).
 
 ---
 
+## Hashtags — tags live in the body
+
+Tags are written inline as `#hashtags` — there is no separate tags field in
+the editor. On save, the post's tag list is derived from the text (union
+across all of the version's languages), and on the public page each hashtag
+renders as a link to that tag's archive.
+
+```markdown
+We shipped the new importer today. #elixir #changelog
+```
+
+What counts as a hashtag: `#` followed immediately by a letter, at the start
+of a line or after whitespace/`(`. Letters are Unicode; digits, `_` and `-`
+may follow (up to 30 chars). By construction this excludes:
+
+- Markdown headings (`# Title` — the space breaks the match);
+- URL fragments (`…/page#section` — no preceding whitespace);
+- anything in code fences or inline backticks;
+- anything inside a Markdown link — `[jump](#section)` stays an anchor,
+  and a `#word` in link text stays part of that link.
+
+Dedup is case-insensitive keeping the first spelling; capped at 20 per post.
+To remove a tag, remove it from the text and save.
+
+---
+
 ## Best practices
 
 - **Let Markdown do the heavy lifting.** Use inline components only when you need structured UI blocks.

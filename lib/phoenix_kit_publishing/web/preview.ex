@@ -54,7 +54,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
 
     case Publishing.read_post_by_uuid(post_uuid, language, version) do
       {:ok, post} ->
-        case render_markdown_content(post.content) do
+        case render_markdown_content(post.content, post) do
           {:ok, rendered_html} ->
             post = Map.put(post, :uuid, post_uuid)
 
@@ -162,9 +162,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
     end)
   end
 
-  defp render_markdown_content(content) when is_binary(content) do
+  defp render_markdown_content(content, post) when is_binary(content) do
+    # Same tag-link context as the public page — preview must match
+    # production output (hashtags render as tag-archive links).
     content
-    |> Renderer.render_markdown()
+    |> Renderer.render_markdown(
+      tag_links: {Map.get(post, :group), Map.get(post, :language)}
+    )
     |> then(&{:ok, &1})
   rescue
     # Narrow: the renderer can legitimately raise on PHK XML it can't parse

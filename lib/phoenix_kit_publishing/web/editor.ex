@@ -2889,29 +2889,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   disabled={edit_disabled? or @viewing_older_version}
                 />
 
-                <%!-- Tags — comma-separated, stored on the version like the
-                     featured flag; chips link to tag archives when the group
-                     shows them. --%>
-                <div>
-                  <label class="label py-1" for="post-tags-input">
-                    <span class="label-text text-sm font-semibold text-base-content">
-                      {gettext("Tags")}
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    id="post-tags-input"
-                    name="tags"
-                    value={@form["tags"]}
-                    class={"input input-bordered input-sm w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
-                    placeholder={gettext("news, howto, release")}
-                    readonly={edit_disabled? or @viewing_older_version}
-                  />
-                  <p class="text-xs text-base-content/60 mt-1">
-                    {gettext("Comma-separated; saved with the post.")}
-                  </p>
-                </div>
-
                 <%!-- Audio version — a player renders above the post content
                      when set; the RSS feed carries it as an enclosure. --%>
                 <div>

@@ -199,8 +199,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def render_post_content(post) do
     case Renderer.render_post(post) do
       {:ok, html} -> html
-      # Fallback to uncached rendering if render_post returns unexpected format
-      _ -> Renderer.render_markdown(post.content)
+      # Fallback to uncached rendering if render_post returns unexpected
+      # format. Map.get: bare maps without :group/:language must not raise —
+      # render_markdown treats a non-binary tuple element as "no tag links".
+      _ ->
+        Renderer.render_markdown(post.content,
+          tag_links: {Map.get(post, :group), Map.get(post, :language)}
+        )
     end
   end
 

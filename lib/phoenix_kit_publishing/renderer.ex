@@ -11,7 +11,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   require Logger
 
   alias Phoenix.HTML.Safe
+  alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.PageBuilder
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Shared.Components.Image
   alias PhoenixKit.Modules.Shared.Components.Video
   alias PhoenixKit.Modules.Storage.URLSigner
@@ -30,7 +32,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # v5: markdown engine swapped Earmark -> MDEx (comrak). Output HTML differs
   #     (whitespace, `<img />`, entity normalization, …) for unchanged source,
   #     so v4 entries must be dropped and re-rendered.
-  @cache_version "v5"
+  # v6: body hashtags render as tag-archive links — any cached post containing
+  #     a #word would keep rendering it as plain text without the bump.
+  @cache_version "v6"
 
   # Matches the internal signed-file route — `<prefix>/file/<uuid>/<variant>/<token>`
   # — embedded as an `<img src>`. The prefix is bounded to plain path segments
@@ -144,8 +148,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
           render_and_cache(post, cache_key)
       end
     else
-      # Don't cache drafts, archived posts, or when cache is disabled
-      {:ok, render_markdown(post.content)}
+      # Don't cache drafts, archived posts, or when cache is disabled.
+      # Some callers pass bare maps without :language — hashtags then
+      # render as plain text instead of crashing.
+      {:ok, render_markdown(post.content, tag_links: tag_link_context(post))}
     end
   end
 
@@ -199,12 +205,30 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       html = Renderer.render_markdown(content)
 
   """
-  @spec render_markdown(String.t() | any()) :: String.t()
-  def render_markdown(content) when is_binary(content) do
+  @spec render_markdown(String.t() | any(), keyword()) :: String.t()
+  def render_markdown(content, opts \\ [])
+
+  def render_markdown(content, opts) when is_binary(content) do
     # Author notes are a document-level feature (sequential numbering + a
     # collected section), so they're extracted before the per-segment
     # component pipeline runs.
     {content, notes} = extract_notes(content)
+
+    # Body hashtags become tag-archive links when the caller supplies the
+    # group/language context (public post renders). Runs AFTER the notes
+    # pass — note bodies/phrases have their '#' entity-encoded, so a tag
+    # mentioned inside a note never turns into markup. Code regions are
+    # skipped inside linkify/2 itself.
+    content =
+      case Keyword.get(opts, :tag_links) do
+        {group_slug, language} when is_binary(group_slug) and is_binary(language) ->
+          Hashtags.linkify(content, fn tag ->
+            PublishingHTML.term_archive_path(language, group_slug, {:tag, tag})
+          end)
+
+        _ ->
+          content
+      end
 
     {time, result} =
       :timer.tc(fn ->
@@ -225,7 +249,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     heal_signed_file_urls(result) <> notes_section(notes)
   end
 
-  def render_markdown(_), do: ""
+  def render_markdown(_, _opts), do: ""
 
   # ===========================================================================
   # Author notes (<Note note="…">phrase</Note>)
@@ -274,7 +298,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       ~s(<a class="pk-note-ref" id="pk-note-ref-#{number}" href="#pk-note-#{number}" data-note="),
       escape_html(body),
       ~s(">),
-      phrase,
+      # Encode '#' in the phrase too: the ref is already an <a>, and the
+      # later hashtag pass must not nest a second anchor inside it.
+      String.replace(phrase, "#", "&#35;"),
       ~s(<sup>#{number}</sup></a>)
     ]
   end
@@ -311,6 +337,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     |> String.replace("<", "&lt;")
     |> String.replace(">", "&gt;")
     |> String.replace("\"", "&quot;")
+    # '#' too: the hashtag-link pass runs after the notes pass, and an
+    # entity-encoded hash renders identically while never matching the
+    # hashtag regex — a tag mentioned in a note stays plain text.
+    |> String.replace("#", "&#35;")
   end
 
   # Re-resolves embedded signed-file URLs against the CURRENT url_prefix and
@@ -794,8 +824,17 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   # Private Functions
 
+  defp tag_link_context(post) do
+    with group when is_binary(group) <- Map.get(post, :group),
+         language when is_binary(language) <- Map.get(post, :language) do
+      {group, language}
+    else
+      _ -> nil
+    end
+  end
+
   defp render_and_cache(post, cache_key) do
-    html = render_markdown(post.content)
+    html = render_markdown(post.content, tag_links: tag_link_context(post))
 
     # Cache the rendered HTML
     put_cached(cache_key, html)

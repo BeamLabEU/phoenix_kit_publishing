@@ -70,7 +70,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         "slug",
         "featured_image_uuid",
         "featured",
-        "tags",
         "audio_uuid",
         "url_slug",
         "title",
@@ -79,7 +78,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         "og_image_uuid"
       ])
       |> Map.put("content", socket.assigns.content)
-      |> Map.update("tags", [], &parse_tags/1)
 
     params =
       case {socket.assigns.group_mode, Map.get(params, "slug")} do
@@ -117,20 +115,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         {:noreply, Phoenix.LiveView.put_flash(socket, :error, error_message)}
     end
   end
-
-  # The form carries tags as one comma-separated string; version.data stores a
-  # list. Trimmed, blanks dropped, case-preserving dedup, capped at 20.
-  defp parse_tags(value) when is_binary(value) do
-    value
-    |> String.split(",")
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.uniq_by(&String.downcase/1)
-    |> Enum.take(20)
-  end
-
-  defp parse_tags(value) when is_list(value), do: value
-  defp parse_tags(_), do: []
 
   defp validate_url_slug_for_save(socket, params) do
     url_slug = Map.get(params, "url_slug", "")

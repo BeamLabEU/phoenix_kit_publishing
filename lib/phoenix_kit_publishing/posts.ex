@@ -19,6 +19,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -1298,7 +1299,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         Map.get(params, "description", post_metadata[:description])
       )
       |> maybe_put_version_field("seo_title", Map.get(params, "seo_title"))
-      |> maybe_put_version_field("tags", Map.get(params, "tags"))
+      |> maybe_put_version_field("tags", resolve_tags(version, params))
       |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
       |> maybe_put_version_field("featured", normalize_featured(Map.get(params, "featured")))
       |> maybe_put_version_field("audio_uuid", Map.get(params, "audio_uuid"))
@@ -1322,6 +1323,28 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   defp maybe_put_version_field(data, _key, nil), do: data
   defp maybe_put_version_field(data, key, value), do: Map.put(data, key, value)
+
+  # Tags ARE body hashtags (boss call 2026-07-28): a save that carries content
+  # re-derives the version's tags as the union of hashtags across ALL of the
+  # version's language bodies — the just-saved row is already upserted in this
+  # transaction, so a fresh read sees it. A save without content leaves tags
+  # alone, EXCEPT an explicit "tags" list (programmatic/API callers), which is
+  # normalized and honored. Content always wins over a tags list sent in the
+  # same call — the body is the source of truth now.
+  defp resolve_tags(version, params) do
+    cond do
+      is_binary(Map.get(params, "content")) ->
+        DBStorage.batch_load_contents([version.uuid])
+        |> Map.get(version.uuid, [])
+        |> Hashtags.extract_all()
+
+      is_list(Map.get(params, "tags")) ->
+        Hashtags.normalize(Map.get(params, "tags"))
+
+      true ->
+        nil
+    end
+  end
 
   # Normalizes the editor's "featured" checkbox into a boolean for version.data.
   # `nil` (key absent) is preserved so a save that doesn't carry the field leaves
