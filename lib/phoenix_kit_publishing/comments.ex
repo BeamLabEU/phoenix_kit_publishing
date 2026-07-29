@@ -49,8 +49,9 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   - `:thread` — the main comment thread as a nested tree (each comment
     gets a `:children` list), replies attached via `parent_uuid`;
   - `:note_comments` — `%{note_id => [comments]}` for comments carrying a
-    `metadata["note_id"]` (posted from a note's slide-out panel), flat and
-    oldest-first per note;
+    `metadata["note_id"]` (posted from a note's slide-out panel), each
+    note's list a nested tree like the main thread (replies inherit the
+    parent's note_id, so a whole thread lives in one panel);
   - `:count` — main-thread comment count (replies included, note
     comments excluded — the "N comments" header describes the thread the
     reader is looking at).
@@ -61,12 +62,27 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
     {note_scoped, main} =
       Enum.split_with(comments, fn comment -> is_binary(comment.metadata["note_id"]) end)
 
+    note_comments =
+      note_scoped
+      |> Enum.group_by(& &1.metadata["note_id"])
+      |> Map.new(fn {note_id, comments} -> {note_id, build_tree(comments)} end)
+
     %{
       thread: build_tree(main),
-      note_comments: Enum.group_by(note_scoped, & &1.metadata["note_id"]),
+      note_comments: note_comments,
       count: length(main)
     }
   end
+
+  @doc "Total node count of a comment tree (a panel's thread size)."
+  def tree_size(comments) when is_list(comments) do
+    Enum.reduce(comments, 0, fn comment, acc ->
+      # `|| []`: an unpopulated :children (nil) must not crash the count.
+      acc + 1 + tree_size(Map.get(comment, :children) || [])
+    end)
+  end
+
+  def tree_size(_), do: 0
 
   # Nested tree from the flat (oldest-first) list. A reply whose parent is
   # missing from the published set (hidden/deleted parent, or a parent that

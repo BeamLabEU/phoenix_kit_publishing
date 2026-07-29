@@ -1621,6 +1621,105 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     match?(%{user: %{}}, assigns[:phoenix_kit_current_scope])
   end
 
+  # Progressive enhancement for every comment form on the page (main
+  # thread, replies, note panels): with JS, the POST goes over fetch and
+  # the #comments / #pk-note-panels sections are re-fetched and swapped in
+  # place — no page reload, scroll and the open panel (:target) survive.
+  # Without JS (or on any fetch failure) the plain form POST still works.
+  # Same inline-script pattern as reading_progress/1 on these dead views.
+  defp comment_fetch_assets do
+    """
+    <script>
+    (function () {
+      if (window.__pkCommentFetch) return;
+      window.__pkCommentFetch = true;
+      function showError(form, message) {
+        var note = form.querySelector('[data-pk-comment-error]');
+        if (!note) {
+          note = document.createElement('p');
+          note.setAttribute('data-pk-comment-error', '');
+          note.className = 'text-error text-xs';
+          form.insertBefore(note, form.querySelector('textarea'));
+        }
+        note.textContent = message || 'Something went wrong — please try again.';
+      }
+      // Success path AFTER the server stored the comment: re-fetch the page
+      // and swap the thread sections. MUST NOT fall back to form.submit()
+      // from here — the POST already succeeded, a resubmit would duplicate
+      // the comment. Any failure downgrades to a plain reload (a GET).
+      function refreshSections() {
+        return fetch(window.location.pathname + window.location.search, {
+          credentials: 'same-origin'
+        })
+          .then(function (resp) {
+            if (!resp.ok) throw new Error('refetch failed');
+            return resp.text();
+          })
+          .then(function (html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var stale = false;
+            ['comments', 'pk-note-panels'].forEach(function (id) {
+              var cur = document.getElementById(id);
+              var next = doc.getElementById(id);
+              if (cur && next) cur.replaceWith(next);
+              else if (cur && !next) stale = true;
+            });
+            if (stale) throw new Error('sections vanished');
+            // Swapping the :target node drops the :target CSS match in
+            // browsers — re-open the hash's panel by class.
+            var hash = window.location.hash.slice(1);
+            var target = hash && document.getElementById(hash);
+            if (target && target.classList.contains('pk-note-panel')) {
+              target.classList.add('pk-open');
+            }
+          })
+          .catch(function () { window.location.reload(); });
+      }
+      // Real fragment navigation (opening another panel, the ✕/backdrop
+      // close links) hands control back to :target — clear the class.
+      window.addEventListener('hashchange', function () {
+        document.querySelectorAll('.pk-note-panel.pk-open').forEach(function (el) {
+          el.classList.remove('pk-open');
+        });
+      });
+      document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form.matches || !form.matches('form[data-pk-comment-form]')) return;
+        if (!window.fetch || !window.DOMParser || form.dataset.pkNative) return;
+        e.preventDefault();
+        var btn = form.querySelector('button[type=submit], input[type=submit]');
+        if (btn) btn.disabled = true;
+        fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'x-pk-comment-fetch': '1' },
+          credentials: 'same-origin'
+        })
+          .then(function (resp) { return resp.json(); })
+          .then(function (data) { return data; }, function () { return null; })
+          .then(function (data) {
+            if (data === null) {
+              // POST or JSON parse failed BEFORE we know the server stored
+              // anything (non-JSON 404, network, auth redirect): degrade to
+              // the no-JS path. pkNative stops re-interception.
+              form.dataset.pkNative = '1';
+              if (btn) btn.disabled = false;
+              form.submit();
+              return;
+            }
+            if (!data.ok) {
+              showError(form, data.message);
+              if (btn) btn.disabled = false;
+              return;
+            }
+            return refreshSections();
+          });
+      });
+    })();
+    </script>
+    """
+  end
+
   # One comment in the thread, recursively rendering its replies. The reply
   # form hides behind <details> — open/close works with no JS, several can
   # be open at once, and nothing scroll-jumps.
@@ -1682,7 +1781,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       |> Map.put_new(:submit_label, gettext("Post comment"))
 
     ~H"""
-    <form method="post" action={@action} class="space-y-2">
+    <form method="post" action={@action} data-pk-comment-form class="space-y-2">
       <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
       <input type="hidden" name="post_uuid" value={@post_uuid} />
       <input type="hidden" name="ft" value={@token} />
@@ -1719,7 +1818,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   """
   def note_panels(assigns) do
     ~H"""
-    <section aria-label={gettext("Author notes")}>
+    <section id="pk-note-panels" aria-label={gettext("Author notes")}>
       <div :for={note <- @post_notes} id={"pk-note-panel-#{note.id}"} class="pk-note-panel">
         <a
           href={"#pk-note-ref-#{note.number}"}
@@ -1752,24 +1851,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               {ngettext(
                 "%{count} comment on this note",
                 "%{count} comments on this note",
-                length(Map.get(@note_comments, note.id, []))
+                Publishing.Comments.tree_size(Map.get(@note_comments, note.id, []))
               )}
             </h3>
             <ol class="mb-4 space-y-4">
-              <li :for={comment <- Map.get(@note_comments, note.id, [])}>
-                <div class="flex items-baseline gap-2 text-sm">
-                  <span class="font-semibold">{comment_author_name(comment)}</span>
-                  <time
-                    class="text-xs text-base-content/50"
-                    datetime={DateTime.to_iso8601(comment.inserted_at)}
-                  >
-                    {Calendar.strftime(comment.inserted_at, "%Y-%m-%d %H:%M")}
-                  </time>
-                </div>
-                <div class="mt-1 text-sm">
-                  {Publishing.Comments.render_content(comment.content)}
-                </div>
-              </li>
+              <.comment_node
+                :for={comment <- Map.get(@note_comments, note.id, [])}
+                comment={comment}
+                form_action={@form_action <> "#pk-note-panel-#{note.id}"}
+                post_uuid={@post_uuid}
+                form_token={@form_token}
+                can_comment={@can_comment}
+              />
             </ol>
             <%= if @can_comment do %>
               <.comment_form
@@ -1793,12 +1886,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       </div>
     </section>
     <style>
+      /* .pk-open mirrors :target — replacing a :target node in the DOM
+         (the fetch enhancement's section swap) makes browsers drop the
+         :target match, so the script re-opens the hash's panel by class. */
       .pk-note-panel{position:fixed;inset:0;z-index:60;visibility:hidden;pointer-events:none}
-      .pk-note-panel:target{visibility:visible;pointer-events:auto}
+      .pk-note-panel:target,.pk-note-panel.pk-open{visibility:visible;pointer-events:auto}
       .pk-note-panel-backdrop{position:absolute;inset:0;background:rgb(0 0 0/.25);opacity:0;transition:opacity .2s ease}
-      .pk-note-panel:target .pk-note-panel-backdrop{opacity:1}
+      .pk-note-panel:target .pk-note-panel-backdrop,.pk-note-panel.pk-open .pk-note-panel-backdrop{opacity:1}
       .pk-note-panel aside{position:absolute;top:0;right:0;bottom:0;width:min(26rem,92vw);overflow-y:auto;transform:translateX(100%);transition:transform .25s ease}
-      .pk-note-panel:target aside{transform:none}
+      .pk-note-panel:target aside,.pk-note-panel.pk-open aside{transform:none}
       @media (prefers-reduced-motion: reduce){
         .pk-note-panel-backdrop,.pk-note-panel aside{transition:none}
       }
@@ -2072,6 +2168,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           module). Dead-view thread + plain POST form — works with no JS;
           the controller handles honeypot/time-trap/auth and redirects back
           here with a flash. --%>
+        <%!-- The enhancement script lives OUTSIDE #comments: that section
+          gets swapped by the script itself, and a document-level listener
+          shouldn't ride a subtree it replaces. --%>
+        <div :if={assigns[:comments_enabled]} class="hidden" aria-hidden="true">
+          {Phoenix.HTML.raw(comment_fetch_assets())}
+        </div>
         <section :if={assigns[:comments_enabled]} id="comments" class="mt-10 border-t pt-6">
           {Publishing.Comments.content_styles()}
           <h2 class="mb-4 text-lg font-semibold">

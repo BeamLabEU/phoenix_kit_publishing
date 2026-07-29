@@ -312,6 +312,51 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
       assert reply.metadata["note_id"] == note_id
     end
 
+    test "note-panel threads nest replies and render Reply controls in the panel", %{
+      conn: conn,
+      slug: slug,
+      post: post,
+      user: user
+    } do
+      alias PhoenixKit.Modules.Publishing
+
+      {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
+
+      {:ok, _} =
+        Posts.update_post(
+          slug,
+          read,
+          %{"content" => "Uses <Note note=\"Threaded note.\">a term</Note> here."},
+          %{}
+        )
+
+      note_id = PhoenixKit.Modules.Publishing.Renderer.note_dom_id("Threaded note.")
+
+      {:ok, root} =
+        PublishingComments.create(post.uuid, user.uuid, "Panel root", note_id: note_id)
+
+      conn =
+        post_comment(
+          conn,
+          slug,
+          Map.put(base_params(post, "Panel reply"), "parent_uuid", root.uuid)
+        )
+
+      # The reply inherited the note anchor, so the redirect reopens the panel.
+      assert redirected_to(conn) =~ "#pk-note-panel-#{note_id}"
+
+      page = PublishingComments.for_post_page(post.uuid)
+
+      assert [%{content: "Panel root", children: [%{content: "Panel reply"}]}] =
+               page.note_comments[note_id]
+
+      assert PublishingComments.tree_size(page.note_comments[note_id]) == 2
+
+      html = build_conn() |> get("/#{slug}/discussed") |> html_response(200)
+      assert html =~ "2 comments on this note"
+      assert html =~ "Panel reply"
+    end
+
     test "a malformed note_id posts as a plain thread comment", %{
       conn: conn,
       slug: slug,
@@ -328,6 +373,57 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
       page = PublishingComments.for_post_page(post.uuid)
       assert page.count == 1
       assert page.note_comments == %{}
+    end
+  end
+
+  describe "fetch-enhanced submissions (x-pk-comment-fetch)" do
+    setup %{slug: slug, user: user} do
+      {:ok, _} = Groups.update_group(slug, %{"comments_enabled" => "true"})
+      :ok = login(user)
+      :ok
+    end
+
+    defp post_fetch(conn, slug, params) do
+      conn
+      |> put_req_header("x-pk-comment-fetch", "1")
+      |> post("/#{slug}/discussed", params)
+    end
+
+    test "success returns 200 JSON instead of a redirect", %{
+      conn: conn,
+      slug: slug,
+      post: post
+    } do
+      conn = post_fetch(conn, slug, base_params(post, "Over fetch"))
+
+      assert json_response(conn, 200) == %{"ok" => true, "message" => "Comment posted."}
+      assert [%{content: "Over fetch"}] = PublishingComments.for_post_page(post.uuid).thread
+    end
+
+    test "errors return 422 JSON with the message", %{conn: conn, slug: slug, post: post} do
+      conn = post_fetch(conn, slug, %{base_params(post, "late") | "ft" => "garbage"})
+
+      assert %{"ok" => false, "message" => message} = json_response(conn, 422)
+      assert message =~ "expired"
+      assert PublishingComments.for_post_page(post.uuid).count == 0
+    end
+
+    test "the honeypot still pretends success over fetch", %{
+      conn: conn,
+      slug: slug,
+      post: post
+    } do
+      params = base_params(post, "spam") |> Map.put("website", "https://spam.example")
+      conn = post_fetch(conn, slug, params)
+
+      assert %{"ok" => true} = json_response(conn, 200)
+      assert PublishingComments.for_post_page(post.uuid).count == 0
+    end
+
+    test "the enhancement script and form markers render", %{conn: conn, slug: slug} do
+      html = build_conn() |> get("/#{slug}/discussed") |> html_response(200)
+      assert html =~ "data-pk-comment-form"
+      assert html =~ "__pkCommentFetch"
     end
   end
 end

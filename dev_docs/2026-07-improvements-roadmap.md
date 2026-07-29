@@ -116,14 +116,26 @@ makes sense.)
   main list). Reply forms behind `<details>` (no JS); recursive
   `comment_node` rendering with indent; success redirects anchor from the
   CREATED comment's stored thread location.
-- **Known limits (deliberate, surfaced)**: note-panel comment lists are
-  flat (replies inherit the note and appear in the panel chronologically —
-  no nested rendering there); `note_id` is format-validated but not
-  checked against the post's actual notes (junk ids from a logged-in
-  client create comments visible only in the comments admin — listing
-  content isn't available in the POST path without extra reads); the
-  CSS-only dialog has no focus trap/aria-modal (inherent no-JS limits;
-  panel aside is focusable via tabindex).
+- **Panel threads + no-reload posting (Max feedback, same day)** —
+  note-panel comment lists are now full TREES with the same `<details>`
+  Reply controls as the main thread (seam builds per-note trees;
+  `tree_size/1` drives the panel header count). All comment forms carry
+  `data-pk-comment-form`; an inline enhancement script (same pattern as
+  `reading_progress/1`) POSTs over fetch (`x-pk-comment-fetch` header →
+  the controller answers JSON 200/422 instead of flash+redirect) and
+  swaps `#comments` + `#pk-note-panels` in place — no page reload, scroll
+  and the open panel survive (`.pk-open` mirrors `:target`, which
+  browsers drop when the target node is replaced; cleared on hashchange).
+  A refetch/swap failure downgrades to `location.reload()` — never a
+  re-POST (duplicate-comment guard); a failed/non-JSON POST falls back to
+  the native form submit. No-JS behavior unchanged (flash + redirect
+  reopens the panel via the fragment).
+- **Known limits (deliberate, surfaced)**: `note_id` is format-validated
+  but not checked against the post's actual notes (junk ids from a
+  logged-in client create comments visible only in the comments admin —
+  listing content isn't available in the POST path without extra reads);
+  the CSS-only dialog has no focus trap/aria-modal (inherent no-JS
+  limits; panel aside is focusable via tabindex).
 
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.

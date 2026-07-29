@@ -155,9 +155,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   comments_enabled, the comments seam is available, honeypot empty, the
   signed form token is 3s–1day old (bots submit instantly; stale tabs
   re-render), the post uuid belongs to the group's published set, and the
-  reader is logged in. Every outcome redirects back to the post (or the
-  group listing when the post can't be resolved) with a flash — no JSON,
-  no dead ends.
+  reader is logged in. Plain form posts get a flash + redirect back to the
+  post (or the group listing when the post can't be resolved); requests
+  from the page's fetch enhancement (`x-pk-comment-fetch` header) get a
+  JSON verdict instead so the client can swap the thread in place.
   """
   def create_comment(conn, params) do
     group_slug = params["group"]
@@ -189,26 +190,44 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
     cond do
       is_nil(post) ->
-        conn
-        |> put_flash(:error, gettext("That post is no longer available."))
-        |> redirect(to: PublishingHTML.group_listing_path(language, group_slug))
+        comment_outcome(
+          conn,
+          :error,
+          gettext("That post is no longer available."),
+          PublishingHTML.group_listing_path(language, group_slug)
+        )
 
       # Honeypot: a filled "website" field is a bot — pretend success.
       params["website"] not in [nil, ""] ->
-        redirect(conn, to: back_path)
+        comment_outcome(conn, :silent, nil, back_path)
 
       not comment_token_valid?(conn, params["ft"]) ->
-        conn
-        |> put_flash(:error, gettext("The form expired — please try again."))
-        |> redirect(to: back_path)
+        comment_outcome(conn, :error, gettext("The form expired — please try again."), back_path)
 
       is_nil(current_user_uuid(conn)) ->
-        conn
-        |> put_flash(:error, gettext("Please log in to comment."))
-        |> redirect(to: back_path)
+        comment_outcome(conn, :error, gettext("Please log in to comment."), back_path)
 
       true ->
         submit_comment(conn, post, params, back_path)
+    end
+  end
+
+  # One exit point for every comment-POST outcome. The plain form flow
+  # flashes + redirects; the fetch-enhanced flow (x-pk-comment-fetch,
+  # set by the page's progressive-enhancement script) gets JSON so the
+  # client can swap the thread in place instead of reloading. :silent =
+  # the honeypot's pretend-success (no flash, ok to the bot either way).
+  defp comment_outcome(conn, kind, message, path) do
+    if get_req_header(conn, "x-pk-comment-fetch") != [] do
+      case kind do
+        :error -> conn |> put_status(422) |> json(%{ok: false, message: message})
+        _ -> json(conn, %{ok: true, message: message})
+      end
+    else
+      case kind do
+        :silent -> redirect(conn, to: path)
+        kind -> conn |> put_flash(kind, message) |> redirect(to: path)
+      end
     end
   end
 
@@ -247,36 +266,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
               back_path
           end
 
-        conn
-        |> put_flash(:info, gettext("Comment posted."))
-        |> redirect(to: success_path)
+        comment_outcome(conn, :info, gettext("Comment posted."), success_path)
 
-      {:error, :empty_comment} ->
-        conn
-        |> put_flash(:error, gettext("The comment can't be empty."))
-        |> redirect(to: back_path)
-
-      {:error, :content_too_long} ->
-        conn
-        |> put_flash(:error, gettext("That comment is too long."))
-        |> redirect(to: back_path)
-
-      {:error, :parent_not_found} ->
-        conn
-        |> put_flash(:error, gettext("The comment you replied to is no longer available."))
-        |> redirect(to: back_path)
-
-      {:error, :max_depth_exceeded} ->
-        conn
-        |> put_flash(:error, gettext("This thread is too deep to reply to."))
-        |> redirect(to: back_path)
-
-      {:error, _} ->
-        conn
-        |> put_flash(:error, gettext("Couldn't post your comment — please try again."))
-        |> redirect(to: back_path)
+      {:error, reason} ->
+        comment_outcome(conn, :error, comment_error_message(reason), back_path)
     end
   end
+
+  defp comment_error_message(:empty_comment), do: gettext("The comment can't be empty.")
+  defp comment_error_message(:content_too_long), do: gettext("That comment is too long.")
+
+  defp comment_error_message(:parent_not_found),
+    do: gettext("The comment you replied to is no longer available.")
+
+  defp comment_error_message(:max_depth_exceeded),
+    do: gettext("This thread is too deep to reply to.")
+
+  defp comment_error_message(_), do: gettext("Couldn't post your comment — please try again.")
 
   # A note anchor is the url-safe digest Renderer.note_dom_id/1 emits —
   # anything else is a crafted payload and is dropped (the comment then
