@@ -200,6 +200,55 @@ defmodule PhoenixKit.Modules.Publishing.ShowcaseTest do
     end
   end
 
+  describe "interactions with the rest of the pipeline" do
+    # Every feature in the body is regex-driven over the same source: the code
+    # mask, the note extractor, the hashtag linkifier and the component
+    # scanner. A quorum reviewer flagged that they were only ever tested in
+    # isolation, which is fair — this renders them all at once.
+    test "showcase, notes, hashtags and code coexist" do
+      html =
+        Renderer.render_markdown(
+          """
+          Intro with #elixir and a <Note note="a clarifying remark">phrase</Note>.
+
+          <Showcase src="/a.jpg" side="right" overlap="20" alt="Band">
+          ### Band heading #phoenix
+
+          Band prose with a <Note note="note inside a band">second note</Note>.
+          </Showcase>
+
+          ```
+          <Showcase src="/x.jpg">literal example #nottag</Showcase>
+          ```
+
+          Outro #otp.
+          """,
+          tag_links: {"blog", "en"}
+        )
+
+      # The band rendered, once, with its own markup.
+      assert length(String.split(html, ~s(class="pk-showcase ))) - 1 == 1
+      assert html =~ "Band heading"
+
+      # Prose hashtags outside the band link...
+      assert html =~ ~s(/blog/tag/elixir")
+      assert html =~ ~s(/blog/tag/otp")
+      # ...and the fenced example neither renders nor tags.
+      refute html =~ ~s(/blog/tag/nottag)
+      assert html =~ "&lt;Showcase"
+
+      # Notes still number sequentially across the whole document, including
+      # the one inside the band, and neither is duplicated as bare text.
+      assert html =~ "<sup>1</sup>"
+      assert html =~ "<sup>2</sup>"
+      refute html =~ "a clarifying remarkphrase"
+
+      # Exactly one copy of each stylesheet.
+      assert length(String.split(html, "pk-showcase__media{grid-row")) - 1 == 1
+      assert length(String.split(html, ".pk-note-ref{text-decoration")) - 1 == 1
+    end
+  end
+
   describe "safety" do
     test "unsafe src schemes render the prose alone, never the image" do
       for bad <- ["javascript:alert(1)", "data:image/png;base64,x", "ftp://x/y.jpg"] do
