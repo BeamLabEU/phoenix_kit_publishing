@@ -280,16 +280,16 @@ The body is ordinary Markdown (heading, paragraphs, links). Attributes:
 | `alt` | text | Image alt text. Always set it. |
 | `side` | `left` \| `right` | Which edge the image bleeds to. Default `left`. |
 | `overlap` | `0`–`40` | How much of the band the image and text share, in percent. Default `15`. |
-| `tone` | `dark` \| `light` \| `none` | The band paints its own background and text colour so the words read both over the image and beside it: `dark` = dark band, light text (default); `light` = the inverse; `none` = inherit the page theme and skip the tint. |
+| `tone` | `page` \| `dark` \| `light` \| `none` | How the band is coloured. `page` (default) uses the page's own `base-100`/`base-content`, so there is no visible slab beside the image — the picture dissolves into the page. `dark` and `light` paint a deliberate band (dark background + light text, or the inverse) for a section that should stand apart. `none` inherits the theme and skips the tint entirely. |
 | `align` / `stretch` | as elsewhere | The band is full-bleed by default; pass these to narrow it. |
 
 Behaviour worth knowing:
 
 - The overlap is a real CSS grid track shared by the image and the text —
   the browser lays it out, there is no JavaScript.
-- The image is tinted toward the band colour on the side the text comes
-  from, and **the more they overlap, the stronger the tint**, so the text
-  stays readable.
+- The image is blended into the band colour on the side the text comes
+  from, and **the wider the overlap, the earlier that blend starts**, so
+  the text stays readable.
 - On narrow screens the two stack, the overlap becomes total, and the tint
   becomes a full vertical wash over the image.
 - An unusable `src` (or none) renders the text on its own rather than an

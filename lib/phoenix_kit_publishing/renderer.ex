@@ -65,6 +65,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @showcase_css """
   <style>
   .pk-showcase{display:grid;grid-template-columns:[sc-edge-start] 1fr [sc-mid-start] var(--pk-sc-overlap,15%) [sc-mid-end] 1fr [sc-edge-end];align-items:center;margin:2.5rem 0;overflow:hidden}
+  /* tone="page" (default): the band takes the PAGE's own colours, so there is
+     no slab beside the image — the picture simply dissolves into the page. */
+  .pk-showcase--page{background:var(--color-base-100,#fff);color:var(--color-base-content,#111)}
   .pk-showcase--dark{background:#0b0b0d;color:#fff}
   .pk-showcase--light{background:#fafafa;color:#111}
   .pk-showcase__media{grid-row:1;position:relative;align-self:stretch;min-height:0}
@@ -76,24 +79,29 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   .pk-showcase--left .pk-showcase__text{grid-column:sc-mid-start / sc-edge-end}
   .pk-showcase--right .pk-showcase__media{grid-column:sc-mid-start / sc-edge-end}
   .pk-showcase--right .pk-showcase__text{grid-column:sc-edge-start / sc-mid-end}
-  /* Scrim: fades the image into the band on the side the text comes from. */
+  /* Scrim: blends the image into the band on the side the text comes from,
+     starting at --pk-sc-fade (earlier for a wider overlap). */
   .pk-showcase__media::after{content:"";position:absolute;inset:0;pointer-events:none}
-  .pk-showcase--left.pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to right,transparent 45%,rgb(11 11 13 / var(--pk-sc-shade,.55)))}
-  .pk-showcase--right.pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to left,transparent 45%,rgb(11 11 13 / var(--pk-sc-shade,.55)))}
-  .pk-showcase--left.pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to right,transparent 45%,rgb(250 250 250 / var(--pk-sc-shade,.55)))}
-  .pk-showcase--right.pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to left,transparent 45%,rgb(250 250 250 / var(--pk-sc-shade,.55)))}
+  .pk-showcase--left.pk-showcase--page .pk-showcase__media::after{background:linear-gradient(to right,transparent var(--pk-sc-fade,55%),var(--color-base-100,#fff))}
+  .pk-showcase--right.pk-showcase--page .pk-showcase__media::after{background:linear-gradient(to left,transparent var(--pk-sc-fade,55%),var(--color-base-100,#fff))}
+  .pk-showcase--left.pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to right,transparent var(--pk-sc-fade,55%),rgb(11 11 13 / var(--pk-sc-shade,.55)))}
+  .pk-showcase--right.pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to left,transparent var(--pk-sc-fade,55%),rgb(11 11 13 / var(--pk-sc-shade,.55)))}
+  .pk-showcase--left.pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to right,transparent var(--pk-sc-fade,55%),rgb(250 250 250 / var(--pk-sc-shade,.55)))}
+  .pk-showcase--right.pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to left,transparent var(--pk-sc-fade,55%),rgb(250 250 250 / var(--pk-sc-shade,.55)))}
   /* Narrow screens: the two stack, so the overlap is total and the scrim
      becomes a full vertical wash — the boss's "as the overlap increases the
-     image gets darkened or lightened as needed". */
+     image gets darkened or lightened as needed".
+     Must repeat the side classes: the desktop rules are .side.tone (three
+     classes), so a two-class rule here loses on specificity even inside
+     the media query and the wash would silently never apply. */
   @media (max-width:767px){
     .pk-showcase{grid-template-columns:1fr}
     .pk-showcase--left .pk-showcase__media,.pk-showcase--right .pk-showcase__media,
     .pk-showcase--left .pk-showcase__text,.pk-showcase--right .pk-showcase__text{grid-column:1;grid-row:1}
     .pk-showcase__text{align-self:end}
     .pk-showcase__media img{min-height:22rem}
-    /* Must repeat the side classes: the desktop rules are .side.tone (three
-       classes), so a two-class rule here loses on specificity even inside
-       the media query and the wash would silently never apply. */
+    .pk-showcase--left.pk-showcase--page .pk-showcase__media::after,
+    .pk-showcase--right.pk-showcase--page .pk-showcase__media::after{background:linear-gradient(to bottom,transparent 25%,var(--color-base-100,#fff))}
     .pk-showcase--left.pk-showcase--dark .pk-showcase__media::after,
     .pk-showcase--right.pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to bottom,rgb(11 11 13 / .2) 30%,rgb(11 11 13 / .85))}
     .pk-showcase--left.pk-showcase--light .pk-showcase__media::after,
@@ -934,7 +942,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
         html = """
         <figure class="pk-showcase pk-showcase--#{side} pk-showcase--#{tone}" \
-        style="--pk-sc-overlap:#{overlap}%;--pk-sc-shade:#{showcase_shade(overlap)}">
+        style="--pk-sc-overlap:#{overlap}%;--pk-sc-shade:#{showcase_shade(overlap)};        --pk-sc-fade:#{showcase_fade(overlap)}%">
         <div class="pk-showcase__media"><img src="#{src}" alt="#{alt}" loading="lazy" decoding="async"></div>
         <div class="pk-showcase__text">#{text_html}</div>
         </figure>
@@ -986,9 +994,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   defp showcase_safe_src?("https://" <> _), do: true
   defp showcase_safe_src?(_), do: false
 
+  defp showcase_tone("dark"), do: "dark"
   defp showcase_tone("light"), do: "light"
   defp showcase_tone("none"), do: "none"
-  defp showcase_tone(_), do: "dark"
+  defp showcase_tone(_), do: "page"
 
   defp showcase_overlap(value) when is_binary(value) do
     case Integer.parse(value) do
@@ -1007,6 +1016,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     |> min(0.8)
     |> Float.round(2)
   end
+
+  # Where the scrim starts, as a percentage across the image. A wider overlap
+  # pulls the fade earlier so more of the image is already blended by the time
+  # the text reaches it.
+  defp showcase_fade(overlap), do: (70 - overlap) |> max(30) |> min(70)
 
   # Parse XML attribute string into a map
   defp parse_xml_attributes(attrs_string) do

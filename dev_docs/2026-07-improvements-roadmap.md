@@ -166,9 +166,12 @@ makes sense.)
 - Image bled to one edge, Markdown text on the other, sharing an `overlap`
   grid track; `side`, `overlap` (0–40), `tone` (dark/light/none),
   `file_uuid`/`src`, full-bleed by default with align/stretch passthrough.
-- The band paints its OWN background/text colour rather than inheriting the
-  host theme — the text sits partly over the image and partly beside it, and
-  one colour has to work for both.
+- `tone` decides the band's colours. Default is `page` (base-100 /
+  base-content), so the band is invisible against the page and the image
+  dissolves into it; `dark`/`light` paint a deliberate band. The first cut
+  defaulted to a hardcoded near-black, which Max reported as "black
+  background where there isn't an image" — the reference design works only
+  because that whole page is black.
 - Scrim strength scales with `overlap` (more text over image ⇒ more tint);
   narrow screens stack, overlap goes total, and the scrim becomes a vertical
   wash. Pure CSS, no JS. Render cache → v7.

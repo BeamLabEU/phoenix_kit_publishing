@@ -81,14 +81,36 @@ defmodule PhoenixKit.Modules.Publishing.ShowcaseTest do
       end
     end
 
-    test "tone selects the band's own colours; dark is the default" do
-      dark = render(~s(<Showcase src="/a.jpg">Text</Showcase>))
-      light = render(~s(<Showcase src="/a.jpg" tone="light">Text</Showcase>))
-      none = render(~s(<Showcase src="/a.jpg" tone="none">Text</Showcase>))
+    test "tone defaults to the PAGE's colours, not a coloured slab" do
+      # The band spans the full width, so a hardcoded dark background painted a
+      # black rectangle beside the image on a light page (reported on a live
+      # post). The default now takes base-100/base-content, which makes the
+      # band invisible against the page and the image dissolve into it.
+      default = render(~s(<Showcase src="/a.jpg">Text</Showcase>))
 
-      assert dark =~ "pk-showcase--dark"
-      assert light =~ "pk-showcase--light"
-      assert none =~ "pk-showcase--none"
+      assert default =~ ~s(class="pk-showcase pk-showcase--left pk-showcase--page)
+      refute default =~ "pk-showcase--dark pk-showcase"
+      assert default =~ ".pk-showcase--page{background:var(--color-base-100"
+      assert default =~ "var(--color-base-100,#fff))}"
+    end
+
+    test "explicit tones opt into a deliberate band" do
+      for {tone, class} <- [{"dark", "--dark"}, {"light", "--light"}, {"none", "--none"}] do
+        html = render(~s(<Showcase src="/a.jpg" tone="#{tone}">Text</Showcase>))
+        assert html =~ "pk-showcase pk-showcase--left pk-showcase#{class}"
+      end
+    end
+
+    test "the scrim starts earlier as the overlap widens" do
+      [narrow, wide] =
+        Enum.map([5, 40], fn o ->
+          html = render(~s(<Showcase src="/a.jpg" overlap="#{o}">T</Showcase>))
+          [_, fade] = Regex.run(~r/--pk-sc-fade:(\d+)%/, html)
+          String.to_integer(fade)
+        end)
+
+      assert wide < narrow
+      assert wide >= 30
     end
   end
 
@@ -126,9 +148,11 @@ defmodule PhoenixKit.Modules.Publishing.ShowcaseTest do
       # test can't evaluate specificity, so pin the shape instead.
       [_, mobile] = String.split(html, "@media (max-width:767px)")
 
-      assert mobile =~
-               ".pk-showcase--left.pk-showcase--dark .pk-showcase__media::after,\n" <>
-                 "  .pk-showcase--right.pk-showcase--dark .pk-showcase__media::after"
+      for tone <- ~w(page dark light) do
+        assert mobile =~
+                 ".pk-showcase--left.pk-showcase--#{tone} .pk-showcase__media::after,\n" <>
+                   "  .pk-showcase--right.pk-showcase--#{tone} .pk-showcase__media::after"
+      end
     end
   end
 
