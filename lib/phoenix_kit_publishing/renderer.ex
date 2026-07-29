@@ -463,7 +463,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     """
     <style>
     .pk-note-ref{text-decoration:underline dotted;text-underline-offset:3px;position:relative;color:inherit}
-    .pk-note-ref sup{color:oklch(var(--p));font-weight:600;margin-left:1px}
+    .pk-note-ref sup{color:var(--color-primary,currentColor);font-weight:600;margin-left:1px}
     .pk-note-ref:hover::after,.pk-note-ref:focus-visible::after{content:attr(data-note);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(20rem,80vw);white-space:normal;background:var(--color-base-200,#eee);color:var(--color-base-content,#111);border:1px solid var(--color-base-300,#ddd);border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;line-height:1.35;z-index:20;box-shadow:0 4px 12px rgb(0 0 0/.08)}
     </style>
     """
@@ -488,7 +488,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     </section>
     <style>
     .pk-note-ref{text-decoration:underline dotted;text-underline-offset:3px;position:relative;color:inherit}
-    .pk-note-ref sup{color:oklch(var(--p));font-weight:600;margin-left:1px}
+    .pk-note-ref sup{color:var(--color-primary,currentColor);font-weight:600;margin-left:1px}
     .pk-note-ref:hover::after,.pk-note-ref:focus-visible::after{content:attr(data-note);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(20rem,80vw);white-space:normal;background:var(--color-base-200,#eee);color:var(--color-base-content,#111);border:1px solid var(--color-base-300,#ddd);border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;line-height:1.35;z-index:20;box-shadow:0 4px 12px rgb(0 0 0/.08)}
     .pk-notes li:target{background:var(--color-base-200,#eee);border-radius:.25rem}
     </style>

@@ -193,8 +193,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
 
   defp preview_notes_style(group_slug) do
     case Publishing.get_group(group_slug) do
-      {:ok, group} -> Map.get(group, "notes_style", "footnotes")
-      _ -> "footnotes"
+      {:ok, group} -> PostRendering.group_notes_style(group)
+      _ -> Constants.default_notes_style()
     end
   end
 

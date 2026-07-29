@@ -30,18 +30,29 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   # - PHK components (`<Image alt="see #elixir" />`, `<Video>…</Video>`):
   #   attribute values must never be rewritten, and block bodies are
   #   emitted as raw HTML, where a Markdown link would show literally.
-  @masked_regions ~r{```.*?```|~~~.*?~~~|```.*|~~~.*|``[^\n]+?``|`(?:[^`\n]|\n(?!\n))*`|!?\[[^\]\n]*\]\([^)\n]*\)|<([A-Z][A-Za-z0-9]*)\b[^>]*>.*?</\1>|<[A-Z][A-Za-z0-9]*\b[^>]*>}s
+  @masked_regions ~r{```.*?```|~~~.*?~~~|```.*|~~~.*|``[^\n]+?``|`(?:[^`\n]|\n(?!\n))*`|!?\[[^\]\n]*\]\([^)\n]*\)|<(CTA|Headline|Subheadline|Video|Audio|EntityForm)\b[^>]*>.*?</\1>|<[A-Za-z][A-Za-z0-9-]*\b[^>]*>}s
 
   # Start-of-line / whitespace / "(" then #<letter><letter|digit|_|->*.
   # The lookahead makes overlong words fail entirely (plain text) rather
   # than linkifying their first 30 characters.
   @hashtag ~r/(^|[\s(])#(\p{L}[\p{L}\p{N}_-]{0,29})(?![\p{L}\p{N}_-])/u
 
+  # Same, minus the start-of-string branch. `linkify/2` splits the document on
+  # masked regions, so `^` would match at every fragment boundary and treat
+  # "`code`#tag" as a tag — a boundary `extract/1` does not see, which would
+  # link a tag that never got stored.
+  @hashtag_mid ~r/([\s(])#(\p{L}[\p{L}\p{N}_-]{0,29})(?![\p{L}\p{N}_-])/u
+
+  # Masked regions collapse to this rather than a space: a space would invent
+  # the whitespace boundary the hashtag rule requires, so "`code`#tag" would
+  # extract "tag".
+  @mask_sentinel "\x00"
+
   @max_tags 20
 
   @doc "All hashtags in a document, first-spelling-wins, order-preserving."
   def extract(content) when is_binary(content) do
-    stripped = Regex.replace(@masked_regions, content, " ")
+    stripped = Regex.replace(@masked_regions, content, @mask_sentinel)
 
     @hashtag
     |> Regex.scan(stripped, capture: :all_but_first)
@@ -59,17 +70,27 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   prose link styling.
   """
   def linkify(content, url_fun) when is_binary(content) and is_function(url_fun, 1) do
+    # Only link what extract/1 would actually STORE. Otherwise the 21st tag in
+    # a body (past the cap) renders as a link to an archive that can't find the
+    # post — a dead link the author never sees in their tag list.
+    allowed = content |> extract() |> MapSet.new(&String.downcase/1)
+
     @masked_regions
     |> Regex.split(content, include_captures: true)
-    |> Enum.map_join(&linkify_part(&1, url_fun))
+    |> Enum.with_index()
+    |> Enum.map_join(fn {part, index} -> linkify_part(part, url_fun, allowed, index == 0) end)
   end
 
-  defp linkify_part(part, url_fun) do
+  defp linkify_part(part, url_fun, allowed, first?) do
     if Regex.match?(@masked_regions, part) do
       part
     else
-      Regex.replace(@hashtag, part, fn _all, lead, tag ->
-        "#{lead}[##{tag}](#{url_fun.(tag)})"
+      regex = if first?, do: @hashtag, else: @hashtag_mid
+
+      Regex.replace(regex, part, fn full, lead, tag ->
+        if MapSet.member?(allowed, String.downcase(tag)),
+          do: "#{lead}[##{tag}](#{url_fun.(tag)})",
+          else: full
       end)
     end
   end

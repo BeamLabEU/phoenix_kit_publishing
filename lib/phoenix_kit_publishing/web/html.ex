@@ -1699,12 +1699,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           .then(function (data) { return data; }, function () { return null; })
           .then(function (data) {
             if (data === null) {
-              // POST or JSON parse failed BEFORE we know the server stored
-              // anything (non-JSON 404, network, auth redirect): degrade to
-              // the no-JS path. pkNative stops re-interception.
-              form.dataset.pkNative = '1';
-              if (btn) btn.disabled = false;
-              form.submit();
+              // The POST failed, or its response wasn't JSON (proxy error,
+              // auth redirect, dropped connection). We CANNOT tell whether
+              // the server stored the comment, so we must not resubmit —
+              // a lost success response would post it twice. Reload instead:
+              // the reader sees the real state and can retype if needed.
+              window.location.reload();
               return;
             }
             if (!data.ok) {
@@ -1724,6 +1724,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   # form hides behind <details> — open/close works with no JS, several can
   # be open at once, and nothing scroll-jumps.
   defp comment_node(assigns) do
+    assigns = Map.put_new(assigns, :note_id, nil)
+
     ~H"""
     <li id={"comment-#{@comment.uuid}"}>
       <div class="flex items-baseline gap-2 text-sm">
@@ -1740,11 +1742,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           {gettext("Reply")}
         </summary>
         <div class="mt-2">
+          <%!-- note_id rides along for ANCHORING only: on a validation error
+                the controller redirects back, and without it the fragment
+                points at a comment inside a closed panel, bouncing a no-JS
+                reader out of the panel they were typing in. Threading still
+                comes from the parent alone (the seam ignores a client
+                note_id on replies). --%>
           <.comment_form
             action={@form_action}
             post_uuid={@post_uuid}
             token={@form_token}
             parent_uuid={@comment.uuid}
+            note_id={@note_id}
             compact={true}
             placeholder={gettext("Write a reply…")}
             submit_label={gettext("Post reply")}
@@ -1762,6 +1771,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           post_uuid={@post_uuid}
           form_token={@form_token}
           can_comment={@can_comment}
+          note_id={@note_id}
         />
       </ol>
     </li>
@@ -1862,6 +1872,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 post_uuid={@post_uuid}
                 form_token={@form_token}
                 can_comment={@can_comment}
+                note_id={note.id}
               />
             </ol>
             <%= if @can_comment do %>

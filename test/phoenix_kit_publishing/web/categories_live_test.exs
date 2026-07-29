@@ -117,6 +117,47 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     assert [{%{name: "A"}, 0}, {%{name: "B"}, 1}] = Categories.list_tree(slug)
   end
 
+  test "submitting Move-to unchanged is a no-op, not a silent reorder", %{
+    conn: conn,
+    slug: slug
+  } do
+    {:ok, a} = Categories.create_category(slug, %{"name" => "A", "position" => 0})
+    {:ok, _b} = Categories.create_category(slug, %{"name" => "B", "position" => 1})
+    {:ok, _c} = Categories.create_category(slug, %{"name" => "C", "position" => 2})
+
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+    view |> element("button[phx-value-uuid='#{a.uuid}'][phx-click='open_move']") |> render_click()
+
+    # The dialog pre-selects A's current parent (root), so clicking Move
+    # without touching the select must change nothing. It used to append A at
+    # the end of its own group — B, C, A — from one careless click.
+    view |> form("#category-move-form", move: %{"parent_uuid" => ""}) |> render_submit()
+
+    assert [{%{name: "A"}, 0}, {%{name: "B"}, 0}, {%{name: "C"}, 0}] = Categories.list_tree(slug)
+  end
+
+  test "a cross-parent drop says so instead of flashing success", %{conn: conn, slug: slug} do
+    {:ok, parent} = Categories.create_category(slug, %{"name" => "Parent"})
+
+    {:ok, child} =
+      Categories.create_category(slug, %{"name" => "Kid", "parent_uuid" => parent.uuid})
+
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+
+    # Dragging the child out to the root is discarded server-side (reorder only
+    # renumbers within a parent), so claiming success while the row snaps back
+    # tells the user a reparent happened.
+    html =
+      render_hook(view, "reorder_categories", %{
+        "ordered_ids" => [child.uuid, parent.uuid],
+        "moved_id" => child.uuid
+      })
+
+    assert html =~ "Move to"
+    {:ok, reloaded} = Categories.get_category(child.uuid)
+    assert reloaded.parent_uuid == parent.uuid
+  end
+
   test "drag reorder renumbers siblings and never re-parents", %{conn: conn, slug: slug} do
     {:ok, a} = Categories.create_category(slug, %{"name" => "A", "position" => 0})
     {:ok, b} = Categories.create_category(slug, %{"name" => "B", "position" => 1})

@@ -230,9 +230,11 @@ defmodule PhoenixKit.Modules.Publishing.ShowcaseTest do
       assert length(String.split(html, ~s(class="pk-showcase ))) - 1 == 1
       assert html =~ "Band heading"
 
-      # Prose hashtags outside the band link...
+      # Prose hashtags outside the band link, and so do the band's own —
+      # a Showcase body is markdown, so it gets the same treatment.
       assert html =~ ~s(/blog/tag/elixir")
       assert html =~ ~s(/blog/tag/otp")
+      assert html =~ ~s(/blog/tag/phoenix")
       # ...and the fenced example neither renders nor tags.
       refute html =~ ~s(/blog/tag/nottag)
       assert html =~ "&lt;Showcase"

@@ -190,6 +190,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
 
   def handle_event("confirm_move", %{"move" => %{"parent_uuid" => parent_uuid}}, socket) do
     case socket.assigns.move do
+      # The select is pre-filled with the current parent, so submitting the
+      # dialog untouched must do nothing. Without this, moving to the parent a
+      # row already has appends it at the end of its own sibling group — a
+      # silent reorder from one careless click on the DEFAULT state.
+      %{parent_uuid: current} when current == parent_uuid ->
+        {:noreply, assign(socket, :move, nil)}
+
       %{uuid: uuid} ->
         opts = [actor_uuid: Shared.actor_uuid_from_socket(socket)]
 
@@ -228,6 +235,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     opts = [actor_uuid: Shared.actor_uuid_from_socket(socket)]
 
     case Categories.reorder_categories(socket.assigns.group_slug, ordered_ids, opts) do
+      # changed == 0 means nothing moved — most often a drop ACROSS parents,
+      # which the context discards by design. Flashing green there tells the
+      # user a reparent happened while the row snaps back.
+      {:ok, 0} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, gettext("Order unchanged — use “Move to…” to change a parent."))
+         |> reload_tree()}
+
       {:ok, _changed} ->
         {:noreply,
          socket

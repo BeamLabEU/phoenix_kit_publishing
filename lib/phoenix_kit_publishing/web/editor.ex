@@ -766,16 +766,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   # Clearing writes "" — the same signal the text input sends when emptied by
   # hand — which the save path turns into a real removal (Posts.put_audio_uuid).
+  # Delegates to the shared clear pipeline so the clear actually PERSISTS: the
+  # first cut only marked the form dirty, so clicking X and then waiting left
+  # the field looking empty while the audio was still attached (autosave only
+  # ever fires from schedule_autosave/1). It also inherits the lock reclaim,
+  # the translation-lock guard, and the live broadcast to other editors.
   def handle_event("clear_audio", _params, socket) do
-    if socket.assigns.readonly? or socket.assigns.viewing_older_version do
-      {:noreply, socket}
-    else
-      {:noreply,
-       socket
-       |> assign(:form, Map.put(socket.assigns.form, "audio_uuid", ""))
-       |> assign(:has_pending_changes, true)
-       |> push_event("changes-status", %{has_changes: true})}
-    end
+    clear_image_field(socket, "audio_uuid", gettext("Audio version removed"))
   end
 
   def handle_event("open_image_component_selector", _params, socket) do
@@ -1997,6 +1994,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      |> push_patch(to: url, replace: true)}
   end
 
+  # Only the audio slot is type-checked: the image slots already point at an
+  # image-filtered selector, and a wrong image is visible at a glance whereas a
+  # wrong audio file is silent.
+  defp media_allowed_for_target?(file_uuid, "audio_uuid") do
+    case PhoenixKit.Modules.Storage.get_file(file_uuid) do
+      %{file_type: "audio"} -> true
+      %{mime_type: mime} when is_binary(mime) -> String.starts_with?(mime, "audio/")
+      _ -> false
+    end
+  rescue
+    # Storage unreachable — don't block the editor over a type check.
+    _ -> true
+  end
+
+  defp media_allowed_for_target?(_file_uuid, _target), do: true
+
   defp handle_media_selected(socket, file_ids) do
     file_uuid = List.first(file_ids)
     inserting_image_component = Map.get(socket.assigns, :inserting_image_component, false)
@@ -2018,6 +2031,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             |> assign(:show_media_selector, false)
             |> assign(:inserting_image_component, false)
             |> put_flash(:info, gettext("Image component inserted")),
+            false
+          }
+
+        file_uuid &&
+            not media_allowed_for_target?(file_uuid, socket.assigns[:media_selector_target]) ->
+          # The shared selector has no audio filter, so a Choose click could
+          # attach a PNG to the audio slot: the post page would render a dead
+          # <audio> and the feed an <enclosure type="audio/mpeg"> pointing at
+          # an image. Refuse rather than store it.
+          {
+            socket
+            |> assign(:show_media_selector, false)
+            |> assign(:media_selector_target, "featured_image_uuid")
+            |> put_flash(:error, gettext("That file isn't audio — pick an audio file.")),
             false
           }
 

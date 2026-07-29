@@ -266,7 +266,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
               back_path
           end
 
-        comment_outcome(conn, :info, gettext("Comment posted."), success_path)
+        # Don't claim "posted" for a row the reader can't see: with the
+        # comments module's moderation on, create returns status "pending",
+        # and the thread only lists published rows — so a success message
+        # followed by no visible comment reads as "the site ate it".
+        message =
+          if comment.status == "published" do
+            gettext("Comment posted.")
+          else
+            gettext("Thanks — your comment is awaiting review.")
+          end
+
+        comment_outcome(conn, :info, message, success_path)
 
       {:error, reason} ->
         comment_outcome(conn, :error, comment_error_message(reason), back_path)
@@ -620,8 +631,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
-        |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect_301, url} ->
@@ -691,8 +702,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
-        |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect, url} ->
@@ -927,7 +938,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # optional comments module is present+enabled.
   defp assign_post_comments(conn, group, post) do
     if Map.get(group, "comments_enabled", false) and PublishingComments.available?() do
-      page = PublishingComments.for_post_page(post.uuid)
+      # The post's real note ids, so a comment anchored to a note that no
+      # longer exists folds back into the main thread instead of vanishing.
+      known_note_ids = Enum.map(conn.assigns[:post_notes] || [], & &1.id)
+      page = PublishingComments.for_post_page(post.uuid, known_note_ids)
 
       conn
       |> assign(:comments_enabled, true)

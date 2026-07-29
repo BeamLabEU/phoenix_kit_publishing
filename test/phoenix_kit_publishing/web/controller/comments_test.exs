@@ -376,6 +376,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
     end
   end
 
+  describe "moderation" do
+    test "a held comment says so instead of claiming it posted", %{
+      conn: conn,
+      slug: slug,
+      post: post,
+      user: user
+    } do
+      {:ok, _} = Groups.update_group(slug, %{"comments_enabled" => "true"})
+      # The comments module's own switch: new rows are created "pending".
+      {:ok, _} = Settings.update_boolean_setting("comments_moderation", true)
+      on_exit(fn -> Settings.update_boolean_setting("comments_moderation", false) end)
+      :ok = login(user)
+
+      conn = post_comment(conn, slug, base_params(post, "Held for review"))
+
+      # The thread only lists published rows, so "Comment posted." followed by
+      # nothing appearing reads as the site having eaten it.
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "awaiting review"
+      refute Phoenix.Flash.get(conn.assigns.flash, :info) =~ "posted"
+      assert PublishingComments.for_post_page(post.uuid).count == 0
+
+      html = build_conn() |> get("/#{slug}/discussed") |> html_response(200)
+      refute html =~ "Held for review"
+    end
+  end
+
   describe "fetch-enhanced submissions (x-pk-comment-fetch)" do
     setup %{slug: slug, user: user} do
       {:ok, _} = Groups.update_group(slug, %{"comments_enabled" => "true"})

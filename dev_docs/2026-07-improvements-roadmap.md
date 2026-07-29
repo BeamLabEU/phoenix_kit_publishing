@@ -184,6 +184,76 @@ makes sense.)
   explicit value in the SHARED `stretch_style/1`, so any component whose
   default is full-bleed can opt back into the text column.
 
+### Quorum sweep 2026-07-30 (6 AIs over the whole wave)
+Areas split three ways; two AIs each. **Fixed in `<commit>`:**
+- Comment posted while moderation is ON said "Comment posted." while the
+  thread (published-only) showed nothing — now says it's awaiting review.
+- The fetch enhancement could double-post: a LOST SUCCESS response is
+  indistinguishable from a pre-store failure, and it fell back to a native
+  resubmit. Now reloads instead — never resubmits.
+- A note comment whose note no longer exists (author reworded it, or the group
+  switched back to footnotes) was stored but rendered nowhere: excluded from
+  the main list for having a note_id, never read by any panel. Unknown ids now
+  fold back into the main thread. Note this fixes the REWORDED-note case that
+  POST-side id validation (both AIs' suggestion) could not.
+- `for_post_page/2` was the one unrescued call in the seam, on every public
+  post render — a raise there 500s a page that used to degrade to "no comments".
+- In-panel reply forms now carry `note_id` for ANCHORING, so a no-JS validation
+  error returns to the open panel instead of a comment inside a closed one.
+- `linkify/2` only links what `extract/1` stores: the 21st tag past the cap was
+  a link to an archive that can't find the post. Same class fixed for
+  "`code`#tag" / "[link](/x)#tag", where the mask invented a word boundary the
+  extractor never saw.
+- Raw HTML attributes are masked: `<span style="color: #fff">` minted a phantom
+  `fff` tag AND rewrote the declaration into a markdown link, breaking the CSS.
+- A `<Showcase>` body is markdown, so its hashtags now extract and link (the
+  generic component mask had swallowed the whole block); raw-body components
+  (`<Video>` et al) stay masked, where a markdown link would show literally.
+- Note superscript used daisyUI 4's `oklch(var(--p))`; now `var(--color-primary)`.
+- `clear_audio` never called `schedule_autosave/1`, so clicking X and waiting
+  left the field looking empty while the audio stayed attached. Now delegates to
+  the shared clear pipeline (autosave + broadcast + lock reclaim + guards).
+- The audio media picker accepted any file type — a PNG gave a dead `<audio>`
+  and an `<enclosure type="audio/mpeg">` pointing at an image. Now refused.
+- The Move-to dialog pre-selects the current parent, so submitting it untouched
+  appended the row at the end of its own group. Now a no-op.
+- A cross-parent drag is discarded by design but flashed success while the row
+  snapped back; now says to use Move-to.
+
+**Deferred (design work, not defects to patch):**
+- **Tag maintenance is not transactional.** Parallel AI translation jobs each
+  compute the cross-language union and replace `version.data`, so the last
+  writer can drop the other's tags; `clear_translation` deletes a body without
+  recomputing, leaving a tag whose text no longer exists anywhere. Codex's fix:
+  one `refresh_version_tags/1` called after every content mutation, under a
+  version-row lock. Wants doing before the AI pipeline is used in anger.
+- **Per-language vs version-wide tags** — a tag only in the Estonian body makes
+  the English archive list the post. Genuine product question for Max.
+- **CSS in the cached body.** Notes/showcase stylesheets are appended to each
+  post's cached HTML: kilobytes per post, and `<style>` in `<body>` breaks under
+  a strict CSP. Three AIs independently raised it. Fix shape: return
+  `%{html:, assets: [:showcase, :notes]}` and let the template emit each once.
+- **Fetch path re-fetches the whole page** to swap two sections (re-runs group
+  fetch, post resolution, note scan, full render). Return the two fragments in
+  the JSON instead.
+- **Panel a11y** — `role="dialog"` with no `aria-modal`, focus move, focus trap
+  or Escape. Keep `:target` as the no-JS baseline, enhance progressively.
+- **Comment POST proves post membership via the listing cache** (capped 5000),
+  so a post past the cap is readable but not commentable. Cheap DB check instead.
+- **Depth-aware Reply UI** — hide Reply at max depth instead of failing on submit.
+- `move_category` reads `max(position)` outside the update transaction; two
+  concurrent moves into one parent can tie.
+- Cache key omits language-routing config, so toggling prefix policy can serve
+  cached bodies with stale `/en/...` tag links.
+
+**False positives worth recording** (all disproved by running code, not argued):
+Gemini claimed `Regex.split(include_captures: true)` also emits capture groups
+(it does not — only the full match), that `render_markdown_html/1` was
+undefined, and that notes/hashtags duplicate text; Vibe claimed
+`reorder_categories/3` returns a bare integer and crashes the LV (it is wrapped
+in `repo().transaction/1`, so it returns `{:ok, count}` — and a passing test
+asserts exactly that).
+
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
 - **Publishing-scoped moderation page** — a filtered surface over comments' status machinery ("maybe" per boss; comments admin covers it today).

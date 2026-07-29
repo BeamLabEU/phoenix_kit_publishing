@@ -56,11 +56,23 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
     comments excluded — the "N comments" header describes the thread the
     reader is looking at).
   """
-  def for_post_page(post_uuid) do
+  def for_post_page(post_uuid, known_note_ids \\ nil) do
     comments = list(post_uuid)
 
+    # A comment only counts as note-scoped if its note still EXISTS on the
+    # post. Note ids are a digest of the note's text, so rewording a note (or
+    # switching the group back to footnote style, where there are no panels at
+    # all) would otherwise leave its whole thread stored but rendered nowhere:
+    # excluded from the main list for having a note_id, and never read by any
+    # panel. Unknown ids fold back into the main thread instead — visible and
+    # counted. `nil` means "caller didn't say", so trust every note_id.
+    known = known_note_ids && MapSet.new(known_note_ids)
+
     {note_scoped, main} =
-      Enum.split_with(comments, fn comment -> is_binary(comment.metadata["note_id"]) end)
+      Enum.split_with(comments, fn comment ->
+        note_id = comment.metadata["note_id"]
+        is_binary(note_id) and (is_nil(known) or MapSet.member?(known, note_id))
+      end)
 
     note_comments =
       note_scoped
@@ -72,6 +84,11 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
       note_comments: note_comments,
       count: length(main)
     }
+  rescue
+    # Every sibling in this seam degrades rather than raising, and this one runs
+    # on EVERY public post render — an unrescued raise here would 500 a page
+    # that used to just show no comments.
+    _ -> %{thread: [], note_comments: %{}, count: 0}
   end
 
   @doc "Total node count of a comment tree (a panel's thread size)."

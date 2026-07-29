@@ -139,9 +139,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
 
       assert has_element?(view, "button[phx-click='clear_audio']")
 
-      # Clearing blanks the field (the save path turns "" into a removal).
+      # Clearing blanks the field (the save path turns "" into a removal)...
       html = render_click(view, "clear_audio")
       refute html =~ uuid
+
+      # ...and must actually PERSIST. Autosave only ever fires from
+      # schedule_autosave/1, so the first cut left the field looking empty
+      # while the audio stayed attached until some unrelated edit.
+      assert :sys.get_state(view.pid).socket.assigns.autosave_timer
     end
 
     test "keeps the slug-truncation warning while the title stays over the URL cap",

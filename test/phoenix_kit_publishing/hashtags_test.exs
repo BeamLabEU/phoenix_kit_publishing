@@ -73,6 +73,58 @@ defmodule PhoenixKit.Modules.Publishing.HashtagsTest do
     end
   end
 
+  describe "extract and linkify agree (no dead links)" do
+    # A tag that renders as a link but was never stored points at an archive
+    # that can't find the post. Every case below is one where the two passes
+    # could disagree.
+    test "the 21st tag is neither stored nor linked" do
+      body = 1..21 |> Enum.map_join(" ", &"#tag#{&1}")
+
+      assert length(Hashtags.extract(body)) == 20
+      refute "tag21" in Hashtags.extract(body)
+
+      html = Renderer.render_markdown(body, tag_links: {"blog", "en"})
+      assert html =~ ~s(/blog/tag/tag20")
+      refute html =~ "/blog/tag/tag21"
+      assert html =~ "#tag21"
+    end
+
+    test "a hashtag butted against a code span or link is neither" do
+      for body <- ["`code`#tag", "[link](/x)#tag"] do
+        assert Hashtags.extract(body) == []
+        refute Renderer.render_markdown(body, tag_links: {"blog", "en"}) =~ "/blog/tag/tag"
+      end
+    end
+
+    test "a colour in a raw HTML attribute is not a tag" do
+      body = ~s(<span style="color: #fff">Text</span> and #real.)
+
+      assert Hashtags.extract(body) == ["real"]
+
+      html = Renderer.render_markdown(body, tag_links: {"blog", "en"})
+      # The style declaration survives intact — no markdown link inside it.
+      assert html =~ ~s(style="color: #fff")
+      refute html =~ "/blog/tag/fff"
+      assert html =~ ~s(/blog/tag/real")
+    end
+
+    test "a hashtag in a Showcase body IS a tag (its body is markdown)" do
+      body = ~s(<Showcase src="/a.jpg">Read about #elixir</Showcase>)
+
+      assert Hashtags.extract(body) == ["elixir"]
+      assert Renderer.render_markdown(body, tag_links: {"blog", "en"}) =~ ~s(/blog/tag/elixir")
+    end
+
+    test "a hashtag in a raw-HTML component body is left alone" do
+      # <Video>'s body is emitted as raw HTML, so a markdown link would show
+      # up literally as [#tag](...) to the reader.
+      body = ~s(<Video url="https://y.tube">Caption #nottag</Video>)
+
+      assert Hashtags.extract(body) == []
+      refute Renderer.render_markdown(body, tag_links: {"blog", "en"}) =~ "/blog/tag/nottag"
+    end
+  end
+
   describe "save-time derivation" do
     setup do
       {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
