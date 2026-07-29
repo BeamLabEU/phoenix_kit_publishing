@@ -118,6 +118,17 @@ defmodule PhoenixKit.Modules.Publishing.ShowcaseTest do
       assert html =~ "@media (max-width:767px)"
       assert html =~ "grid-template-columns:1fr"
       assert html =~ "linear-gradient(to bottom"
+
+      # The mobile scrim rules MUST carry the side classes. The desktop rules
+      # are `.side.tone .media::after` (three classes); a two-class mobile rule
+      # loses on specificity and the wash silently never applies — which is
+      # exactly what shipped until a browser measurement caught it. A textual
+      # test can't evaluate specificity, so pin the shape instead.
+      [_, mobile] = String.split(html, "@media (max-width:767px)")
+
+      assert mobile =~
+               ".pk-showcase--left.pk-showcase--dark .pk-showcase__media::after,\n" <>
+                 "  .pk-showcase--right.pk-showcase--dark .pk-showcase__media::after"
     end
   end
 

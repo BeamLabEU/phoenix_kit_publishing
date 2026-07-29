@@ -91,8 +91,13 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     .pk-showcase--left .pk-showcase__text,.pk-showcase--right .pk-showcase__text{grid-column:1;grid-row:1}
     .pk-showcase__text{align-self:end}
     .pk-showcase__media img{min-height:22rem}
-    .pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to bottom,rgb(11 11 13 / .2) 30%,rgb(11 11 13 / .85))}
-    .pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to bottom,rgb(250 250 250 / .2) 30%,rgb(250 250 250 / .9))}
+    /* Must repeat the side classes: the desktop rules are .side.tone (three
+       classes), so a two-class rule here loses on specificity even inside
+       the media query and the wash would silently never apply. */
+    .pk-showcase--left.pk-showcase--dark .pk-showcase__media::after,
+    .pk-showcase--right.pk-showcase--dark .pk-showcase__media::after{background:linear-gradient(to bottom,rgb(11 11 13 / .2) 30%,rgb(11 11 13 / .85))}
+    .pk-showcase--left.pk-showcase--light .pk-showcase__media::after,
+    .pk-showcase--right.pk-showcase--light .pk-showcase__media::after{background:linear-gradient(to bottom,rgb(250 250 250 / .2) 30%,rgb(250 250 250 / .9))}
   }
   </style>
   """
