@@ -8,6 +8,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AudioTest do
   # async: false — mutates the global publishing settings rows.
   use PhoenixKitPublishing.ConnCase, async: false
 
+  alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Renderer
@@ -94,6 +96,45 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AudioTest do
 
       refute get(conn, "/#{slug}/silent") |> html_response(200) =~ "<audio"
       refute get(conn, "/#{slug}/feed.xml") |> response(200) =~ "<enclosure"
+    end
+
+    test "a BLANK stored audio_uuid renders no player (legacy rows)", %{
+      conn: conn,
+      slug: slug
+    } do
+      {:ok, post} = Posts.create_post(slug, %{title: "Blank", slug: "blank", content: "x"})
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+
+      # Simulate what older saves stored when the picker was left empty: the
+      # key present with "". An empty string is truthy in Elixir, so the
+      # player used to render with an empty uuid segment in its src —
+      # /file//original/<token>, a dead request (reported on a live post).
+      version = DBStorage.get_version(post.uuid, 1)
+
+      {:ok, _} =
+        DBStorage.update_version(version, %{data: Map.put(version.data, "audio_uuid", "")})
+
+      html = get(conn, "/#{slug}/blank") |> html_response(200)
+      refute html =~ "<audio"
+      refute html =~ "/file//"
+      refute get(conn, "/#{slug}/feed.xml") |> response(200) =~ "<enclosure"
+    end
+
+    test "clearing the picker removes the player and the stored key", %{conn: conn, slug: slug} do
+      uuid = "018e3c4a-9f6b-7890-abcd-ef1234567891"
+
+      {:ok, post} = Posts.create_post(slug, %{title: "Cleared", slug: "cleared", content: "x"})
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+      {:ok, _} = Posts.update_post(slug, post, %{"audio_uuid" => uuid}, %{})
+
+      assert get(conn, "/#{slug}/cleared") |> html_response(200) =~ "<audio"
+
+      {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
+      {:ok, _} = Posts.update_post(slug, read, %{"audio_uuid" => ""}, %{})
+
+      refute get(conn, "/#{slug}/cleared") |> html_response(200) =~ "<audio"
+      # Cleared means gone, not stored blank.
+      refute Map.has_key?(DBStorage.get_version(post.uuid, 1).data, "audio_uuid")
     end
   end
 end

@@ -115,6 +115,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(html)
     end
 
+    test "the audio field offers a media picker and a clear button", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, view, html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      # Browse instead of hand-pasting a uuid; the shared media selector is
+      # targeted at this field.
+      assert html =~ ~s(phx-value-field="audio_uuid")
+      # Nothing set yet → no clear button.
+      refute has_element?(view, "button[phx-click='clear_audio']")
+
+      # NOT the field's placeholder uuid — that string is in the markup either
+      # way, so reusing it would make the refute below pass vacuously.
+      uuid = "019fbc11-2222-7333-8444-555566667777"
+
+      render_change(view, "update_meta", %{"audio_uuid" => uuid, "_target" => ["audio_uuid"]})
+
+      assert has_element?(view, "button[phx-click='clear_audio']")
+
+      # Clearing blanks the field (the save path turns "" into a removal).
+      html = render_click(view, "clear_audio")
+      refute html =~ uuid
+    end
+
     test "keeps the slug-truncation warning while the title stays over the URL cap",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =

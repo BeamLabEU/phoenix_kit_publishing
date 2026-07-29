@@ -100,8 +100,21 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   def get_featured_image_uuid(%__MODULE__{data: data}),
     do: Map.get(data, "featured_image_uuid")
 
-  @doc "Returns the post's audio-version file uuid (nil when none)."
-  def get_audio_uuid(%__MODULE__{data: data}), do: Map.get(data, "audio_uuid")
+  @doc """
+  Returns the post's audio-version file uuid (nil when none).
+
+  A cleared audio picker submits `""`, and older rows still carry that
+  blank. Blank normalizes to `nil` HERE so every reader agrees: an empty
+  string is truthy in Elixir, so a template gating on the raw value
+  rendered a player whose src had an empty uuid segment
+  (`/file//original/<token>` — a dead request).
+  """
+  def get_audio_uuid(%__MODULE__{data: data}) do
+    case Map.get(data, "audio_uuid") do
+      uuid when is_binary(uuid) -> if String.trim(uuid) == "", do: nil, else: uuid
+      _ -> nil
+    end
+  end
 
   @doc "Returns the post tags."
   def get_tags(%__MODULE__{data: data}), do: Map.get(data, "tags", [])

@@ -764,6 +764,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      |> assign(:show_media_selector, true)}
   end
 
+  # Clearing writes "" — the same signal the text input sends when emptied by
+  # hand — which the save path turns into a real removal (Posts.put_audio_uuid).
+  def handle_event("clear_audio", _params, socket) do
+    if socket.assigns.readonly? or socket.assigns.viewing_older_version do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(:form, Map.put(socket.assigns.form, "audio_uuid", ""))
+       |> assign(:has_pending_changes, true)
+       |> push_event("changes-status", %{has_changes: true})}
+    end
+  end
+
   def handle_event("open_image_component_selector", _params, socket) do
     {:noreply,
      socket
@@ -2014,6 +2028,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           flash =
             case target do
               "og_image_uuid" -> gettext("OG image selected")
+              "audio_uuid" -> gettext("Audio version selected")
               _ -> gettext("Featured image selected")
             end
 
@@ -2897,18 +2912,45 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       {gettext("Audio version")}
                     </span>
                   </label>
-                  <input
-                    type="text"
-                    id="post-audio-input"
-                    name="audio_uuid"
-                    value={@form["audio_uuid"]}
-                    class={"input input-bordered input-sm w-full font-mono text-xs #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
-                    placeholder="018e3c4a-9f6b-7890-abcd-ef1234567890"
-                    readonly={edit_disabled? or @viewing_older_version}
-                  />
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="text"
+                      id="post-audio-input"
+                      name="audio_uuid"
+                      value={@form["audio_uuid"]}
+                      class={"input input-bordered input-sm w-full font-mono text-xs #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                      placeholder="018e3c4a-9f6b-7890-abcd-ef1234567890"
+                      readonly={edit_disabled? or @viewing_older_version}
+                    />
+                    <%!-- Browsing beats hunting a uuid in the media library:
+                          the selector is the same one the featured image uses,
+                          targeted at this field. --%>
+                    <button
+                      :if={not (edit_disabled? or @viewing_older_version)}
+                      type="button"
+                      phx-click="open_media_selector"
+                      phx-value-field="audio_uuid"
+                      class="btn btn-outline btn-sm shrink-0"
+                    >
+                      <.icon name="hero-musical-note" class="w-4 h-4" />
+                      {gettext("Choose")}
+                    </button>
+                    <button
+                      :if={
+                        not (edit_disabled? or @viewing_older_version) and
+                          @form["audio_uuid"] not in [nil, ""]
+                      }
+                      type="button"
+                      phx-click="clear_audio"
+                      class="btn btn-ghost btn-sm shrink-0"
+                      title={gettext("Remove the audio version")}
+                    >
+                      <.icon name="hero-x-mark" class="w-4 h-4" />
+                    </button>
+                  </div>
                   <p class="text-xs text-base-content/60 mt-1">
                     {gettext(
-                      "A Media ID of an audio file (e.g. a narration). Shows a player above the post and rides the RSS feed as a podcast enclosure."
+                      "An audio file (e.g. a narration). Shows a player above the post and rides the RSS feed as a podcast enclosure."
                     )}
                   </p>
                 </div>

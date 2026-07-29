@@ -1302,7 +1302,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       |> maybe_put_version_field("tags", resolve_tags(version, params))
       |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
       |> maybe_put_version_field("featured", normalize_featured(Map.get(params, "featured")))
-      |> maybe_put_version_field("audio_uuid", Map.get(params, "audio_uuid"))
+      |> put_audio_uuid(Map.get(params, "audio_uuid"))
 
     # Also update version-level status and published_at if provided.
     # "published" is NEVER written here — it is set atomically with
@@ -1323,6 +1323,23 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   defp maybe_put_version_field(data, _key, nil), do: data
   defp maybe_put_version_field(data, key, value), do: Map.put(data, key, value)
+
+  # nil = the field wasn't submitted, leave it alone. "" = the picker was
+  # cleared, so DROP the key instead of storing a blank every reader has to
+  # special-case. Dropping is safe for this key specifically because
+  # "audio_uuid" is not in @legacy_promotable_keys — for a promotable key
+  # (e.g. featured_image_uuid) an absent key is the signal to re-promote the
+  # legacy content-level value, so deleting would resurrect what the user
+  # just cleared.
+  defp put_audio_uuid(data, nil), do: data
+
+  defp put_audio_uuid(data, value) when is_binary(value) do
+    if String.trim(value) == "",
+      do: Map.delete(data, "audio_uuid"),
+      else: Map.put(data, "audio_uuid", value)
+  end
+
+  defp put_audio_uuid(data, _value), do: data
 
   # Tags ARE body hashtags (boss call 2026-07-28): a save that carries content
   # re-derives the version's tags as the union of hashtags across ALL of the
