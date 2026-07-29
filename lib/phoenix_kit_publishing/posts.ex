@@ -661,6 +661,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
          post_slug
        ) do
     final_attrs = resolve_timestamp_in_transaction(post_attrs, mode, group_slug)
+    content = Shared.fetch_option(opts, :content) || ""
 
     with {:ok, db_post} <- DBStorage.create_post(final_attrs),
          {:ok, db_version} <-
@@ -668,19 +669,32 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
              post_uuid: db_post.uuid,
              version_number: 1,
              status: "draft",
-             created_by_uuid: created_by_uuid
+             created_by_uuid: created_by_uuid,
+             data: initial_version_data(content)
            }),
          {:ok, _content} <-
            DBStorage.create_content(%{
              version_uuid: db_version.uuid,
              language: primary_language,
              title: Shared.fetch_option(opts, :title) || "",
-             content: Shared.fetch_option(opts, :content) || "",
+             content: content,
              url_slug: post_slug
            }) do
       db_post
     else
       {:error, reason} -> repo.rollback(reason)
+    end
+  end
+
+  # The body is the only source of tags, so a create that carries content has
+  # to derive them too — the editor's first save would otherwise be what
+  # "registers" the tags, and a post created with content in one shot (import,
+  # API, fixtures) rendered its #hashtags as archive links while being missing
+  # from those very archives.
+  defp initial_version_data(content) do
+    case Hashtags.extract(content) do
+      [] -> %{}
+      tags -> %{"tags" => tags}
     end
   end
 
@@ -1341,25 +1355,19 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   defp put_audio_uuid(data, _value), do: data
 
-  # Tags ARE body hashtags (boss call 2026-07-28): a save that carries content
-  # re-derives the version's tags as the union of hashtags across ALL of the
-  # version's language bodies — the just-saved row is already upserted in this
-  # transaction, so a fresh read sees it. A save without content leaves tags
-  # alone, EXCEPT an explicit "tags" list (programmatic/API callers), which is
-  # normalized and honored. Content always wins over a tags list sent in the
-  # same call — the body is the source of truth now.
+  # Tags ARE body hashtags (boss call 2026-07-28), and the body is their ONLY
+  # source: a save carrying content re-derives the version's tags as the union
+  # of hashtags across all of its language bodies (the just-saved row is
+  # already upserted in this transaction, so a fresh read sees it); a save
+  # without content leaves tags alone. A caller-supplied "tags" list is
+  # deliberately ignored — a second way to set tags would let a post carry a
+  # tag that appears nowhere in its prose, which is exactly the state the
+  # post page can no longer display now that the chip row is gone.
   defp resolve_tags(version, params) do
-    cond do
-      is_binary(Map.get(params, "content")) ->
-        DBStorage.batch_load_contents([version.uuid])
-        |> Map.get(version.uuid, [])
-        |> Hashtags.extract_all()
-
-      is_list(Map.get(params, "tags")) ->
-        Hashtags.normalize(Map.get(params, "tags"))
-
-      true ->
-        nil
+    if is_binary(Map.get(params, "content")) do
+      DBStorage.batch_load_contents([version.uuid])
+      |> Map.get(version.uuid, [])
+      |> Hashtags.extract_all()
     end
   end
 

@@ -151,6 +151,17 @@ makes sense.)
   tags were set through the API path (no hashtags in its body) now shows
   no tags anywhere on its page.
 
+### Single-source tags (2026-07-29, after Max confirmed no released version)
+- The dual write path is gone: a caller-supplied `"tags"` list is now
+  **ignored**, so the body is the only source. `Hashtags.normalize/1` went
+  with it. Invariant restored: every tag a post carries appears in its prose
+  — which is what makes dropping the chip row safe.
+- Surfaced while doing it: `create_post/2` never derived tags at all
+  (`create_version` wrote no `data`), so a post created in one shot with
+  content — import, API, fixtures — rendered its `#hashtags` as archive
+  links while missing from those archives until something re-saved it. The
+  editor's create-then-save flow hid it. Fixed at the create transaction.
+
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
 - **Publishing-scoped moderation page** — a filtered surface over comments' status machinery ("maybe" per boss; comments admin covers it today).

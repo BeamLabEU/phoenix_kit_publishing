@@ -312,6 +312,11 @@ may follow (up to 30 chars). By construction this excludes:
 Dedup is case-insensitive keeping the first spelling; capped at 20 per post.
 To remove a tag, remove it from the text and save.
 
+The body is the **only** source of tags: there is no tags field, and a
+`"tags"` list passed programmatically is ignored. That keeps the invariant
+that every tag a post carries is visible in its prose — which is why the
+post page no longer lists tags separately.
+
 ---
 
 ## Best practices

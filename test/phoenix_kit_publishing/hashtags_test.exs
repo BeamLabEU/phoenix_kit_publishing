@@ -73,20 +73,6 @@ defmodule PhoenixKit.Modules.Publishing.HashtagsTest do
     end
   end
 
-  describe "normalize/1" do
-    test "trims, strips leading #, drops blanks/non-strings, dedups, caps" do
-      assert Hashtags.normalize([" #Elixir ", "elixir", "", "  ", nil, 42, "otp"]) ==
-               ["Elixir", "otp"]
-
-      overlong = Enum.map(1..25, &"tag#{&1}")
-      assert length(Hashtags.normalize(overlong)) == 20
-    end
-
-    test "non-list input normalizes to empty" do
-      assert Hashtags.normalize("not-a-list") == []
-    end
-  end
-
   describe "save-time derivation" do
     setup do
       {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
@@ -101,6 +87,23 @@ defmodule PhoenixKit.Modules.Publishing.HashtagsTest do
 
       :ok = Versions.publish_version(slug, post.uuid, 1)
       %{slug: slug, post: post}
+    end
+
+    test "creating a post WITH content derives its tags immediately", %{slug: slug} do
+      # The import/API shape: one call carrying the body. Without derivation
+      # here the post rendered its #hashtags as archive links while being
+      # absent from those archives until someone happened to re-save it.
+      {:ok, fresh} =
+        Posts.create_post(slug, %{
+          title: "Born Tagged",
+          slug: "born-tagged",
+          content: "Ships with #otp and #ecto."
+        })
+
+      :ok = Versions.publish_version(slug, fresh.uuid, 1)
+
+      {:ok, read} = Publishing.read_post_by_uuid(fresh.uuid, "en", 1)
+      assert read.metadata.tags == ["otp", "ecto"]
     end
 
     test "a content save re-derives tags from the body", %{slug: slug, post: post} do
@@ -128,16 +131,23 @@ defmodule PhoenixKit.Modules.Publishing.HashtagsTest do
       assert Enum.sort(updated.metadata.tags) == ["elixir", "phoenix", "uudised"]
     end
 
-    test "an explicit tags list without content is still honored and normalized", %{
+    test "a caller-supplied tags list is ignored — the body is the only source", %{
       slug: slug,
       post: post
     } do
       {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
 
-      {:ok, updated} =
-        Posts.update_post(slug, read, %{"tags" => [" #Manual ", "manual", ""]}, %{})
+      # Without content, nothing re-derives: the tags derived at create stand.
+      {:ok, updated} = Posts.update_post(slug, read, %{"tags" => ["manual"]}, %{})
+      assert updated.metadata.tags == ["elixir", "phoenix"]
 
-      assert updated.metadata.tags == ["Manual"]
+      # And a list sent alongside content loses to the content.
+      {:ok, read2} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
+
+      {:ok, updated2} =
+        Posts.update_post(slug, read2, %{"content" => "Only #otp.", "tags" => ["manual"]}, %{})
+
+      assert updated2.metadata.tags == ["otp"]
     end
   end
 

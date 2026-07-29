@@ -75,23 +75,6 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   end
 
   @doc """
-  Normalizes an explicit tag list (the content-less API path): keeps
-  strings only, trims, drops blanks and a leading `#`, dedups
-  case-insensitively, caps — the same guarantees the old editor-input
-  parser gave.
-  """
-  def normalize(tags) when is_list(tags) do
-    tags
-    |> Enum.filter(&is_binary/1)
-    |> Enum.map(&(&1 |> String.trim() |> String.trim_leading("#")))
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.uniq_by(&String.downcase/1)
-    |> Enum.take(@max_tags)
-  end
-
-  def normalize(_), do: []
-
-  @doc """
   The tag set for a whole version: the union of hashtags across every
   language's content (per-language bodies may tag differently; the version
   carries one combined list, same storage as before).

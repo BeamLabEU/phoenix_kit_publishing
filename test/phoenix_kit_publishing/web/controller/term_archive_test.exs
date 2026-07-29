@@ -32,14 +32,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.TermArchiveTest do
     {:ok, child} =
       Categories.create_category(slug, %{"name" => "Advanced", "parent_uuid" => parent.uuid})
 
+    # Tags come from the body — writing them as #hashtags in the prose is the
+    # only way to set them, and mirrors how a writer actually tags a post.
     publish = fn title, post_slug, tags ->
-      {:ok, post} = Posts.create_post(slug, %{title: title, slug: post_slug, content: "Body."})
+      body = Enum.map_join(tags, " ", &"##{&1}")
+
+      {:ok, post} =
+        Posts.create_post(slug, %{
+          title: title,
+          slug: post_slug,
+          content: String.trim("Body. " <> body)
+        })
+
       :ok = Versions.publish_version(slug, post.uuid, 1)
-
-      if tags != [] do
-        {:ok, _} = Posts.update_post(slug, post, %{"tags" => tags}, %{})
-      end
-
       post
     end
 
@@ -137,25 +142,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.TermArchiveTest do
        %{conn: conn, slug: slug} do
     # Boss call 2026-07-29: tags aren't listed separately any more. They live
     # inline in the prose as #hashtags, already rendered as links to the same
-    # archive, so a chip row only repeated them. This fixture's tags were set
-    # through the content-less API path, so its body has no hashtags at all —
-    # and the page must therefore show no tag links.
+    # archive, so a chip row only repeated them. The tag link on this page must
+    # therefore appear ONLY inside the body, never as a chip in the header.
     html = get(conn, "/#{slug}/parent-guide") |> html_response(200)
-    refute html =~ "/#{slug}/tag/howto"
 
-    # A post whose body carries the hashtag links to the same archive, which
-    # still exists and still serves.
-    {:ok, post} =
-      Posts.create_post(slug, %{
-        title: "Inline Tagged",
-        slug: "inline-tagged",
-        content: "Filed under #howto today."
-      })
+    [content_at, tag_at] =
+      Enum.map(
+        ["markdown-content", "/#{slug}/tag/howto"],
+        fn needle -> :binary.match(html, needle) |> elem(0) end
+      )
 
-    :ok = Versions.publish_version(slug, post.uuid, 1)
-
-    html = get(conn, "/#{slug}/inline-tagged") |> html_response(200)
-    assert html =~ "/#{slug}/tag/howto"
+    assert tag_at > content_at
     assert html =~ ">#howto</a>"
+    # Exactly one — a chip row would add a second link to the same archive.
+    assert length(String.split(html, "/#{slug}/tag/howto")) - 1 == 1
   end
 end
