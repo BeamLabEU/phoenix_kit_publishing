@@ -33,31 +33,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     title = (socket.assigns.form["title"] || "") |> String.trim()
     slug = (socket.assigns.form["slug"] || "") |> String.trim()
 
+    # An autosave blocked by a missing title/slug used to return silently, so the
+    # writer kept typing behind an "Unsaved changes" badge while NOTHING was
+    # ever written. Flashing on every 500ms cycle would nag, so the reason is
+    # parked on the socket and the badge states it instead.
     cond do
       title == "" ->
-        if is_autosaving do
-          {:noreply, socket}
-        else
-          {:noreply,
-           Phoenix.LiveView.put_flash(socket, :warning, gettext("Title is required to save."))}
-        end
+        blocked(socket, is_autosaving, gettext("Title is required to save."))
 
       socket.assigns.group_mode == "slug" and slug == "" ->
-        if is_autosaving do
-          {:noreply, socket}
-        else
-          {:noreply,
-           Phoenix.LiveView.put_flash(
-             socket,
-             :warning,
-             gettext(
-               "Slug is required. Enter a title to auto-generate one, or type a slug manually."
-             )
-           )}
-        end
+        blocked(
+          socket,
+          is_autosaving,
+          gettext(
+            "Slug is required. Enter a title to auto-generate one, or type a slug manually."
+          )
+        )
 
       true ->
-        do_perform_save_with_params(socket)
+        socket
+        |> Phoenix.Component.assign(:autosave_blocked, nil)
+        |> do_perform_save_with_params()
+    end
+  end
+
+  # Autosave can't proceed: park the reason for the badge. A manual Save also
+  # flashes, because the writer just asked for it and deserves an answer.
+  defp blocked(socket, is_autosaving?, message) do
+    socket = Phoenix.Component.assign(socket, :autosave_blocked, message)
+
+    if is_autosaving? do
+      {:noreply, socket}
+    else
+      {:noreply, Phoenix.LiveView.put_flash(socket, :warning, message)}
     end
   end
 
@@ -105,10 +113,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         # Don't silently clear or save — show the user which post owns the slug
         # (with a link) so they can rename theirs or jump to the other one. The
         # form keeps their typed slug so they can edit it after closing.
+        #
+        # `autosave_blocked` also parks the reason: the changes stay pending, so
+        # without this every subsequent keystroke rescheduled autosave, which
+        # re-hit this branch and re-opened the modal the writer had just closed.
         {:noreply,
          socket
          |> Phoenix.Component.assign(:slug_conflict_info, info)
-         |> Phoenix.Component.assign(:show_slug_conflict_modal, true)}
+         |> Phoenix.Component.assign(:show_slug_conflict_modal, true)
+         |> Phoenix.Component.assign(
+           :autosave_blocked,
+           gettext("That slug is taken — pick another to save.")
+         )}
 
       {:error, reason} ->
         error_message = url_slug_error_message(reason)

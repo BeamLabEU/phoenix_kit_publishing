@@ -25,6 +25,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
 
   setup do
@@ -95,6 +96,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
     end
   end
 
+  defp assigns_of(view) do
+    view.pid |> :sys.get_state() |> get_in([Access.key(:socket), Access.key(:assigns)])
+  end
+
   describe "handle_event" do
     setup %{group: group} do
       {:ok, post} = Posts.create_post(group["slug"], %{title: "Event Subject"})
@@ -147,6 +152,55 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       # schedule_autosave/1, so the first cut left the field looking empty
       # while the audio stayed attached until some unrelated edit.
       assert :sys.get_state(view.pid).socket.assigns.autosave_timer
+    end
+
+    test "typing body text refreshes the collaborative lock's activity clock", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      before = assigns_of(view)[:last_activity_at]
+
+      # The editor reports body edits as a process message, not a phx event.
+      # That handler used to skip touch_activity entirely, so a writer working
+      # only in the body never refreshed the lock: it lapsed mid-session, the
+      # handler then dropped every keystroke, and Save persisted the stale
+      # pre-lapse buffer.
+      send(view.pid, {:editor_content_changed, %{content: "Fresh prose.", editor_id: "x"}})
+      _ = render(view)
+
+      # last_activity_at is System.monotonic_time(:second) — an integer.
+      after_typing = assigns_of(view)[:last_activity_at]
+      assert is_integer(after_typing)
+      assert before == nil or after_typing >= before
+      assert assigns_of(view)[:content] == "Fresh prose."
+    end
+
+    test "a blank title says autosave is blocked instead of a bare 'Unsaved changes'", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      html = render_change(view, "update_meta", %{"title" => "", "_target" => ["title"]})
+      assert html =~ "Unsaved changes"
+
+      # Autosave silently refuses to write without a title, so the badge has to
+      # say so — otherwise the writer keeps typing into a void.
+      send(view.pid, :autosave)
+      html = render(view)
+
+      assert html =~ "Title is required"
+      refute assigns_of(view)[:autosave_blocked] == nil
     end
 
     test "keeps the slug-truncation warning while the title stays over the URL cap",

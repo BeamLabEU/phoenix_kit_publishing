@@ -131,6 +131,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:group_slug, group_slug)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign(:show_media_selector, false)
+      |> assign(:autosave_blocked, nil)
       |> assign(:media_selector_target, "featured_image_uuid")
       |> assign(:media_selection_mode, :single)
       |> assign(:media_selected_uuids, MapSet.new())
@@ -978,6 +979,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         {:noreply, socket}
 
       true ->
+        # Cancel any queued autosave FIRST. apply_version_switch clears
+        # has_pending_changes and swaps the content, so a timer that fires after
+        # the switch is a silent no-op — up to ~1s of typing gone with no
+        # prompt. do_switch_language/2 has always done this; this path hadn't.
+        socket = cancel_autosave_timer(socket)
+
         case Versions.read_version_post(socket, version) do
           {:ok, version_post} ->
             {socket, old_form_key, old_post_slug, new_form_key, actual_language} =
@@ -1302,8 +1309,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   def handle_info(:autosave, socket) do
     # A read-only spectator must never autosave — their buffer is stale and would
     # clobber the lock owner's work. translation_locked? alone didn't cover them.
+    #
+    # Nor while the slug-conflict modal is open: the changes stay pending, so
+    # each keystroke rescheduled autosave, which hit the same conflict and
+    # re-opened the dialog the writer had just dismissed. They resolve it and
+    # save by hand.
     if socket.assigns.has_pending_changes and not socket.assigns.translation_locked? and
-         not socket.assigns[:readonly?] do
+         not socket.assigns[:readonly?] and
+         not socket.assigns[:show_slug_conflict_modal] do
       socket =
         socket
         |> assign(:is_autosaving, true)
@@ -1360,7 +1373,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     # Ignore local editor changes for read-only spectators: their content arrives
     # via remote sync, and marking pending / scheduling autosave here is a write
     # path that would let a spectator's stale buffer overwrite the lock owner.
-    if socket.assigns[:readonly?] do
+    #
+    # Typing body text is EDITING, so this has to do the same lock work
+    # `update_meta` does. It previously did none of it, which meant a writer
+    # working only in the body never refreshed `last_activity_at`: the lock
+    # lapsed under them mid-sentence, `readonly?` flipped, and from then on
+    # every keystroke was dropped here while "Save" persisted the stale
+    # pre-lapse buffer. The lapsed banner even says "Start typing … to resume
+    # editing" — the reclaim it promises lives in `maybe_reclaim_lock/1`.
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
       {:noreply, socket}
     else
       has_changes = Forms.dirty?(socket.assigns.post, socket.assigns.form, content)
@@ -1372,6 +1395,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         |> push_event("changes-status", %{has_changes: has_changes})
 
       socket = if has_changes, do: schedule_autosave(socket), else: socket
+
+      Collaborative.broadcast_form_change(socket, :content, %{
+        content: content,
+        form: socket.assigns.form
+      })
+
+      socket = Collaborative.touch_activity(socket)
 
       {:noreply, socket}
     end
@@ -1883,6 +1913,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # A queued autosave carries edits that a context switch (version/language) is
+  # about to replace, so it must be dropped rather than left to fire into the
+  # new context as a no-op.
+  defp cancel_autosave_timer(socket) do
+    if timer = socket.assigns[:autosave_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    assign(socket, :autosave_timer, nil)
+  end
+
   defp schedule_autosave(socket) do
     if socket.assigns.autosave_timer do
       Process.cancel_timer(socket.assigns.autosave_timer)
@@ -1927,12 +1968,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   defp do_switch_language(socket, new_language) do
-    # Cancel any pending autosave before switching language context
-    if timer = socket.assigns[:autosave_timer] do
-      Process.cancel_timer(timer)
-    end
-
-    socket = assign(socket, :autosave_timer, nil)
+    socket = cancel_autosave_timer(socket)
     post = socket.assigns.post
     group_slug = socket.assigns.group_slug
     content_exists = new_language in post.available_languages
@@ -2607,6 +2643,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       <span class="badge badge-info badge-sm gap-1">
                         <span class="loading loading-spinner loading-xs"></span>
                         {gettext("Saving...")}
+                      </span>
+                    <% @autosave_blocked -> %>
+                      <span class="badge badge-error badge-sm h-auto gap-1">
+                        <.icon name="hero-exclamation-triangle" class="w-3 h-3" />
+                        {@autosave_blocked}
                       </span>
                     <% @has_pending_changes -> %>
                       <span class="badge badge-warning badge-sm h-auto">
