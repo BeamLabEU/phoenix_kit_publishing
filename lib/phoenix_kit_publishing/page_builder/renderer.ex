@@ -107,14 +107,19 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
     end
   end
 
-  # An explicit stretch percent wins over an align preset.
+  # An explicit stretch percent wins over an align preset. `align="none"` (and
+  # `stretch="0"`) mean "stay inside the text column" — worth naming, because
+  # a component whose DEFAULT is full-bleed (e.g. <Showcase>) otherwise has no
+  # way to opt back in to the column.
   defp stretch_style(attributes) do
     stretch = parse_stretch(Map.get(attributes, "stretch"))
+    align = Map.get(attributes, "align")
 
     cond do
+      align == "none" -> nil
       stretch -> stretch_margin(stretch)
-      Map.get(attributes, "align") == "wide" -> stretch_margin(@wide_preset)
-      Map.get(attributes, "align") == "full" -> full_bleed_margin()
+      align == "wide" -> stretch_margin(@wide_preset)
+      align == "full" -> full_bleed_margin()
       true -> nil
     end
   end

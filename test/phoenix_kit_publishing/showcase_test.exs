@@ -114,6 +114,50 @@ defmodule PhoenixKit.Modules.Publishing.ShowcaseTest do
     end
   end
 
+  describe "width and height controls" do
+    test "align/stretch control how far the band reaches past the text column" do
+      full = render(~s(<Showcase src="/a.jpg">T</Showcase>))
+      wide = render(~s(<Showcase src="/a.jpg" align="wide">T</Showcase>))
+      pct = render(~s(<Showcase src="/a.jpg" stretch="20">T</Showcase>))
+      inside = render(~s(<Showcase src="/a.jpg" align="none">T</Showcase>))
+
+      # Default: full-bleed to the viewport edge.
+      assert full =~ "pk-stretch"
+      assert full =~ "(100vw - 100%) / 2 - 1rem"
+      # Presets and explicit percentages hang out by a measured amount.
+      assert wide =~ "min(15.0%,"
+      assert pct =~ "min(10.0%,"
+      # align="none" keeps the band inside the text column — no wrapper at all.
+      refute inside =~ "pk-stretch"
+    end
+
+    test "height pins the image area; presets and pixel values both work" do
+      auto = render(~s(<Showcase src="/a.jpg">T</Showcase>))
+      short = render(~s(<Showcase src="/a.jpg" height="short">T</Showcase>))
+      px = render(~s(<Showcase src="/a.jpg" height="420">T</Showcase>))
+
+      # Default keeps the image's natural aspect — no fixed height at all.
+      # `--fixed"` (with the quote) matches only the figure's class attribute;
+      # a bare "pk-showcase--fixed" also matches the stylesheet's own rules.
+      refute auto =~ ~s(pk-showcase--fixed")
+      refute auto =~ "--pk-sc-height:"
+
+      assert short =~ ~s(pk-showcase--fixed")
+      assert short =~ "--pk-sc-height:18rem"
+      assert px =~ "--pk-sc-height:420px"
+      # The fixed rule must out-specify the responsive min-heights.
+      assert short =~ ".pk-showcase--fixed .pk-showcase__media{height:var(--pk-sc-height"
+      assert short =~ ".pk-showcase--fixed .pk-showcase__media img{height:100%;min-height:0}"
+    end
+
+    test "an out-of-range or junk height falls back to the natural aspect" do
+      for bad <- ["10", "99999", "enormous", "auto"] do
+        html = render(~s(<Showcase src="/a.jpg" height="#{bad}">T</Showcase>))
+        refute html =~ ~s(pk-showcase--fixed")
+      end
+    end
+  end
+
   describe "stylesheet" do
     test "ships once per document, and only when a showcase is present" do
       plain = render("Just prose.")

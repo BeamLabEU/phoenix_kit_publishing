@@ -281,7 +281,8 @@ The body is ordinary Markdown (heading, paragraphs, links). Attributes:
 | `side` | `left` \| `right` | Which edge the image bleeds to. Default `left`. |
 | `overlap` | `0`–`40` | How much of the band the image and text share, in percent. Default `15`. |
 | `tone` | `page` \| `dark` \| `light` \| `none` | How the band is coloured. `page` (default) uses the page's own `base-100`/`base-content`, so there is no visible slab beside the image — the picture dissolves into the page. `dark` and `light` paint a deliberate band (dark background + light text, or the inverse) for a section that should stand apart. `none` inherits the theme and skips the tint entirely. |
-| `align` / `stretch` | as elsewhere | The band is full-bleed by default; pass these to narrow it. |
+| `height` | `short` \| `medium` \| `tall` \| `120`–`1200` | How tall the image area is: `short` = 18rem, `medium` = 26rem, `tall` = 38rem, or a plain pixel count. Omit it to keep the image's natural shape — which on a full-bleed band can be very tall. `object-fit: cover` crops to whatever you pick. |
+| `align` / `stretch` | `full` \| `wide` \| `none` \| `1`–`100` | How far the band reaches past the text column. `align="full"` (the default here) runs to the page edge, `align="wide"` adds 30%, `stretch="20"` adds 20%, and `align="none"` keeps the band inside the column like ordinary prose. |
 
 Behaviour worth knowing:
 
@@ -294,6 +295,8 @@ Behaviour worth knowing:
   becomes a full vertical wash over the image.
 - An unusable `src` (or none) renders the text on its own rather than an
   empty band.
+- The band's height is the taller of the image area and the text, so a long
+  paragraph still gets the room it needs even with `height="short"`.
 
 ---
 

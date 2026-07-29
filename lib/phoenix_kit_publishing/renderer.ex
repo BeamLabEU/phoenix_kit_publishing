@@ -58,6 +58,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @showcase_regex ~r/^<Showcase\s*([^>]*)>(.*)<\/Showcase>$/s
   @showcase_default_overlap 15
   @showcase_max_overlap 40
+  @showcase_min_height 120
+  @showcase_max_height 1200
 
   # Named grid lines make the overlap literal: the media spans
   # [edge → overlap-end] and the text [overlap-start → edge], so the middle
@@ -73,6 +75,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   .pk-showcase__media{grid-row:1;position:relative;align-self:stretch;min-height:0}
   .pk-showcase__media img{display:block;width:100%;height:100%;min-height:14rem;object-fit:cover;margin:0;border-radius:0}
   .pk-showcase__text{grid-row:1;position:relative;z-index:1;padding:clamp(1rem,4vw,3rem)}
+  /* height="short|medium|tall|<px>" pins the image area; object-fit crops. */
+  .pk-showcase--fixed .pk-showcase__media{height:var(--pk-sc-height,26rem)}
+  .pk-showcase--fixed .pk-showcase__media img{height:100%;min-height:0}
   .pk-showcase__text > :first-child{margin-top:0}
   .pk-showcase__text > :last-child{margin-bottom:0}
   .pk-showcase--left .pk-showcase__media{grid-column:sc-edge-start / sc-mid-end}
@@ -100,6 +105,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     .pk-showcase--left .pk-showcase__text,.pk-showcase--right .pk-showcase__text{grid-column:1;grid-row:1}
     .pk-showcase__text{align-self:end}
     .pk-showcase__media img{min-height:22rem}
+    .pk-showcase--fixed .pk-showcase__media img{min-height:0}
     .pk-showcase--left.pk-showcase--page .pk-showcase__media::after,
     .pk-showcase--right.pk-showcase--page .pk-showcase__media::after{background:linear-gradient(to bottom,transparent 25%,var(--color-base-100,#fff))}
     .pk-showcase--left.pk-showcase--dark .pk-showcase__media::after,
@@ -939,10 +945,21 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         tone = showcase_tone(Map.get(attrs, "tone"))
         overlap = showcase_overlap(Map.get(attrs, "overlap"))
         alt = attrs |> Map.get("alt", "") |> escape_html()
+        height = showcase_height(Map.get(attrs, "height"))
+
+        classes =
+          ["pk-showcase", "pk-showcase--#{side}", "pk-showcase--#{tone}"] ++
+            if(height, do: ["pk-showcase--fixed"], else: [])
+
+        vars =
+          [
+            "--pk-sc-overlap:#{overlap}%",
+            "--pk-sc-shade:#{showcase_shade(overlap)}",
+            "--pk-sc-fade:#{showcase_fade(overlap)}%"
+          ] ++ if(height, do: ["--pk-sc-height:#{height}"], else: [])
 
         html = """
-        <figure class="pk-showcase pk-showcase--#{side} pk-showcase--#{tone}" \
-        style="--pk-sc-overlap:#{overlap}%;--pk-sc-shade:#{showcase_shade(overlap)};        --pk-sc-fade:#{showcase_fade(overlap)}%">
+        <figure class="#{Enum.join(classes, " ")}" style="#{Enum.join(vars, ";")}">
         <div class="pk-showcase__media"><img src="#{src}" alt="#{alt}" loading="lazy" decoding="async"></div>
         <div class="pk-showcase__text">#{text_html}</div>
         </figure>
@@ -1021,6 +1038,24 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # pulls the fade earlier so more of the image is already blended by the time
   # the text reaches it.
   defp showcase_fade(overlap), do: (70 - overlap) |> max(30) |> min(70)
+
+  # How tall the image area is. Without this the band's height comes from the
+  # image's own aspect at whatever width the lane gives it, which on a
+  # full-bleed band can be very tall. A preset or a plain pixel count (clamped)
+  # pins it and lets `object-fit: cover` crop. nil = keep the natural aspect.
+  defp showcase_height("short"), do: "18rem"
+  defp showcase_height("medium"), do: "26rem"
+  defp showcase_height("tall"), do: "38rem"
+  defp showcase_height("auto"), do: nil
+
+  defp showcase_height(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} when n >= @showcase_min_height and n <= @showcase_max_height -> "#{n}px"
+      _ -> nil
+    end
+  end
+
+  defp showcase_height(_), do: nil
 
   # Parse XML attribute string into a map
   defp parse_xml_attributes(attrs_string) do

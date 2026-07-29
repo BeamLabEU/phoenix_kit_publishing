@@ -178,6 +178,11 @@ makes sense.)
 - Known house-wide limit pinned by a test: a `>` inside any component
   attribute value ends the opening tag early (every component scans with
   `[^>]*`). It degrades to an empty attribute, never raw markup.
+- Author controls, both asked for after seeing it live: `height`
+  (short/medium/tall/pixels, omit for natural aspect — a full-bleed band's
+  natural height was ~600px) and the width lane. `align="none"` is now an
+  explicit value in the SHARED `stretch_style/1`, so any component whose
+  default is full-bleed can opt back into the text column.
 
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
