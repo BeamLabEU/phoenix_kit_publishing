@@ -222,6 +222,20 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "notes_style",
+        type: :enum,
+        allowed: Constants.notes_styles(),
+        default: Constants.default_notes_style(),
+        scope: :post,
+        label: "Author notes style",
+        description:
+          "How <Note> annotations display: \"footnotes\" — numbered references " <>
+            "with a collected Notes section at the bottom (plus hover popovers) — " <>
+            "or \"panel\" — clicking the annotated phrase slides out a right-side " <>
+            "panel with the note and its own comment thread.",
+        depends_on: nil
+      },
+      %{
         key: "post_date_position",
         type: :enum,
         allowed: Constants.post_date_positions(),

@@ -170,4 +170,164 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
 
     assert redirected_to(conn) == "/#{slug}"
   end
+
+  describe "threaded replies" do
+    setup %{slug: slug, user: user} do
+      {:ok, _} = Groups.update_group(slug, %{"comments_enabled" => "true"})
+      :ok = login(user)
+      :ok
+    end
+
+    test "a reply nests under its parent in the rendered thread", %{
+      conn: conn,
+      slug: slug,
+      post: post,
+      user: user
+    } do
+      {:ok, parent} = PublishingComments.create(post.uuid, user.uuid, "Parent comment")
+
+      conn =
+        post_comment(
+          conn,
+          slug,
+          Map.put(base_params(post, "The reply"), "parent_uuid", parent.uuid)
+        )
+
+      assert redirected_to(conn) =~ "#comment-#{parent.uuid}"
+
+      page = PublishingComments.for_post_page(post.uuid)
+      assert [%{content: "Parent comment", children: [%{content: "The reply"}]}] = page.thread
+      assert page.count == 2
+
+      html = build_conn() |> get("/#{slug}/discussed") |> html_response(200)
+      assert html =~ "2 comments"
+      assert html =~ "The reply"
+      # The reply affordance renders for logged-out readers too? No — the
+      # details/summary Reply only shows when logged in.
+      refute html =~ ">Reply<"
+    end
+
+    test "a parent from ANOTHER post is rejected", %{
+      conn: conn,
+      slug: slug,
+      post: post,
+      user: user
+    } do
+      {:ok, other} =
+        Posts.create_post(slug, %{title: "Other", slug: "other", content: "Body."})
+
+      :ok = Versions.publish_version(slug, other.uuid, 1)
+      {:ok, foreign_parent} = PublishingComments.create(other.uuid, user.uuid, "Elsewhere")
+
+      conn =
+        post_comment(
+          conn,
+          slug,
+          Map.put(base_params(post, "hijack"), "parent_uuid", foreign_parent.uuid)
+        )
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "no longer available"
+      assert PublishingComments.for_post_page(post.uuid).count == 0
+    end
+
+    test "a garbage parent_uuid posts as a plain top-level comment", %{
+      conn: conn,
+      slug: slug,
+      post: post
+    } do
+      # Non-uuid parents are dropped up front (same treatment as a
+      # malformed note_id) — the comment still lands, unthreaded, and the
+      # junk never reaches the redirect anchor.
+      conn =
+        post_comment(conn, slug, Map.put(base_params(post, "hi"), "parent_uuid", "not-a-uuid"))
+
+      refute redirected_to(conn) =~ "not-a-uuid"
+
+      page = PublishingComments.for_post_page(post.uuid)
+      assert [%{content: "hi", parent_uuid: nil}] = page.thread
+    end
+  end
+
+  describe "note-anchored comments (panel style)" do
+    setup %{slug: slug, user: user} do
+      {:ok, _} =
+        Groups.update_group(slug, %{"comments_enabled" => "true", "notes_style" => "panel"})
+
+      :ok = login(user)
+      :ok
+    end
+
+    test "a note comment lands in its panel, not the main thread", %{
+      conn: conn,
+      slug: slug,
+      post: post,
+      user: user
+    } do
+      alias PhoenixKit.Modules.Publishing
+
+      {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
+
+      {:ok, _} =
+        PhoenixKit.Modules.Publishing.Posts.update_post(
+          slug,
+          read,
+          %{"content" => "Uses <Note note=\"The note body.\">a term</Note> here."},
+          %{}
+        )
+
+      note_id = PhoenixKit.Modules.Publishing.Renderer.note_dom_id("The note body.")
+
+      conn =
+        post_comment(
+          conn,
+          slug,
+          Map.put(base_params(post, "About that note"), "note_id", note_id)
+        )
+
+      # Redirect reopens the panel (:target).
+      assert redirected_to(conn) =~ "#pk-note-panel-#{note_id}"
+
+      page = PublishingComments.for_post_page(post.uuid)
+      assert page.count == 0
+      assert [%{content: "About that note"}] = page.note_comments[note_id]
+
+      html = build_conn() |> get("/#{slug}/discussed") |> html_response(200)
+      # Body ref targets the panel; the panel carries the note text + comment.
+      assert html =~ "#pk-note-panel-#{note_id}"
+      assert html =~ "The note body."
+      assert html =~ "About that note"
+      assert html =~ "1 comment on this note"
+      # Main thread header still counts zero.
+      assert html =~ "0 comments"
+
+      # A reply to a note comment inherits the note anchor (threads never
+      # straddle the panel and the main list).
+      [note_comment] = page.note_comments[note_id]
+
+      {:ok, reply} =
+        PublishingComments.create(post.uuid, user.uuid, "Reply in panel",
+          parent_uuid: note_comment.uuid
+        )
+
+      assert reply.metadata["note_id"] == note_id
+    end
+
+    test "a malformed note_id posts as a plain thread comment", %{
+      conn: conn,
+      slug: slug,
+      post: post
+    } do
+      conn =
+        post_comment(
+          conn,
+          slug,
+          Map.put(base_params(post, "hello"), "note_id", "<script>alert(1)</script>")
+        )
+
+      assert redirected_to(conn) =~ "#comments"
+      page = PublishingComments.for_post_page(post.uuid)
+      assert page.count == 1
+      assert page.note_comments == %{}
+    end
+  end
 end

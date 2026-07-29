@@ -84,4 +84,72 @@ defmodule PhoenixKit.Modules.Publishing.RendererNotesTest do
     assert html =~ "a phrase<sup>1</sup>"
     assert html =~ ~s(<li id="pk-note-1">side info)
   end
+
+  describe "panel style (notes_style: \"panel\")" do
+    test "refs target the slide-out panel anchors; no bottom section" do
+      content = "See <Note note=\"Panel body text.\">the phrase</Note> here."
+      html = Renderer.render_markdown(content, notes_style: "panel")
+
+      panel_id = Renderer.note_dom_id("Panel body text.")
+      assert html =~ ~s(href="#pk-note-panel-#{panel_id}")
+      assert html =~ "the phrase<sup>1</sup>"
+      # Hover popover survives; the collected section does not.
+      assert html =~ ~s(data-note="Panel body text.")
+      assert html =~ ".pk-note-ref:hover::after"
+      refute html =~ "pk-notes"
+      refute html =~ ~s(id="pk-note-1")
+    end
+
+    test "unknown/absent style falls back to footnotes" do
+      content = "See <Note note=\"n\">p</Note>."
+
+      for style <- [nil, "bogus"] do
+        html = Renderer.render_markdown(content, notes_style: style)
+        assert html =~ ~s(href="#pk-note-1")
+        assert html =~ "pk-notes"
+      end
+    end
+  end
+
+  describe "list_notes/1" do
+    test "returns document-ordered notes with stable content-derived ids" do
+      content = """
+      One <Note note="first body">a</Note> and two <Note note="second body">b</Note>.
+
+      ```
+      <Note note="in a fence">ignored</Note>
+      ```
+      """
+
+      assert [
+               %{number: 1, id: id1, body: "first body"},
+               %{number: 2, id: id2, body: "second body"}
+             ] = Renderer.list_notes(content)
+
+      assert id1 == Renderer.note_dom_id("first body")
+      assert id1 != id2
+      # The id is content-addressed: inserting an earlier note must not
+      # move an existing note's anchor (comments stay attached).
+      shifted = "Zero <Note note=\"new earliest\">z</Note>. " <> content
+      assert Enum.any?(Renderer.list_notes(shifted), &(&1.id == id1))
+    end
+
+    test "no notes → empty list; non-binary input tolerated" do
+      assert Renderer.list_notes("plain prose") == []
+      assert Renderer.list_notes(nil) == []
+    end
+
+    test "duplicate note texts get distinct ids; the first keeps the plain digest" do
+      content = "A <Note note=\"same\">x</Note> B <Note note=\"same\">y</Note>."
+
+      assert [%{id: id1}, %{id: id2}] = Renderer.list_notes(content)
+      assert id1 == Renderer.note_dom_id("same")
+      assert id1 != id2
+
+      # The rendered refs target the two distinct panels.
+      html = Renderer.render_markdown(content, notes_style: "panel")
+      assert html =~ ~s(href="#pk-note-panel-#{id1}")
+      assert html =~ ~s(href="#pk-note-panel-#{id2}")
+    end
+  end
 end

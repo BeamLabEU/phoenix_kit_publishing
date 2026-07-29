@@ -197,6 +197,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "show_breadcrumbs" => group["show_breadcrumbs"],
       "post_date_position" => group["post_date_position"],
       "post_width" => group["post_width"],
+      "notes_style" => group["notes_style"],
       "show_featured_image" => group["show_featured_image"],
       "show_reading_time" => group["show_reading_time"],
       "show_tags" => group["show_tags"],
@@ -313,6 +314,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       {gettext("Narrow"), "narrow"},
       {gettext("Normal"), "normal"},
       {gettext("Wide"), "wide"}
+    ]
+  end
+
+  # Label/value pairs for the author-notes-style <select>. Values must match
+  # Publishing.Constants.notes_styles/0. These ARE the two styles' proper
+  # names — keep the labels descriptive so writers know what each one does.
+  defp notes_style_options do
+    [
+      {gettext("Footnotes — numbered refs, notes collected at the bottom"), "footnotes"},
+      {gettext("Slide-out panel — click the phrase, note opens on the right"), "panel"}
     ]
   end
 
@@ -589,6 +600,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   field={@form[:post_date_position]}
                   label={gettext("Post date position")}
                   options={post_date_position_options()}
+                />
+
+                <.select
+                  field={@form[:notes_style]}
+                  label={gettext("Author notes style")}
+                  options={notes_style_options()}
                 />
 
                 <.checkbox field={@form[:show_breadcrumbs]}>

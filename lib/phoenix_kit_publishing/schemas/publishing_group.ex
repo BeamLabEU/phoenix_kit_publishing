@@ -51,6 +51,10 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
     post page: `"above"`, `"below"`, or `"hidden"`. Default `"below"`.
   - `post_width` - Post-page content column width: `"narrow"`, `"normal"`, or
     `"wide"`. Default `"normal"`.
+  - `notes_style` - How author `<Note>` annotations display on the post page:
+    `"footnotes"` (numbered refs + a collected bottom section + hover popovers)
+    or `"panel"` (clicking the phrase slides out a right-side panel with the
+    note and its comments). Default `"footnotes"`.
   - `show_featured_image` - Show the post's featured image at the top of the post
     page (default `false`).
   - `show_reading_time` - Show an estimated reading time on the post page (default `false`).
@@ -222,6 +226,10 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc ~S|Returns the post-page content width ("narrow"/"normal"/"wide"; default "normal").|
   def post_width(%__MODULE__{data: data}),
     do: Map.get(data, "post_width", Publishing.Constants.default_post_width())
+
+  @doc ~S|Returns the author-note display style ("footnotes"/"panel"; default "footnotes").|
+  def notes_style(%__MODULE__{data: data}),
+    do: Map.get(data, "notes_style", Publishing.Constants.default_notes_style())
 
   @doc "Returns whether a post's featured image shows at the top of the post page (default false)."
   def show_featured_image?(%__MODULE__{data: data}),

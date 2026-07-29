@@ -158,6 +158,15 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @doc ~S|Default public-listing layout ("grid").|
   def default_listing_layout, do: @default_listing_layout
 
+  @notes_styles ["footnotes", "panel"]
+  @default_notes_style "footnotes"
+
+  @doc ~S|Valid author-note display styles: "footnotes" (numbered refs + a collected bottom section + hover popovers) or "panel" (clicking the phrase slides a right-side panel out with the note and its comments).|
+  def notes_styles, do: @notes_styles
+
+  @doc ~S|Default author-note display style ("footnotes" — the original layout).|
+  def default_notes_style, do: @default_notes_style
+
   @post_date_positions ["above", "below", "hidden"]
   @default_post_date_position "below"
 

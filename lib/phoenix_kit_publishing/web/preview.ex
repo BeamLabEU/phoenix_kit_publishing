@@ -38,6 +38,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
       )
       |> assign(:post, nil)
       |> assign(:html_content, nil)
+      |> assign(:post_notes, [])
       |> assign(:translations, [])
       |> assign(:breadcrumbs, [])
       |> assign(:version_dropdown, nil)
@@ -54,7 +55,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
 
     case Publishing.read_post_by_uuid(post_uuid, language, version) do
       {:ok, post} ->
-        case render_markdown_content(post.content, post) do
+        notes_style = preview_notes_style(post.group)
+
+        case render_markdown_content(post.content, post, notes_style) do
           {:ok, rendered_html} ->
             post = Map.put(post, :uuid, post_uuid)
 
@@ -77,6 +80,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
              |> assign(:group_slug, post.group)
              |> assign(:group_name, group_name)
              |> assign(:html_content, rendered_html)
+             |> assign(
+               :post_notes,
+               if(notes_style == "panel", do: Renderer.list_notes(post.content), else: [])
+             )
              |> assign(:current_language, canonical_language)
              |> assign(:translations, translations)
              |> assign(:breadcrumbs, breadcrumbs)
@@ -162,11 +169,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
     end)
   end
 
-  defp render_markdown_content(content, post) when is_binary(content) do
-    # Same tag-link context as the public page — preview must match
-    # production output (hashtags render as tag-archive links).
+  defp render_markdown_content(content, post, notes_style) when is_binary(content) do
+    # Same tag-link + notes-style context as the public page — preview must
+    # match production output (hashtags link, note refs target panels).
     content
-    |> Renderer.render_markdown(tag_links: {Map.get(post, :group), Map.get(post, :language)})
+    |> Renderer.render_markdown(
+      tag_links: {Map.get(post, :group), Map.get(post, :language)},
+      notes_style: notes_style
+    )
     |> then(&{:ok, &1})
   rescue
     # Narrow: the renderer can legitimately raise on PHK XML it can't parse
@@ -179,6 +189,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
     error in [Saxy.ParseError, RuntimeError] ->
       Logger.error("[Publishing.Preview] Markdown rendering failed: #{inspect(error)}")
       {:error, gettext("Failed to render preview.")}
+  end
+
+  defp preview_notes_style(group_slug) do
+    case Publishing.get_group(group_slug) do
+      {:ok, group} -> Map.get(group, "notes_style", "footnotes")
+      _ -> "footnotes"
+    end
   end
 
   @impl true
@@ -304,6 +321,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
           <div class="prose prose-lg max-w-none">
             {raw(@html_content)}
           </div>
+
+          <%!-- Note slide-out panels ("panel" notes style) — same markup as
+            the public page, commenting off in preview. --%>
+          <PublishingHTML.note_panels
+            :if={@post_notes != []}
+            post_notes={@post_notes}
+            note_comments={%{}}
+            comments_enabled={false}
+            form_action=""
+            post_uuid={@post[:uuid]}
+            form_token={nil}
+            can_comment={false}
+          />
 
           <%!-- Post Footer — mirrors the public post page's compact back
             link (name-only text, aria-carried action), inert in preview. --%>

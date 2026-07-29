@@ -267,11 +267,21 @@ Annotate a phrase to clarify it for readers:
 The design uses <Note note="Content-addressed: the key is a hash of the bytes.">CAS storage</Note> under the hood.
 ```
 
-Renders as the phrase with a superscript number that links to a collected
-**Notes** section at the bottom of the post (works with no JavaScript), plus
-a hover/focus popover showing the note text (pure CSS).
+Two display styles, chosen per group in the group's settings ("Author
+notes style"):
+
+- **Footnotes** (default) — the phrase gets a superscript number linking to
+  a collected **Notes** section at the bottom of the post, plus a
+  hover/focus popover showing the note text (pure CSS, no JavaScript).
+- **Slide-out panel** — clicking the phrase slides a panel out from the
+  right side with the note text; when the group has commenting enabled,
+  readers can comment on that specific note inside the panel (the hover
+  popover still works). Also pure CSS (`:target`), no JavaScript.
 
 - Numbering is automatic and sequential through the document.
+- A note's comment thread is anchored to the note's *text* (a content
+  hash), not its number — inserting an earlier note doesn't detach
+  comments; rewording the note does.
 - The `note` text is plain text; it cannot contain double quotes (use
   apostrophes) and HTML in it is shown literally, never executed.
 - A literal `<Note>` inside a code fence is left as code.

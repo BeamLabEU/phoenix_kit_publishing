@@ -1617,6 +1617,195 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
   defp comment_author_name(_), do: gettext("Reader")
 
+  defp can_comment?(assigns) do
+    match?(%{user: %{}}, assigns[:phoenix_kit_current_scope])
+  end
+
+  # One comment in the thread, recursively rendering its replies. The reply
+  # form hides behind <details> — open/close works with no JS, several can
+  # be open at once, and nothing scroll-jumps.
+  defp comment_node(assigns) do
+    ~H"""
+    <li id={"comment-#{@comment.uuid}"}>
+      <div class="flex items-baseline gap-2 text-sm">
+        <span class="font-semibold">{comment_author_name(@comment)}</span>
+        <time class="text-xs text-base-content/50" datetime={DateTime.to_iso8601(@comment.inserted_at)}>
+          {Calendar.strftime(@comment.inserted_at, "%Y-%m-%d %H:%M")}
+        </time>
+      </div>
+      <div class="mt-1 text-sm">
+        {Publishing.Comments.render_content(@comment.content)}
+      </div>
+      <details :if={@can_comment} class="mt-1">
+        <summary class="cursor-pointer select-none text-xs text-base-content/50 hover:text-primary">
+          {gettext("Reply")}
+        </summary>
+        <div class="mt-2">
+          <.comment_form
+            action={@form_action}
+            post_uuid={@post_uuid}
+            token={@form_token}
+            parent_uuid={@comment.uuid}
+            compact={true}
+            placeholder={gettext("Write a reply…")}
+            submit_label={gettext("Post reply")}
+          />
+        </div>
+      </details>
+      <ol
+        :if={@comment.children != []}
+        class="mt-4 space-y-4 border-l-2 border-base-200 pl-4 sm:pl-5"
+      >
+        <.comment_node
+          :for={child <- @comment.children}
+          comment={child}
+          form_action={@form_action}
+          post_uuid={@post_uuid}
+          form_token={@form_token}
+          can_comment={@can_comment}
+        />
+      </ol>
+    </li>
+    """
+  end
+
+  # The POST comment form — shared by the top-level thread, per-comment
+  # reply <details>, and the note panels. Same protections everywhere:
+  # CSRF, honeypot, signed time-trap token; parent_uuid/note_id thread it.
+  defp comment_form(assigns) do
+    assigns =
+      assigns
+      |> Map.put_new(:parent_uuid, nil)
+      |> Map.put_new(:note_id, nil)
+      |> Map.put_new(:compact, false)
+      |> Map.put_new(:placeholder, gettext("Write a comment… (Markdown supported)"))
+      |> Map.put_new(:submit_label, gettext("Post comment"))
+
+    ~H"""
+    <form method="post" action={@action} class="space-y-2">
+      <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+      <input type="hidden" name="post_uuid" value={@post_uuid} />
+      <input type="hidden" name="ft" value={@token} />
+      <input :if={@parent_uuid} type="hidden" name="parent_uuid" value={@parent_uuid} />
+      <input :if={@note_id} type="hidden" name="note_id" value={@note_id} />
+      <%!-- Honeypot — visually hidden; anything typed here is a bot. --%>
+      <div class="hidden" aria-hidden="true">
+        <label>
+          Website <input type="text" name="website" tabindex="-1" autocomplete="off" />
+        </label>
+      </div>
+      <textarea
+        name="content"
+        rows={if @compact, do: "2", else: "4"}
+        required
+        maxlength="10000"
+        placeholder={@placeholder}
+        class="textarea textarea-bordered w-full"
+      ></textarea>
+      <button type="submit" class={["btn btn-primary", if(@compact, do: "btn-xs", else: "btn-sm")]}>
+        {@submit_label}
+      </button>
+    </form>
+    """
+  end
+
+  @doc """
+  The right-side slide-out panels for "panel" notes style. CSS-only:
+  hidden off-canvas until the panel is the URL :target (the note ref in
+  the body links to it); the backdrop and ✕ link back to the ref, which
+  both closes the panel and returns the reader to the annotated phrase.
+  Public so the editor preview can render the same panels (with
+  commenting off) — preview must match production.
+  """
+  def note_panels(assigns) do
+    ~H"""
+    <section aria-label={gettext("Author notes")}>
+      <div :for={note <- @post_notes} id={"pk-note-panel-#{note.id}"} class="pk-note-panel">
+        <a
+          href={"#pk-note-ref-#{note.number}"}
+          class="pk-note-panel-backdrop"
+          aria-label={gettext("Close note")}
+        >
+        </a>
+        <aside
+          role="dialog"
+          aria-label={gettext("Note %{number}", number: note.number)}
+          tabindex="-1"
+          class="bg-base-100 shadow-2xl border-l border-base-200"
+        >
+          <header class="flex items-center justify-between gap-2 border-b border-base-200 px-4 py-3">
+            <span class="text-sm font-semibold">
+              <span class="badge badge-primary badge-sm align-middle">{note.number}</span>
+              {gettext("Note")}
+            </span>
+            <a
+              href={"#pk-note-ref-#{note.number}"}
+              class="btn btn-ghost btn-xs btn-circle"
+              aria-label={gettext("Close note")}
+            >
+              ✕
+            </a>
+          </header>
+          <div class="px-4 py-3 text-sm leading-relaxed">{note.body}</div>
+          <div :if={@comments_enabled} class="border-t border-base-200 px-4 py-3">
+            <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-base-content/50">
+              {ngettext(
+                "%{count} comment on this note",
+                "%{count} comments on this note",
+                length(Map.get(@note_comments, note.id, []))
+              )}
+            </h3>
+            <ol class="mb-4 space-y-4">
+              <li :for={comment <- Map.get(@note_comments, note.id, [])}>
+                <div class="flex items-baseline gap-2 text-sm">
+                  <span class="font-semibold">{comment_author_name(comment)}</span>
+                  <time
+                    class="text-xs text-base-content/50"
+                    datetime={DateTime.to_iso8601(comment.inserted_at)}
+                  >
+                    {Calendar.strftime(comment.inserted_at, "%Y-%m-%d %H:%M")}
+                  </time>
+                </div>
+                <div class="mt-1 text-sm">
+                  {Publishing.Comments.render_content(comment.content)}
+                </div>
+              </li>
+            </ol>
+            <%= if @can_comment do %>
+              <.comment_form
+                action={@form_action <> "#pk-note-panel-#{note.id}"}
+                post_uuid={@post_uuid}
+                token={@form_token}
+                note_id={note.id}
+                compact={true}
+                placeholder={gettext("Comment on this note…")}
+              />
+            <% else %>
+              <div class="text-xs text-base-content/60">
+                <.link navigate={PhoenixKit.Utils.Routes.path("/users/log-in")} class="link">
+                  {gettext("Log in")}
+                </.link>
+                {gettext("to comment on this note.")}
+              </div>
+            <% end %>
+          </div>
+        </aside>
+      </div>
+    </section>
+    <style>
+      .pk-note-panel{position:fixed;inset:0;z-index:60;visibility:hidden;pointer-events:none}
+      .pk-note-panel:target{visibility:visible;pointer-events:auto}
+      .pk-note-panel-backdrop{position:absolute;inset:0;background:rgb(0 0 0/.25);opacity:0;transition:opacity .2s ease}
+      .pk-note-panel:target .pk-note-panel-backdrop{opacity:1}
+      .pk-note-panel aside{position:absolute;top:0;right:0;bottom:0;width:min(26rem,92vw);overflow-y:auto;transform:translateX(100%);transition:transform .25s ease}
+      .pk-note-panel:target aside{transform:none}
+      @media (prefers-reduced-motion: reduce){
+        .pk-note-panel-backdrop,.pk-note-panel aside{transition:none}
+      }
+    </style>
+    """
+  end
+
   # An explicit description wins; otherwise derive an excerpt from the content.
   defp post_card_excerpt(post) do
     if desc = Map.get(post.metadata, :description) do
@@ -1886,54 +2075,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <section :if={assigns[:comments_enabled]} id="comments" class="mt-10 border-t pt-6">
           {Publishing.Comments.content_styles()}
           <h2 class="mb-4 text-lg font-semibold">
-            {ngettext("%{count} comment", "%{count} comments", length(@post_comments))}
+            {ngettext("%{count} comment", "%{count} comments", @post_comment_count)}
           </h2>
           <div :if={@post_comments == []} class="mb-6 text-sm text-base-content/60">
             {gettext("No comments yet — be the first.")}
           </div>
           <ol class="mb-8 space-y-5">
-            <li :for={comment <- @post_comments} id={"comment-#{comment.uuid}"}>
-              <div class="flex items-baseline gap-2 text-sm">
-                <span class="font-semibold">{comment_author_name(comment)}</span>
-                <time
-                  class="text-xs text-base-content/50"
-                  datetime={DateTime.to_iso8601(comment.inserted_at)}
-                >
-                  {Calendar.strftime(comment.inserted_at, "%Y-%m-%d %H:%M")}
-                </time>
-              </div>
-              <div class="mt-1 text-sm">
-                {Publishing.Comments.render_content(comment.content)}
-              </div>
-            </li>
+            <.comment_node
+              :for={comment <- @post_comments}
+              comment={comment}
+              form_action={build_post_url(@group_slug, @post, @current_language) <> "#comments"}
+              post_uuid={@post.uuid}
+              form_token={assigns[:comment_form_token]}
+              can_comment={can_comment?(assigns)}
+            />
           </ol>
-          <%= if assigns[:phoenix_kit_current_scope] && assigns.phoenix_kit_current_scope.user do %>
-            <form
-              method="post"
+          <%= if can_comment?(assigns) do %>
+            <.comment_form
               action={build_post_url(@group_slug, @post, @current_language) <> "#comments"}
-              class="space-y-3"
-            >
-              <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
-              <input type="hidden" name="post_uuid" value={@post.uuid} />
-              <input type="hidden" name="ft" value={assigns[:comment_form_token]} />
-              <%!-- Honeypot — visually hidden; anything typed here is a bot. --%>
-              <div class="hidden" aria-hidden="true">
-                <label>
-                  Website <input type="text" name="website" tabindex="-1" autocomplete="off" />
-                </label>
-              </div>
-              <textarea
-                name="content"
-                rows="4"
-                required
-                maxlength="10000"
-                placeholder={gettext("Write a comment… (Markdown supported)")}
-                class="textarea textarea-bordered w-full"
-              ></textarea>
-              <button type="submit" class="btn btn-primary btn-sm">
-                {gettext("Post comment")}
-              </button>
-            </form>
+              post_uuid={@post.uuid}
+              token={assigns[:comment_form_token]}
+            />
           <% else %>
             <div class="rounded-lg border border-dashed border-base-300 p-4 text-sm text-base-content/60">
               <.link navigate={PhoenixKit.Utils.Routes.path("/users/log-in")} class="link">
@@ -1943,6 +2105,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             </div>
           <% end %>
         </section>
+        <%!-- Author-note slide-out panels ("panel" notes style). Pure CSS:
+          a note ref in the body targets its panel; :target slides it in
+          from the right — no JS. Each panel carries the note text and,
+          when commenting is on, that note's own comment thread. --%>
+        <.note_panels
+          :if={assigns[:post_notes] != nil and assigns.post_notes != []}
+          post_notes={@post_notes}
+          note_comments={assigns[:note_comments] || %{}}
+          comments_enabled={assigns[:comments_enabled]}
+          form_action={build_post_url(@group_slug, @post, @current_language)}
+          post_uuid={@post.uuid}
+          form_token={assigns[:comment_form_token]}
+          can_comment={can_comment?(assigns)}
+        />
         <%!-- Post Footer — same compact muted link as the top, no button chrome. --%>
         <footer class="mt-6 border-t pt-2">
           <.link

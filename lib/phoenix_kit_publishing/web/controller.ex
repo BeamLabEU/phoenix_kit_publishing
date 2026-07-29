@@ -34,6 +34,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
+  alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Web.Controller.Routing
   alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
@@ -213,12 +214,42 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
   defp submit_comment(conn, post, params, back_path) do
     content = params["content"] |> to_string() |> String.trim()
+    note_id = comment_note_id(params)
+    parent_uuid = comment_parent_uuid(params)
 
-    case PublishingComments.create(post[:uuid], current_user_uuid(conn), content) do
-      {:ok, _comment} ->
+    # A note-panel comment redirects back with that panel's :target open;
+    # a reply lands on its parent comment. (Error paths use the request's
+    # view of the thread; success re-derives from the created comment.)
+    back_path =
+      cond do
+        note_id -> replace_anchor(back_path, "pk-note-panel-#{note_id}")
+        parent_uuid -> replace_anchor(back_path, "comment-#{parent_uuid}")
+        true -> back_path
+      end
+
+    case PublishingComments.create(post[:uuid], current_user_uuid(conn), content,
+           parent_uuid: parent_uuid,
+           note_id: note_id
+         ) do
+      {:ok, comment} ->
+        # Anchor from the stored truth: a reply INHERITS its parent's
+        # note_id, so replying inside a panel must reopen that panel even
+        # though the reply form never carried note_id itself.
+        success_path =
+          cond do
+            is_binary(comment.metadata["note_id"]) ->
+              replace_anchor(back_path, "pk-note-panel-#{comment.metadata["note_id"]}")
+
+            is_binary(comment.parent_uuid) ->
+              replace_anchor(back_path, "comment-#{comment.parent_uuid}")
+
+            true ->
+              back_path
+          end
+
         conn
         |> put_flash(:info, gettext("Comment posted."))
-        |> redirect(to: back_path)
+        |> redirect(to: success_path)
 
       {:error, :empty_comment} ->
         conn
@@ -230,11 +261,50 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> put_flash(:error, gettext("That comment is too long."))
         |> redirect(to: back_path)
 
+      {:error, :parent_not_found} ->
+        conn
+        |> put_flash(:error, gettext("The comment you replied to is no longer available."))
+        |> redirect(to: back_path)
+
+      {:error, :max_depth_exceeded} ->
+        conn
+        |> put_flash(:error, gettext("This thread is too deep to reply to."))
+        |> redirect(to: back_path)
+
       {:error, _} ->
         conn
         |> put_flash(:error, gettext("Couldn't post your comment — please try again."))
         |> redirect(to: back_path)
     end
+  end
+
+  # A note anchor is the url-safe digest Renderer.note_dom_id/1 emits —
+  # anything else is a crafted payload and is dropped (the comment then
+  # posts as a regular thread comment rather than erroring).
+  defp comment_note_id(params) do
+    case params["note_id"] do
+      note_id when is_binary(note_id) ->
+        if Regex.match?(~r/^[A-Za-z0-9_-]{4,32}$/, note_id), do: note_id, else: nil
+
+      _ ->
+        nil
+    end
+  end
+
+  # UUID-cast up front: the value is echoed into the redirect anchor
+  # (#comment-<uuid>), so junk must never travel that far.
+  defp comment_parent_uuid(params) do
+    with parent_uuid when is_binary(parent_uuid) <- params["parent_uuid"],
+         {:ok, _} <- Ecto.UUID.cast(parent_uuid) do
+      parent_uuid
+    else
+      _ -> nil
+    end
+  end
+
+  defp replace_anchor(path, anchor) do
+    [base | _] = String.split(path, "#", parts: 2)
+    base <> "#" <> anchor
   end
 
   # 3s minimum (instant submits are bots), 1 day maximum (stale tabs).
@@ -545,6 +615,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect_301, url} ->
@@ -615,6 +686,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect, url} ->
@@ -850,15 +922,37 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # optional comments module is present+enabled.
   defp assign_post_comments(conn, group, post) do
     if Map.get(group, "comments_enabled", false) and PublishingComments.available?() do
+      page = PublishingComments.for_post_page(post.uuid)
+
       conn
       |> assign(:comments_enabled, true)
-      |> assign(:post_comments, PublishingComments.list(post.uuid))
+      |> assign(:post_comments, page.thread)
+      |> assign(:post_comment_count, page.count)
+      |> assign(:note_comments, page.note_comments)
       |> assign(
         :comment_form_token,
         Phoenix.Token.sign(conn, "pk_pub_comment", System.system_time(:second))
       )
     else
-      assign(conn, :comments_enabled, false)
+      # Full default set — a host layout referencing these must not
+      # KeyError just because commenting is off.
+      conn
+      |> assign(:comments_enabled, false)
+      |> assign(:post_comments, [])
+      |> assign(:post_comment_count, 0)
+      |> assign(:note_comments, %{})
+      |> assign(:comment_form_token, nil)
+    end
+  end
+
+  # The author notes for the slide-out panels — only extracted when the
+  # group renders notes in panel style (the footnotes style keeps them
+  # inside the cached body HTML).
+  defp assign_post_notes(conn, group, post) do
+    if PostRendering.group_notes_style(group) == "panel" do
+      assign(conn, :post_notes, Renderer.list_notes(post.content))
+    else
+      assign(conn, :post_notes, [])
     end
   end
 

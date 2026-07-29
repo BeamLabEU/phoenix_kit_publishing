@@ -26,7 +26,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
 
   # Suppress dialyzer false positive for defensive fallback pattern
-  @dialyzer {:nowarn_function, render_post_content: 1}
+  @dialyzer {:nowarn_function, render_post_content: 2}
 
   # ============================================================================
   # Main Rendering Functions
@@ -77,8 +77,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     if canonical_redirect?(conn, language, canonical_language, canonical_url) do
       {:redirect_301, canonical_url}
     else
-      html_content = render_post_content(post)
       group = fetch_group(group_slug)
+      html_content = render_post_content(post, notes_style: group_notes_style(group))
       group_name = resolve_group_name(group, group_slug, canonical_language)
       translations = Translations.build_translation_links(group_slug, post, canonical_language)
       breadcrumbs = build_breadcrumbs(group_slug, post, canonical_language, group_name)
@@ -126,8 +126,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
   defp build_versioned_post_response(group_slug, post, version) do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
-    html_content = render_post_content(post)
     group = fetch_group(group_slug)
+    html_content = render_post_content(post, notes_style: group_notes_style(group))
     group_name = resolve_group_name(group, group_slug, canonical_language)
 
     translations =
@@ -194,10 +194,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
   @doc """
   Renders post content with caching for published posts.
-  Uses Renderer.render_post/1 which caches based on content hash.
+  Uses Renderer.render_post/2 which caches based on content hash.
   """
-  def render_post_content(post) do
-    case Renderer.render_post(post) do
+  def render_post_content(post, opts \\ []) do
+    case Renderer.render_post(post, opts) do
       {:ok, html} ->
         html
 
@@ -206,10 +206,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
       # render_markdown treats a non-binary tuple element as "no tag links".
       _ ->
         Renderer.render_markdown(post.content,
-          tag_links: {Map.get(post, :group), Map.get(post, :language)}
+          tag_links: {Map.get(post, :group), Map.get(post, :language)},
+          notes_style: Keyword.get(opts, :notes_style)
         )
     end
   end
+
+  @doc ~S(The group's author-notes display style: "footnotes" or "panel".)
+  def group_notes_style(group) when is_map(group),
+    do: Map.get(group, "notes_style", Constants.default_notes_style())
+
+  def group_notes_style(_), do: Constants.default_notes_style()
 
   # ============================================================================
   # Version Dropdown

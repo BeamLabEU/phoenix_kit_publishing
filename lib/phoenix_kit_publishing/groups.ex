@@ -41,6 +41,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @post_date_positions Constants.post_date_positions()
   @default_post_width Constants.default_post_width()
   @post_widths Constants.post_widths()
+  @default_notes_style Constants.default_notes_style()
+  @notes_styles Constants.notes_styles()
   @type_regex ~r/^[a-z][a-z0-9-]{0,31}$/
 
   @type_item_names %{
@@ -309,7 +311,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     {"listing_sort", @listing_sorts},
     {"listing_layout", @listing_layouts},
     {"post_date_position", @post_date_positions},
-    {"post_width", @post_widths}
+    {"post_width", @post_widths},
+    {"notes_style", @notes_styles}
   ]
 
   @doc false
@@ -707,6 +710,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "show_breadcrumbs" => Map.get(data, "show_breadcrumbs", false),
       "post_date_position" => Map.get(data, "post_date_position", @default_post_date_position),
       "post_width" => Map.get(data, "post_width", @default_post_width),
+      "notes_style" => Map.get(data, "notes_style", @default_notes_style),
       "show_featured_image" => Map.get(data, "show_featured_image", false),
       "show_reading_time" => Map.get(data, "show_reading_time", false),
       "show_tags" => Map.get(data, "show_tags", false),

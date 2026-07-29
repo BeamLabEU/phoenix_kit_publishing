@@ -135,23 +135,27 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       {:ok, html} = Renderer.render_post(post)
 
   """
-  @spec render_post(map()) :: {:ok, String.t()} | {:error, any()}
-  def render_post(post) do
+  @spec render_post(map(), keyword()) :: {:ok, String.t()} | {:error, any()}
+  def render_post(post, opts \\ []) do
     if post.metadata.status == "published" and render_cache_enabled?(post.group) do
-      cache_key = build_cache_key(post)
+      cache_key = build_cache_key(post, opts)
 
       case get_cached(cache_key) do
         {:ok, html} ->
           {:ok, html}
 
         :miss ->
-          render_and_cache(post, cache_key)
+          render_and_cache(post, cache_key, opts)
       end
     else
       # Don't cache drafts, archived posts, or when cache is disabled.
       # Some callers pass bare maps without :language — hashtags then
       # render as plain text instead of crashing.
-      {:ok, render_markdown(post.content, tag_links: tag_link_context(post))}
+      {:ok,
+       render_markdown(post.content,
+         tag_links: tag_link_context(post),
+         notes_style: Keyword.get(opts, :notes_style)
+       )}
     end
   end
 
@@ -211,8 +215,13 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   def render_markdown(content, opts) when is_binary(content) do
     # Author notes are a document-level feature (sequential numbering + a
     # collected section), so they're extracted before the per-segment
-    # component pipeline runs.
-    {content, notes} = extract_notes(content)
+    # component pipeline runs. Two display styles (group setting):
+    # "footnotes" (default) — refs link to a collected bottom section;
+    # "panel" — refs link to per-note slide-out panels the POST TEMPLATE
+    # renders (they carry live comment threads, which must never be baked
+    # into this cacheable HTML).
+    notes_style = normalize_notes_style(Keyword.get(opts, :notes_style))
+    {content, notes} = extract_notes(content, notes_style)
 
     # Body hashtags become tag-archive links when the caller supplies the
     # group/language context (public post renders). Runs AFTER the notes
@@ -246,10 +255,17 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
     # credo:disable-for-lines:2 Credo.Check.Warning.MissingMetadataKeyInLoggerConfig
     Logger.debug("Content render time: #{time}μs", content_size: byte_size(content))
-    heal_signed_file_urls(result) <> notes_section(notes)
+
+    case notes_style do
+      "panel" -> heal_signed_file_urls(result) <> notes_ref_styles(notes)
+      _ -> heal_signed_file_urls(result) <> notes_section(notes)
+    end
   end
 
   def render_markdown(_, _opts), do: ""
+
+  defp normalize_notes_style("panel"), do: "panel"
+  defp normalize_notes_style(_), do: "footnotes"
 
   # ===========================================================================
   # Author notes (<Note note="…">phrase</Note>)
@@ -266,7 +282,52 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   @note_regex ~r/<Note\s+note="([^"]*)"\s*>(.*?)<\/Note>/s
 
-  defp extract_notes(content) do
+  @doc """
+  The post's author notes in document order:
+  `[%{number: n, id: stable_id, body: text}]`. The id is derived from the
+  note text (not the number), so a comment anchored to a note survives the
+  author inserting an earlier note — it detaches only when the note text
+  itself changes. The post template uses this to render the slide-out
+  panels in "panel" notes style; a `<Note>` inside a code fence is ignored
+  (same mask as rendering).
+  """
+  def list_notes(content) when is_binary(content) do
+    @note_regex
+    |> Regex.scan(mask_scanned_code(content), capture: :all_but_first)
+    |> Enum.with_index(1)
+    |> Enum.map_reduce(%{}, fn {[body, _phrase], number}, seen ->
+      occurrence = Map.get(seen, body, 0) + 1
+
+      {%{number: number, id: note_dom_id(body, occurrence), body: body},
+       Map.put(seen, body, occurrence)}
+    end)
+    |> elem(0)
+  end
+
+  def list_notes(_), do: []
+
+  @doc """
+  Stable DOM/comment anchor for a note: a short url-safe digest of the
+  note text. Content-addressed on purpose — see `list_notes/1`. Repeated
+  identical note texts get occurrence-suffixed digests (2nd, 3rd, …) so
+  panel DOM ids stay unique; the first occurrence keeps the plain digest,
+  so existing comments never detach when a duplicate appears later.
+  """
+  def note_dom_id(body, occurrence \\ 1)
+
+  def note_dom_id(body, 1) when is_binary(body), do: digest_note(body)
+
+  def note_dom_id(body, occurrence) when is_binary(body) and is_integer(occurrence),
+    do: digest_note(body <> "\n#{occurrence}")
+
+  defp digest_note(input) do
+    :sha256
+    |> :crypto.hash(input)
+    |> Base.url_encode64(padding: false)
+    |> binary_part(0, 12)
+  end
+
+  defp extract_notes(content, notes_style) do
     masked = mask_scanned_code(content)
 
     if masked =~ @note_regex do
@@ -277,7 +338,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
           case Regex.run(@note_regex, part) do
             [^part, body, phrase] ->
               number = length(notes) + 1
-              {[note_ref_html(number, body, phrase) | out], [body | notes]}
+              # Occurrence of this exact body so far — duplicate note texts
+              # must not collide on the panel anchor (note_dom_id/2).
+              occurrence = Enum.count(notes, &(&1 == body)) + 1
+
+              {[note_ref_html(number, occurrence, body, phrase, notes_style) | out],
+               [body | notes]}
 
             _ ->
               {[part | out], notes}
@@ -293,9 +359,17 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     end
   end
 
-  defp note_ref_html(number, body, phrase) do
+  defp note_ref_html(number, occurrence, body, phrase, notes_style) do
+    # Footnotes target the collected bottom section; panel style targets the
+    # template-rendered slide-out (`:target` opens it — still no JS).
+    href =
+      case notes_style do
+        "panel" -> "#pk-note-panel-#{note_dom_id(body, occurrence)}"
+        _ -> "#pk-note-#{number}"
+      end
+
     [
-      ~s(<a class="pk-note-ref" id="pk-note-ref-#{number}" href="#pk-note-#{number}" data-note="),
+      ~s(<a class="pk-note-ref" id="pk-note-ref-#{number}" href="#{href}" data-note="),
       escape_html(body),
       ~s(">),
       # Encode '#' in the phrase too: the ref is already an <a>, and the
@@ -303,6 +377,20 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       String.replace(phrase, "#", "&#35;"),
       ~s(<sup>#{number}</sup></a>)
     ]
+  end
+
+  # Panel style: no bottom section — the template renders the panels. The
+  # refs keep the hover/focus popover, so emit just that style block.
+  defp notes_ref_styles([]), do: ""
+
+  defp notes_ref_styles(_notes) do
+    """
+    <style>
+    .pk-note-ref{text-decoration:underline dotted;text-underline-offset:3px;position:relative;color:inherit}
+    .pk-note-ref sup{color:oklch(var(--p));font-weight:600;margin-left:1px}
+    .pk-note-ref:hover::after,.pk-note-ref:focus-visible::after{content:attr(data-note);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(20rem,80vw);white-space:normal;background:var(--color-base-200,#eee);color:var(--color-base-content,#111);border:1px solid var(--color-base-300,#ddd);border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;line-height:1.35;z-index:20;box-shadow:0 4px 12px rgb(0 0 0/.08)}
+    </style>
+    """
   end
 
   defp notes_section([]), do: ""
@@ -833,8 +921,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     end
   end
 
-  defp render_and_cache(post, cache_key) do
-    html = render_markdown(post.content, tag_links: tag_link_context(post))
+  defp render_and_cache(post, cache_key, opts) do
+    html =
+      render_markdown(post.content,
+        tag_links: tag_link_context(post),
+        notes_style: Keyword.get(opts, :notes_style)
+      )
 
     # Cache the rendered HTML
     put_cached(cache_key, html)
@@ -842,7 +934,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     {:ok, html}
   end
 
-  defp build_cache_key(post) do
+  defp build_cache_key(post, opts) do
     # Build content hash from content + metadata + the two inputs that
     # heal_signed_file_urls/1 re-signs against: the active url_prefix and a
     # secret-derived marker. Both participate so a prefix change OR a
@@ -859,7 +951,15 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
     identifier = post[:uuid] || post.slug
 
-    "#{@cache_version}:publishing_post:#{post.group}:#{identifier}:#{post.language}:#{content_hash}"
+    # The notes style changes the emitted ref markup — a group flipping the
+    # setting must not serve the other style's cached HTML.
+    style_token =
+      case Keyword.get(opts, :notes_style) do
+        "panel" -> ":np"
+        _ -> ""
+      end
+
+    "#{@cache_version}:publishing_post:#{post.group}:#{identifier}:#{post.language}:#{content_hash}#{style_token}"
   end
 
   defp url_prefix_marker do

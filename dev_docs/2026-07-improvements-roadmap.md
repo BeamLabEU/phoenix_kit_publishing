@@ -95,6 +95,36 @@ makes sense.)
   never reach the server and silently save empty. Should be `phx-change`
   (input event). Found while browser-verifying hashtags.
 
+### Boss feedback round 3 (2026-07-29)
+- **Note styles, properly labeled (this commit)** — group setting
+  `notes_style`: "Footnotes — numbered refs, notes collected at the
+  bottom" (default, the original) | "Slide-out panel — click the phrase,
+  note opens on the right". Panel style: refs target per-note fixed
+  panels rendered by the POST TEMPLATE (never baked into cached HTML);
+  pure CSS `:target` slide-in, backdrop/✕ close back to the phrase; hover
+  popover kept in both styles. Cache key gets a `:np` token in panel mode.
+- **Comments on notes** — each panel carries its own comment list + form;
+  comments store `metadata["note_id"]` = 12-char content digest of the
+  note text (`Renderer.note_dom_id/2`; duplicates get occurrence-suffixed
+  digests). Note comments are excluded from the main-thread count; the
+  POST redirect reopens the panel via the fragment.
+- **Threaded replies** — the comments module's native `parent_uuid`/
+  `depth`/max-depth; publishing's seam validates the parent is a
+  published comment on the SAME post (module doesn't check resource
+  ownership) and replies inherit the parent's `note_id` (client-sent
+  note_id ignored on replies — threads can't straddle the panel and the
+  main list). Reply forms behind `<details>` (no JS); recursive
+  `comment_node` rendering with indent; success redirects anchor from the
+  CREATED comment's stored thread location.
+- **Known limits (deliberate, surfaced)**: note-panel comment lists are
+  flat (replies inherit the note and appear in the panel chronologically —
+  no nested rendering there); `note_id` is format-validated but not
+  checked against the post's actual notes (junk ids from a logged-in
+  client create comments visible only in the comments admin — listing
+  content isn't available in the POST path without extra reads); the
+  CSS-only dialog has no focus trap/aria-modal (inherent no-JS limits;
+  panel aside is focusable via tabindex).
+
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
 - **Publishing-scoped moderation page** — a filtered surface over comments' status machinery ("maybe" per boss; comments admin covers it today).

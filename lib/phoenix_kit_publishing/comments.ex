@@ -43,6 +43,52 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
     _ -> []
   end
 
+  @doc """
+  Everything the post page needs in one read, pre-partitioned:
+
+  - `:thread` — the main comment thread as a nested tree (each comment
+    gets a `:children` list), replies attached via `parent_uuid`;
+  - `:note_comments` — `%{note_id => [comments]}` for comments carrying a
+    `metadata["note_id"]` (posted from a note's slide-out panel), flat and
+    oldest-first per note;
+  - `:count` — main-thread comment count (replies included, note
+    comments excluded — the "N comments" header describes the thread the
+    reader is looking at).
+  """
+  def for_post_page(post_uuid) do
+    comments = list(post_uuid)
+
+    {note_scoped, main} =
+      Enum.split_with(comments, fn comment -> is_binary(comment.metadata["note_id"]) end)
+
+    %{
+      thread: build_tree(main),
+      note_comments: Enum.group_by(note_scoped, & &1.metadata["note_id"]),
+      count: length(main)
+    }
+  end
+
+  # Nested tree from the flat (oldest-first) list. A reply whose parent is
+  # missing from the published set (hidden/deleted parent, or a parent that
+  # lives in a note panel) surfaces at the top level rather than vanishing.
+  defp build_tree(comments) do
+    known = MapSet.new(comments, & &1.uuid)
+    by_parent = Enum.group_by(comments, & &1.parent_uuid)
+
+    comments
+    |> Enum.filter(fn c -> is_nil(c.parent_uuid) or not MapSet.member?(known, c.parent_uuid) end)
+    |> Enum.map(&attach_children(&1, by_parent))
+  end
+
+  defp attach_children(comment, by_parent) do
+    children =
+      by_parent
+      |> Map.get(comment.uuid, [])
+      |> Enum.map(&attach_children(&1, by_parent))
+
+    Map.put(comment, :children, children)
+  end
+
   @doc "Published-comment count for a post."
   def count(post_uuid) do
     if available?() do
@@ -55,19 +101,74 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   end
 
   @doc """
-  Creates a top-level comment on a post for a logged-in user. Returns the
-  comments module's result verbatim (`{:ok, comment}` or `{:error, reason}`
-  — `:content_too_long`, `:empty_comment`, …).
+  Creates a comment on a post for a logged-in user. Returns the comments
+  module's result verbatim (`{:ok, comment}` or `{:error, reason}` —
+  `:content_too_long`, `:empty_comment`, `:max_depth_exceeded`, …).
+
+  ## Options
+
+  - `:parent_uuid` — makes this a reply. The parent must be a published
+    comment on the SAME post (the comments module computes depth from the
+    parent but does not check resource ownership — a crafted uuid could
+    otherwise thread onto another post's comment). A reply inherits its
+    parent's `note_id`, so a thread never straddles the main list and a
+    note panel.
+  - `:note_id` — anchors the comment to an author note (posted from the
+    note's slide-out panel). Stored in `metadata["note_id"]`.
   """
-  def create(post_uuid, user_uuid, content) when is_binary(content) do
+  def create(post_uuid, user_uuid, content, opts \\ []) when is_binary(content) do
     if available?() do
-      @comments_mod.create_comment(@resource_type, post_uuid, user_uuid, %{content: content})
+      case resolve_threading(post_uuid, opts) do
+        {:ok, attrs} ->
+          @comments_mod.create_comment(
+            @resource_type,
+            post_uuid,
+            user_uuid,
+            Map.put(attrs, :content, content)
+          )
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     else
       {:error, :comments_unavailable}
     end
   rescue
     _ -> {:error, :comments_unavailable}
   end
+
+  defp resolve_threading(post_uuid, opts) do
+    case Keyword.get(opts, :parent_uuid) do
+      nil ->
+        {:ok, note_attrs(%{}, Keyword.get(opts, :note_id))}
+
+      parent_uuid ->
+        resolve_parent(post_uuid, parent_uuid, Keyword.get(opts, :note_id))
+    end
+  end
+
+  # Cast first: repo().get raises on a non-uuid string, and the outer
+  # rescue would mislabel that as :comments_unavailable.
+  defp resolve_parent(post_uuid, parent_uuid, _note_id) when is_binary(parent_uuid) do
+    # A reply's note anchor comes from the PARENT alone — honoring a
+    # client-sent note_id here would let a crafted request split a thread
+    # across the main list and a panel.
+    with {:ok, _} <- Ecto.UUID.cast(parent_uuid),
+         %{resource_type: @resource_type, resource_uuid: ^post_uuid, status: "published"} =
+           parent <-
+           @comments_mod.get_comment(parent_uuid) do
+      {:ok, note_attrs(%{parent_uuid: parent.uuid}, parent.metadata["note_id"])}
+    else
+      _ -> {:error, :parent_not_found}
+    end
+  end
+
+  defp resolve_parent(_post_uuid, _parent_uuid, _note_id), do: {:error, :parent_not_found}
+
+  defp note_attrs(attrs, note_id) when is_binary(note_id) and note_id != "",
+    do: Map.put(attrs, :metadata, %{"note_id" => note_id})
+
+  defp note_attrs(attrs, _), do: attrs
 
   @doc """
   Renders a comment's markdown content — the comments module's sanitized
