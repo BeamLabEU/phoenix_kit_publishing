@@ -605,7 +605,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       # Clear stale flashes up front so a fresh slug-truncation warning set by
       # the slug-update step below survives this render (it used to be wiped by
       # a clear_flash at the END of the handler).
-      socket = clear_flash(socket)
+      # Keep :error — an autosave/save failure is the one message the writer
+      # must not lose, and this runs on every keystroke.
+      socket = clear_flash(socket, :info)
+      socket = clear_flash(socket, :warning)
       target = Map.get(params, "_target", [])
       params = prepare_meta_params(params, target, socket)
 
@@ -635,33 +638,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       socket = if has_changes, do: schedule_autosave(socket), else: socket
 
       Collaborative.broadcast_form_change(socket, :meta, new_form)
-      socket = Collaborative.touch_activity(socket)
-
-      {:noreply, socket}
-    end
-  end
-
-  def handle_event("update_content", %{"content" => content}, socket) do
-    socket = maybe_reclaim_lock(socket)
-
-    if socket.assigns.readonly? or socket.assigns.translation_locked? do
-      {:noreply, socket}
-    else
-      has_changes = Forms.dirty?(socket.assigns.post, socket.assigns.form, content)
-
-      socket =
-        socket
-        |> assign(:content, content)
-        |> assign(:has_pending_changes, has_changes)
-        |> push_event("changes-status", %{has_changes: has_changes})
-
-      socket = if has_changes, do: schedule_autosave(socket), else: socket
-
-      Collaborative.broadcast_form_change(socket, :content, %{
-        content: content,
-        form: socket.assigns.form
-      })
-
       socket = Collaborative.touch_activity(socket)
 
       {:noreply, socket}
@@ -774,46 +750,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # the translation-lock guard, and the live broadcast to other editors.
   def handle_event("clear_audio", _params, socket) do
     clear_image_field(socket, "audio_uuid", gettext("Audio version removed"))
-  end
-
-  def handle_event("open_image_component_selector", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_media_selector, true)
-     |> assign(:inserting_image_component, true)}
-  end
-
-  def handle_event("insert_component", %{"component" => "video"}, socket) do
-    send_update(MarkdownEditor,
-      id: "content-editor",
-      action: :prompt_insert,
-      prompt: gettext("Enter YouTube URL:"),
-      template: "\n<Video url=\"%{value}\">\n  Optional caption text\n</Video>\n"
-    )
-
-    {:noreply, socket}
-  end
-
-  def handle_event("insert_component", %{"component" => "cta"}, socket) do
-    template = """
-    <CTA primary="true" action="/your-link">Button Text</CTA>
-    """
-
-    send_update(MarkdownEditor, id: "content-editor", action: :insert_at_cursor, text: template)
-    {:noreply, socket}
-  end
-
-  def handle_event("insert_video_component", %{"url" => url}, socket) do
-    template = """
-
-    <Video url="#{url}">
-      Optional caption text
-    </Video>
-
-    """
-
-    send_update(MarkdownEditor, id: "content-editor", action: :insert_at_cursor, text: template)
-    {:noreply, socket}
   end
 
   def handle_event("clear_featured_image", _params, socket),
@@ -957,14 +893,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # ============================================================================
   # Handle Events - Version Management
   # ============================================================================
-
-  def handle_event("toggle_version_access", %{"enabled" => enabled_str}, socket) do
-    if socket.assigns[:readonly?] do
-      {:noreply, socket}
-    else
-      do_toggle_version_access(socket, enabled_str == "true")
-    end
-  end
 
   def handle_event("switch_version", %{"version" => version_str}, socket) do
     # Parse defensively — a hand-crafted `?v=abc` would otherwise crash the LV on
@@ -1166,44 +1094,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
          )}
     end
   end
-
-  defp do_toggle_version_access(socket, enabled) do
-    post = socket.assigns.post
-    group_slug = socket.assigns.group_slug
-
-    updated_metadata = Map.put(post.metadata, :allow_version_access, enabled)
-    updated_post = %{post | metadata: updated_metadata}
-
-    scope = socket.assigns[:phoenix_kit_current_scope]
-    params = %{"allow_version_access" => enabled}
-
-    case Publishing.update_post(group_slug, updated_post, params, %{
-           scope: scope,
-           actor_uuid: Shared.actor_uuid_from_socket(socket)
-         }) do
-      {:ok, saved_post} ->
-        flash_msg = version_access_flash(enabled)
-
-        {:noreply,
-         socket
-         |> assign(:post, saved_post)
-         |> put_flash(:info, flash_msg)}
-
-      {:error, reason} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           gettext("Couldn't update the version-access setting.") <> " " <> Errors.message(reason)
-         )}
-    end
-  end
-
-  defp version_access_flash(true),
-    do: gettext("Version access enabled - older versions are now publicly accessible")
-
-  defp version_access_flash(false),
-    do: gettext("Version access disabled - only live version is publicly accessible")
 
   # Update post struct with current form values for accurate public URL and status display
   defp update_post_from_form(post, form, language) do
@@ -2343,7 +2233,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
             <%!-- Endpoint Selection --%>
             <div class="space-y-1">
-              <form phx-change="select_ai_endpoint">
+              <form id="ai-endpoint-form" phx-change="select_ai_endpoint">
                 <label class="select select-sm w-full">
                   <select name="endpoint_uuid">
                     <option value="">{gettext("Select an endpoint...")}</option>
@@ -2373,7 +2263,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
             <%!-- Prompt Selection --%>
             <div class="space-y-1">
-              <form phx-change="select_ai_prompt">
+              <form id="ai-prompt-form" phx-change="select_ai_prompt">
                 <label class="select select-sm w-full">
                   <select name="prompt_uuid">
                     <option value="">{gettext("Select a prompt...")}</option>
@@ -2744,10 +2634,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         }
                         readonly={edit_disabled? or @viewing_older_version}
                       />
-                      <p class="text-xs text-base-content/60 mt-1">
-                        {gettext("Use lowercase letters, numbers, and hyphens only.")}
-                        {gettext("This will be the default URL for all languages.")}
-                      </p>
+                      <div class="mt-1 flex items-start justify-between gap-2">
+                        <p class="text-xs text-base-content/60">
+                          {gettext("Use lowercase letters, numbers, and hyphens only.")}
+                          {gettext("This will be the default URL for all languages.")}
+                        </p>
+                        <%!-- The handler existed with no control, so a slug that
+                              drifted from a retitled post could only be fixed by
+                              hand. --%>
+                        <button
+                          :if={not (edit_disabled? or @viewing_older_version)}
+                          type="button"
+                          phx-click="regenerate_slug"
+                          phx-disable-with={gettext("Working…")}
+                          class="btn btn-ghost btn-xs shrink-0"
+                          title={gettext("Re-derive the slug from the current title")}
+                        >
+                          <.icon name="hero-arrow-path" class="w-3 h-3" />
+                          {gettext("From title")}
+                        </button>
+                      </div>
                     </div>
                   <% else %>
                     <%!-- Translation: per-language URL slug for SEO-friendly localized URLs --%>
@@ -2957,6 +2863,41 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <p class="text-xs text-base-content/60 mt-1 ml-1">
                     {gettext(
                       "Pins this post to the top of its listing and shows it larger. The group's settings control whether featured posts appear and how they're displayed."
+                    )}
+                  </p>
+                </div>
+
+                <%!-- Public version browsing. The public side already honours
+                      this (post_rendering gates `?v=N` on it) and the mapper
+                      reads it, but nothing ever WROTE it and no control existed.
+                      Rides the form exactly like `featured`: a phx-click toggle
+                      inside this form would fire the form's own change event,
+                      and update_meta rebuilds :post from the form — clobbering
+                      the value the click had just persisted. --%>
+                <div>
+                  <label class="label cursor-pointer justify-start gap-2 py-1">
+                    <input
+                      type="hidden"
+                      name="allow_version_access"
+                      value="false"
+                      disabled={edit_disabled? or @viewing_older_version}
+                    />
+                    <input
+                      type="checkbox"
+                      id="post-version-access-checkbox"
+                      name="allow_version_access"
+                      value="true"
+                      checked={@form["allow_version_access"] in [true, "true"]}
+                      disabled={edit_disabled? or @viewing_older_version}
+                      class="checkbox checkbox-primary checkbox-sm"
+                    />
+                    <span class="label-text text-sm font-semibold text-base-content">
+                      {gettext("Let readers browse older versions")}
+                    </span>
+                  </label>
+                  <p class="text-xs text-base-content/60 mt-1 ml-1">
+                    {gettext(
+                      "Adds ?v=N access to this post's published versions. Off by default — only the live version is public."
                     )}
                   </p>
                 </div>
@@ -3230,6 +3171,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </label>
                   <p class="text-xs text-base-content/50 mt-1">
                     {gettext("Applies to all languages in this version.")}
+                  </p>
+                  <%!-- Publishing archives every OTHER version (Persistence
+                        calls publish_version, which does that atomically). A
+                        select can't carry a data-confirm, so say it plainly
+                        before the writer saves rather than after. --%>
+                  <p
+                    :if={@form["status"] == "published" and length(@available_versions || []) > 1}
+                    class="text-xs text-warning mt-1 flex items-start gap-1"
+                  >
+                    <.icon name="hero-exclamation-triangle" class="w-3 h-3 mt-0.5 shrink-0" />
+                    {gettext(
+                      "Saving will publish this version and archive the other %{count}.",
+                      count: length(@available_versions) - 1
+                    )}
                   </p>
                 </div>
 

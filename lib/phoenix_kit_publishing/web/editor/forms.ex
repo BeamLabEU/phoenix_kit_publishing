@@ -11,7 +11,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
-  alias PhoenixKit.Utils.Date, as: UtilsDate
 
   # ============================================================================
   # Form Building
@@ -62,6 +61,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "published_at" => get_published_at(post),
       "featured_image_uuid" => Map.get(post.metadata, :featured_image_uuid, ""),
       "featured" => Map.get(post.metadata, :featured, false),
+      "allow_version_access" => Map.get(post.metadata, :allow_version_access, false),
       "url_slug" => get_url_slug_for_form(post),
       "audio_uuid" => Map.get(post.metadata, :audio_uuid) || "",
       "og_title" => og_field(post, "title"),
@@ -81,12 +81,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
     if title == Constants.default_title(), do: "", else: title
   end
 
-  defp get_published_at(post) do
-    post.metadata.published_at ||
-      UtilsDate.utc_now()
-      |> floor_datetime_to_minute()
-      |> DateTime.to_iso8601()
-  end
+  # A post with no published_at used to get a FRESH `now` on every call, so
+  # `dirty?/3` compared this call's minute against the last one and flipped the
+  # post to "Unsaved changes" the moment the clock ticked over — with nothing
+  # typed. Absent means absent; the writer picks a date or publishing stamps one.
+  defp get_published_at(post), do: post.metadata.published_at || ""
 
   defp get_url_slug_for_form(post) do
     url_slug_from_metadata = Map.get(post.metadata, :url_slug)
@@ -138,6 +137,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
         "published_at" => normalize_published_at(Map.get(form, "published_at")),
         "featured_image_uuid" => featured_image_uuid,
         "featured" => normalize_featured_flag(form),
+        "allow_version_access" => Map.get(form, "allow_version_access") in [true, "true", "on"],
         "url_slug" => url_slug,
         "audio_uuid" => normalize_string(form, "audio_uuid"),
         "og_title" => normalize_string(form, "og_title"),
@@ -162,6 +162,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "slug" => "",
       "featured_image_uuid" => "",
       "featured" => false,
+      "allow_version_access" => false,
       "url_slug" => "",
       "audio_uuid" => "",
       "og_title" => "",

@@ -1316,6 +1316,12 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       |> maybe_put_version_field("tags", resolve_tags(version, params))
       |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
       |> maybe_put_version_field("featured", normalize_featured(Map.get(params, "featured")))
+      # Public `?v=N` browsing is gated on this and the mapper reads it, but no
+      # write path existed — so the setting could never actually be turned on.
+      |> maybe_put_version_field(
+        "allow_version_access",
+        normalize_featured(Map.get(params, "allow_version_access"))
+      )
       |> put_audio_uuid(Map.get(params, "audio_uuid"))
 
     # Also update version-level status and published_at if provided.

@@ -106,7 +106,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       %{post: post}
     end
 
-    test "update_content event accepts new content body", %{
+    test "body edits from the markdown editor reach the LiveView", %{
       conn: conn,
       group: group,
       post: post
@@ -116,8 +116,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      html = render_change(view, "update_content", %{"content" => "Updated body."})
-      assert is_binary(html)
+      send(view.pid, {:editor_content_changed, %{content: "Updated body.", editor_id: "c"}})
+      _ = render(view)
+
+      assert assigns_of(view)[:content] == "Updated body."
     end
 
     test "the audio field offers a media picker and a clear button", %{
@@ -201,6 +203,55 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
 
       assert html =~ "Title is required"
       refute assigns_of(view)[:autosave_blocked] == nil
+    end
+
+    test "the editor exposes the affordances its handlers implement", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, view, html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      # Both features existed with no control at all, so they were unreachable
+      # while their tests kept them looking covered. Worse, allow_version_access
+      # had no WRITE path either: the public route gated on it and the mapper
+      # read it, but nothing ever stored it.
+      assert html =~ ~s(phx-click="regenerate_slug")
+      assert html =~ ~s(name="allow_version_access")
+
+      view |> element("button[phx-click='regenerate_slug']") |> render_click()
+
+      # It rides the form (a phx-click inside this form would trip the form's
+      # own change event, and update_meta would rebuild :post over the top).
+      render_change(view, "update_meta", %{
+        "allow_version_access" => "true",
+        "_target" => ["allow_version_access"]
+      })
+
+      assert assigns_of(view)[:form]["allow_version_access"] == true
+    end
+
+    test "warns before a save publishes this version and archives the rest", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, _v2} = Versions.create_version_from(group["slug"], post[:uuid], 1)
+
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      # A <select> can't carry a data-confirm, so the consequence has to be
+      # stated before the writer saves.
+      html =
+        render_change(view, "update_meta", %{"status" => "published", "_target" => ["status"]})
+
+      assert html =~ "archive the other"
     end
 
     test "keeps the slug-truncation warning while the title stays over the URL cap",
@@ -359,7 +410,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       # straight into the form map. Without the title/slug being set, save
       # bails at the "Title is required" guard in Persistence.perform_save.
       _ = render_change(view, "update_meta", %{"title" => "Saved Title", "_target" => ["title"]})
-      _ = render_change(view, "update_content", %{"content" => "## Body content"})
+      send(view.pid, {:editor_content_changed, %{content: "## Body content", editor_id: "c"}})
+      _ = render(view)
 
       html = render_click(view, "save", %{})
       assert is_binary(html)
@@ -399,7 +451,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
       _ = render_change(view, "update_meta", %{"title" => "Saved Title", "_target" => ["title"]})
-      _ = render_change(view, "update_content", %{"content" => "## Body"})
+      send(view.pid, {:editor_content_changed, %{content: "## Body", editor_id: "c"}})
+      _ = render(view)
 
       html = render_click(view, "save", %{})
 
@@ -529,39 +582,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(render_click(view, "select_ai_prompt", %{"prompt_uuid" => "fake-prompt"}))
     end
 
-    test "insert_component handlers add component to content body",
+    test "toolbar inserts route through the markdown editor component",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =
         conn
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      assert is_binary(render_click(view, "insert_component", %{"component" => "video"}))
-      assert is_binary(render_click(view, "insert_component", %{"component" => "cta"}))
+      # The MarkdownEditor toolbar sends these; there is no phx event for them.
+      send(view.pid, {:editor_insert_component, %{type: :video}})
+      send(view.pid, {:editor_insert_component, %{type: :image}})
+      assert is_binary(render(view))
     end
 
-    test "insert_video_component accepts a URL",
+    test "an unknown insert type is ignored",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =
         conn
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      html =
-        render_click(view, "insert_video_component", %{"url" => "https://example.com/v.mp4"})
-
-      assert is_binary(html)
-    end
-
-    test "toggle_version_access updates the assign",
-         %{conn: conn, group: group, post: post} do
-      {:ok, view, _html} =
-        conn
-        |> put_test_scope(fake_scope())
-        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
-
-      assert is_binary(render_click(view, "toggle_version_access", %{"enabled" => "true"}))
-      assert is_binary(render_click(view, "toggle_version_access", %{"enabled" => "false"}))
+      send(view.pid, {:editor_insert_component, %{type: :sandwich}})
+      assert is_binary(render(view))
     end
 
     test "translate_to_all_languages early-returns when AI is disabled",
