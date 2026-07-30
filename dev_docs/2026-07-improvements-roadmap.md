@@ -254,6 +254,54 @@ undefined, and that notes/hashtags duplicate text; Vibe claimed
 in `repo().transaction/1`, so it returns `{:ok, count}` — and a passing test
 asserts exactly that).
 
+### Editor pass + quorum round 2 (2026-07-30)
+Core bumped 1.7.214 -> 1.7.220. **The editor suggestions API we spec'd is NOT
+in any release** — 1.7.220's MarkdownEditor has no suggestions hook and still
+syncs content on `phx-keyup`. Verified against Hex and both core remotes.
+
+Fixed (work-loss first):
+- Body typing never refreshed the collaborative lock, so a prose-only session
+  let its own lock lapse; afterwards keystrokes were dropped and Save wrote the
+  stale pre-lapse buffer.
+- The lapsed banner said "start typing to resume" but `readonly?` disabled the
+  very fields that would trigger the reclaim — a catch-22. Now an explicit
+  "Resume editing" button.
+- Autosave blocked on a blank title returned in silence behind an "Unsaved
+  changes" badge; the badge now states the reason, recomputed on every edit
+  (a save-only reset left it stuck when the fix also made the form clean).
+- EVERY buffer-replacing navigation now flushes first (version switch, language
+  switch, create-version, translation enqueue) — the version path was fixed and
+  the language path missed on the first pass, which is why the pin now covers
+  the whole set. Translation also enqueued from stale source text.
+- The slug-conflict modal reopened on every keystroke.
+- A successful save clears a prior `:error`, since update_meta now deliberately
+  keeps errors across keystrokes.
+- Six dead handle_event clauses: two were features missing only a control
+  (`regenerate_slug` button, `allow_version_access` checkbox), four deleted.
+  `allow_version_access` had NO write path either, and its public gate only
+  served currently-published versions — but publishing v2 archives v1, so
+  every historical URL 404'd and the dropdown could never hold more than the
+  active version. "Browse older versions" now means previously published.
+- `regenerate_slug` marked dirty without arming autosave (same hole
+  `clear_audio` had); `:editor_save_requested` was a latent fake Save.
+
+Deferred (design work):
+- **Owner disconnect during lock handoff loses the synchronized buffer.** A
+  promoted spectator reloads from the DB, discarding the newer content it had
+  already received live. Wants revisioned collaboration (broadcast a revision,
+  only reload when the DB copy is at least as new) — three AIs pointed at the
+  same shape.
+- **One transition function** for every buffer-changing action instead of
+  flush calls sprinkled per site; likewise one `apply_local_edit` wrapper so the
+  next half-wired control can't skip lock/autosave/broadcast again. Both
+  recurrences this session (clear_audio, regenerate_slug) were that class.
+- Content can be one 400ms debounce behind the textarea, so even a perfect
+  flush may miss the last keystrokes — needs a flush-on-demand from the editor
+  component.
+- Same-user multi-tab: both tabs own the lock and neither applies the other's
+  changes.
+- `allow_version_access` is stored per version but reads as post-wide policy.
+
 ### Follow-ups (surfaced, not silently dropped)
 - **Guest commenting** — needs BeamLab's phoenix_kit_comments: nullable user_uuid + author name/email fields (+ core migration); publishing then adds the guest form path (pending status default). Cross-repo — needs Max/BeamLab coordination.
 - **Publishing-scoped moderation page** — a filtered surface over comments' status machinery ("maybe" per boss; comments admin covers it today).

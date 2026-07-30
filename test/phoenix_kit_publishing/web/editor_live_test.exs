@@ -193,16 +193,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
+      # Autosave silently refuses to write without a title, so the badge says so
+      # immediately rather than showing a hopeful "Unsaved changes" that will
+      # never clear.
       html = render_change(view, "update_meta", %{"title" => "", "_target" => ["title"]})
-      assert html =~ "Unsaved changes"
-
-      # Autosave silently refuses to write without a title, so the badge has to
-      # say so — otherwise the writer keeps typing into a void.
-      send(view.pid, :autosave)
-      html = render(view)
 
       assert html =~ "Title is required"
+      refute html =~ "Unsaved changes"
+
+      # An autosave cycle in that state must not change the story.
+      send(view.pid, :autosave)
+      assert render(view) =~ "Title is required"
       refute assigns_of(view)[:autosave_blocked] == nil
+
+      # ...and clears as soon as the cause is fixed. This has to happen on the
+      # EDIT, not on a save: retyping the original title makes the form clean
+      # again, so no autosave fires and a save-only reset left the warning up
+      # forever (caught in the browser, not by the first version of this test).
+      html =
+        render_change(view, "update_meta", %{"title" => "Event Subject", "_target" => ["title"]})
+
+      assert assigns_of(view)[:autosave_blocked] == nil
+      refute html =~ "Title is required"
     end
 
     test "the editor exposes the affordances its handlers implement", %{

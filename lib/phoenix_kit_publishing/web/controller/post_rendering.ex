@@ -108,12 +108,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
     if post_allows_version_access?(group_slug, internal_slug, language) do
       case Publishing.read_post(group_slug, internal_slug, language, version) do
-        {:ok, %{metadata: %{status: "published"}} = post} ->
-          build_versioned_post_response(group_slug, post, version)
-
-        {:ok, _unpublished} ->
-          log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
-          {:error, :unpublished}
+        {:ok, post} ->
+          # "Browse older versions" has to mean PREVIOUSLY published, not
+          # currently published: publishing a new version archives the one it
+          # replaces, so a live-status-only check made every historical URL 404
+          # and left the dropdown unable to hold more than the active version.
+          # A version that never shipped (plain draft, no published_at) stays
+          # private.
+          if historically_published?(post) do
+            build_versioned_post_response(group_slug, post, version)
+          else
+            log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
+            {:error, :unpublished}
+          end
 
         {:error, reason} ->
           log_404(conn, group_slug, {:slug, internal_slug, version}, language, reason)
@@ -123,6 +130,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
       {:error, :version_access_disabled}
     end
   end
+
+  # Published now, or archived after having been published at some point.
+  defp historically_published?(%{metadata: metadata}) do
+    case Map.get(metadata, :status) do
+      "published" -> true
+      "archived" -> Map.get(metadata, :published_at) not in [nil, ""]
+      _ -> false
+    end
+  end
+
+  defp historically_published?(_), do: false
 
   defp build_versioned_post_response(group_slug, post, version) do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
@@ -236,10 +254,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     current_version = Map.get(post, :version, 1)
 
     if allow_access and version_statuses != %{} do
-      # Filter to only published versions
+      # Published now, or archived (i.e. superseded by a later publish) — the
+      # same "previously published" rule the versioned route uses. Filtering on
+      # the live status alone left the dropdown unable to list anything but the
+      # active version, which is the one you're already reading.
       published_versions =
         version_statuses
-        |> Enum.filter(fn {_v, status} -> status == "published" end)
+        |> Enum.filter(fn {_v, status} -> status in ["published", "archived"] end)
         |> Enum.map(fn {v, _status} -> v end)
         |> Enum.sort(:desc)
 

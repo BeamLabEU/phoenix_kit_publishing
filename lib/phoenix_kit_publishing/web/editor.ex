@@ -621,6 +621,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         process_slug_updates(socket, params, target, new_form)
 
       has_changes = Forms.dirty?(socket_with_slug.assigns.post, new_form, socket.assigns.content)
+
+      # Recompute the blocked reason on every edit, not just when a save runs.
+      # Otherwise fixing the cause leaves the warning up forever whenever the
+      # fix also makes the form clean (retyping the original title): nothing is
+      # pending, so no autosave fires, so nothing clears it.
+      socket_with_slug =
+        assign(socket_with_slug, :autosave_blocked, blocked_reason(socket_with_slug, new_form))
+
       language = Helpers.editor_language(socket.assigns)
 
       {updated_post, public_url} =
@@ -644,8 +652,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # Takes the lock back after an inactivity lapse. Needed as its OWN event
+  # because every editable control is disabled while readonly? is true, so the
+  # banner's old "start typing to resume" was impossible to act on.
+  def handle_event("resume_editing", _params, socket) do
+    socket = Collaborative.try_reclaim_lock(socket)
+
+    if socket.assigns[:readonly?] do
+      {:noreply,
+       put_flash(
+         socket,
+         :warning,
+         gettext("Someone else is editing this post now — you can still watch.")
+       )}
+    else
+      {:noreply, put_flash(socket, :info, gettext("You're editing again."))}
+    end
+  end
+
   def handle_event("regenerate_slug", _params, socket) do
-    if socket.assigns.group_mode == "slug" do
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.group_mode == "slug" and not socket.assigns.readonly? and
+         not socket.assigns.translation_locked? do
       title = socket.assigns.form["title"] || ""
 
       {socket, new_form, _slug_events} =
@@ -653,11 +682,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
       has_changes = Forms.dirty?(socket.assigns.post, new_form, socket.assigns.content)
 
-      {:noreply,
-       socket
-       |> assign(:form, new_form)
-       |> assign(:has_pending_changes, has_changes)
-       |> push_event("changes-status", %{has_changes: has_changes})}
+      # Marking dirty without arming autosave meant the regenerated slug sat
+      # unsaved until the writer happened to type elsewhere — the same hole
+      # clear_audio had.
+      socket =
+        socket
+        |> assign(:form, new_form)
+        |> assign(:has_pending_changes, has_changes)
+        |> push_event("changes-status", %{has_changes: has_changes})
+
+      socket = if has_changes, do: schedule_autosave(socket), else: socket
+      Collaborative.broadcast_form_change(socket, :meta, new_form)
+      socket = Collaborative.touch_activity(socket)
+
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -907,41 +945,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         {:noreply, socket}
 
       true ->
-        # Cancel any queued autosave FIRST. apply_version_switch clears
-        # has_pending_changes and swaps the content, so a timer that fires after
-        # the switch is a silent no-op — up to ~1s of typing gone with no
-        # prompt. do_switch_language/2 has always done this; this path hadn't.
-        socket = cancel_autosave_timer(socket)
+        # Flush pending edits BEFORE the switch replaces the buffer, the same
+        # way "preview" does. Cancelling the timer alone stopped a wrong-context
+        # save but still discarded the work; if the flush can't complete (blank
+        # title, slug conflict) we stay put and let the writer see why.
+        case flush_before_switch(socket) do
+          {:blocked, socket} ->
+            {:noreply, socket}
 
-        case Versions.read_version_post(socket, version) do
-          {:ok, version_post} ->
-            {socket, old_form_key, old_post_slug, new_form_key, actual_language} =
-              Versions.apply_version_switch(
-                socket,
-                version,
-                version_post,
-                &Forms.post_form_with_primary_status/3
-              )
-
-            socket =
-              socket
-              |> Helpers.assign_current_language(actual_language)
-              |> Collaborative.cleanup_and_setup_collaborative_editing(old_form_key, new_form_key,
-                old_post_slug: old_post_slug
-              )
-
-            post = socket.assigns.post
-
-            url =
-              Helpers.build_edit_url(socket.assigns.group_slug, post,
-                version: version,
-                lang: actual_language
-              )
-
-            {:noreply, push_patch(socket, to: url, replace: true)}
-
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, gettext("Version not found"))}
+          {:ok, socket} ->
+            do_switch_version(socket, version)
         end
     end
   end
@@ -988,9 +1001,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   def handle_event("create_version_from_source", _params, socket) do
-    case Versions.create_version_from_source(socket) do
-      {:ok, socket} -> {:noreply, socket}
-      {:error, socket} -> {:noreply, socket}
+    # Creating a version reads PERSISTED state and navigates away, so pending
+    # edits would be both excluded from the new version and lost.
+    case flush_before_switch(socket) do
+      {:blocked, socket} ->
+        {:noreply, socket}
+
+      {:ok, socket} ->
+        case Versions.create_version_from_source(socket) do
+          {:ok, socket} -> {:noreply, socket}
+          {:error, socket} -> {:noreply, socket}
+        end
     end
   end
 
@@ -1003,7 +1024,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       {:noreply,
        put_flash(socket, :warning, gettext("Save the post to enable language switching"))}
     else
-      do_switch_language(socket, new_language)
+      # Same policy as the version switch: the language buffer is about to be
+      # replaced, so outstanding edits get written first, and a flush that
+      # can't complete keeps us here with the reason visible.
+      case flush_before_switch(socket) do
+        {:blocked, socket} -> {:noreply, socket}
+        {:ok, socket} -> do_switch_language(socket, new_language)
+      end
     end
   end
 
@@ -1297,12 +1324,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  def handle_info({:editor_insert_component, %{type: :image}}, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
+
   def handle_info({:editor_insert_component, %{type: :image}}, socket) do
     {:noreply,
      socket
      |> assign(:show_media_selector, true)
      |> assign(:inserting_image_component, true)}
   end
+
+  def handle_info({:editor_insert_component, %{type: :video}}, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
 
   def handle_info({:editor_insert_component, %{type: :video}}, socket) do
     # Insert the renderer-supported `<Video>` component (the markdown renderer
@@ -1320,7 +1355,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   def handle_info({:editor_insert_component, _}, socket), do: {:noreply, socket}
-  def handle_info({:editor_save_requested, _}, socket), do: {:noreply, socket}
+  # The MarkdownEditor's own Save button. Publishing hides it today
+  # (show_save_button defaults false), so this was a no-op — meaning the day
+  # anyone enables that button they'd ship a Save that does nothing. Wire it to
+  # the same path the toolbar Save uses.
+  def handle_info({:editor_save_requested, _}, socket) do
+    if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
+      {:noreply, socket}
+    else
+      Persistence.perform_save(socket)
+    end
+  end
 
   # ============================================================================
   # Handle Info - Collaborative Editing
@@ -1806,6 +1851,71 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # A queued autosave carries edits that a context switch (version/language) is
   # about to replace, so it must be dropped rather than left to fire into the
   # new context as a no-op.
+  # Mirrors Persistence.perform_save/1's own guards — the single source of
+  # "why can't this be saved right now".
+  defp blocked_reason(socket, form) do
+    title = (form["title"] || "") |> to_string() |> String.trim()
+    slug = (form["slug"] || "") |> to_string() |> String.trim()
+
+    cond do
+      title == "" -> gettext("Title is required to save.")
+      socket.assigns.group_mode == "slug" and slug == "" -> gettext("Slug is required to save.")
+      true -> nil
+    end
+  end
+
+  defp do_switch_version(socket, version) do
+    socket = cancel_autosave_timer(socket)
+
+    case Versions.read_version_post(socket, version) do
+      {:ok, version_post} ->
+        {socket, old_form_key, old_post_slug, new_form_key, actual_language} =
+          Versions.apply_version_switch(
+            socket,
+            version,
+            version_post,
+            &Forms.post_form_with_primary_status/3
+          )
+
+        socket =
+          socket
+          |> Helpers.assign_current_language(actual_language)
+          |> Collaborative.cleanup_and_setup_collaborative_editing(old_form_key, new_form_key,
+            old_post_slug: old_post_slug
+          )
+
+        post = socket.assigns.post
+
+        url =
+          Helpers.build_edit_url(socket.assigns.group_slug, post,
+            version: version,
+            lang: actual_language
+          )
+
+        {:noreply, push_patch(socket, to: url, replace: true)}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, gettext("Version not found"))}
+    end
+  end
+
+  # Saves outstanding work before a navigation that swaps the editor's buffer.
+  # A read-only spectator never saves — they read has_pending_changes: true
+  # after a remote sync, so saving would clobber the owner.
+  defp flush_before_switch(socket) do
+    if socket.assigns.has_pending_changes and not socket.assigns[:readonly?] do
+      {:noreply, saved} = Persistence.perform_save(socket)
+
+      if saved.assigns.has_pending_changes do
+        {:blocked, saved}
+      else
+        {:ok, saved}
+      end
+    else
+      {:ok, socket}
+    end
+  end
+
   defp cancel_autosave_timer(socket) do
     if timer = socket.assigns[:autosave_timer] do
       Process.cancel_timer(timer)
@@ -2132,10 +2242,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           <%= if assigns[:lock_released_by_timeout] do %>
             <span class="font-medium">{gettext("Session paused:")}</span>
             <span>
-              {gettext(
-                "Your editing lock expired due to inactivity. Start typing or click Save to resume editing."
-              )}
+              {gettext("Your editing lock expired due to inactivity.")}
             </span>
+            <%!-- An explicit control, because the promise of "just start typing"
+                  can't be kept: readonly? disables the very fields whose input
+                  would trigger the reclaim. --%>
+            <button
+              type="button"
+              phx-click="resume_editing"
+              phx-disable-with={gettext("Resuming…")}
+              class="btn btn-warning btn-sm ml-2"
+            >
+              <.icon name="hero-play" class="w-4 h-4" />
+              {gettext("Resume editing")}
+            </button>
           <% else %>
             <span class="font-medium">{gettext("View only mode:")}</span>
             <span>

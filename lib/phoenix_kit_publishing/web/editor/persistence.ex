@@ -525,6 +525,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       PublishingPubSub.broadcast_editor_saved(socket.assigns.form_key, socket.id)
     end
 
+    # A save that WORKS must retract a previous failure. update_meta now
+    # deliberately preserves :error across keystrokes (so an autosave failure
+    # isn't wiped by the next character), which means nothing else would ever
+    # clear it: the writer would see red "Autosave failed" and green "Post
+    # saved" side by side, indefinitely.
+    socket = Phoenix.LiveView.clear_flash(socket, :error)
+
     flash_message =
       if socket.assigns.is_autosaving,
         do: nil,
