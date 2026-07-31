@@ -13,10 +13,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
   require Logger
 
-  # Lock expires after 30 minutes of inactivity
-  @lock_timeout_seconds 30 * 60
-  # Warn 5 minutes before expiration
-  @lock_warning_seconds 25 * 60
+  # How long an idle editor keeps the lock, in minutes. A setting because the
+  # right number is a fact about the team, not about the software: 30 minutes
+  # is generous for a newsroom passing a story around and impatient for
+  # someone drafting an essay over lunch. Whoever is waiting for the lock and
+  # whoever is thinking are the same person's colleagues.
+  @default_lock_timeout_minutes 30
+  # Always warn this long before it goes, so the notice is useful at any
+  # timeout rather than proportionally silly at short ones.
+  @lock_warning_lead_seconds 5 * 60
   # Check every minute
   @lock_check_interval_ms 60_000
 
@@ -515,12 +520,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
       cond do
         # Lock expired - release it
-        inactive_seconds >= @lock_timeout_seconds ->
+        inactive_seconds >= lock_timeout_seconds() ->
           release_lock_due_to_inactivity(socket)
 
         # Approaching expiration - warn user
-        inactive_seconds >= @lock_warning_seconds && !socket.assigns[:lock_warning_shown] ->
-          minutes_left = div(@lock_timeout_seconds - inactive_seconds, 60)
+        inactive_seconds >= lock_timeout_seconds() - @lock_warning_lead_seconds &&
+            !socket.assigns[:lock_warning_shown] ->
+          minutes_left = div(lock_timeout_seconds() - inactive_seconds, 60)
 
           socket
           |> Phoenix.Component.assign(:lock_warning_shown, true)
@@ -539,6 +545,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     else
       socket
     end
+  end
+
+  # Minutes, read per check so a change takes effect without a restart. Clamped
+  # low: a timeout under a minute would release the lock between keystrokes.
+  defp lock_timeout_seconds do
+    minutes =
+      case PhoenixKit.Settings.get_setting_cached("publishing_editor_lock_minutes") do
+        value when is_integer(value) and value > 0 ->
+          value
+
+        value when is_binary(value) ->
+          case Integer.parse(value) do
+            {n, _} when n > 0 -> n
+            _ -> @default_lock_timeout_minutes
+          end
+
+        _ ->
+          @default_lock_timeout_minutes
+      end
+
+    max(minutes, 1) * 60
   end
 
   @doc """

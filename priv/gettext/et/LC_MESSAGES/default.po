@@ -12,7 +12,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:720
+#: lib/phoenix_kit_publishing/web/settings.ex:815
 #, elixir-autogen, elixir-format
 msgid "\"In Memory\" means the cache is loaded into :persistent_term for sub-microsecond reads."
 msgstr "\\\"Mälusisene\\\" tähendab, et vahemälu laaditakse :persistent_term-i, mis võimaldab alla mikrosekundilisi lugemisi."
@@ -31,8 +31,8 @@ msgstr "\\\"Tõlgi kõikidesse\\\" loob või kirjutab üle tõlked kõigi lubatu
 #: lib/phoenix_kit_publishing/web/html.ex:2589
 #: lib/phoenix_kit_publishing/web/html.ex:2603
 #: lib/phoenix_kit_publishing/web/html.ex:2611
-#: lib/phoenix_kit_publishing/web/html.ex:2781
-#: lib/phoenix_kit_publishing/web/html.ex:2785
+#: lib/phoenix_kit_publishing/web/html.ex:2808
+#: lib/phoenix_kit_publishing/web/html.ex:2812
 #, elixir-autogen, elixir-format
 msgid "%B %d, %Y"
 msgstr "%B %d, %Y"
@@ -55,7 +55,7 @@ msgstr[1] "%{count} versiooni"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2605
 #: lib/phoenix_kit_publishing/web/html.ex:2613
-#: lib/phoenix_kit_publishing/web/html.ex:2798
+#: lib/phoenix_kit_publishing/web/html.ex:2825
 #, elixir-autogen, elixir-format
 msgid "%{date} at %{time}"
 msgstr "%{date} kell %{time}"
@@ -134,18 +134,18 @@ msgstr "AI päring ebaõnnestus: %{reason}"
 msgid "AI translation failed: %{reason}"
 msgstr "AI tõlge ebaõnnestus: %{reason}"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:322
+#: lib/phoenix_kit_publishing/web/settings.ex:382
 #, elixir-autogen, elixir-format
 msgid "ASCII only"
 msgstr "Ainult ASCII"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:547
+#: lib/phoenix_kit_publishing/web/settings.ex:607
 #, elixir-autogen, elixir-format
 msgid "ASCII only — strip"
 msgstr "Ainult ASCII — eemaldamine"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:655
-#: lib/phoenix_kit_publishing/web/settings.ex:830
+#: lib/phoenix_kit_publishing/web/settings.ex:750
+#: lib/phoenix_kit_publishing/web/settings.ex:925
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "Tegevused"
@@ -190,12 +190,12 @@ msgstr "Teine kasutaja redigeerib hetkel seda postitust. Saate seda vaadata, kui
 msgid "Applies to all languages in this version."
 msgstr "Kehtib kõigi selle versiooni keelte kohta."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2963
+#: lib/phoenix_kit_publishing/web/html.ex:2990
 #, elixir-autogen, elixir-format
 msgid "Apr"
 msgstr "Apr"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2946
+#: lib/phoenix_kit_publishing/web/html.ex:2973
 #, elixir-autogen, elixir-format
 msgid "April"
 msgstr "Aprill"
@@ -211,12 +211,12 @@ msgstr "Aprill"
 msgid "Archived"
 msgstr "Arhiveeritud"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2967
+#: lib/phoenix_kit_publishing/web/html.ex:2994
 #, elixir-autogen, elixir-format
 msgid "Aug"
 msgstr "Aug"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2950
+#: lib/phoenix_kit_publishing/web/html.ex:2977
 #, elixir-autogen, elixir-format
 msgid "August"
 msgstr "August"
@@ -244,17 +244,17 @@ msgstr "Tagasi rühma %{group}"
 msgid "Back to Editor"
 msgstr "Tagasi redaktorisse"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:797
+#: lib/phoenix_kit_publishing/web/settings.ex:892
 #, elixir-autogen, elixir-format
 msgid "Cache Hits"
 msgstr "Vahemälu tabamused"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:801
+#: lib/phoenix_kit_publishing/web/settings.ex:896
 #, elixir-autogen, elixir-format
 msgid "Cache Misses"
 msgstr "Vahemälu möödalasud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:115
+#: lib/phoenix_kit_publishing/web/settings.ex:116
 #, elixir-autogen, elixir-format
 msgid "Cache cleared for %{group}"
 msgstr "%{group} vahemälu tühjendatud"
@@ -264,22 +264,22 @@ msgstr "%{group} vahemälu tühjendatud"
 msgid "Cache miss"
 msgstr "Vahemälu möödalask"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:96
+#: lib/phoenix_kit_publishing/web/settings.ex:97
 #, elixir-autogen, elixir-format
 msgid "Cache regenerated for %{group}"
 msgstr "%{group} vahemälu genereeriti uuesti"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:774
+#: lib/phoenix_kit_publishing/web/settings.ex:869
 #, elixir-autogen, elixir-format
 msgid "Cache rendered HTML for published posts (6-hour TTL)"
 msgstr "Vahemälusta avaldatud postituste renderdatud HTML (TTL 6 tundi)"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:581
+#: lib/phoenix_kit_publishing/web/settings.ex:676
 #, elixir-autogen, elixir-format
 msgid "Cached listing data speeds up listing pages. Cache is automatically updated when posts change."
 msgstr "Vahemällu salvestatud loendiandmed kiirendavad loendilehti. Vahemälu uuendatakse automaatselt, kui postitused muutuvad."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:744
+#: lib/phoenix_kit_publishing/web/settings.ex:839
 #, elixir-autogen, elixir-format
 msgid "Cached rendered HTML for published posts. Uses content-hash keys so edits auto-invalidate."
 msgstr "Avaldatud postituste renderdatud HTML on vahemälus. Kasutab sisu räsil põhinevaid võtmeid, mistõttu muudatuste korral aegub vahemälu automaatselt."
@@ -352,24 +352,24 @@ msgstr "Valige, kuidas uus versioon luua:"
 msgid "Chronological URLs ideal for news and updates."
 msgstr "Kronoloogilised URL-id sobivad uudiste ja värskenduste jaoks."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:762
+#: lib/phoenix_kit_publishing/web/settings.ex:857
 #, elixir-autogen, elixir-format
 msgid "Clear All"
 msgstr "Tühjenda kõik"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:756
+#: lib/phoenix_kit_publishing/web/settings.ex:851
 #, elixir-autogen, elixir-format
 msgid "Clear all cached rendered posts? They will be re-rendered on next view."
 msgstr "Kas tühjendada kõik vahemällu salvestatud renderdatud postitused? Need renderdatakse järgmisel vaatamisel uuesti."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:688
-#: lib/phoenix_kit_publishing/web/settings.ex:692
+#: lib/phoenix_kit_publishing/web/settings.ex:783
+#: lib/phoenix_kit_publishing/web/settings.ex:787
 #, elixir-autogen, elixir-format
 msgid "Clear cache"
 msgstr "Tühjenda vahemälu"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:856
-#: lib/phoenix_kit_publishing/web/settings.ex:860
+#: lib/phoenix_kit_publishing/web/settings.ex:951
+#: lib/phoenix_kit_publishing/web/settings.ex:955
 #, elixir-autogen, elixir-format
 msgid "Clear cache for this group"
 msgstr "Tühjenda selle rühma vahemälu"
@@ -384,15 +384,15 @@ msgstr "Kas tühjendada %{language} tõlke sisu? Selle keele jaoks saate hiljem 
 msgid "Clear translation"
 msgstr "Tühjenda tõlge"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:257
+#: lib/phoenix_kit_publishing/web/settings.ex:292
 #, elixir-autogen, elixir-format
 msgid "Cleared %{count} cached posts for %{group}"
 msgstr "Tühjendati %{count} vahemällu salvestatud postitust rühma %{group} jaoks"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3760
-#: lib/phoenix_kit_publishing/web/settings.ex:686
-#: lib/phoenix_kit_publishing/web/settings.ex:753
-#: lib/phoenix_kit_publishing/web/settings.ex:854
+#: lib/phoenix_kit_publishing/web/settings.ex:781
+#: lib/phoenix_kit_publishing/web/settings.ex:848
+#: lib/phoenix_kit_publishing/web/settings.ex:949
 #, elixir-autogen, elixir-format
 msgid "Clearing…"
 msgstr "Tühjendamine…"
@@ -422,7 +422,7 @@ msgstr "Sisutüüp"
 msgid "Content type determines default item naming and may affect how content is displayed."
 msgstr "Sisutüüp määrab vaikimisi üksuste nimetuse ja võib mõjutada sisu kuvamist."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:412
+#: lib/phoenix_kit_publishing/web/settings.ex:472
 #, elixir-autogen, elixir-format
 msgid "Control whether the default language keeps its locale segment in public URLs."
 msgstr "Määrake, kas vaikekeel säilitab avalikes URL-ides oma keelesegmendi."
@@ -437,7 +437,7 @@ msgstr "Kopeeri versioonist v%{version}"
 msgid "Could not reload post - it may have been moved or deleted"
 msgstr "Postitust ei õnnestunud uuesti laadida – see võib olla teisaldatud või kustutatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:265
+#: lib/phoenix_kit_publishing/web/settings.ex:300
 #, elixir-autogen, elixir-format
 msgid "Couldn't clear the cache for this group."
 msgstr "Selle rühma vahemälu ei õnnestunud tühjendada."
@@ -483,7 +483,7 @@ msgstr "Seda rühma ei õnnestunud prügikasti liigutada."
 msgid "Couldn't move this post to trash."
 msgstr "Seda postitust ei õnnestunud prügikasti liigutada."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:103
+#: lib/phoenix_kit_publishing/web/settings.ex:104
 #, elixir-autogen, elixir-format
 msgid "Couldn't regenerate the cache for this group."
 msgstr "Selle rühma vahemälu ei õnnestunud uuesti genereerida."
@@ -551,7 +551,7 @@ msgstr "Loo versioon"
 msgid "Create a New Publishing Group"
 msgstr "Loo uus avaldamisrühm"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:636
+#: lib/phoenix_kit_publishing/web/settings.ex:731
 #, elixir-autogen, elixir-format
 msgid "Create a publishing group to manage its cache."
 msgstr "Vahemälu haldamiseks looge avaldamisrühm."
@@ -623,12 +623,12 @@ msgstr "Andmebaasi uuendamine ebaõnnestus"
 msgid "Date"
 msgstr "Kuupäev"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2971
+#: lib/phoenix_kit_publishing/web/html.ex:2998
 #, elixir-autogen, elixir-format
 msgid "Dec"
 msgstr "Dets"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2954
+#: lib/phoenix_kit_publishing/web/html.ex:2981
 #, elixir-autogen, elixir-format
 msgid "December"
 msgstr "Detsember"
@@ -638,7 +638,7 @@ msgstr "Detsember"
 msgid "Default Language"
 msgstr "Vaikekeel"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:422
+#: lib/phoenix_kit_publishing/web/settings.ex:482
 #, elixir-autogen, elixir-format
 msgid "Default Language Without Prefix"
 msgstr "Vaikekeel ilma prefiksita"
@@ -736,7 +736,7 @@ msgstr "Muuda rühma"
 msgid "Editing is paused while AI translates this content. It will unlock automatically when finished."
 msgstr "Redigeerimine on peatatud, kuni AI seda sisu tõlgib. See avatakse automaatselt, kui tõlkimine on valmis."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:829
+#: lib/phoenix_kit_publishing/web/settings.ex:924
 #, elixir-autogen, elixir-format
 msgid "Enabled"
 msgstr "Lubatud"
@@ -747,7 +747,7 @@ msgstr "Lubatud"
 msgid "Enqueueing…"
 msgstr "Järjekorda lisamine…"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:807
+#: lib/phoenix_kit_publishing/web/settings.ex:902
 #, elixir-autogen, elixir-format
 msgid "Entries Cached"
 msgstr "Vahemällu salvestatud kirjed"
@@ -808,12 +808,12 @@ msgstr "Esiletõstetud pilt tühjendatud"
 msgid "Featured image selected"
 msgstr "Esiletõstetud pilt valitud"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2961
+#: lib/phoenix_kit_publishing/web/html.ex:2988
 #, elixir-autogen, elixir-format
 msgid "Feb"
 msgstr "Veebr"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2944
+#: lib/phoenix_kit_publishing/web/html.ex:2971
 #, elixir-autogen, elixir-format
 msgid "February"
 msgstr "Veebruar"
@@ -846,8 +846,8 @@ msgstr "Genereeritud OG-pildi eelvaade"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2491
 #: lib/phoenix_kit_publishing/web/listing.ex:1090
-#: lib/phoenix_kit_publishing/web/settings.ex:645
-#: lib/phoenix_kit_publishing/web/settings.ex:828
+#: lib/phoenix_kit_publishing/web/settings.ex:740
+#: lib/phoenix_kit_publishing/web/settings.ex:923
 #, elixir-autogen, elixir-format
 msgid "Group"
 msgstr "Rühm"
@@ -889,12 +889,12 @@ msgstr "Rühm taastati"
 msgid "Group updated"
 msgstr "Rühm uuendatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:811
+#: lib/phoenix_kit_publishing/web/settings.ex:906
 #, elixir-autogen, elixir-format
 msgid "Hit Rate"
 msgstr "Tabamuste määr"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:531
+#: lib/phoenix_kit_publishing/web/settings.ex:591
 #, elixir-autogen, elixir-format
 msgid "How titles in non-Latin scripts (e.g. Cyrillic) are turned into URL slugs."
 msgstr "Kuidas mitteladina kirjas (nt kirillitsas) pealkirjad muudetakse URL-i sluggideks."
@@ -904,32 +904,32 @@ msgstr "Kuidas mitteladina kirjas (nt kirillitsas) pealkirjad muudetakse URL-i s
 msgid "Image component inserted"
 msgstr "Pildikomponent lisatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:449
+#: lib/phoenix_kit_publishing/web/settings.ex:509
 #, elixir-autogen, elixir-format
 msgid "In-Page Language Switcher"
 msgstr "Lehesisene keelevalija"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:469
+#: lib/phoenix_kit_publishing/web/settings.ex:529
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "Lehesisesed OpenGraph sildid"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:186
+#: lib/phoenix_kit_publishing/web/settings.ex:187
 #, elixir-autogen, elixir-format
 msgid "In-page OpenGraph tags disabled — your host layout should render the forwarded :og assign in <head>"
 msgstr "Lehesisesed OpenGraph sildid on keelatud — teie majutav paigutus peaks renderdama edastatud :og määrangu <head>-is"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:182
+#: lib/phoenix_kit_publishing/web/settings.ex:183
 #, elixir-autogen, elixir-format
 msgid "In-page OpenGraph tags enabled — publishing pages will render their own social meta tags"
 msgstr "Lehesisesed OpenGraph sildid on lubatud — avaldamise leheküljed renderdavad oma sotsiaalmeedia metasildid"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:164
+#: lib/phoenix_kit_publishing/web/settings.ex:165
 #, elixir-autogen, elixir-format
 msgid "In-page language switcher disabled — host layout / custom switcher should render translations"
 msgstr "Lehesisene keelevalija on keelatud — majutav paigutus / kohandatud valija peaks tõlked renderdama"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:160
+#: lib/phoenix_kit_publishing/web/settings.ex:161
 #, elixir-autogen, elixir-format
 msgid "In-page language switcher enabled — publishing pages will render their own switcher"
 msgstr "Lehesisene keelevalija on lubatud — avaldamise leheküljed renderdavad oma valija"
@@ -1018,32 +1018,32 @@ msgstr "Üksuste nimetamine"
 msgid "Items called \"%{plural}\"."
 msgstr "Üksuste nimetus: \\\"%{plural}\\\"."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2960
+#: lib/phoenix_kit_publishing/web/html.ex:2987
 #, elixir-autogen, elixir-format
 msgid "Jan"
 msgstr "Jaan"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2943
+#: lib/phoenix_kit_publishing/web/html.ex:2970
 #, elixir-autogen, elixir-format
 msgid "January"
 msgstr "Jaanuar"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2966
+#: lib/phoenix_kit_publishing/web/html.ex:2993
 #, elixir-autogen, elixir-format
 msgid "Jul"
 msgstr "Juuli"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2949
+#: lib/phoenix_kit_publishing/web/html.ex:2976
 #, elixir-autogen, elixir-format
 msgid "July"
 msgstr "Juuli"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2965
+#: lib/phoenix_kit_publishing/web/html.ex:2992
 #, elixir-autogen, elixir-format
 msgid "Jun"
 msgstr "Juuni"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2948
+#: lib/phoenix_kit_publishing/web/html.ex:2975
 #, elixir-autogen, elixir-format
 msgid "June"
 msgstr "Juuni"
@@ -1083,7 +1083,7 @@ msgstr "Lahku"
 msgid "Legal pages like terms and privacy policy. Items called \"%{plural}\"."
 msgstr "Õiguslikud leheküljed, näiteks kasutustingimused ja privaatsuspoliitika. Üksuste nimetus: \\\"%{plural}\\\"."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:578
+#: lib/phoenix_kit_publishing/web/settings.ex:673
 #, elixir-autogen, elixir-format
 msgid "Listing Cache"
 msgstr "Loendi vahemälu"
@@ -1093,7 +1093,7 @@ msgstr "Loendi vahemälu"
 msgid "Load more"
 msgstr "Laadi rohkem"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:440
+#: lib/phoenix_kit_publishing/web/settings.ex:500
 #, elixir-autogen, elixir-format
 msgid "Manage"
 msgstr "Halda"
@@ -1108,48 +1108,48 @@ msgstr "Halda otspunkte"
 msgid "Manage Prompts"
 msgstr "Halda juhiseid"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:400
+#: lib/phoenix_kit_publishing/web/settings.ex:460
 #, elixir-autogen, elixir-format
 msgid "Manage caching and performance settings for the publishing module."
 msgstr "Halda avaldamismooduli vahemälu ja jõudluse seadeid."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2962
+#: lib/phoenix_kit_publishing/web/html.ex:2989
 #, elixir-autogen, elixir-format
 msgid "Mar"
 msgstr "Märts"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2945
+#: lib/phoenix_kit_publishing/web/html.ex:2972
 #, elixir-autogen, elixir-format
 msgid "March"
 msgstr "Märts"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2947
-#: lib/phoenix_kit_publishing/web/html.ex:2964
+#: lib/phoenix_kit_publishing/web/html.ex:2974
+#: lib/phoenix_kit_publishing/web/html.ex:2991
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr "Mai"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:651
+#: lib/phoenix_kit_publishing/web/settings.ex:746
 #, elixir-autogen, elixir-format
 msgid "Memory"
 msgstr "Mälu"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:607
+#: lib/phoenix_kit_publishing/web/settings.ex:702
 #, elixir-autogen, elixir-format
 msgid "Memory Cache"
 msgstr "Mälusisene vahemälu"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:330
+#: lib/phoenix_kit_publishing/web/settings.ex:390
 #, elixir-autogen, elixir-format
 msgid "Memory cache disabled"
 msgstr "Mälusisene vahemälu keelatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:329
+#: lib/phoenix_kit_publishing/web/settings.ex:389
 #, elixir-autogen, elixir-format
 msgid "Memory cache enabled"
 msgstr "Mälusisene vahemälu lubatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:626
+#: lib/phoenix_kit_publishing/web/settings.ex:721
 #, elixir-autogen, elixir-format
 msgid "Memory cache is disabled. Listing pages will query the database on every request."
 msgstr "Mälusisene vahemälu on keelatud. Loendilehed pärivad andmebaasi iga päringu puhul."
@@ -1259,17 +1259,17 @@ msgstr "Ei leitud"
 msgid "Not published"
 msgstr "Avaldamata"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2970
+#: lib/phoenix_kit_publishing/web/html.ex:2997
 #, elixir-autogen, elixir-format
 msgid "Nov"
 msgstr "Nov"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2953
+#: lib/phoenix_kit_publishing/web/html.ex:2980
 #, elixir-autogen, elixir-format
 msgid "November"
 msgstr "November"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:429
+#: lib/phoenix_kit_publishing/web/settings.ex:489
 #, elixir-autogen, elixir-format
 msgid "OFF — primary language URLs include the locale prefix (e.g. /en/blog/post). Managed on the Languages page."
 msgstr "VÄLJAS — peamise keele URL-id sisaldavad keeleprefiksit (nt /en/blog/post). Hallatav lehel Keeled."
@@ -1309,17 +1309,17 @@ msgstr "OG-pealkiri"
 msgid "OK"
 msgstr "OK"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:425
+#: lib/phoenix_kit_publishing/web/settings.ex:485
 #, elixir-autogen, elixir-format
 msgid "ON — primary language URLs are prefixless (e.g. /blog/post). Managed on the Languages page."
 msgstr "SEES — peamise keele URL-id on ilma prefiksita (nt /blog/post). Hallatav lehel Keeled."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2969
+#: lib/phoenix_kit_publishing/web/html.ex:2996
 #, elixir-autogen, elixir-format
 msgid "Oct"
 msgstr "Okt"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2952
+#: lib/phoenix_kit_publishing/web/html.ex:2979
 #, elixir-autogen, elixir-format
 msgid "October"
 msgstr "Oktoober"
@@ -1355,7 +1355,7 @@ msgstr "Määrake, kuidas see postitus näeb välja sotsiaalmeedias jagamisel. J
 msgid "Paste a Phoenix Kit Media ID if you know it."
 msgstr "Kleepige Phoenix Kit meedia ID, kui see on teada."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:563
+#: lib/phoenix_kit_publishing/web/settings.ex:658
 #, elixir-autogen, elixir-format
 msgid "Per-translation URLs are always exposed on the conn under :phoenix_kit_publishing_translations — your host layout can read them whether the in-page switcher is enabled or not."
 msgstr "Tõlkepõhised URL-id on alati kättesaadavad conn all väljal :phoenix_kit_publishing_translations — teie majutav paigutus saab neid lugeda olenemata sellest, kas lehesisene valija on lubatud või mitte."
@@ -1461,7 +1461,7 @@ msgstr "Teine kasutaja uuendas postitust"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:450
 #: lib/phoenix_kit_publishing/web/index.ex:540
-#: lib/phoenix_kit_publishing/web/settings.ex:646
+#: lib/phoenix_kit_publishing/web/settings.ex:741
 #, elixir-autogen, elixir-format
 msgid "Posts"
 msgstr "Postitused"
@@ -1507,7 +1507,7 @@ msgstr "Avalik"
 msgid "Public URL"
 msgstr "Avalik URL"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:409
+#: lib/phoenix_kit_publishing/web/settings.ex:469
 #, elixir-autogen, elixir-format
 msgid "Public URL Language"
 msgstr "Avaliku URL-i keel"
@@ -1543,7 +1543,7 @@ msgid "Publishing"
 msgstr "Avaldamine"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:39
-#: lib/phoenix_kit_publishing/web/settings.ex:399
+#: lib/phoenix_kit_publishing/web/settings.ex:459
 #, elixir-autogen, elixir-format
 msgid "Publishing Settings"
 msgstr "Avaldamise seaded"
@@ -1576,7 +1576,7 @@ msgstr "Värskenda"
 msgid "Refreshing…"
 msgstr "Värskendamine…"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:595
+#: lib/phoenix_kit_publishing/web/settings.ex:690
 #, elixir-autogen, elixir-format
 msgid "Regenerate All"
 msgstr "Genereeri kõik uuesti"
@@ -1586,24 +1586,24 @@ msgstr "Genereeri kõik uuesti"
 msgid "Regenerate Default Prompt"
 msgstr "Genereeri vaikejuhis uuesti"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:702
-#: lib/phoenix_kit_publishing/web/settings.ex:706
+#: lib/phoenix_kit_publishing/web/settings.ex:797
+#: lib/phoenix_kit_publishing/web/settings.ex:801
 #, elixir-autogen, elixir-format
 msgid "Regenerate cache"
 msgstr "Genereeri vahemälu uuesti"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:726
+#: lib/phoenix_kit_publishing/web/settings.ex:821
 #, elixir-autogen, elixir-format
 msgid "Regenerate scans all posts and rebuilds the cache."
 msgstr "Uuesti genereerimine skannib kõik postitused ja loob vahemälu uuesti."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:129
+#: lib/phoenix_kit_publishing/web/settings.ex:130
 #, elixir-autogen, elixir-format
 msgid "Regenerated %{count} caches"
 msgstr "Genereeriti uuesti %{count} vahemälu"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:591
-#: lib/phoenix_kit_publishing/web/settings.ex:700
+#: lib/phoenix_kit_publishing/web/settings.ex:686
+#: lib/phoenix_kit_publishing/web/settings.ex:795
 #, elixir-autogen, elixir-format
 msgid "Regenerating…"
 msgstr "Uuesti genereerimine…"
@@ -1622,53 +1622,53 @@ msgstr "Eemalda"
 msgid "Removing…"
 msgstr "Eemaldamine…"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:741
-#: lib/phoenix_kit_publishing/web/settings.ex:772
+#: lib/phoenix_kit_publishing/web/settings.ex:836
+#: lib/phoenix_kit_publishing/web/settings.ex:867
 #, elixir-autogen, elixir-format
 msgid "Render Cache"
 msgstr "Renderduse vahemälu"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:471
+#: lib/phoenix_kit_publishing/web/settings.ex:531
 #, elixir-autogen, elixir-format
 msgid "Render OpenGraph + Twitter Card meta tags on listing + post pages so link previews work out of the box. Disable when your host layout renders the forwarded :og assign in <head>."
 msgstr "Renderda OpenGraph + Twitter Card metasildid loendi- ja postituse lehtedel, et lingi eelvaated töötaksid kohe. Keela, kui teie majutav paigutus renderdab edastatud :og määrangu <head>-is."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:246
+#: lib/phoenix_kit_publishing/web/settings.ex:281
 #, elixir-autogen, elixir-format
 msgid "Render cache cleared"
 msgstr "Renderduse vahemälu tühjendatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:333
+#: lib/phoenix_kit_publishing/web/settings.ex:393
 #, elixir-autogen, elixir-format
 msgid "Render cache disabled"
 msgstr "Renderduse vahemälu keelatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:332
+#: lib/phoenix_kit_publishing/web/settings.ex:392
 #, elixir-autogen, elixir-format
 msgid "Render cache enabled"
 msgstr "Renderduse vahemälu lubatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:339
+#: lib/phoenix_kit_publishing/web/settings.ex:399
 #, elixir-autogen, elixir-format
 msgid "Render cache for %{group} disabled"
 msgstr "Renderduse vahemälu rühmale %{group} keelatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:336
+#: lib/phoenix_kit_publishing/web/settings.ex:396
 #, elixir-autogen, elixir-format
 msgid "Render cache for %{group} enabled"
 msgstr "Renderduse vahemälu rühmale %{group} lubatud"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:790
+#: lib/phoenix_kit_publishing/web/settings.ex:885
 #, elixir-autogen, elixir-format
 msgid "Render cache is disabled. Posts will be rendered on every request."
 msgstr "Renderduse vahemälu on keelatud. Postitused renderdatakse iga päringu puhul."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:876
+#: lib/phoenix_kit_publishing/web/settings.ex:971
 #, elixir-autogen, elixir-format
 msgid "Render cache stores pre-rendered HTML for published posts. Cache keys include content hashes, so edits automatically use fresh renders. TTL: 6 hours."
 msgstr "Renderduse vahemälu salvestab avaldatud postituste eelnevalt renderdatud HTML-i. Vahemälu võtmed sisaldavad sisu räsi, mistõttu muudatused kasutavad automaatselt värsket renderdust. TTL: 6 tundi."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:451
+#: lib/phoenix_kit_publishing/web/settings.ex:511
 #, elixir-autogen, elixir-format
 msgid "Render the language switcher on listing + post pages. Disable when your host layout already provides one."
 msgstr "Renderda keelevalija loendi- ja postituse lehtedel. Keela, kui teie majutav paigutus juba pakub oma valijat."
@@ -1739,12 +1739,12 @@ msgstr "Vali otspunkt..."
 msgid "Semantic URLs ideal for evergreen content."
 msgstr "Semantilised URL-id sobivad ajatu sisu jaoks."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2968
+#: lib/phoenix_kit_publishing/web/html.ex:2995
 #, elixir-autogen, elixir-format
 msgid "Sep"
 msgstr "Sept"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2951
+#: lib/phoenix_kit_publishing/web/html.ex:2978
 #, elixir-autogen, elixir-format
 msgid "September"
 msgstr "September"
@@ -1775,7 +1775,7 @@ msgstr "Ainsus"
 msgid "Slug"
 msgstr "Slug"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:529
+#: lib/phoenix_kit_publishing/web/settings.ex:589
 #, elixir-autogen, elixir-format
 msgid "Slug Style"
 msgstr "Slugi stiil"
@@ -1800,7 +1800,7 @@ msgstr "Slug on vastuolus reserveeritud marsruudisõnaga"
 msgid "Slug is required. Enter a title to auto-generate one, or type a slug manually."
 msgstr "Slug on kohustuslik. Sisestage pealkiri selle automaatseks loomiseks või sisestage slug käsitsi."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:234
+#: lib/phoenix_kit_publishing/web/settings.ex:235
 #, elixir-autogen, elixir-format
 msgid "Slug style updated to %{style}"
 msgstr "Slugi stiiliks määrati %{style}"
@@ -1862,7 +1862,7 @@ msgstr "Olek"
 msgid "Status updated to %{status}"
 msgstr "Olekuks määrati %{status}"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:609
+#: lib/phoenix_kit_publishing/web/settings.ex:704
 #, elixir-autogen, elixir-format
 msgid "Store in :persistent_term for sub-microsecond reads"
 msgstr "Salvesta :persistent_term-isse mikrosekundilisest kiiremateks lugemisteks"
@@ -2096,12 +2096,12 @@ msgstr "Tõlkimine käib"
 msgid "Translation job enqueued for: %{languages}"
 msgstr "Tõlketöö lisati järjekorda keeltele: %{languages}"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:323
+#: lib/phoenix_kit_publishing/web/settings.ex:383
 #, elixir-autogen, elixir-format
 msgid "Transliterate"
 msgstr "Translitereerimine"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:541
+#: lib/phoenix_kit_publishing/web/settings.ex:601
 #, elixir-autogen, elixir-format
 msgid "Transliterate — privet"
 msgstr "Translitereerimine — privet"
@@ -2180,12 +2180,12 @@ msgstr "URL-i slug tohib sisaldada ainult väiketähti, numbreid ja sidekriipse"
 msgid "Unexpected error: %{reason}"
 msgstr "Ootamatu viga: %{reason}"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:321
+#: lib/phoenix_kit_publishing/web/settings.ex:381
 #, elixir-autogen, elixir-format
 msgid "Unicode"
 msgstr "Unicode"
 
-#: lib/phoenix_kit_publishing/web/settings.ex:544
+#: lib/phoenix_kit_publishing/web/settings.ex:604
 #, elixir-autogen, elixir-format
 msgid "Unicode — привет"
 msgstr "Unicode — привет"
@@ -2327,7 +2327,7 @@ msgstr "Vaata avalikku saiti"
 msgid "What do you call items in this publishing group? These names appear in the UI."
 msgstr "Kuidas te nimetate selle avaldamisrühma üksusi? Need nimed kuvatakse kasutajaliideses."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:557
+#: lib/phoenix_kit_publishing/web/settings.ex:652
 #, elixir-autogen, elixir-format
 msgid "When enabled, default-language public URLs become prefixless and prefixed default-language URLs redirect to the canonical prefixless version."
 msgstr "Kui see on lubatud, muutuvad vaikekeele avalikud URL-id prefiksita ning prefiksiga vaikekeele URL-id suunatakse ümber kanoonilisele prefiksita versioonile."
@@ -2347,12 +2347,12 @@ msgstr "Teil pole õigust tõlkeid tühjendada"
 msgid "You have unsaved changes. Leave without saving?"
 msgstr "Teil on salvestamata muudatusi. Kas lahkuda ilma salvestamata?"
 
-#: lib/phoenix_kit_publishing/web/editor/collaborative.ex:566
+#: lib/phoenix_kit_publishing/web/editor/collaborative.ex:593
 #, elixir-autogen, elixir-format
 msgid "Your editing lock was released due to inactivity. Click anywhere to reclaim it."
 msgstr "Teie redigeerimislukk vabastati tegevusetuse tõttu. Selle tagasi saamiseks klõpsake kuskil."
 
-#: lib/phoenix_kit_publishing/web/editor/collaborative.ex:529
+#: lib/phoenix_kit_publishing/web/editor/collaborative.ex:535
 #, elixir-autogen, elixir-format
 msgid "Your editing lock will expire in %{minutes} minutes due to inactivity"
 msgstr "Teie redigeerimislukk aegub tegevusetuse tõttu %{minutes} minuti pärast"
@@ -2410,7 +2410,7 @@ msgstr "kuvatakse"
 msgid "your-group"
 msgstr "sinu-ryhm"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2772
+#: lib/phoenix_kit_publishing/web/html.ex:2778
 #, elixir-autogen, elixir-format
 msgid "%{count} min read"
 msgid_plural "%{count} min read"
@@ -2883,7 +2883,7 @@ msgstr ""
 msgid "Edit category"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/settings.ex:511
+#: lib/phoenix_kit_publishing/web/settings.ex:571
 #, elixir-autogen, elixir-format
 msgid "Emit a schema.org Article script on post pages for richer search results. Disable if your host builds its own structured data."
 msgstr ""
@@ -2898,17 +2898,17 @@ msgstr ""
 msgid "Grid — cards with images"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/settings.ex:509
+#: lib/phoenix_kit_publishing/web/settings.ex:569
 #, elixir-autogen, elixir-format
 msgid "JSON-LD Structured Data"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/settings.ex:220
+#: lib/phoenix_kit_publishing/web/settings.ex:221
 #, elixir-autogen, elixir-format
 msgid "JSON-LD structured data disabled"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/settings.ex:219
+#: lib/phoenix_kit_publishing/web/settings.ex:220
 #, elixir-autogen, elixir-format
 msgid "JSON-LD structured data enabled on post pages"
 msgstr ""
@@ -2988,17 +2988,17 @@ msgstr ""
 msgid "Position"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/settings.ex:489
+#: lib/phoenix_kit_publishing/web/settings.ex:549
 #, elixir-autogen, elixir-format
 msgid "RSS Feeds"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/settings.ex:204
+#: lib/phoenix_kit_publishing/web/settings.ex:205
 #, elixir-autogen, elixir-format
 msgid "RSS feeds disabled — feed URLs return 404"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/settings.ex:203
+#: lib/phoenix_kit_publishing/web/settings.ex:204
 #, elixir-autogen, elixir-format
 msgid "RSS feeds enabled — every group serves /<group>/feed.xml"
 msgstr ""
@@ -3018,7 +3018,7 @@ msgstr ""
 msgid "Search posts…"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/settings.ex:491
+#: lib/phoenix_kit_publishing/web/settings.ex:551
 #, elixir-autogen, elixir-format
 msgid "Serve an RSS 2.0 feed for every group at /<group>/feed.xml (newest 50 published posts, per language)."
 msgstr ""
@@ -3527,4 +3527,39 @@ msgstr ""
 #: lib/phoenix_kit_publishing/comments.ex:219
 #, elixir-autogen, elixir-format
 msgid "Someone replied to your comment"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:628
+#, elixir-autogen, elixir-format
+msgid "Drives the \"min read\" estimate. 200 suits English prose; lower it for dense or technical writing."
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:639
+#, elixir-autogen, elixir-format
+msgid "Editing lock timeout (minutes)"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:641
+#, elixir-autogen, elixir-format
+msgid "How long an idle editor keeps a post before it is released for someone else. A warning appears five minutes before."
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:618
+#, elixir-autogen, elixir-format
+msgid "How many posts a listing page shows before paginating."
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:617
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Posts per page"
+msgstr "Postituse leht"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:626
+#, elixir-autogen, elixir-format
+msgid "Reading speed (words per minute)"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:270
+#, elixir-autogen, elixir-format
+msgid "Setting updated"
 msgstr ""

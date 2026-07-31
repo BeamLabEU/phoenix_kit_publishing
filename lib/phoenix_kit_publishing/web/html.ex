@@ -2760,7 +2760,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   defp post_width_class("wide"), do: "max-w-6xl"
   defp post_width_class(_), do: "max-w-4xl"
 
-  # Estimates reading time from the rendered HTML at ~200 words/min (min 1 min).
+  # Estimates reading time from the rendered HTML (min 1 min).
+  #
+  # The rate is a setting because 200 wpm is an English prose figure, and the
+  # label is shown to whoever the site is written for: dense technical writing
+  # is read slower, a language with longer words counts fewer of them for the
+  # same reading, and a site can simply disagree. Hardcoding it made the one
+  # number on the page that is a claim about the READER unarguable.
   defp reading_time_label(html) when is_binary(html) do
     words =
       html
@@ -2768,11 +2774,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       |> String.split(~r/\s+/, trim: true)
       |> length()
 
-    minutes = max(1, ceil(words / 200))
+    minutes = max(1, ceil(words / reading_words_per_minute()))
     ngettext("%{count} min read", "%{count} min read", minutes)
   end
 
   defp reading_time_label(_), do: ""
+
+  @default_reading_wpm 200
+
+  defp reading_words_per_minute do
+    case Settings.get_setting_cached("publishing_reading_wpm") do
+      nil ->
+        @default_reading_wpm
+
+      value when is_integer(value) and value > 0 ->
+        value
+
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {n, _} when n > 0 -> n
+          _ -> @default_reading_wpm
+        end
+
+      _ ->
+        @default_reading_wpm
+    end
+  end
 
   # Formats a timestamp post's date for display (e.g., "December 31, 2025")
   defp format_timestamp_date(post) do
