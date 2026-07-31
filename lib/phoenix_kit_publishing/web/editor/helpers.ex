@@ -196,6 +196,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   end
 
   @doc """
+  Marks the editor clean — to us AND to Leaf.
+
+  "The content is saved now" has to be said twice, because two things track
+  it independently: `has_pending_changes`, which drives the badge and arms
+  autosave, and Leaf's own snapshot, which drives its navigation guard. Only
+  the first was ever set, so the guard believed every saved post still had
+  unsaved work and challenged the reader on every refresh and every attempt
+  to leave.
+
+  One function rather than a line at each of the dozen places that go clean,
+  because that is exactly the shape that drifted the first time.
+
+  Ordering is deliberate: `send_update` is processed after the current
+  handler returns, so Leaf's re-baseline lands after any `set-content` this
+  same pipeline pushed. Reversed, it would snapshot the content being
+  replaced and read dirty immediately.
+  """
+  def mark_clean(socket) do
+    Phoenix.LiveView.send_update(Leaf, id: "content-editor", action: :mark_saved)
+    Phoenix.Component.assign(socket, :has_pending_changes, false)
+  end
+
+  @doc """
   A `<Gallery>` block wrapping one `<Image>` line per chosen file.
 
   Uuids rather than signed URLs: the URL is then resolved at render time, so

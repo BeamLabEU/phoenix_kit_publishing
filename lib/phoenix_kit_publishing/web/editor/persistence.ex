@@ -397,7 +397,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
             Map.get(new_version_post, :version_dates, %{})
           )
           |> Phoenix.Component.assign(:editing_published_version, false)
-          |> Phoenix.Component.assign(:has_pending_changes, false)
+          |> Helpers.mark_clean()
           |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
           |> Phoenix.LiveView.put_flash(
             :info,
@@ -572,7 +572,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       |> Phoenix.Component.assign(:post, refreshed_post)
       |> Forms.assign_form_with_tracking(form)
       |> Phoenix.Component.assign(:content, refreshed_post.content)
-      |> Phoenix.Component.assign(:has_pending_changes, false)
+      |> Helpers.mark_clean()
       |> Phoenix.Component.assign(:editing_published_version, is_published)
       |> Phoenix.Component.assign(:saved_status, new_saved_status)
       |> Phoenix.Component.assign(:language_statuses, refreshed_post.language_statuses)
@@ -653,7 +653,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           |> Forms.assign_form_with_tracking(form)
           |> Phoenix.Component.assign(:content, updated_post.content)
           |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
-          |> Phoenix.Component.assign(:has_pending_changes, false)
+          |> Helpers.mark_clean()
           |> Phoenix.Component.assign(extra_assigns)
           |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
           |> Phoenix.LiveView.push_patch(
@@ -841,7 +841,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         |> Forms.assign_form_with_tracking(form)
         |> Phoenix.Component.assign(:content, updated_post.content)
         |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
-        |> Phoenix.Component.assign(:has_pending_changes, false)
+        |> Helpers.mark_clean()
         |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
         |> Phoenix.LiveView.push_event("set-content", %{content: updated_post.content})
         |> Phoenix.LiveView.put_flash(flash_level, flash_msg)
@@ -888,7 +888,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         |> Forms.assign_form_with_tracking(form)
         |> Phoenix.Component.assign(:content, updated_post.content)
         |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
-        |> Phoenix.Component.assign(:has_pending_changes, false)
+        |> Helpers.mark_clean()
         # This socket now matches the row again, so a later promotion should
         # take the saved copy rather than re-adopting what it mirrored before.
         |> Collaborative.clear_synced_from_owner()
