@@ -1374,6 +1374,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # Mode toggles are the component's own business.
   def handle_info({:leaf_mode_changed, _}, socket), do: {:noreply, socket}
 
+  # A PHK component button. The selected text becomes the component's body
+  # where that makes sense — select a phrase, press the note button, and the
+  # phrase is what carries the note — so the common case is one gesture
+  # rather than "insert, then retype what you already had".
+  def handle_info({:leaf_toolbar_action, %{id: id, selection: selection}}, socket) do
+    if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
+      {:noreply, socket}
+    else
+      selected = Map.get(selection || %{}, :text, "") |> to_string()
+
+      case component_snippet(id, selected) do
+        nil ->
+          {:noreply, socket}
+
+        text ->
+          send_update(Leaf, id: "content-editor", action: :insert_markdown, text: text)
+          {:noreply, socket}
+      end
+    end
+  end
+
+  def handle_info({:leaf_toolbar_action, _}, socket), do: {:noreply, socket}
+
   # The category picker changed the selection. It's a LiveComponent, so it
   # can't write the parent's form itself — and the form is where this has to
   # land, because that is what makes it dirty-tracked, autosaved, broadcast
@@ -2172,6 +2195,89 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   defp media_allowed_for_target?(_file_uuid, _target), do: true
 
+  # The PHK block components, as toolbar buttons.
+  #
+  # Leaf's built-in image and video buttons already exist and route through
+  # the media picker (`{:leaf_insert_request, …}`), so they are not repeated
+  # here. These are the ones that had no affordance at all: the only way to
+  # reach a Showcase band or an author note was to know the tag and type it,
+  # which means the features may as well not exist for anyone who hasn't read
+  # the format doc.
+  #
+  # `icon` is raw SVG rather than a heroicon class because Leaf renders these
+  # in its own toolbar, outside this app's CSS: a `hero-*` class only works
+  # where that stylesheet reached, and Leaf's toolbar sits in its own markup.
+  defp component_toolbar_buttons do
+    [
+      %{
+        id: "phk-headline",
+        title: gettext("Headline (wide)"),
+        icon: toolbar_glyph("H")
+      },
+      %{
+        id: "phk-showcase",
+        title: gettext("Showcase band"),
+        icon: toolbar_glyph("▤")
+      },
+      %{
+        id: "phk-note",
+        title: gettext("Author note"),
+        icon: toolbar_glyph("†")
+      },
+      %{
+        id: "phk-cta",
+        title: gettext("Call to action"),
+        icon: toolbar_glyph("▭")
+      }
+    ]
+  end
+
+  defp toolbar_glyph(char) do
+    ~s(<span class="text-xs font-semibold leading-none">#{char}</span>)
+  end
+
+  # The markup each button inserts. Placeholder text is deliberate: an empty
+  # component renders as nothing, which reads as "the button is broken", so
+  # each one arrives with something visible to edit over.
+  defp component_snippet("phk-headline", selected) do
+    body = fallback(selected, gettext("Headline text"))
+    ~s(<Headline stretch="30">#{body}</Headline>\n\n)
+  end
+
+  defp component_snippet("phk-showcase", selected) do
+    body = fallback(selected, gettext("Words beside the picture."))
+
+    """
+    <Showcase src="" side="left" overlap="18" height="medium" alt="">
+    ### #{gettext("Heading")}
+
+    #{body}
+    </Showcase>
+
+    """
+  end
+
+  # Wraps the selection rather than replacing it: a note is an annotation ON
+  # a phrase, so the phrase has to survive.
+  defp component_snippet("phk-note", selected) do
+    phrase = fallback(selected, gettext("the phrase"))
+    ~s(<Note note="#{gettext("Your note here")}">#{phrase}</Note>)
+  end
+
+  defp component_snippet("phk-cta", selected) do
+    body = fallback(selected, gettext("What should the reader do next?"))
+    ~s(<CTA>#{body}</CTA>\n\n)
+  end
+
+  defp component_snippet(_unknown, _selected), do: nil
+
+  defp fallback(selected, default) do
+    case String.trim(selected) do
+      "" -> default
+      text -> text
+    end
+  end
+
   # What the picker should contain for a given slot. Only audio is narrowed:
   # `media_allowed_for_target?/2` refuses nothing else, and the image fields
   # are legitimately used for more than one kind of file — narrowing those
@@ -2884,7 +2990,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       <Showcase>, <Note>, <Audio> and friends, so markdown is
                       the mode that can actually edit them. The toolbar still
                       offers the other modes — Leaf has no supported way to
-                      remove them — but nothing depends on anyone using one. --%>
+                      remove them — but nothing depends on anyone using one.
+
+                      `protect_navigation` predates the move to Leaf and was
+                      dropped in the swap — it warns before leaving with
+                      unsaved work, which nothing else here does.
+
+                      `save_status` was dropped in the same swap and is NOT
+                      coming back. Leaf's badge only knows saved/saving/
+                      unsaved, while the badge above says WHY a save is
+                      blocked ("Title is required to save."). Restoring it
+                      put two status indicators on screen disagreeing with
+                      each other.
+
+                      `toolbar_extra` adds the PHK components to the toolbar.
+                      Leaf's own image and video buttons already route into
+                      the media picker; these are the block components that
+                      previously had to be typed out by hand. --%>
                 <.leaf_editor
                   id="content-editor"
                   content={@content}
@@ -2896,6 +3018,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   mode={:markdown}
                   preserve_tags={Renderer.component_tags()}
                   gettext_backend={PhoenixKitPublishing.Gettext}
+                  protect_navigation={true}
+                  toolbar_extra={component_toolbar_buttons()}
                   suggestions={[
                     %{
                       trigger: "#",
