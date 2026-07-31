@@ -133,7 +133,13 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @supports (transform-style: preserve-3d) and (--probe: 0) {
     .pk-helix__scene{display:block;position:relative;height:var(--pk-hx-height,520px);perspective:var(--pk-hx-perspective,1200px);perspective-origin:50% 50%;overflow:hidden;background:var(--pk-hx-bg,var(--color-base-100,#fff));border-radius:12px}
     .pk-helix__world{display:block;position:absolute;inset:0;transform-style:preserve-3d}
-    .pk-helix__card{position:absolute;left:50%;top:50%;width:var(--pk-hx-card-w,225px);height:var(--pk-hx-card-h,155px);aspect-ratio:auto;will-change:transform,opacity,filter;transform:var(--pk-hx-rest);animation:pk-hx-move var(--pk-hx-dur,80s) linear infinite,pk-hx-depth var(--pk-hx-rot,40s) linear infinite}
+    .pk-helix__card{position:absolute;left:50%;top:50%;width:var(--pk-hx-card-w,225px);height:var(--pk-hx-card-h,155px);aspect-ratio:auto;will-change:transform,filter;transform:var(--pk-hx-rest);animation:pk-hx-move var(--pk-hx-dur,80s) linear infinite var(--pk-hx-d1,0s),pk-hx-blur var(--pk-hx-rot,40s) linear infinite var(--pk-hx-d2,0s)}
+    /* The card itself stays OPAQUE — a photograph you can see through reads as
+       a rendering fault, not as distance. Depth is a scrim painted OVER it in
+       the backdrop colour, so a far card recedes into the page while remaining
+       a solid object. (Fading the card's own opacity, which is what the first
+       theme-aware version did, let cards show through one another.) */
+    .pk-helix__card::after{content:"";position:absolute;inset:0;pointer-events:none;background:var(--pk-hx-bg,var(--color-base-100,#fff));opacity:0;animation:pk-hx-scrim var(--pk-hx-rot,40s) linear infinite var(--pk-hx-d2,0s)}
     /* Fades the strand into the backdrop on all four sides.
        Top and bottom hide the wrap, where a card jumps from the end of the
        strand back to the start. Left and right exist for a different reason:
@@ -150,23 +156,66 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   /* One full rotation, sampled every eighth of a turn — dense enough that the
      interpolation between stops is imperceptible.
 
-     Distance is expressed as OPACITY, not brightness. The published versions
-     of this effect darken the far side, which only reads as depth over a
-     near-black backdrop: on a light theme a dimmed card goes dark against
-     white and leaps FORWARD instead of receding. Fading toward whatever is
-     behind works on any theme, and it is cheaper than a brightness filter.
+     Distance is a scrim in the BACKDROP colour rather than a brightness cut.
+     Darkening only reads as distance over a dark page: on a light theme a
+     dimmed card goes dark against white and jumps forward instead of
+     receding. Fading toward whatever is actually behind works on any theme.
 
-     opacity = 0.15 + 0.85·depth², blur = (1−depth)²·max, depth = (cos θ+1)/2. */
-  @keyframes pk-hx-depth{
-    0%{opacity:1;filter:blur(0)}
-    12.5%{opacity:0.769;filter:blur(calc(var(--pk-hx-blur,5px) * 0.021))}
-    25%{opacity:0.363;filter:blur(calc(var(--pk-hx-blur,5px) * 0.25))}
-    37.5%{opacity:0.168;filter:blur(calc(var(--pk-hx-blur,5px) * 0.729))}
-    50%{opacity:0.15;filter:blur(var(--pk-hx-blur,5px))}
-    62.5%{opacity:0.168;filter:blur(calc(var(--pk-hx-blur,5px) * 0.729))}
-    75%{opacity:0.363;filter:blur(calc(var(--pk-hx-blur,5px) * 0.25))}
-    87.5%{opacity:0.769;filter:blur(calc(var(--pk-hx-blur,5px) * 0.021))}
-    100%{opacity:1;filter:blur(0)}
+     scrim = 0.85·(1−depth²), blur = (1−depth)²·max, depth = (cos θ + 1)/2. */
+  @keyframes pk-hx-scrim{
+    0%{opacity:0}
+    12.5%{opacity:0.231}
+    25%{opacity:0.638}
+    37.5%{opacity:0.832}
+    50%{opacity:0.85}
+    62.5%{opacity:0.832}
+    75%{opacity:0.638}
+    87.5%{opacity:0.231}
+    100%{opacity:0}
+  }
+  @keyframes pk-hx-blur{
+    0%{filter:blur(0)}
+    12.5%{filter:blur(calc(var(--pk-hx-blur,5px) * 0.021))}
+    25%{filter:blur(calc(var(--pk-hx-blur,5px) * 0.25))}
+    37.5%{filter:blur(calc(var(--pk-hx-blur,5px) * 0.729))}
+    50%{filter:blur(var(--pk-hx-blur,5px))}
+    62.5%{filter:blur(calc(var(--pk-hx-blur,5px) * 0.729))}
+    75%{filter:blur(calc(var(--pk-hx-blur,5px) * 0.25))}
+    87.5%{filter:blur(calc(var(--pk-hx-blur,5px) * 0.021))}
+    100%{filter:blur(0)}
+  }
+
+  /* motion="scroll": the helix turns as the reader scrolls past it instead of
+     drifting on its own — the behaviour of the gallery this is modelled on.
+     Still no JavaScript: `animation-timeline: view()` ties progress to the
+     element's own passage through the viewport.
+
+     Gated, because support is narrower than the rest of this. Where it is
+     missing the drift animation above simply stays in effect, which is a
+     working gallery rather than a still one — so `motion="scroll"` degrades
+     to `motion="drift"` rather than to nothing.
+
+     Drift mode spreads its cards with a negative `animation-delay`, and
+     neither that nor `animation-range` can do the job here: delays are
+     ignored on a non-time timeline, and a range offset moves WHEN a card
+     animates rather than where it starts — negative values there are invalid
+     outright and get dropped, landing every card in lockstep.
+
+     So scroll mode bakes each card's starting angle into keyframes of its
+     own, emitted next to the gallery. Every card then plays the same single
+     pass over the same range, from wherever on the helix it belongs. Looping
+     doesn't arise — one pass, with fill-mode holding both ends — which is
+     also why the wrap that drift mode must hide isn't a problem here. */
+  @supports (animation-timeline: view()) {
+    /* A NAMED timeline declared on the figure, not `view()` on the cards.
+       `view()` resolves against the nearest scroll container, and the scene
+       above is `overflow:hidden` — which counts as one. Bound to that, the
+       timeline never advances and every card freezes at whatever progress it
+       happened to start on. The figure sits outside the clip, so its passage
+       through the real viewport is what drives the rotation. */
+    .pk-helix--scroll{view-timeline-name:--pk-hx-view;view-timeline-axis:block}
+    .pk-helix--scroll .pk-helix__card{animation-name:var(--pk-hx-k1);animation-timeline:--pk-hx-view;animation-duration:auto;animation-iteration-count:1;animation-delay:0s;animation-fill-mode:both;animation-range:cover 0% cover 100%}
+    .pk-helix--scroll .pk-helix__card::after{animation-name:var(--pk-hx-k2);animation-timeline:--pk-hx-view;animation-duration:auto;animation-iteration-count:1;animation-delay:0s;animation-fill-mode:both;animation-range:cover 0% cover 100%}
   }
 
   /* Blur is by far the most expensive part — recomputed for every card on
@@ -181,7 +230,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
      card's delay already places it correctly, so pausing is a posed
      arrangement rather than the heap that stopping a script would leave. */
   @media (prefers-reduced-motion:reduce){
-    .pk-helix__card{animation-play-state:paused}
+    .pk-helix__card,.pk-helix__card::after{animation-play-state:paused}
   }
 
   /* Data saver, and displays that repaint slowly (e-ink, some kiosk panels):
@@ -191,6 +240,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     .pk-helix__scene{display:block;height:auto;background:none;perspective:none;overflow:visible}
     .pk-helix__world{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;position:static;inset:auto;transform-style:flat}
     .pk-helix__card{position:static;width:auto;height:auto;aspect-ratio:3/2;transform:none;animation:none;filter:none;opacity:1;will-change:auto}
+    .pk-helix__card::after{display:none}
     .pk-helix__vignette{display:none}
   }
   </style>
@@ -1059,6 +1109,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         ""
 
       images ->
+        motion = gallery_motion(Map.get(attrs, "motion"))
         strands = gallery_int(Map.get(attrs, "strands"), 2, 1, 4)
         turns = gallery_int(Map.get(attrs, "turns"), 2, 1, 6)
         radius = gallery_int(Map.get(attrs, "radius"), 420, 120, 900)
@@ -1084,15 +1135,37 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
             "--pk-hx-rot:#{Float.round(duration / turns, 3)}s"
           ] ++ gallery_background(Map.get(attrs, "background"))
 
+        gid = "g#{:erlang.phash2({images, height, radius, turns, motion}, 100_000)}"
+
+        geometry = %{
+          strands: strands,
+          per_strand: per_strand,
+          turns: turns,
+          duration: duration,
+          radius: radius,
+          span: span,
+          gid: gid,
+          motion: motion
+        }
+
         cards =
           images
           |> Enum.with_index()
-          |> Enum.map_join("\n", fn {image, i} ->
-            gallery_card(image, i, strands, per_strand, turns, duration, radius, span)
-          end)
+          |> Enum.map_join("\n", fn {image, i} -> gallery_card(image, i, geometry) end)
+
+        # Scroll mode can't express per-card phase through delays or ranges,
+        # so each card gets keyframes carrying its own starting angle.
+        keyframes =
+          if motion == "scroll" do
+            "<style>" <>
+              Enum.map_join(0..(length(images) - 1), "", &gallery_scroll_keyframes(&1, geometry)) <>
+              "</style>"
+          else
+            ""
+          end
 
         """
-        <figure class="pk-helix">
+        <figure class="pk-helix#{if motion == "scroll", do: " pk-helix--scroll", else: ""}">
         <div class="pk-helix__scene" style="#{Enum.join(scene_vars, ";")}">
         <div class="pk-helix__world">
         #{cards}
@@ -1100,6 +1173,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         <div class="pk-helix__vignette"></div>
         </div>
         </figure>
+        #{keyframes}
         """
         |> Phoenix.HTML.raw()
         |> PageBuilder.Renderer.wrap_stretch(showcase_lane(attrs))
@@ -1112,7 +1186,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       ""
   end
 
-  defp gallery_card(%{src: src, alt: alt}, i, strands, per_strand, turns, duration, radius, span) do
+  defp gallery_card(%{src: src, alt: alt}, i, geo) do
+    %{strands: strands, per_strand: per_strand, turns: turns, duration: duration} = geo
+    %{radius: radius, span: span, gid: gid, motion: motion} = geo
     strand = rem(i, strands)
     index = div(i, strands)
     # Where this card starts along its strand, 0..1.
@@ -1141,16 +1217,69 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       "--pk-hx-rest:translate(-50%,-50%) rotateY(#{Float.round(angle, 4)}turn) " <>
         "translateZ(#{radius}px) translateY(#{Float.round(y, 1)}px)"
 
+    # Delays travel as custom properties rather than as `animation-delay`
+    # directly, because the depth scrim lives on a ::after that needs the same
+    # offset — and a pseudo-element can inherit a custom property but cannot
+    # read its host's animation-delay.
     style =
       [
         "--pk-hx-phase:#{Float.round(phase, 4)}turn",
-        "animation-delay:#{move_delay}s,#{depth_delay}s",
+        "--pk-hx-d1:#{move_delay}s",
+        "--pk-hx-d2:#{depth_delay}s",
         static
       ]
+      |> then(fn base ->
+        # Scroll mode names this card's own keyframes; drift mode uses the
+        # shared pair declared in the stylesheet.
+        if motion == "scroll" do
+          base ++ ["--pk-hx-k1:pk-hx-#{gid}-m#{i}", "--pk-hx-k2:pk-hx-#{gid}-s#{i}"]
+        else
+          base
+        end
+      end)
       |> Enum.join(";")
 
     ~s(<div class="pk-helix__card" style="#{style}">) <>
       ~s(<img src="#{src}" alt="#{alt}" loading="lazy" decoding="async"></div>)
+  end
+
+  # One card's scroll-driven pass: it starts wherever it belongs on the helix
+  # and travels a full strand length as the gallery crosses the viewport.
+  #
+  # The depth stops are computed here rather than shared, because with the
+  # starting angle baked in, each card meets the far side of the cylinder at a
+  # different point of its own pass.
+  defp gallery_scroll_keyframes(i, geo) do
+    %{strands: strands, per_strand: per_strand, turns: turns} = geo
+    %{radius: radius, span: span, gid: gid} = geo
+
+    strand = rem(i, strands)
+    index = div(i, strands)
+    progress = index / per_strand
+    phase = strand / strands
+
+    a0 = phase + progress * turns
+    y0 = (progress - 0.5) * span
+
+    move =
+      "@keyframes pk-hx-#{gid}-m#{i}{" <>
+        "from{transform:translate(-50%,-50%) rotateY(#{Float.round(a0, 4)}turn) " <>
+        "translateZ(#{radius}px) translateY(#{Float.round(y0, 1)}px)}" <>
+        "to{transform:translate(-50%,-50%) rotateY(#{Float.round(a0 + turns, 4)}turn) " <>
+        "translateZ(#{radius}px) translateY(#{Float.round(y0 + span, 1)}px)}}"
+
+    scrim =
+      0..8
+      |> Enum.map_join("", fn stop ->
+        pct = stop / 8
+        # Where this card is facing at that point of its pass.
+        angle = (a0 + pct * turns) * 2 * :math.pi()
+        depth = (:math.cos(angle) + 1) / 2
+        opacity = Float.round(0.85 * (1 - depth * depth), 3)
+        "#{Float.round(pct * 100, 1)}%{opacity:#{opacity}}"
+      end)
+
+    move <> "@keyframes pk-hx-#{gid}-s#{i}{" <> scrim <> "}"
   end
 
   # Markdown image lines, in source order. Anything else in the body is
@@ -1171,6 +1300,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # HTML-escaping doesn't touch it. Anything not recognisably a colour is
   # dropped and the theme default stands.
   @gallery_color_regex ~r/^(#[0-9a-fA-F]{3,8}|(rgb|rgba|hsl|hsla|oklch|oklab|color-mix)\([^;{}"'()]*\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]{3,20})$/
+
+  # "drift" (default) turns on its own; "scroll" ties the rotation to the
+  # reader's scroll. Anything else falls back to drift rather than erroring —
+  # a typo in an attribute shouldn't cost you the gallery.
+  defp gallery_motion("scroll"), do: "scroll"
+  defp gallery_motion(_), do: "drift"
 
   defp gallery_background(bg) when is_binary(bg) do
     trimmed = String.trim(bg)

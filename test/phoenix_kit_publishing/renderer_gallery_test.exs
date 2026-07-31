@@ -60,7 +60,7 @@ defmodule PhoenixKit.Modules.Publishing.RendererGalleryTest do
       gallery(four_images())
       |> cards()
       |> Enum.map(fn style ->
-        [_, move] = Regex.run(~r/animation-delay:(-?[\d.]+)s/, style)
+        [_, move] = Regex.run(~r/--pk-hx-d1:(-?[\d.]+)s/, style)
         move
       end)
 
@@ -142,10 +142,113 @@ defmodule PhoenixKit.Modules.Publishing.RendererGalleryTest do
     assert html =~ "var(--pk-hx-bg,var(--color-base-100,#fff))"
     refute html =~ "#0d0d0c"
 
-    # Distance reads as opacity, not brightness. Darkening only recedes over a
-    # dark backdrop; on a light theme it makes the far cards jump forward.
-    assert html =~ "opacity:0.15;"
+    # Darkening only recedes over a dark backdrop; on a light theme it makes
+    # the far cards jump forward instead.
     refute html =~ "brightness("
+  end
+
+  test "cards stay opaque; distance is a scrim over them" do
+    html = gallery(four_images())
+
+    # A photograph you can see through reads as a rendering fault rather than
+    # as distance — and fading the card's own opacity let cards show through
+    # one another. The scrim keeps each card a solid object.
+    assert html =~ ".pk-helix__card::after"
+    assert html =~ "@keyframes pk-hx-scrim"
+
+    scrim = html |> String.split("@keyframes pk-hx-scrim") |> Enum.at(1) |> String.slice(0, 300)
+    assert scrim =~ "0%{opacity:0}"
+
+    # Nothing may animate the CARD's opacity.
+    move = html |> String.split("@keyframes pk-hx-move") |> Enum.at(1) |> String.slice(0, 400)
+    refute move =~ "opacity"
+  end
+
+  test "the scrim can reach the card's own delay" do
+    # A pseudo-element can inherit a custom property but cannot read its
+    # host's animation-delay, so the offsets travel as variables.
+    for style <- cards(gallery(four_images())) do
+      assert style =~ "--pk-hx-d1:"
+      assert style =~ "--pk-hx-d2:"
+      refute style =~ "animation-delay:"
+    end
+  end
+
+  defp figure_class(html) do
+    [_, cls] = Regex.run(~r/<figure class="([^"]*)"/, html)
+    cls
+  end
+
+  test "motion=scroll ties the turn to the reader's scroll" do
+    html = gallery(four_images(), ~s(height="520" motion="scroll"))
+
+    assert figure_class(html) =~ "pk-helix--scroll"
+    assert html =~ "@supports (animation-timeline: view())"
+
+    # Neither a delay nor a range offset can carry per-card phase on a scroll
+    # timeline, so each card names keyframes of its own.
+    for style <- cards(html) do
+      assert style =~ "--pk-hx-k1:pk-hx-"
+      assert style =~ "--pk-hx-k2:pk-hx-"
+    end
+
+    # Those keyframes have to actually exist, and differ per card — identical
+    # ones would be lockstep rotation wearing a disguise.
+    names = Regex.scan(~r/@keyframes (pk-hx-g\d+-m\d+)/, html) |> Enum.map(&Enum.at(&1, 1))
+    assert length(names) == 4
+    assert length(Enum.uniq(names)) == 4
+
+    starts =
+      Regex.scan(
+        ~r/@keyframes pk-hx-g\d+-m\d+\{from\{transform:[^}]*rotateY\(([-\d.]+)turn\)/,
+        html
+      )
+      |> Enum.map(&Enum.at(&1, 1))
+
+    assert length(Enum.uniq(starts)) > 1, "every card would start facing the same way"
+  end
+
+  test "the scroll timeline is named, not view() on the cards" do
+    html = gallery(four_images(), ~s(motion="scroll"))
+
+    # `view()` resolves against the nearest scroll container, and the scene is
+    # overflow:hidden — which counts as one. Bound to that, the timeline never
+    # advances and every card freezes at whatever progress it started on. The
+    # figure sits outside the clip, so the timeline is declared there.
+    assert html =~ ".pk-helix--scroll{view-timeline-name:--pk-hx-view"
+    assert html =~ "animation-timeline:--pk-hx-view"
+
+    # The @supports condition still mentions view() as a feature probe, so
+    # check the card rule itself rather than the whole document.
+    card_rule =
+      html
+      |> String.split(".pk-helix--scroll .pk-helix__card{")
+      |> Enum.at(1)
+      |> String.split("}")
+      |> List.first()
+
+    refute card_rule =~ "animation-timeline:view()"
+  end
+
+  test "drift mode emits no per-card keyframes" do
+    # They're only needed where delays can't carry phase; emitting them always
+    # would bloat every cached post body for nothing.
+    refute gallery(four_images()) =~ "@keyframes pk-hx-g"
+  end
+
+  test "drift is the default and an unknown motion falls back to it" do
+    refute figure_class(gallery(four_images())) =~ "pk-helix--scroll"
+    refute figure_class(gallery(four_images(), ~s(motion="sideways"))) =~ "pk-helix--scroll"
+  end
+
+  test "scroll mode degrades to drift, not to a still gallery" do
+    html = gallery(four_images(), ~s(motion="scroll"))
+
+    # The timeline is applied inside @supports; the time-based animation is
+    # declared outside it, so a browser without scroll timelines keeps
+    # turning rather than freezing.
+    [before_supports, _] = String.split(html, "@supports (animation-timeline: view())", parts: 2)
+    assert before_supports =~ "animation:pk-hx-move"
   end
 
   test "an explicit background still wins" do
@@ -183,7 +286,7 @@ defmodule PhoenixKit.Modules.Publishing.RendererGalleryTest do
     without = render("Just prose, no gallery here.")
 
     assert with_gallery =~ "@keyframes pk-hx-move"
-    assert with_gallery =~ "@keyframes pk-hx-depth"
+    assert with_gallery =~ "@keyframes pk-hx-scrim"
     assert with_gallery =~ "prefers-reduced-motion"
     refute without =~ "pk-hx-move"
   end

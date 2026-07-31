@@ -756,7 +756,7 @@ msgstr "Постановка в очередь…"
 msgid "Entries Cached"
 msgstr "Записей в кэше"
 
-#: lib/phoenix_kit_publishing/renderer.ex:696
+#: lib/phoenix_kit_publishing/renderer.ex:757
 #, elixir-autogen, elixir-format
 msgid "Error rendering markdown"
 msgstr "Ошибка обработки Markdown"

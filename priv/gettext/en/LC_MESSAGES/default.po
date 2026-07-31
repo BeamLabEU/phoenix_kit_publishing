@@ -752,7 +752,7 @@ msgstr "Enqueueing…"
 msgid "Entries Cached"
 msgstr "Entries Cached"
 
-#: lib/phoenix_kit_publishing/renderer.ex:696
+#: lib/phoenix_kit_publishing/renderer.ex:757
 #, elixir-autogen, elixir-format
 msgid "Error rendering markdown"
 msgstr "Error rendering markdown"

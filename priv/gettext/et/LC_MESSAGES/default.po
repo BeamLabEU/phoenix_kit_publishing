@@ -752,7 +752,7 @@ msgstr "Järjekorda lisamine…"
 msgid "Entries Cached"
 msgstr "Vahemällu salvestatud kirjed"
 
-#: lib/phoenix_kit_publishing/renderer.ex:696
+#: lib/phoenix_kit_publishing/renderer.ex:757
 #, elixir-autogen, elixir-format
 msgid "Error rendering markdown"
 msgstr "Viga markdown'i renderdamisel"
