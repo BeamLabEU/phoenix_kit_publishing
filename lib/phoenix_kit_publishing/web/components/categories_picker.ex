@@ -168,10 +168,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
             class="badge badge-soft badge-primary gap-1 py-2.5"
           >
             {PublishingCategory.translated_name(category, @language)}
+            <%!-- cursor-pointer is not redundant here: Tailwind v4's preflight
+                  stopped giving buttons a pointer, so a bare <button> reads as
+                  decoration. daisyUI's `btn` sets it, which is why this only
+                  bites buttons styled by hand. --%>
             <button
               :if={not @disabled}
               type="button"
-              class="opacity-60 hover:opacity-100"
+              class="cursor-pointer opacity-60 hover:opacity-100"
               aria-label={gettext("Remove %{name}", name: category.name)}
               phx-click="category_remove"
               phx-value-uuid={category.uuid}
