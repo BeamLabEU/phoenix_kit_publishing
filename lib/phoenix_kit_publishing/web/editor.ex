@@ -2796,6 +2796,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   toolbar={[:image, :video]}
                   readonly={edit_disabled? or @viewing_older_version}
                   preserve_tags={Renderer.component_tags()}
+                  gettext_backend={PhoenixKitPublishing.Gettext}
                   suggestions={[
                     %{
                       trigger: "#",
