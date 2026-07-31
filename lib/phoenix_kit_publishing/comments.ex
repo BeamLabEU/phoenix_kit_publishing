@@ -15,6 +15,13 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   follow-up).
   """
 
+  use Gettext, backend: PhoenixKitPublishing.Gettext
+
+  require Logger
+
+  alias PhoenixKit.Modules.Publishing.ActivityLog
+  alias PhoenixKit.Modules.Publishing.DBStorage
+
   @comments_mod PhoenixKitComments
   @compile {:no_warn_undefined, [PhoenixKitComments, PhoenixKitComments.Web.Markdown]}
 
@@ -153,12 +160,9 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
     if available?() do
       case resolve_threading(post_uuid, opts) do
         {:ok, attrs} ->
-          @comments_mod.create_comment(
-            @resource_type,
-            post_uuid,
-            user_uuid,
-            Map.put(attrs, :content, content)
-          )
+          @resource_type
+          |> @comments_mod.create_comment(post_uuid, user_uuid, Map.put(attrs, :content, content))
+          |> log_created(post_uuid, user_uuid, attrs)
 
         {:error, reason} ->
           {:error, reason}
@@ -168,6 +172,73 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
     end
   rescue
     _ -> {:error, :comments_unavailable}
+  end
+
+  # A comment was the one publishing mutation that left no audit trail at all,
+  # and the one most obviously worth telling somebody about.
+  #
+  # `target_uuid` is what turns an activity into a notification — core skips
+  # the fan-out when it is nil, which is why publishing generated none. The
+  # recipient is whoever is being replied to: the parent commenter for a
+  # reply, the post's author otherwise. Never the actor, or core would skip
+  # it anyway (you don't need telling that you commented).
+  defp log_created({:ok, comment} = result, post_uuid, user_uuid, attrs) do
+    do_log_created(comment, post_uuid, user_uuid, attrs)
+    result
+  rescue
+    error ->
+      # `create/4` wraps its whole body in a rescue that reports
+      # `:comments_unavailable`, so an exception raised while writing the
+      # audit row would tell the reader their comment failed — after it had
+      # been saved. Audit trouble must stay audit trouble.
+      Logger.warning("[Publishing] comment activity log failed: #{Exception.message(error)}")
+      result
+  end
+
+  defp log_created(other, _post_uuid, _user_uuid, _attrs), do: other
+
+  defp do_log_created(comment, post_uuid, user_uuid, attrs) do
+    post = safe_get_post(post_uuid)
+    reply? = is_binary(Map.get(attrs, :parent_uuid))
+    recipient = recipient_for(reply?, Map.get(attrs, :parent_uuid), post)
+
+    ActivityLog.log(%{
+      action: if(reply?, do: "publishing.comment.replied", else: "publishing.comment.created"),
+      mode: "manual",
+      actor_uuid: user_uuid,
+      target_uuid: if(recipient && recipient != user_uuid, do: recipient),
+      resource_type: "publishing_post",
+      resource_uuid: post_uuid,
+      metadata: %{
+        "comment_uuid" => Map.get(comment, :uuid),
+        # The post row carries the slug; the title lives on the per-language
+        # content row, so it isn't reachable from here without another read.
+        "post_slug" => post && post.slug,
+        "notification_text" =>
+          if(reply?,
+            do: gettext("Someone replied to your comment"),
+            else: gettext("New comment on your post")
+          ),
+        "notification_icon" => "hero-chat-bubble-left-right"
+      }
+    })
+  end
+
+  defp recipient_for(true, parent_uuid, post) do
+    case @comments_mod.get_comment(parent_uuid) do
+      %{user_uuid: uuid} when is_binary(uuid) -> uuid
+      _ -> post && post.created_by_uuid
+    end
+  rescue
+    _ -> post && post.created_by_uuid
+  end
+
+  defp recipient_for(false, _parent_uuid, post), do: post && post.created_by_uuid
+
+  defp safe_get_post(post_uuid) do
+    DBStorage.get_post_by_uuid(post_uuid)
+  rescue
+    _ -> nil
   end
 
   defp resolve_threading(post_uuid, opts) do

@@ -457,6 +457,47 @@ defmodule PhoenixKit.Modules.Publishing do
     }
   end
 
+  @doc """
+  Notification types this module contributes to the per-user preferences UI.
+
+  Without this the actions below still generate notifications, but a reader
+  has no way to turn them off — the preferences screen only lists registered
+  types. Publishing had neither: no type here, and no `target_uuid` on any
+  activity, so it produced no notifications at all.
+
+  Split into sub-types because the two differ in how personal they are: a
+  reply is addressed to you, while a comment on your post is closer to
+  ambient traffic and is the one a busy author mutes first.
+  """
+  @impl PhoenixKit.Module
+  def notification_types do
+    [
+      %{
+        key: "publishing",
+        label: "Publishing",
+        description: "Activity on posts you wrote",
+        actions: [],
+        default: true,
+        sub_types: [
+          %{
+            key: "comments",
+            label: "Comments on your posts",
+            description: "Someone commented on a post you wrote",
+            actions: ["publishing.comment.created"],
+            default: true
+          },
+          %{
+            key: "replies",
+            label: "Replies to your comments",
+            description: "Someone replied to a comment you left",
+            actions: ["publishing.comment.replied"],
+            default: true
+          }
+        ]
+      }
+    ]
+  end
+
   @impl PhoenixKit.Module
   def permission_metadata do
     %{

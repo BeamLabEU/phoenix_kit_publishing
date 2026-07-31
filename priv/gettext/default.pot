@@ -3517,3 +3517,13 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "Saving will publish this version and archive v%{version}, which is live now."
 msgstr ""
+
+#: lib/phoenix_kit_publishing/comments.ex:220
+#, elixir-autogen, elixir-format
+msgid "New comment on your post"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/comments.ex:219
+#, elixir-autogen, elixir-format
+msgid "Someone replied to your comment"
+msgstr ""
