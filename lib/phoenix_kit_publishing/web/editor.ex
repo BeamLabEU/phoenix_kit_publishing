@@ -2161,6 +2161,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   defp media_allowed_for_target?(_file_uuid, _target), do: true
 
+  # What the picker should contain for a given slot. Only audio is narrowed:
+  # `media_allowed_for_target?/2` refuses nothing else, and the image fields
+  # are legitimately used for more than one kind of file — narrowing those
+  # would take away a choice rather than prevent a mistake.
+  defp media_filter_for_target("audio_uuid"), do: :audio
+  defp media_filter_for_target(_target), do: :all
+
   defp handle_media_selected(socket, file_ids) do
     file_uuid = List.first(file_ids)
     inserting_image_component = Map.get(socket.assigns, :inserting_image_component, false)
@@ -3664,13 +3671,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     danger={true}
     />
 
-    <%!-- Media Selector Modal --%>
+    <%!-- Media Selector Modal.
+
+         The audio slot gets a picker that only contains audio. It used to
+         show the whole library and refuse a wrong pick afterwards, which
+         put the mistake after the effort — you browse, choose a file, and
+         only then find out that kind isn't allowed. The server-side check
+         stays as the backstop for anything that reaches the handler by
+         another route. --%>
     <.live_component
     module={PhoenixKitWeb.Live.Components.MediaSelectorModal}
     id="media-selector-modal"
     show={@show_media_selector}
     mode={@media_selection_mode}
     selected_uuids={@media_selected_uuids}
+    file_type_filter={media_filter_for_target(@media_selector_target)}
+    lock_file_type={@media_selector_target == "audio_uuid"}
     phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
     />
     """
