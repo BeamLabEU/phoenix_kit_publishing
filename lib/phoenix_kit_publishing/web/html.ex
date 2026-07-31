@@ -2282,7 +2282,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           :if={assigns[:newer_post] || assigns[:older_post]}
           class={[
             "grid gap-4 sm:grid-cols-2",
-            if(post_categories == [], do: trailing_rule, else: "mt-8")
+            # Following the categories, this is the second half of one
+            # trailing block rather than a new section, so it sits close. The
+            # old `mt-8` was sized for a boundary it used to mark itself and
+            # left a gap nearly as tall as the chips row above it.
+            if(post_categories == [], do: trailing_rule, else: "mt-4")
           ]}
           aria-label={gettext("More posts")}
         >

@@ -27,12 +27,12 @@ msgstr "« Traduire uniquement les manquantes » ne créera des traductions que 
 msgid "\"Translate to All\" will create or overwrite translations for all enabled languages."
 msgstr "« Traduire vers toutes les langues » créera ou écrasera les traductions pour toutes les langues activées."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2577
-#: lib/phoenix_kit_publishing/web/html.ex:2585
-#: lib/phoenix_kit_publishing/web/html.ex:2599
-#: lib/phoenix_kit_publishing/web/html.ex:2607
-#: lib/phoenix_kit_publishing/web/html.ex:2777
+#: lib/phoenix_kit_publishing/web/html.ex:2581
+#: lib/phoenix_kit_publishing/web/html.ex:2589
+#: lib/phoenix_kit_publishing/web/html.ex:2603
+#: lib/phoenix_kit_publishing/web/html.ex:2611
 #: lib/phoenix_kit_publishing/web/html.ex:2781
+#: lib/phoenix_kit_publishing/web/html.ex:2785
 #, elixir-autogen, elixir-format
 msgid "%B %d, %Y"
 msgstr "%B %d, %Y"
@@ -53,9 +53,9 @@ msgid_plural "%{count} versions"
 msgstr[0] "%{count} version"
 msgstr[1] "%{count} versions"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2601
-#: lib/phoenix_kit_publishing/web/html.ex:2609
-#: lib/phoenix_kit_publishing/web/html.ex:2794
+#: lib/phoenix_kit_publishing/web/html.ex:2605
+#: lib/phoenix_kit_publishing/web/html.ex:2613
+#: lib/phoenix_kit_publishing/web/html.ex:2798
 #, elixir-autogen, elixir-format
 msgid "%{date} at %{time}"
 msgstr "%{date} à %{time}"
@@ -190,12 +190,12 @@ msgstr "Un autre utilisateur modifie actuellement cet article. Vous pouvez le co
 msgid "Applies to all languages in this version."
 msgstr "S'applique à toutes les langues de cette version."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2959
+#: lib/phoenix_kit_publishing/web/html.ex:2963
 #, elixir-autogen, elixir-format
 msgid "Apr"
 msgstr "avr."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2942
+#: lib/phoenix_kit_publishing/web/html.ex:2946
 #, elixir-autogen, elixir-format
 msgid "April"
 msgstr "avril"
@@ -211,12 +211,12 @@ msgstr "avril"
 msgid "Archived"
 msgstr "Archivé"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2963
+#: lib/phoenix_kit_publishing/web/html.ex:2967
 #, elixir-autogen, elixir-format
 msgid "Aug"
 msgstr "août"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2946
+#: lib/phoenix_kit_publishing/web/html.ex:2950
 #, elixir-autogen, elixir-format
 msgid "August"
 msgstr "août"
@@ -233,7 +233,7 @@ msgstr "Échec de l'enregistrement automatique — cliquez sur Enregistrer pour 
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2490
 #: lib/phoenix_kit_publishing/web/html.ex:2092
-#: lib/phoenix_kit_publishing/web/html.ex:2372
+#: lib/phoenix_kit_publishing/web/html.ex:2376
 #: lib/phoenix_kit_publishing/web/preview.ex:343
 #, elixir-autogen, elixir-format
 msgid "Back to %{group}"
@@ -623,12 +623,12 @@ msgstr "Échec de la mise à jour de la base de données"
 msgid "Date"
 msgstr "Date"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2967
+#: lib/phoenix_kit_publishing/web/html.ex:2971
 #, elixir-autogen, elixir-format
 msgid "Dec"
 msgstr "déc."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2950
+#: lib/phoenix_kit_publishing/web/html.ex:2954
 #, elixir-autogen, elixir-format
 msgid "December"
 msgstr "décembre"
@@ -808,12 +808,12 @@ msgstr "Image mise en avant effacée"
 msgid "Featured image selected"
 msgstr "Image mise en avant sélectionnée"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2957
+#: lib/phoenix_kit_publishing/web/html.ex:2961
 #, elixir-autogen, elixir-format
 msgid "Feb"
 msgstr "févr."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2940
+#: lib/phoenix_kit_publishing/web/html.ex:2944
 #, elixir-autogen, elixir-format
 msgid "February"
 msgstr "février"
@@ -1018,32 +1018,32 @@ msgstr "Nom des éléments"
 msgid "Items called \"%{plural}\"."
 msgstr "Les éléments sont appelés « %{plural} »."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2956
+#: lib/phoenix_kit_publishing/web/html.ex:2960
 #, elixir-autogen, elixir-format
 msgid "Jan"
 msgstr "janv."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2939
+#: lib/phoenix_kit_publishing/web/html.ex:2943
 #, elixir-autogen, elixir-format
 msgid "January"
 msgstr "janvier"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2962
+#: lib/phoenix_kit_publishing/web/html.ex:2966
 #, elixir-autogen, elixir-format
 msgid "Jul"
 msgstr "juil."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2945
+#: lib/phoenix_kit_publishing/web/html.ex:2949
 #, elixir-autogen, elixir-format
 msgid "July"
 msgstr "juillet"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2961
+#: lib/phoenix_kit_publishing/web/html.ex:2965
 #, elixir-autogen, elixir-format
 msgid "Jun"
 msgstr "juin"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2944
+#: lib/phoenix_kit_publishing/web/html.ex:2948
 #, elixir-autogen, elixir-format
 msgid "June"
 msgstr "juin"
@@ -1113,18 +1113,18 @@ msgstr "Gérer les invites"
 msgid "Manage caching and performance settings for the publishing module."
 msgstr "Gérez les paramètres de cache et de performance du module de publication."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2958
+#: lib/phoenix_kit_publishing/web/html.ex:2962
 #, elixir-autogen, elixir-format
 msgid "Mar"
 msgstr "mars"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2941
+#: lib/phoenix_kit_publishing/web/html.ex:2945
 #, elixir-autogen, elixir-format
 msgid "March"
 msgstr "mars"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2943
-#: lib/phoenix_kit_publishing/web/html.ex:2960
+#: lib/phoenix_kit_publishing/web/html.ex:2947
+#: lib/phoenix_kit_publishing/web/html.ex:2964
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr "mai"
@@ -1259,12 +1259,12 @@ msgstr "Introuvable"
 msgid "Not published"
 msgstr "Non publié"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2966
+#: lib/phoenix_kit_publishing/web/html.ex:2970
 #, elixir-autogen, elixir-format
 msgid "Nov"
 msgstr "nov."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2949
+#: lib/phoenix_kit_publishing/web/html.ex:2953
 #, elixir-autogen, elixir-format
 msgid "November"
 msgstr "novembre"
@@ -1314,12 +1314,12 @@ msgstr "OK"
 msgid "ON — primary language URLs are prefixless (e.g. /blog/post). Managed on the Languages page."
 msgstr "ACTIVÉ — les URL de la langue principale sont sans préfixe (par ex. /blog/post). Gérable depuis la page Langues."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2965
+#: lib/phoenix_kit_publishing/web/html.ex:2969
 #, elixir-autogen, elixir-format
 msgid "Oct"
 msgstr "oct."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2948
+#: lib/phoenix_kit_publishing/web/html.ex:2952
 #, elixir-autogen, elixir-format
 msgid "October"
 msgstr "octobre"
@@ -1739,12 +1739,12 @@ msgstr "Sélectionner un point de terminaison..."
 msgid "Semantic URLs ideal for evergreen content."
 msgstr "URL sémantiques, idéales pour le contenu pérenne."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2964
+#: lib/phoenix_kit_publishing/web/html.ex:2968
 #, elixir-autogen, elixir-format
 msgid "Sep"
 msgstr "sept."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2947
+#: lib/phoenix_kit_publishing/web/html.ex:2951
 #, elixir-autogen, elixir-format
 msgid "September"
 msgstr "septembre"
@@ -2410,7 +2410,7 @@ msgstr "affichage"
 msgid "your-group"
 msgstr "votre-groupe"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2768
+#: lib/phoenix_kit_publishing/web/html.ex:2772
 #, elixir-autogen, elixir-format
 msgid "%{count} min read"
 msgid_plural "%{count} min read"
@@ -2933,7 +2933,7 @@ msgstr ""
 msgid "Minimal — date and title only, no images"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/html.ex:2287
+#: lib/phoenix_kit_publishing/web/html.ex:2291
 #, elixir-autogen, elixir-format
 msgid "More posts"
 msgstr ""
@@ -2952,7 +2952,7 @@ msgstr ""
 msgid "New category"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/html.ex:2295
+#: lib/phoenix_kit_publishing/web/html.ex:2299
 #, elixir-autogen, elixir-format
 msgid "Newer"
 msgstr ""
@@ -2973,7 +2973,7 @@ msgstr ""
 msgid "None (top level)"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/html.ex:2305
+#: lib/phoenix_kit_publishing/web/html.ex:2309
 #, elixir-autogen, elixir-format
 msgid "Older"
 msgstr ""
@@ -3085,7 +3085,7 @@ msgstr ""
 msgid "Show view counts"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/html.ex:2323
+#: lib/phoenix_kit_publishing/web/html.ex:2327
 #, elixir-autogen, elixir-format
 msgid "%{count} comment"
 msgid_plural "%{count} comments"
@@ -3123,12 +3123,12 @@ msgid "Listen to this post"
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/html.ex:2001
-#: lib/phoenix_kit_publishing/web/html.ex:2347
+#: lib/phoenix_kit_publishing/web/html.ex:2351
 #, elixir-autogen, elixir-format
 msgid "Log in"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/html.ex:2326
+#: lib/phoenix_kit_publishing/web/html.ex:2330
 #, elixir-autogen, elixir-format
 msgid "No comments yet — be the first."
 msgstr ""
@@ -3180,7 +3180,7 @@ msgstr ""
 msgid "Your browser does not support the audio element."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/html.ex:2349
+#: lib/phoenix_kit_publishing/web/html.ex:2353
 #, elixir-autogen, elixir-format
 msgid "to join the conversation."
 msgstr ""
