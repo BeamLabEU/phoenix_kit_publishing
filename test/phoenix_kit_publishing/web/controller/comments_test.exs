@@ -376,6 +376,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
     end
   end
 
+  describe "closing a note panel" do
+    setup %{slug: slug} do
+      {:ok, _} =
+        Groups.update_group(slug, %{"comments_enabled" => "true", "notes_style" => "panel"})
+
+      :ok
+    end
+
+    test "closing targets a fixed anchor, not the reference in the prose", %{
+      conn: conn,
+      slug: slug,
+      post: post
+    } do
+      alias PhoenixKit.Modules.Publishing
+      alias PhoenixKit.Modules.Publishing.Posts
+
+      {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
+
+      {:ok, _} =
+        Posts.update_post(
+          slug,
+          read,
+          %{"content" => ~s(Body with <Note note="A note.">a phrase</Note> in it.)},
+          %{}
+        )
+
+      html = conn |> get("/#{slug}/#{post.slug}") |> html_response(200)
+
+      # Opening costs nothing — the panel is fixed, so nothing scrolls. The
+      # close link used to point back at the reference marker in the text,
+      # which the browser then scrolled to the top of the viewport: a 440px
+      # jump away from the sentence the reader was already looking at.
+      assert html =~ ~s(id="pk-note-dismiss")
+      assert html =~ ~s(href="#pk-note-dismiss")
+
+      refute html =~ ~s(class="pk-note-panel-backdrop" aria-label) &&
+               html =~ ~s(href="#pk-note-ref-1" class="pk-note-panel-backdrop")
+
+      # The anchor has to be fixed and in view, or closing scrolls to reach it.
+      assert html =~ ".pk-note-dismiss{position:fixed"
+    end
+  end
+
   describe "moderation" do
     test "a held comment says so instead of claiming it posted", %{
       conn: conn,

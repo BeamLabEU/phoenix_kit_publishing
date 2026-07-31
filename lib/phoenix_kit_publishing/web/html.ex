@@ -1934,12 +1934,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   def note_panels(assigns) do
     ~H"""
     <section id="pk-note-panels" aria-label={gettext("Author notes")}>
+      <%!-- Closing a note used to point back at its reference marker in the
+        prose, on the reasoning that it returns you to what you were reading.
+        But opening a panel scrolls nothing — the panel is fixed — so you were
+        never taken away, and the "return" was a 440px jump to wherever the
+        browser chose to align that marker.
+
+        Closing instead targets this: fixed, one pixel, always inside the
+        viewport. `:target` moves off the panel so it shuts, and there is
+        nothing to scroll into view because it is already there. --%>
+      <span id="pk-note-dismiss" class="pk-note-dismiss" aria-hidden="true"></span>
       <div :for={note <- @post_notes} id={"pk-note-panel-#{note.id}"} class="pk-note-panel">
-        <a
-          href={"#pk-note-ref-#{note.number}"}
-          class="pk-note-panel-backdrop"
-          aria-label={gettext("Close note")}
-        >
+        <a href="#pk-note-dismiss" class="pk-note-panel-backdrop" aria-label={gettext("Close note")}>
         </a>
         <aside
           role="dialog"
@@ -1953,7 +1959,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               {gettext("Note")}
             </span>
             <a
-              href={"#pk-note-ref-#{note.number}"}
+              href="#pk-note-dismiss"
               class="btn btn-ghost btn-xs btn-circle"
               aria-label={gettext("Close note")}
             >
@@ -2005,7 +2011,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       /* .pk-open mirrors :target — replacing a :target node in the DOM
          (the fetch enhancement's section swap) makes browsers drop the
          :target match, so the script re-opens the hash's panel by class. */
-      .pk-note-panel{position:fixed;inset:0;z-index:60;visibility:hidden;pointer-events:none}
+      .pk-note-dismiss{position:fixed;top:0;left:0;width:1px;height:1px;pointer-events:none}
+    .pk-note-panel{position:fixed;inset:0;z-index:60;visibility:hidden;pointer-events:none}
       .pk-note-panel:target,.pk-note-panel.pk-open{visibility:visible;pointer-events:auto}
       .pk-note-panel-backdrop{position:absolute;inset:0;background:rgb(0 0 0/.25);opacity:0;transition:opacity .2s ease}
       .pk-note-panel:target .pk-note-panel-backdrop,.pk-note-panel.pk-open .pk-note-panel-backdrop{opacity:1}
