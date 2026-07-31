@@ -1363,6 +1363,41 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # Mode toggles are the component's own business.
   def handle_info({:leaf_mode_changed, _}, socket), do: {:noreply, socket}
 
+  # The category picker changed the selection. It's a LiveComponent, so it
+  # can't write the parent's form itself — and the form is where this has to
+  # land, because that is what makes it dirty-tracked, autosaved, broadcast
+  # to watchers and written by the same save as everything else on the
+  # version. Same pipeline as `update_meta`, minus the slug/title machinery
+  # that doesn't apply.
+  def handle_info({:categories_changed, uuids}, socket) do
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.readonly? or socket.assigns.translation_locked? do
+      {:noreply, socket}
+    else
+      new_form =
+        socket.assigns.form
+        |> Map.put("category_uuids", uuids)
+        |> Forms.normalize_form()
+
+      has_changes = Forms.dirty?(socket.assigns.post, new_form, socket.assigns.content)
+
+      socket =
+        socket
+        |> Forms.assign_form_with_tracking(new_form)
+        |> assign(:has_pending_changes, has_changes)
+        |> assign(:autosave_blocked, blocked_reason(socket, new_form))
+        |> push_event("changes-status", %{has_changes: has_changes})
+
+      socket = if has_changes, do: schedule_autosave(socket), else: socket
+
+      Collaborative.broadcast_form_change(socket, :meta, new_form)
+      socket = Collaborative.touch_activity(socket)
+
+      {:noreply, socket}
+    end
+  end
+
   # `#` in the body opens the tag popup. Answering is optional by contract —
   # a host that stays silent just gets a spinner that closes itself — so this
   # degrades rather than blocking the writer.
@@ -3132,14 +3167,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </p>
                 </div>
 
-                <%!-- Categories (WordPress-style tree; persists on toggle —
-                     independent of the content save, see the component doc). --%>
+                <%!-- Categories — version-level, edited through the form and
+                     written by the ordinary save (see the component doc). --%>
                 <.live_component
                   module={PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker}
                   id="post-categories-picker"
                   group_slug={@group_slug}
-                  post_uuid={assigns[:post] && @post[:uuid]}
-                  actor_uuid={Shared.actor_uuid_from_assigns(assigns)}
+                  selected={@form["category_uuids"] || []}
+                  language={@current_language}
                   disabled={edit_disabled? or @viewing_older_version}
                 />
 

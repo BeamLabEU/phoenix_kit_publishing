@@ -1314,6 +1314,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       )
       |> maybe_put_version_field("seo_title", Map.get(params, "seo_title"))
       |> maybe_put_version_field("tags", resolve_tags(version, params))
+      |> maybe_put_version_field("category_uuids", resolve_category_uuids(params))
       |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
       |> maybe_put_version_field("featured", normalize_featured(Map.get(params, "featured")))
       # Public `?v=N` browsing is gated on this and the mapper reads it, but no
@@ -1374,6 +1375,18 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       DBStorage.batch_load_contents([version.uuid])
       |> Map.get(version.uuid, [])
       |> Hashtags.extract_all()
+    end
+  end
+
+  # Categories filed against this version. `nil` (key absent) leaves the
+  # existing filing alone, so a save that doesn't carry the field — an
+  # autosave from a context that never loaded the picker, a translation
+  # write — can't quietly unfile a post. An empty list is a real answer:
+  # somebody removed the last chip, and that has to stick.
+  defp resolve_category_uuids(params) do
+    case Map.get(params, "category_uuids") do
+      list when is_list(list) -> list |> Enum.filter(&is_binary/1) |> Enum.uniq()
+      _ -> nil
     end
   end
 

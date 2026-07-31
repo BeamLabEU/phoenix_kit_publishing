@@ -79,6 +79,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         "slug",
         "featured_image_uuid",
         "featured",
+        "category_uuids",
         "audio_uuid",
         "allow_version_access",
         "url_slug",

@@ -977,9 +977,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
   # The post's categories for the chips row — only fetched when the group
   # shows them.
+  #
+  # Read off the post map rather than by post uuid, because the map is the
+  # version being rendered: someone on `?v=2` sees how v2 was filed, not how
+  # the live version is filed today. Resolving uuids to rows is a lookup
+  # against the group's category list, which is small and already cached.
   defp assign_post_categories(conn, group, post) do
     if Map.get(group, "show_categories", false) do
-      assign(conn, :post_categories, Categories.categories_of_post(post.uuid))
+      uuids = Map.get(post.metadata || %{}, :category_uuids, [])
+      assign(conn, :post_categories, Categories.categories_by_uuids(post.group, uuids))
     else
       assign(conn, :post_categories, [])
     end

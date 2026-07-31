@@ -1,21 +1,40 @@
 defmodule PhoenixKit.Modules.Publishing.Categories do
   @moduledoc """
   Hierarchical, per-group categories (WordPress-parity taxonomy) and the
-  post↔category assignments. Backed by core migration **V159**.
+  assignments of posts to them. The category rows come from core migration
+  **V159**.
 
-  Context-layer rules the DB doesn't enforce:
+  ## Assignments are version-level
+
+  A post's filing lives in `version.data["category_uuids"]`, next to the
+  version's tags, excerpt and SEO fields — not in a post-level join table.
+  A post's subject genuinely changes as it is revised (a release note that
+  grows into a guide), and a reader on `?v=2` should see how v2 was filed,
+  not how the live version is filed today. A new version inherits the whole
+  `data` map from the one it was created from, so the filing carries forward
+  by default and only differs where somebody changed it.
+
+  This is why there is no foreign key behind an assignment: `delete_category/2`
+  has to unfile the category by hand (`unfile_deleted_category/1`).
+
+  The V159 join table predates this and is drained on first use by
+  `backfill_version_categories/1`; nothing writes it any more.
+
+  Post-level helpers here (`replace_post_categories/3`,
+  `categories_of_post/1`, `category_uuids_for_post/1`) mean "the live
+  version, or the newest draft if it has never been published". Callers
+  that hold a specific version should read `category_uuids` off the post map
+  and resolve it with `categories_by_uuids/2`.
+
+  ## Context-layer rules the DB doesn't enforce
 
   - **Same-group parents** — a category's parent must belong to the same
     group.
   - **No cycles** — a category cannot become its own descendant; checked
     inside the update transaction so concurrent re-parents can't sneak a
     loop through.
-  - **Assignment scope** — `replace_post_categories/3` only accepts
-    categories of the post's own group.
-
-  Reads used by the public side (`categories_for_posts/1`, `by_slug/2`)
-  are plain queries — the listing cache carries the per-post category
-  uuids so hot listing paths never join here.
+  - **Assignment scope** — only categories of the post's own group are
+    accepted; foreign uuids are dropped rather than raising.
   """
 
   import Ecto.Query
@@ -26,7 +45,10 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.PublishingPostCategory
+  alias PhoenixKit.Modules.Publishing.PublishingVersion
   alias PhoenixKit.Modules.Publishing.SlugHelpers
+
+  require Logger
 
   defp repo, do: PhoenixKit.RepoHelper.repo()
 
@@ -190,6 +212,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     with {:ok, category} <- get_category(uuid) do
       case repo().delete(category) do
         {:ok, deleted} ->
+          unfile_deleted_category(deleted)
+
           ActivityLog.log_manual(
             "publishing.category.deleted",
             ActivityLog.actor_uuid(opts),
@@ -205,6 +229,43 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
           {:error, changeset}
       end
     end
+  end
+
+  # Assignments live in `version.data`, which no foreign key can reach, so
+  # deleting a category has to remove its uuid from every version that named
+  # it. Skipping this leaves versions filed under something that no longer
+  # exists — harmless to render (the uuid just resolves to nothing) but it
+  # comes back to life the moment a new category is created with the same
+  # uuid, and it quietly inflates nothing while looking like data.
+  #
+  # Scoped to the deleted category's own group: `data` is JSONB with no index
+  # here, and a group-wide update is small, where a table-wide one would not
+  # stay small.
+  defp unfile_deleted_category(%{uuid: category_uuid, group_uuid: group_uuid}) do
+    from(v in PublishingVersion,
+      join: p in PublishingPost,
+      on: p.uuid == v.post_uuid,
+      where: p.group_uuid == ^group_uuid,
+      where: fragment("? -> 'category_uuids' @> ?", v.data, ^[category_uuid]),
+      update: [
+        set: [
+          data:
+            fragment(
+              "jsonb_set(?, '{category_uuids}', (? -> 'category_uuids') - ?)",
+              v.data,
+              v.data,
+              ^category_uuid
+            )
+        ]
+      ]
+    )
+    |> repo().update_all([])
+
+    :ok
+  rescue
+    error ->
+      Logger.warning("[Publishing] Could not unfile deleted category: #{inspect(error)}")
+      :ok
   end
 
   @doc """
@@ -329,15 +390,105 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   # ===========================================================================
 
   @doc """
-  Replaces a post's category set with `category_uuids` (max 100 — a
+  Moves the legacy post-level assignments onto the versions, once per group.
+
+  Categories used to be a post-level join table, so every existing post's
+  filing lives there and nowhere else. Versions are the source of truth now,
+  and a version whose `data` has no `category_uuids` key is indistinguishable
+  from one deliberately filed under nothing — so without this, upgrading
+  silently unfiles the entire archive.
+
+  Copied onto EVERY version of the post, not just the active one, because
+  that is what the old model meant: the assignment applied to whatever
+  version you were looking at. Versions that already carry the key are left
+  alone, so a real edit can never be overwritten.
+
+  The legacy rows are then dropped, which is what makes this self-limiting:
+  no rows means nothing to move, so the steady state is a single cheap query
+  rather than a scan that repeats forever. It also leaves the core-owned
+  table empty, so whoever eventually drops it isn't deleting live data.
+
+  Returns the number of versions written.
+  """
+  def backfill_version_categories(group_slug) do
+    legacy =
+      from(pc in PublishingPostCategory,
+        join: p in PublishingPost,
+        on: p.uuid == pc.post_uuid,
+        join: g in PublishingGroup,
+        on: g.uuid == p.group_uuid,
+        where: g.slug == ^group_slug,
+        select: {pc.post_uuid, pc.category_uuid}
+      )
+      |> repo().all()
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+
+    if legacy == %{} do
+      0
+    else
+      {:ok, written} = repo().transaction(fn -> write_backfill(legacy) end)
+      Logger.info("[Publishing] Moved categories onto #{written} versions in #{group_slug}")
+      written
+    end
+  rescue
+    error ->
+      Logger.warning("[Publishing] Category backfill skipped: #{inspect(error)}")
+      0
+  end
+
+  defp write_backfill(legacy) do
+    post_uuids = Map.keys(legacy)
+
+    # An EMPTY list counts as "not migrated yet", not as a deliberate answer.
+    # A save can reach a version before this ever runs — the editor builds its
+    # form from `version.data`, sees no categories there because they are
+    # still in the old table, and writes that back as `[]`. Treating that as a
+    # real edit would let one autosave permanently unfile a post, and the
+    # writer would have no way to know it happened.
+    #
+    # Safe because the legacy rows are drained below: once the move is done
+    # there is nothing left to re-apply, so a genuine "filed under nothing"
+    # sticks from then on.
+    written =
+      from(v in PublishingVersion,
+        where: v.post_uuid in ^post_uuids,
+        where:
+          fragment("NOT (? \\? 'category_uuids')", v.data) or
+            fragment("? -> 'category_uuids' = '[]'::jsonb", v.data)
+      )
+      |> repo().all()
+      |> Enum.reduce(0, fn version, count ->
+        uuids = legacy |> Map.get(version.post_uuid, []) |> Enum.uniq()
+        data = Map.put(version.data || %{}, "category_uuids", uuids)
+
+        case version |> Ecto.Changeset.change(data: data) |> repo().update() do
+          {:ok, _} -> count + 1
+          {:error, _} -> count
+        end
+      end)
+
+    from(pc in PublishingPostCategory, where: pc.post_uuid in ^post_uuids)
+    |> repo().delete_all()
+
+    written
+  end
+
+  @doc """
+  Files a post's ACTIVE version under `category_uuids` (max 100 — a
   client-misbehavior guard, same convention as the reorder fns). Only
   categories belonging to the post's group are accepted; unknown/foreign
-  uuids are silently dropped rather than erroring, so a stale editor
-  checkbox can't fail the whole save.
+  uuids are silently dropped rather than erroring, so a stale selection
+  can't fail the whole save.
+
+  Assignments are version-level now, and this writes the version the public
+  sees. The editor doesn't use it — a writer edits the version they have
+  open, through the form — but it stays as the way to file a post when you
+  have a post uuid and mean "the live one": seeds, imports, bulk tools.
   """
   def replace_post_categories(post_uuid, category_uuids, opts \\ [])
       when is_list(category_uuids) and length(category_uuids) <= 100 do
-    with {:ok, post} <- get_post(post_uuid) do
+    with {:ok, post} <- get_post(post_uuid),
+         {:ok, version} <- target_version(post) do
       # Non-UUID strings must be dropped BEFORE the query — Ecto raises a
       # CastError on an uncastable value inside `in ^list`.
       castable =
@@ -354,19 +505,11 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         |> repo().all()
 
       {:ok, _} =
-        repo().transaction(fn ->
-          from(pc in PublishingPostCategory, where: pc.post_uuid == ^post_uuid)
-          |> repo().delete_all()
-
-          now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-          rows =
-            Enum.map(valid_uuids, fn category_uuid ->
-              %{post_uuid: post_uuid, category_uuid: category_uuid, inserted_at: now}
-            end)
-
-          repo().insert_all(PublishingPostCategory, rows, on_conflict: :nothing)
-        end)
+        version
+        |> Ecto.Changeset.change(
+          data: Map.put(version.data || %{}, "category_uuids", valid_uuids)
+        )
+        |> repo().update()
 
       ActivityLog.log_manual(
         "publishing.post.categorized",
@@ -381,45 +524,127 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     end
   end
 
-  @doc "Full category structs assigned to a post, position-ordered."
+  @doc """
+  Full category structs for a set of uuids within a group, position-ordered.
+
+  The lookup categories now go through: assignments live on the version, so a
+  reader has uuids and needs rows. Foreign or deleted uuids simply don't come
+  back — a version filed under a category somebody later deleted renders with
+  one fewer chip instead of erroring.
+  """
+  def categories_by_uuids(_group_slug, []), do: []
+
+  def categories_by_uuids(group_slug, uuids) when is_list(uuids) do
+    castable =
+      Enum.filter(uuids, fn value ->
+        is_binary(value) and match?({:ok, _}, Ecto.UUID.cast(value))
+      end)
+
+    if castable == [] do
+      []
+    else
+      group_slug
+      |> list_categories()
+      |> Enum.filter(&(&1.uuid in castable))
+    end
+  end
+
+  def categories_by_uuids(_group_slug, _uuids), do: []
+
+  @doc """
+  Full category structs on a post's ACTIVE version, position-ordered.
+
+  For a specific version, read `category_uuids` off the post map you already
+  have and resolve with `categories_by_uuids/2` — the public post page does
+  that, so `?v=2` shows how v2 was filed.
+  """
   def categories_of_post(post_uuid) do
-    from(pc in PublishingPostCategory,
-      join: c in PublishingCategory,
-      on: c.uuid == pc.category_uuid,
-      where: pc.post_uuid == ^post_uuid,
-      order_by: [asc: c.position, asc: c.name],
-      select: c
-    )
-    |> repo().all()
+    with {:ok, post} <- get_post(post_uuid),
+         {:ok, version} <- target_version(post) do
+      group_slug = group_slug_of(post)
+      categories_by_uuids(group_slug, PublishingVersion.get_category_uuids(version))
+    else
+      _ -> []
+    end
   rescue
     _ -> []
   end
 
-  @doc "Category uuids assigned to a post."
-  def category_uuids_for_post(post_uuid) do
-    from(pc in PublishingPostCategory,
-      where: pc.post_uuid == ^post_uuid,
-      select: pc.category_uuid
+  # The version a post-level caller means: the live one if there is one,
+  # otherwise the newest draft. A post that has never been published has no
+  # active version, and filing something before publishing it is the normal
+  # order of work — refusing there would make categories settable only after
+  # the fact.
+  defp target_version(post) do
+    case active_version(post) do
+      {:ok, version} -> {:ok, version}
+      {:error, _} -> latest_version(post)
+    end
+  end
+
+  defp active_version(%{active_version_uuid: uuid}) when is_binary(uuid) do
+    case repo().get(PublishingVersion, uuid) do
+      nil -> {:error, :no_active_version}
+      version -> {:ok, version}
+    end
+  end
+
+  defp active_version(_post), do: {:error, :no_active_version}
+
+  defp latest_version(%{uuid: post_uuid}) do
+    from(v in PublishingVersion,
+      where: v.post_uuid == ^post_uuid,
+      order_by: [desc: v.version_number],
+      limit: 1
     )
-    |> repo().all()
+    |> repo().one()
+    |> case do
+      nil -> {:error, :no_version}
+      version -> {:ok, version}
+    end
+  end
+
+  defp latest_version(_post), do: {:error, :no_version}
+
+  defp group_slug_of(post) do
+    case repo().get(PublishingGroup, post.group_uuid) do
+      nil -> nil
+      group -> group.slug
+    end
+  end
+
+  @doc "Category uuids on a post's ACTIVE version."
+  def category_uuids_for_post(post_uuid) do
+    with {:ok, post} <- get_post(post_uuid),
+         {:ok, version} <- target_version(post) do
+      PublishingVersion.get_category_uuids(version)
+    else
+      _ -> []
+    end
+  rescue
+    _ -> []
   end
 
   @doc """
-  Category uuids per post, for a whole list of post uuids in one query —
-  `%{post_uuid => [category_uuid]}`. The listing-cache regen uses this so
-  cached maps carry categories without per-post queries.
+  Category uuids per post, from each post's ACTIVE version —
+  `%{post_uuid => [category_uuid]}`.
+
+  The listing cache no longer needs this (it has the version in hand while
+  building each entry), but bulk callers that only hold post uuids still do.
   """
   def categories_for_posts(post_uuids) when is_list(post_uuids) do
-    from(pc in PublishingPostCategory,
-      where: pc.post_uuid in ^post_uuids,
-      select: {pc.post_uuid, pc.category_uuid}
+    from(p in PublishingPost,
+      join: v in PublishingVersion,
+      on: v.uuid == p.active_version_uuid,
+      where: p.uuid in ^post_uuids,
+      select: {p.uuid, fragment("? -> 'category_uuids'", v.data)}
     )
     |> repo().all()
-    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+    |> Map.new(fn {post_uuid, uuids} ->
+      {post_uuid, uuids |> List.wrap() |> Enum.filter(&is_binary/1)}
+    end)
   rescue
-    # Table missing (host core < V159): the listing-cache regen calls this on
-    # EVERY group rebuild — it must degrade to "no categories", never take
-    # the whole public listing down.
+    # Must degrade to "no categories", never take a public listing down.
     _ -> %{}
   end
 
@@ -455,20 +680,27 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   active published version, not trashed.
   """
   def published_post_counts(group_slug) do
-    from(pc in PublishingPostCategory,
-      join: c in PublishingCategory,
-      on: c.uuid == pc.category_uuid,
+    # Counted off each post's ACTIVE version, because that is the filing the
+    # public sees. A draft version refiled into a different category doesn't
+    # move the count until it is published — otherwise the admin tree would
+    # advertise archive entries that aren't there yet.
+    from(p in PublishingPost,
       join: g in PublishingGroup,
-      on: g.uuid == c.group_uuid,
-      join: p in PublishingPost,
-      on: p.uuid == pc.post_uuid,
+      on: g.uuid == p.group_uuid,
+      join: v in PublishingVersion,
+      on: v.uuid == p.active_version_uuid,
       where: g.slug == ^group_slug,
-      where: is_nil(p.trashed_at) and not is_nil(p.active_version_uuid),
-      group_by: pc.category_uuid,
-      select: {pc.category_uuid, count(p.uuid)}
+      where: is_nil(p.trashed_at),
+      select: {p.uuid, fragment("? -> 'category_uuids'", v.data)}
     )
     |> repo().all()
-    |> Map.new()
+    |> Enum.reduce(%{}, fn {_post_uuid, uuids}, acc ->
+      uuids
+      |> List.wrap()
+      |> Enum.filter(&is_binary/1)
+      |> Enum.uniq()
+      |> Enum.reduce(acc, fn uuid, inner -> Map.update(inner, uuid, 1, &(&1 + 1)) end)
+    end)
   rescue
     _ -> %{}
   end

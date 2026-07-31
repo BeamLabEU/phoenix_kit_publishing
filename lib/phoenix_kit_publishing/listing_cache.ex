@@ -36,6 +36,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   - On invalidate: clears :persistent_term entry (next read triggers regeneration)
   """
 
+  alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
 
@@ -136,6 +137,14 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   @spec regenerate(String.t(), keyword()) :: :ok | {:error, any()}
   def regenerate(group_slug, opts \\ []) do
     broadcast? = Keyword.get(opts, :broadcast, true)
+
+    # Categories moved from a post-level join table onto the versions. This is
+    # where the one-time move happens, because it is the one path every group
+    # goes through — public archives, admin listings, cache warmups — and a
+    # site whose archives are the only thing reading categories would never
+    # reach an admin-only hook. It drains the legacy rows, so the steady state
+    # is a single query that finds nothing.
+    Categories.backfill_version_categories(group_slug)
 
     if memory_cache_enabled?() do
       do_regenerate(group_slug, broadcast?)

@@ -119,6 +119,23 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   @doc "Returns the post tags."
   def get_tags(%__MODULE__{data: data}), do: Map.get(data, "tags", [])
 
+  @doc """
+  Returns the categories filed against this version.
+
+  Version-level, like everything else here. A post's subject can genuinely
+  change between versions — a release note that grows into a guide — and the
+  old version keeps the filing it was published under, which is what someone
+  reading `?v=2` should see. A new version inherits the whole `data` map from
+  the one it was created from, so this carries forward by default and only
+  differs where somebody changed it.
+  """
+  def get_category_uuids(%__MODULE__{data: data}) do
+    case Map.get(data, "category_uuids") do
+      list when is_list(list) -> Enum.filter(list, &is_binary/1)
+      _ -> []
+    end
+  end
+
   @doc "Returns the SEO description."
   def get_description(%__MODULE__{data: data}), do: Map.get(data, "description")
 
