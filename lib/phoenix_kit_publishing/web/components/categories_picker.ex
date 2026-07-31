@@ -34,6 +34,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
 
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.PublishingCategory
+  alias PhoenixKit.Utils.Routes
 
   # Deliberately more than a writer will ever have on one post: the dropdown
   # is for finding one entry, not for browsing the whole taxonomy.
@@ -52,13 +53,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
 
   @impl true
   def handle_event("category_search", %{"q" => query}, socket) do
+    # Re-read rather than search the tree loaded at mount. Making a category
+    # happens in another tab, and the whole point of sending people there is
+    # that they come back and use it — if this searched a stale list, the new
+    # category wouldn't be findable and the trip would look like it failed.
+    # One small query per search, on an admin screen.
+    tree = Categories.list_tree(socket.assigns.group_slug)
+
     results =
-      socket.assigns.tree
+      tree
       |> matching(query, socket.assigns.selected)
       |> Enum.take(@max_results)
 
     {:noreply,
-     push_event(socket, "category_results", %{
+     socket
+     |> assign(:tree, tree)
+     |> assign(:selected_categories, resolve(tree, socket.assigns.selected))
+     |> push_event("category_results", %{
        q: query,
        results: results,
        has_more: false
@@ -175,6 +186,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
           :if={not @disabled}
           id={"#{@id}-search"}
           dropdown_id={"#{@id}-dropdown"}
+          {%{"phx-target" => @myself}}
           search_on_focus
           direction="up"
           search_event="category_search"
@@ -186,6 +198,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
           searching_label={gettext("Searching…")}
           no_matches_label={gettext("No matching categories")}
         />
+
+        <%!-- Deliberately a link to the management page rather than a
+             "create" row in the dropdown. A category isn't just a name: its
+             slug becomes a public archive URL, and it has a parent, a
+             position and translations. A search box can only supply the
+             name, so inline creation would file everything flat at the root
+             and leave someone to clean up a live URL afterwards.
+
+             New tab, because the writer is mid-post with unsaved changes —
+             navigating away to make a category is the one thing this must
+             not cost them. A real anchor, so cmd-click and middle-click
+             behave, and it works with no JS at all. --%>
+        <.link
+          :if={not @disabled}
+          href={Routes.path("/admin/publishing/categories/#{@group_slug}")}
+          target="_blank"
+          rel="noopener"
+          class="link link-hover text-xs text-base-content/60 mt-1 inline-flex items-center gap-1"
+        >
+          <span class="hero-plus-mini h-3 w-3"></span>
+          {gettext("New category")}
+        </.link>
 
         <p :if={@selected_categories == [] and not @disabled} class="text-xs text-base-content/60 mt-1">
           {gettext("Saved with the version, so each version keeps its own filing.")}
