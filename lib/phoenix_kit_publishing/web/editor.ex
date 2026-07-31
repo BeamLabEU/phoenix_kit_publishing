@@ -1385,6 +1385,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       selected = Map.get(selection || %{}, :text, "") |> to_string()
 
       case component_snippet(id, selected) do
+        # A gallery with no pictures renders as nothing at all, so a skeleton
+        # would look like the button had failed. It opens the picker instead,
+        # in multi-select, and arrives already full.
+        :pick_audio ->
+          {:noreply,
+           socket
+           |> assign(:media_selection_mode, :single)
+           |> assign(:media_selected_uuids, [])
+           |> assign(:media_selector_target, "audio_component")
+           |> assign(:inserting_audio, true)
+           |> assign(:show_media_selector, true)}
+
+        :pick_images ->
+          {:noreply,
+           socket
+           |> assign(:media_selection_mode, :multiple)
+           |> assign(:media_selected_uuids, [])
+           |> assign(:media_selector_target, "gallery")
+           |> assign(:inserting_gallery, true)
+           |> assign(:show_media_selector, true)}
+
         nil ->
           {:noreply, socket}
 
@@ -2182,7 +2203,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # Only the audio slot is type-checked: the image slots already point at an
   # image-filtered selector, and a wrong image is visible at a glance whereas a
   # wrong audio file is silent.
-  defp media_allowed_for_target?(file_uuid, "audio_uuid") do
+  defp media_allowed_for_target?(file_uuid, target)
+       when target in ["audio_uuid", "audio_component"] do
     case PhoenixKit.Modules.Storage.get_file(file_uuid) do
       %{file_type: "audio"} -> true
       %{mime_type: mime} when is_binary(mime) -> String.starts_with?(mime, "audio/")
@@ -2218,6 +2240,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         id: "phk-showcase",
         title: gettext("Showcase band"),
         icon: toolbar_glyph("▤")
+      },
+      %{
+        id: "phk-gallery",
+        title: gettext("Gallery (helix)"),
+        icon: toolbar_glyph("◍")
+      },
+      %{
+        id: "phk-audio",
+        title: gettext("Audio player"),
+        icon: toolbar_glyph("♪")
       },
       %{
         id: "phk-note",
@@ -2264,6 +2296,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     ~s(<Note note="#{gettext("Your note here")}">#{phrase}</Note>)
   end
 
+  defp component_snippet("phk-gallery", _selected), do: :pick_images
+  defp component_snippet("phk-audio", _selected), do: :pick_audio
+
   defp component_snippet("phk-cta", selected) do
     body = fallback(selected, gettext("What should the reader do next?"))
     ~s(<CTA>#{body}</CTA>\n\n)
@@ -2283,6 +2318,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # are legitimately used for more than one kind of file — narrowing those
   # would take away a choice rather than prevent a mistake.
   defp media_filter_for_target("audio_uuid"), do: :audio
+  defp media_filter_for_target("audio_component"), do: :audio
+  defp media_filter_for_target("gallery"), do: :image
   defp media_filter_for_target(_target), do: :all
 
   defp handle_media_selected(socket, file_ids) do
@@ -2308,9 +2345,44 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   defp do_handle_media_selected(socket, file_ids) do
     file_uuid = List.first(file_ids)
     inserting_image_component = Map.get(socket.assigns, :inserting_image_component, false)
+    inserting_gallery = Map.get(socket.assigns, :inserting_gallery, false)
+    inserting_audio = Map.get(socket.assigns, :inserting_audio, false)
 
     {socket, autosave?} =
       cond do
+        inserting_audio and file_uuid ->
+          send_update(Leaf,
+            id: "content-editor",
+            action: :insert_markdown,
+            text: Helpers.audio_component_markup(file_uuid)
+          )
+
+          {
+            socket
+            |> assign(:show_media_selector, false)
+            |> assign(:media_selector_target, "featured_image_uuid")
+            |> assign(:inserting_audio, false)
+            |> put_flash(:info, gettext("Audio player inserted")),
+            false
+          }
+
+        inserting_gallery and file_ids != [] ->
+          send_update(Leaf,
+            id: "content-editor",
+            action: :insert_markdown,
+            text: Helpers.gallery_markup(file_ids)
+          )
+
+          {
+            socket
+            |> assign(:show_media_selector, false)
+            |> assign(:media_selection_mode, :single)
+            |> assign(:media_selector_target, "featured_image_uuid")
+            |> assign(:inserting_gallery, false)
+            |> put_flash(:info, gettext("Gallery inserted")),
+            false
+          }
+
         file_uuid && inserting_image_component ->
           markup = Helpers.image_component_markup(file_uuid)
           # Insert through Leaf's own command (CSP-safe, survives navigation)
@@ -3857,7 +3929,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     mode={@media_selection_mode}
     selected_uuids={@media_selected_uuids}
     file_type_filter={media_filter_for_target(@media_selector_target)}
-    lock_file_type={@media_selector_target == "audio_uuid"}
+    lock_file_type={@media_selector_target in ["audio_uuid", "audio_component", "gallery"]}
     phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
     />
     """

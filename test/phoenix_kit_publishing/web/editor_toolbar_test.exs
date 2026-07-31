@@ -27,6 +27,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorToolbarTest do
     %{view: view, html: html}
   end
 
+  defp assigns_of(view) do
+    view.pid |> :sys.get_state() |> get_in([Access.key(:socket), Access.key(:assigns)])
+  end
+
   defp toolbar_action(view, id, selected \\ "") do
     send(
       view.pid,
@@ -38,9 +42,57 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorToolbarTest do
   end
 
   test "the component buttons reach the toolbar", %{html: html} do
-    for id <- ~w(phk-headline phk-showcase phk-note phk-cta) do
+    for id <- ~w(phk-headline phk-showcase phk-gallery phk-audio phk-note phk-cta) do
       assert html =~ id, "#{id} must be offered in the toolbar"
     end
+  end
+
+  test "gallery and audio open the picker instead of inserting a skeleton", %{view: view} do
+    # Both render as NOTHING when empty, so a placeholder skeleton would look
+    # exactly like a button that did nothing. They collect their files first.
+    toolbar_action(view, "phk-gallery")
+    gallery = assigns_of(view)
+
+    assert gallery[:show_media_selector]
+    assert gallery[:inserting_gallery]
+    assert gallery[:media_selection_mode] == :multiple, "a gallery needs more than one picture"
+    assert gallery[:media_selector_target] == "gallery"
+
+    refute_push_event(view, "leaf-command:content-editor", %{action: "insert_markdown"})
+  end
+
+  test "the audio button picks one audio file", %{view: view} do
+    toolbar_action(view, "phk-audio")
+    a = assigns_of(view)
+
+    assert a[:show_media_selector]
+    assert a[:inserting_audio]
+    assert a[:media_selection_mode] == :single
+    assert a[:media_selector_target] == "audio_component"
+  end
+
+  test "a chosen gallery arrives as uuid-backed images, not frozen URLs", %{view: view} do
+    toolbar_action(view, "phk-gallery")
+
+    uuids = [Ecto.UUID.generate(), Ecto.UUID.generate()]
+    send(view.pid, {:media_selected, uuids})
+    _ = render(view)
+
+    assert_push_event(view, "leaf-command:content-editor", %{
+      action: "insert_markdown",
+      text: text
+    })
+
+    assert text =~ "<Gallery"
+    assert text =~ "</Gallery>"
+
+    # file_uuid, so the URL is resolved at render time and the post survives a
+    # change of storage prefix or signing secret.
+    for uuid <- uuids do
+      assert text =~ ~s(file_uuid="#{uuid}")
+    end
+
+    refute text =~ "/file/"
   end
 
   test "a note wraps the selection instead of replacing it", %{view: view} do

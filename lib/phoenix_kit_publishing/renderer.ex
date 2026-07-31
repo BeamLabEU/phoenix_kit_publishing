@@ -1282,16 +1282,65 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     move <> "@keyframes pk-hx-#{gid}-s#{i}{" <> scrim <> "}"
   end
 
-  # Markdown image lines, in source order. Anything else in the body is
-  # ignored rather than rendered, so a stray blank line or comment can't
-  # produce a card with no picture in it.
+  # The pictures, in source order. Two forms are accepted: ordinary Markdown
+  # image lines, and `<Image file_uuid="…">` tags — the latter being what the
+  # editor's picker inserts, and what survives a change of storage prefix or
+  # signing secret, since the URL is resolved at render time rather than
+  # frozen into the post.
+  #
+  # Anything else in the body is ignored rather than rendered, so a stray
+  # blank line or comment can't produce a card with no picture in it.
   defp gallery_images(body) do
+    body = to_string(body)
+
+    (gallery_markdown_images(body) ++ gallery_uuid_images(body))
+    |> Enum.sort_by(& &1.at)
+    |> Enum.map(&Map.delete(&1, :at))
+  end
+
+  defp gallery_markdown_images(body) do
     ~r/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/
-    |> Regex.scan(to_string(body))
-    |> Enum.map(fn [_full, alt, src] ->
-      %{src: escape_html(src), alt: escape_html(alt)}
+    |> Regex.scan(body, return: :index)
+    |> Enum.map(fn [{at, _}, alt_r, src_r] ->
+      %{
+        at: at,
+        src: body |> binary_part(elem(src_r, 0), elem(src_r, 1)) |> escape_html(),
+        alt: body |> binary_part(elem(alt_r, 0), elem(alt_r, 1)) |> escape_html()
+      }
     end)
   end
+
+  defp gallery_uuid_images(body) do
+    # Matched as a whole tag and then parsed with the module's own attribute
+    # reader, rather than picking attributes out with one clever regex: an
+    # optional capture group after a lazy quantifier is happy to match nothing,
+    # which silently dropped every alt text.
+    ~r/<Image\s([^>]*)>/
+    |> Regex.scan(body, return: :index)
+    |> Enum.map(fn [{at, _}, {attr_start, attr_len}] ->
+      attrs = body |> binary_part(attr_start, attr_len) |> parse_xml_attributes()
+      {at, attrs}
+    end)
+    |> Enum.filter(fn {_at, attrs} ->
+      uuid = Map.get(attrs, "file_uuid")
+      is_binary(uuid) and Shared.uuid_format?(uuid)
+    end)
+    |> Enum.map(fn {at, attrs} ->
+      %{
+        at: at,
+        src: escape_html(URLSigner.signed_url(Map.get(attrs, "file_uuid"), "large")),
+        alt: escape_html(Map.get(attrs, "alt", ""))
+      }
+    end)
+  rescue
+    _ -> []
+  end
+
+  # "drift" (default) turns on its own; "scroll" ties the rotation to the
+  # reader's scroll. Anything else falls back to drift rather than erroring —
+  # a typo in an attribute shouldn't cost you the gallery.
+  defp gallery_motion("scroll"), do: "scroll"
+  defp gallery_motion(_), do: "drift"
 
   # The default is the theme's own surface, so the gallery belongs to the page
   # rather than sitting on it as a foreign panel. An explicit override is
@@ -1300,12 +1349,6 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # HTML-escaping doesn't touch it. Anything not recognisably a colour is
   # dropped and the theme default stands.
   @gallery_color_regex ~r/^(#[0-9a-fA-F]{3,8}|(rgb|rgba|hsl|hsla|oklch|oklab|color-mix)\([^;{}"'()]*\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]{3,20})$/
-
-  # "drift" (default) turns on its own; "scroll" ties the rotation to the
-  # reader's scroll. Anything else falls back to drift rather than erroring —
-  # a typo in an attribute shouldn't cost you the gallery.
-  defp gallery_motion("scroll"), do: "scroll"
-  defp gallery_motion(_), do: "drift"
 
   defp gallery_background(bg) when is_binary(bg) do
     trimmed = String.trim(bg)

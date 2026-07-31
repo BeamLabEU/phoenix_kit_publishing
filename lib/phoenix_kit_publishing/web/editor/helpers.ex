@@ -195,6 +195,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
     ~s(\n<Image file_uuid="#{safe_uuid}" alt="#{alt_from_file(file_uuid)}"/>\n)
   end
 
+  @doc """
+  A `<Gallery>` block wrapping one `<Image>` line per chosen file.
+
+  Uuids rather than signed URLs: the URL is then resolved at render time, so
+  the post survives a change of storage prefix or signing secret instead of
+  carrying a frozen link that quietly rots.
+  """
+  def gallery_markup(file_uuids) when is_list(file_uuids) do
+    lines =
+      file_uuids
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map_join("\n", fn uuid ->
+        safe = String.replace(uuid, ~r/[^0-9a-fA-F-]/, "")
+        ~s(<Image file_uuid="#{safe}" alt="#{alt_from_file(uuid)}"/>)
+      end)
+
+    ~s(\n<Gallery height="520" radius="420" turns="2">\n#{lines}\n</Gallery>\n)
+  end
+
+  @doc """
+  An inline `<Audio>` player for a chosen file. Distinct from the sidebar's
+  "Audio version", which is the whole post read aloud — this one drops a
+  player at the cursor.
+  """
+  def audio_component_markup(file_uuid) when is_binary(file_uuid) do
+    safe = String.replace(file_uuid, ~r/[^0-9a-fA-F-]/, "")
+    ~s(\n<Audio file_uuid="#{safe}" title="#{alt_from_file(file_uuid)}"/>\n)
+  end
+
   defp alt_from_file(file_uuid) do
     case safe_get_file(file_uuid) do
       %{original_file_name: name} when is_binary(name) and name != "" ->
