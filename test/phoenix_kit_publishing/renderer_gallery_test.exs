@@ -111,6 +111,37 @@ defmodule PhoenixKit.Modules.Publishing.RendererGalleryTest do
     assert html =~ "(--probe: 0)"
   end
 
+  test "the backdrop and the depth cue both follow the theme" do
+    html = gallery(four_images())
+
+    # A hardcoded near-black panel is a foreign object on a light theme —
+    # the same mistake the Showcase band's default tone once made.
+    assert html =~ "var(--pk-hx-bg,var(--color-base-100,#fff))"
+    refute html =~ "#0d0d0c"
+
+    # Distance reads as opacity, not brightness. Darkening only recedes over a
+    # dark backdrop; on a light theme it makes the far cards jump forward.
+    assert html =~ "opacity:0.15;"
+    refute html =~ "brightness("
+  end
+
+  test "an explicit background still wins" do
+    html = gallery(four_images(), ~s(height="400" background="#101014"))
+    assert html =~ "--pk-hx-bg:#101014"
+
+    themed = gallery(four_images(), ~s|background="var(--color-base-300)"|)
+    assert themed =~ "--pk-hx-bg:var(--color-base-300)"
+  end
+
+  test "a background that isn't a colour is dropped, not escaped into the style" do
+    # This lands inside a `style` attribute, where `;` opens a new declaration
+    # — HTML escaping doesn't stop that, so the value is allow-listed instead.
+    html = gallery(four_images(), ~s(background="red;position:fixed;inset:0"))
+
+    refute html =~ "position:fixed"
+    refute html =~ "--pk-hx-bg:"
+  end
+
   test "expensive and unwanted work is dropped where it should be" do
     html = gallery(four_images())
 

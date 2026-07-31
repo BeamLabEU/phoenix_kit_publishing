@@ -131,31 +131,38 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
      radius and no span, i.e. a heap. Failing that test drops cleanly to the
      grid above rather than to a pile. */
   @supports (transform-style: preserve-3d) and (--probe: 0) {
-    .pk-helix__scene{display:block;position:relative;height:var(--pk-hx-height,520px);perspective:var(--pk-hx-perspective,1200px);perspective-origin:50% 50%;overflow:hidden;background:var(--pk-hx-bg,#0d0d0c);border-radius:12px}
+    .pk-helix__scene{display:block;position:relative;height:var(--pk-hx-height,520px);perspective:var(--pk-hx-perspective,1200px);perspective-origin:50% 50%;overflow:hidden;background:var(--pk-hx-bg,var(--color-base-100,#fff));border-radius:12px}
     .pk-helix__world{display:block;position:absolute;inset:0;transform-style:preserve-3d}
-    .pk-helix__card{position:absolute;left:50%;top:50%;width:var(--pk-hx-card-w,225px);height:var(--pk-hx-card-h,155px);aspect-ratio:auto;will-change:transform,filter;transform:var(--pk-hx-rest);animation:pk-hx-move var(--pk-hx-dur,80s) linear infinite,pk-hx-depth var(--pk-hx-rot,40s) linear infinite}
+    .pk-helix__card{position:absolute;left:50%;top:50%;width:var(--pk-hx-card-w,225px);height:var(--pk-hx-card-h,155px);aspect-ratio:auto;will-change:transform,opacity,filter;transform:var(--pk-hx-rest);animation:pk-hx-move var(--pk-hx-dur,80s) linear infinite,pk-hx-depth var(--pk-hx-rot,40s) linear infinite}
     /* Fades the strand into the backdrop top and bottom, which is also what
        hides the wrap point where a card jumps from the end back to the start. */
-    .pk-helix__vignette{display:block;position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,var(--pk-hx-bg,#0d0d0c) 0%,transparent 18%,transparent 82%,var(--pk-hx-bg,#0d0d0c) 100%)}
+    .pk-helix__vignette{display:block;position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,var(--pk-hx-bg,var(--color-base-100,#fff)) 0%,transparent 18%,transparent 82%,var(--pk-hx-bg,var(--color-base-100,#fff)) 100%)}
   }
 
   @keyframes pk-hx-move{
     from{transform:translate(-50%,-50%) rotateY(var(--pk-hx-phase,0turn)) translateZ(var(--pk-hx-radius,420px)) translateY(calc(var(--pk-hx-span,780px) * -0.5))}
     to{transform:translate(-50%,-50%) rotateY(calc(var(--pk-hx-phase,0turn) + var(--pk-hx-turns,2) * 1turn)) translateZ(var(--pk-hx-radius,420px)) translateY(calc(var(--pk-hx-span,780px) * 0.5))}
   }
-  /* One full rotation. brightness = 0.12 + 0.88·depth², blur = (1−depth)²·max,
-     with depth = (cos θ + 1)/2 — sampled every eighth of a turn, dense enough
-     that the interpolation between stops is imperceptible. */
+  /* One full rotation, sampled every eighth of a turn — dense enough that the
+     interpolation between stops is imperceptible.
+
+     Distance is expressed as OPACITY, not brightness. The published versions
+     of this effect darken the far side, which only reads as depth over a
+     near-black backdrop: on a light theme a dimmed card goes dark against
+     white and leaps FORWARD instead of receding. Fading toward whatever is
+     behind works on any theme, and it is cheaper than a brightness filter.
+
+     opacity = 0.15 + 0.85·depth², blur = (1−depth)²·max, depth = (cos θ+1)/2. */
   @keyframes pk-hx-depth{
-    0%{filter:brightness(1) blur(0)}
-    12.5%{filter:brightness(0.761) blur(calc(var(--pk-hx-blur,5px) * 0.021))}
-    25%{filter:brightness(0.34) blur(calc(var(--pk-hx-blur,5px) * 0.25))}
-    37.5%{filter:brightness(0.139) blur(calc(var(--pk-hx-blur,5px) * 0.729))}
-    50%{filter:brightness(0.12) blur(var(--pk-hx-blur,5px))}
-    62.5%{filter:brightness(0.139) blur(calc(var(--pk-hx-blur,5px) * 0.729))}
-    75%{filter:brightness(0.34) blur(calc(var(--pk-hx-blur,5px) * 0.25))}
-    87.5%{filter:brightness(0.761) blur(calc(var(--pk-hx-blur,5px) * 0.021))}
-    100%{filter:brightness(1) blur(0)}
+    0%{opacity:1;filter:blur(0)}
+    12.5%{opacity:0.769;filter:blur(calc(var(--pk-hx-blur,5px) * 0.021))}
+    25%{opacity:0.363;filter:blur(calc(var(--pk-hx-blur,5px) * 0.25))}
+    37.5%{opacity:0.168;filter:blur(calc(var(--pk-hx-blur,5px) * 0.729))}
+    50%{opacity:0.15;filter:blur(var(--pk-hx-blur,5px))}
+    62.5%{opacity:0.168;filter:blur(calc(var(--pk-hx-blur,5px) * 0.729))}
+    75%{opacity:0.363;filter:blur(calc(var(--pk-hx-blur,5px) * 0.25))}
+    87.5%{opacity:0.769;filter:blur(calc(var(--pk-hx-blur,5px) * 0.021))}
+    100%{opacity:1;filter:blur(0)}
   }
 
   /* Blur is by far the most expensive part — recomputed for every card on
@@ -179,7 +186,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @media (prefers-reduced-data:reduce),(update:slow){
     .pk-helix__scene{display:block;height:auto;background:none;perspective:none;overflow:visible}
     .pk-helix__world{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;position:static;inset:auto;transform-style:flat}
-    .pk-helix__card{position:static;width:auto;height:auto;aspect-ratio:3/2;transform:none;animation:none;filter:none;will-change:auto}
+    .pk-helix__card{position:static;width:auto;height:auto;aspect-ratio:3/2;transform:none;animation:none;filter:none;opacity:1;will-change:auto}
     .pk-helix__vignette{display:none}
   }
   </style>
@@ -1149,8 +1156,23 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     end)
   end
 
-  defp gallery_background(bg) when is_binary(bg) and bg != "",
-    do: ["--pk-hx-bg:#{escape_html(bg)}"]
+  # The default is the theme's own surface, so the gallery belongs to the page
+  # rather than sitting on it as a foreign panel. An explicit override is
+  # allow-listed rather than escaped: this lands inside a `style` attribute,
+  # where the dangerous character is `;` — it starts a new declaration, and
+  # HTML-escaping doesn't touch it. Anything not recognisably a colour is
+  # dropped and the theme default stands.
+  @gallery_color_regex ~r/^(#[0-9a-fA-F]{3,8}|(rgb|rgba|hsl|hsla|oklch|oklab|color-mix)\([^;{}"'()]*\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]{3,20})$/
+
+  defp gallery_background(bg) when is_binary(bg) do
+    trimmed = String.trim(bg)
+
+    if trimmed != "" and Regex.match?(@gallery_color_regex, trimmed) do
+      ["--pk-hx-bg:#{trimmed}"]
+    else
+      []
+    end
+  end
 
   defp gallery_background(_bg), do: []
 
