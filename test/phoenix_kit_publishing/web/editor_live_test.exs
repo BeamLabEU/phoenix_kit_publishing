@@ -254,11 +254,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert assigns_of(view)[:form]["allow_version_access"] == true
     end
 
-    test "warns before a save publishes this version and archives the rest", %{
+    test "warns before a save takes the live version down", %{
       conn: conn,
       group: group,
       post: post
     } do
+      :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
+      {:ok, _v2} = Versions.create_version_from(group["slug"], post[:uuid], 1)
+
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit?v=2")
+
+      # A <select> can't carry a data-confirm, so the consequence has to be
+      # stated before the writer saves.
+      html =
+        render_change(view, "update_meta", %{"status" => "published", "_target" => ["status"]})
+
+      assert html =~ "which is live now"
+      assert html =~ "archive v1"
+    end
+
+    test "no publish warning when there is nothing live to take down", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      # This used to warn on any post with more than one version, counting
+      # them all as about to be archived. Publishing only archives a version
+      # whose own status is "published", and here none is.
       {:ok, _v2} = Versions.create_version_from(group["slug"], post[:uuid], 1)
 
       {:ok, view, _} =
@@ -266,12 +291,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      # A <select> can't carry a data-confirm, so the consequence has to be
-      # stated before the writer saves.
       html =
         render_change(view, "update_meta", %{"status" => "published", "_target" => ["status"]})
 
-      assert html =~ "archive the other"
+      refute html =~ "which is live now"
     end
 
     test "keeps the slug-truncation warning while the title stays over the URL cap",

@@ -2229,6 +2229,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # `icon` is raw SVG rather than a heroicon class because Leaf renders these
   # in its own toolbar, outside this app's CSS: a `hero-*` class only works
   # where that stylesheet reached, and Leaf's toolbar sits in its own markup.
+  # The version that saving would take down, or nil when saving changes
+  # nothing about what is published.
+  #
+  # This used to warn whenever the status select read "published" and the post
+  # had more than one version, counting every other version as about to be
+  # archived. Both halves were wrong. `archive_other_published_versions!` only
+  # touches versions whose own status is "published", and only one can be — so
+  # a post with five versions loses ONE, not four. And on the version that is
+  # already live there is nothing to take down at all: it is its own target,
+  # so the warning fired on exactly the save that changes nothing.
+  defp version_to_be_archived(assigns) do
+    statuses = assigns[:version_statuses] || %{}
+    current = assigns[:current_version]
+
+    if assigns[:form]["status"] == "published" and Map.get(statuses, current) != "published" do
+      statuses
+      |> Enum.find(fn {number, status} -> status == "published" and number != current end)
+      |> case do
+        {number, _status} -> number
+        nil -> nil
+      end
+    end
+  end
+
   defp component_toolbar_buttons do
     [
       %{
@@ -3694,18 +3718,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <p class="text-xs text-base-content/50 mt-1">
                     {gettext("Applies to all languages in this version.")}
                   </p>
-                  <%!-- Publishing archives every OTHER version (Persistence
-                        calls publish_version, which does that atomically). A
-                        select can't carry a data-confirm, so say it plainly
-                        before the writer saves rather than after. --%>
+                  <%!-- Publishing archives the version that is live now
+                        (Persistence calls publish_version, which does that
+                        atomically). A select can't carry a data-confirm, so
+                        say it plainly before the writer saves rather than
+                        after — but only when it is actually true. --%>
                   <p
-                    :if={@form["status"] == "published" and length(@available_versions || []) > 1}
+                    :if={version_to_be_archived(assigns)}
                     class="text-xs text-warning mt-1 flex items-start gap-1"
                   >
                     <.icon name="hero-exclamation-triangle" class="w-3 h-3 mt-0.5 shrink-0" />
                     {gettext(
-                      "Saving will publish this version and archive the other %{count}.",
-                      count: length(@available_versions) - 1
+                      "Saving will publish this version and archive v%{version}, which is live now.",
+                      version: version_to_be_archived(assigns)
                     )}
                   </p>
                 </div>
