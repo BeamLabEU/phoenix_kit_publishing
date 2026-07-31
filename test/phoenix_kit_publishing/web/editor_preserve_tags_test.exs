@@ -31,6 +31,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorPreserveTagsTest do
              "visual mode silently flattens them on the next autosave"
   end
 
+  test "the body editor opens in markdown mode" do
+    source = File.read!(@editor_source)
+
+    # Leaf defaults to :hybrid, which is a visual surface. Posts here are
+    # written with PHK components, and those are only editable as text — so
+    # the mode is chosen explicitly and should stay chosen.
+    assert source =~ "mode={:markdown}",
+           "the body editor must open in markdown mode; Leaf's :hybrid default " <>
+             "renders PHK components as uneditable blocks"
+  end
+
   test "every tag the renderer dispatches on is declared" do
     declared = MapSet.new(Renderer.component_tags())
 

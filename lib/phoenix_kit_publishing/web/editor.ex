@@ -2783,10 +2783,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   placeholder={gettext("Post title")}
                   readonly={edit_disabled? or @viewing_older_version}
                 />
-                <%!-- Content editor (Leaf): visual/markdown dual mode, and the
+                <%!-- Content editor (Leaf), opened in markdown mode, plus the
                       `#` trigger that turns body hashtags into an autocomplete.
                       Tags come from the group's existing ones — see
-                      handle_info({:leaf_suggest, …}). --%>
+                      handle_info({:leaf_suggest, …}).
+
+                      `mode` is set deliberately, not left at Leaf's default of
+                      :hybrid. The hybrid and visual surfaces round-trip the
+                      body through HTML, which is fine for prose but makes PHK
+                      components second-class: `preserve_tags` keeps them
+                      intact, but only as opaque blocks nobody can edit without
+                      dropping to markdown anyway. Posts here are written with
+                      <Showcase>, <Note>, <Audio> and friends, so markdown is
+                      the mode that can actually edit them. The toolbar still
+                      offers the other modes — Leaf has no supported way to
+                      remove them — but nothing depends on anyone using one. --%>
                 <.leaf_editor
                   id="content-editor"
                   content={@content}
@@ -2795,6 +2806,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   debounce={400}
                   toolbar={[:image, :video]}
                   readonly={edit_disabled? or @viewing_older_version}
+                  mode={:markdown}
                   preserve_tags={Renderer.component_tags()}
                   gettext_backend={PhoenixKitPublishing.Gettext}
                   suggestions={[
@@ -2804,9 +2816,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       first_char: ~r/\p{L}/u,
                       token: ~r/[\p{L}\p{N}_-]/u,
                       max_length: 30,
-                      # 1, not 0: a lone "#" on an empty line is also a valid
-                      # empty heading, and opening the popup on that keystroke
-                      # fights the hybrid preview.
+                      # 1, not 0: a lone "#" at the start of a line is a
+                      # heading, and popping a tag list open on that keystroke
+                      # interrupts someone who is only writing a title.
                       min_chars: 1,
                       debounce: 150,
                       max_results: 10,
