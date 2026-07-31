@@ -37,7 +37,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   #     a #word would keep rendering it as plain text without the bump.
   # v7: <Showcase> renders as a band instead of falling through to the unknown-
   #     component fallback, and its stylesheet is appended per document.
-  @cache_version "v7"
+  # v8: <Gallery> renders as a helix instead of falling through to the unknown-
+  #     component fallback, and its stylesheet is appended per document.
+  @cache_version "v8"
 
   # Matches the internal signed-file route — `<prefix>/file/<uuid>/<variant>/<token>`
   # — embedded as an `<img src>`. The prefix is bounded to plain path segments
@@ -53,7 +55,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @per_group_cache_prefix "publishing_render_cache_enabled_"
 
   @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|Audio|EntityForm)\s+([^>]*?)\/>/s
-  @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|Audio|EntityForm|Showcase)\s*([^>]*)>(.*?)<\/\1>/s
+  @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|Audio|EntityForm|Showcase|Gallery)\s*([^>]*)>(.*?)<\/\1>/s
 
   # Every tag this module knows how to render. The editor hands this list to
   # Leaf as `preserve_tags` so the visual mode treats each one as a single
@@ -64,7 +66,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # containing `<Showcase>`, touch anything, and the autosave writes back a
   # body with the bands flattened to loose paragraphs. It is silent, it looks
   # like nothing happened, and the only copy of the original is gone.
-  @component_tags ~w(Image CTA Headline Subheadline Video Audio EntityForm Showcase Note)
+  @component_tags ~w(Image CTA Headline Subheadline Video Audio EntityForm Showcase Gallery Note)
 
   @doc """
   The PHK component tags the renderer understands, for editors that must keep
@@ -74,10 +76,114 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   def component_tags, do: @component_tags
 
   @showcase_regex ~r/^<Showcase\s*([^>]*)>(.*)<\/Showcase>$/s
+  @gallery_regex ~r/^<Gallery\s*([^>]*)>(.*)<\/Gallery>$/s
   @showcase_default_overlap 15
   @showcase_max_overlap 40
   @showcase_min_height 120
   @showcase_max_height 1200
+
+  # <Gallery> — images on a slowly turning double helix.
+  #
+  # No JavaScript. The reference implementations of this effect run a
+  # requestAnimationFrame loop that writes `transform` and `filter` onto every
+  # card each frame; that can't work here, because public post pages are dead
+  # views where JS is progressive enhancement only, and a gallery whose entire
+  # layout comes from a script renders as a pile of cards stacked at the
+  # centre when the script doesn't run.
+  #
+  # Two observations make CSS sufficient. First, every card follows the SAME
+  # path — they differ only in how far along it they are — so one keyframe
+  # animation plus a negative `animation-delay` per card spreads them along
+  # the strand. Second, the path is a loop: with a whole number of turns the
+  # rotation wraps seamlessly, and the vertical jump from bottom back to top
+  # is invisible because `--pk-hx-span` runs the strand off both edges of the
+  # frame. That is why the reference uses an integer turn count and a span
+  # factor above 1; here those choices are what make the animation loopable
+  # rather than merely tidy.
+  #
+  # Depth (far cards dimmer and blurrier) is a SECOND animation on the same
+  # element, animating `filter` while the first animates `transform`. It runs
+  # on the rotation period rather than the strand period, so a single shared
+  # keyframe block serves every card and every configuration — the card's own
+  # angle is expressed entirely as its delay. Emitting per-instance keyframes
+  # would otherwise be unavoidable, since brightness depends on the absolute
+  # angle, not on progress along the strand.
+  #
+  # `prefers-reduced-motion` pauses both animations. Because each card's delay
+  # already places it correctly, pausing yields a static, properly-posed helix
+  # rather than the collapsed pile that stopping a script would leave.
+  @helix_css """
+  <style>
+  /* ---- Floor: a plain responsive image grid. -------------------------------
+     Everything starts here, and anything that can't do the helix STAYS here.
+     A grid of pictures is a perfectly good gallery, which is the point: the
+     fallback is a real design, not a broken one. */
+  .pk-helix{margin:2.5rem 0;position:relative}
+  .pk-helix__world{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem}
+  .pk-helix__card{border-radius:10px;overflow:hidden;aspect-ratio:3/2}
+  .pk-helix__card img{width:100%;height:100%;object-fit:cover;display:block}
+  .pk-helix__vignette{display:none}
+
+  /* ---- Enhancement: the helix. ---------------------------------------------
+     Gated on BOTH the 3D presentation and custom properties, because the
+     whole layout is expressed in `var()`s — a browser with `preserve-3d` but
+     without custom properties would position every card at the centre with no
+     radius and no span, i.e. a heap. Failing that test drops cleanly to the
+     grid above rather than to a pile. */
+  @supports (transform-style: preserve-3d) and (--probe: 0) {
+    .pk-helix__scene{display:block;position:relative;height:var(--pk-hx-height,520px);perspective:var(--pk-hx-perspective,1200px);perspective-origin:50% 50%;overflow:hidden;background:var(--pk-hx-bg,#0d0d0c);border-radius:12px}
+    .pk-helix__world{display:block;position:absolute;inset:0;transform-style:preserve-3d}
+    .pk-helix__card{position:absolute;left:50%;top:50%;width:var(--pk-hx-card-w,225px);height:var(--pk-hx-card-h,155px);aspect-ratio:auto;will-change:transform,filter;transform:var(--pk-hx-rest);animation:pk-hx-move var(--pk-hx-dur,80s) linear infinite,pk-hx-depth var(--pk-hx-rot,40s) linear infinite}
+    /* Fades the strand into the backdrop top and bottom, which is also what
+       hides the wrap point where a card jumps from the end back to the start. */
+    .pk-helix__vignette{display:block;position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,var(--pk-hx-bg,#0d0d0c) 0%,transparent 18%,transparent 82%,var(--pk-hx-bg,#0d0d0c) 100%)}
+  }
+
+  @keyframes pk-hx-move{
+    from{transform:translate(-50%,-50%) rotateY(var(--pk-hx-phase,0turn)) translateZ(var(--pk-hx-radius,420px)) translateY(calc(var(--pk-hx-span,780px) * -0.5))}
+    to{transform:translate(-50%,-50%) rotateY(calc(var(--pk-hx-phase,0turn) + var(--pk-hx-turns,2) * 1turn)) translateZ(var(--pk-hx-radius,420px)) translateY(calc(var(--pk-hx-span,780px) * 0.5))}
+  }
+  /* One full rotation. brightness = 0.12 + 0.88·depth², blur = (1−depth)²·max,
+     with depth = (cos θ + 1)/2 — sampled every eighth of a turn, dense enough
+     that the interpolation between stops is imperceptible. */
+  @keyframes pk-hx-depth{
+    0%{filter:brightness(1) blur(0)}
+    12.5%{filter:brightness(0.761) blur(calc(var(--pk-hx-blur,5px) * 0.021))}
+    25%{filter:brightness(0.34) blur(calc(var(--pk-hx-blur,5px) * 0.25))}
+    37.5%{filter:brightness(0.139) blur(calc(var(--pk-hx-blur,5px) * 0.729))}
+    50%{filter:brightness(0.12) blur(var(--pk-hx-blur,5px))}
+    62.5%{filter:brightness(0.139) blur(calc(var(--pk-hx-blur,5px) * 0.729))}
+    75%{filter:brightness(0.34) blur(calc(var(--pk-hx-blur,5px) * 0.25))}
+    87.5%{filter:brightness(0.761) blur(calc(var(--pk-hx-blur,5px) * 0.021))}
+    100%{filter:brightness(1) blur(0)}
+  }
+
+  /* Blur is by far the most expensive part — recomputed for every card on
+     every frame — so it comes off wherever the hardware is likely to be
+     modest: small screens, and touch devices of any size (a coarse pointer at
+     tablet width is still phone-class silicon). Brightness alone still reads
+     as depth. */
+  @media (max-width:767px){.pk-helix__scene{--pk-hx-blur:0px}}
+  @media (hover:none) and (pointer:coarse){.pk-helix__scene{--pk-hx-blur:0px}}
+
+  /* Someone who asked for less motion gets the helix holding still. Each
+     card's delay already places it correctly, so pausing is a posed
+     arrangement rather than the heap that stopping a script would leave. */
+  @media (prefers-reduced-motion:reduce){
+    .pk-helix__card{animation-play-state:paused}
+  }
+
+  /* Data saver, and displays that repaint slowly (e-ink, some kiosk panels):
+     abandon the effect entirely and show the grid, which costs one repaint
+     instead of a permanent animation. */
+  @media (prefers-reduced-data:reduce),(update:slow){
+    .pk-helix__scene{display:block;height:auto;background:none;perspective:none;overflow:visible}
+    .pk-helix__world{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;position:static;inset:auto;transform-style:flat}
+    .pk-helix__card{position:static;width:auto;height:auto;aspect-ratio:3/2;transform:none;animation:none;filter:none;will-change:auto}
+    .pk-helix__vignette{display:none}
+  }
+  </style>
+  """
 
   # Named grid lines make the overlap literal: the media spans
   # [edge → overlap-end] and the text [overlap-start → edge], so the middle
@@ -345,7 +451,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       end
 
     healed = heal_signed_file_urls(result)
-    healed <> notes_html <> showcase_styles(healed)
+    healed <> notes_html <> showcase_styles(healed) <> helix_styles(healed)
   end
 
   def render_markdown(_, _opts), do: ""
@@ -356,6 +462,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # drag the stylesheet along with it.
   defp showcase_styles(html) do
     if String.contains?(html, ~s(class="pk-showcase )), do: @showcase_css, else: ""
+  end
+
+  defp helix_styles(html) do
+    if String.contains?(html, ~s(class="pk-helix)), do: @helix_css, else: ""
   end
 
   defp normalize_notes_style("panel"), do: "panel"
@@ -554,6 +664,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       String.contains?(content, "<Video") ||
       String.contains?(content, "<Audio") ||
       String.contains?(content, "<Showcase") ||
+      String.contains?(content, "<Gallery") ||
       String.contains?(content, "<EntityForm")
   end
 
@@ -905,12 +1016,148 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   end
 
   defp render_block_component(fragment) do
-    case Regex.run(@showcase_regex, fragment) do
-      [_full, attrs, body] ->
+    cond do
+      match = Regex.run(@showcase_regex, fragment) ->
+        [_full, attrs, body] = match
         render_showcase(parse_xml_attributes(attrs), body)
 
-      _ ->
+      match = Regex.run(@gallery_regex, fragment) ->
+        [_full, attrs, body] = match
+        render_gallery(parse_xml_attributes(attrs), body)
+
+      true ->
         render_page_builder_block(fragment)
+    end
+  end
+
+  # Images arranged on a slowly turning double helix. See `@helix_css` for why
+  # this is pure CSS and how the animation loops.
+  #
+  # The body is ordinary Markdown image lines, so a gallery reads as a list of
+  # pictures in the source and degrades to exactly that if this ever stops
+  # rendering:
+  #
+  #     <Gallery height="520" radius="420">
+  #     ![A doorway](https://…/1.jpg)
+  #     ![The courtyard](https://…/2.jpg)
+  #     </Gallery>
+  defp render_gallery(attrs, body) do
+    case gallery_images(body) do
+      # Nothing usable — better to render nothing than an empty black box.
+      [] ->
+        ""
+
+      images ->
+        strands = gallery_int(Map.get(attrs, "strands"), 2, 1, 4)
+        turns = gallery_int(Map.get(attrs, "turns"), 2, 1, 6)
+        radius = gallery_int(Map.get(attrs, "radius"), 420, 120, 900)
+        height = gallery_int(Map.get(attrs, "height"), 520, 200, 1200)
+        card_w = gallery_int(Map.get(attrs, "card_width"), 225, 60, 600)
+        card_h = gallery_int(Map.get(attrs, "card_height"), 155, 40, 400)
+        # Seconds for one card to travel a whole strand.
+        duration = gallery_int(Map.get(attrs, "speed"), 80, 10, 600)
+
+        # Runs the strand off both edges, which is what hides the wrap.
+        span = round(height * 1.5)
+        per_strand = max(ceil(length(images) / strands), 1)
+
+        scene_vars =
+          [
+            "--pk-hx-height:#{height}px",
+            "--pk-hx-radius:#{radius}px",
+            "--pk-hx-span:#{span}px",
+            "--pk-hx-turns:#{turns}",
+            "--pk-hx-card-w:#{card_w}px",
+            "--pk-hx-card-h:#{card_h}px",
+            "--pk-hx-dur:#{duration}s",
+            "--pk-hx-rot:#{Float.round(duration / turns, 3)}s"
+          ] ++ gallery_background(Map.get(attrs, "background"))
+
+        cards =
+          images
+          |> Enum.with_index()
+          |> Enum.map_join("\n", fn {image, i} ->
+            gallery_card(image, i, strands, per_strand, turns, duration, radius, span)
+          end)
+
+        """
+        <figure class="pk-helix">
+        <div class="pk-helix__scene" style="#{Enum.join(scene_vars, ";")}">
+        <div class="pk-helix__world">
+        #{cards}
+        </div>
+        <div class="pk-helix__vignette"></div>
+        </div>
+        </figure>
+        """
+    end
+  rescue
+    error ->
+      Logger.warning("Error rendering Gallery component: #{inspect(error)}")
+      ""
+  end
+
+  defp gallery_card(%{src: src, alt: alt}, i, strands, per_strand, turns, duration, radius, span) do
+    strand = rem(i, strands)
+    index = div(i, strands)
+    # Where this card starts along its strand, 0..1.
+    progress = index / per_strand
+    # Strand phase, in turns: two strands sit half a turn apart.
+    phase = strand / strands
+
+    # Negative delays start each animation partway through, which is what
+    # spreads the cards along the strand instead of stacking them at the top.
+    move_delay = -Float.round(progress * duration, 3)
+
+    # The depth animation runs on the ROTATION period, so its offset is the
+    # card's absolute angle expressed in rotations.
+    rotations = phase + progress * turns
+    depth_delay = -Float.round(:math.fmod(rotations, 1.0) * (duration / turns), 3)
+
+    # The resting pose, for when animations don't run at all. Carried as a
+    # CUSTOM PROPERTY rather than as `transform` directly: an inline transform
+    # would also apply on devices that fall back to the plain grid, throwing
+    # its cards off-screen. The `@supports` block is what turns this into an
+    # actual transform, so it exists only where the helix does.
+    angle = phase + progress * turns
+    y = (progress - 0.5) * span
+
+    static =
+      "--pk-hx-rest:translate(-50%,-50%) rotateY(#{Float.round(angle, 4)}turn) " <>
+        "translateZ(#{radius}px) translateY(#{Float.round(y, 1)}px)"
+
+    style =
+      [
+        "--pk-hx-phase:#{Float.round(phase, 4)}turn",
+        "animation-delay:#{move_delay}s,#{depth_delay}s",
+        static
+      ]
+      |> Enum.join(";")
+
+    ~s(<div class="pk-helix__card" style="#{style}">) <>
+      ~s(<img src="#{src}" alt="#{alt}" loading="lazy" decoding="async"></div>)
+  end
+
+  # Markdown image lines, in source order. Anything else in the body is
+  # ignored rather than rendered, so a stray blank line or comment can't
+  # produce a card with no picture in it.
+  defp gallery_images(body) do
+    ~r/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/
+    |> Regex.scan(to_string(body))
+    |> Enum.map(fn [_full, alt, src] ->
+      %{src: escape_html(src), alt: escape_html(alt)}
+    end)
+  end
+
+  defp gallery_background(bg) when is_binary(bg) and bg != "",
+    do: ["--pk-hx-bg:#{escape_html(bg)}"]
+
+  defp gallery_background(_bg), do: []
+
+  defp gallery_int(value, default, min, max) do
+    case value |> to_string() |> String.trim() |> Integer.parse() do
+      {n, _} -> n |> max(min) |> min(max)
+      :error -> default
     end
   end
 

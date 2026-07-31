@@ -752,7 +752,7 @@ msgstr "Mise en file d'attente…"
 msgid "Entries Cached"
 msgstr "Entrées mises en cache"
 
-#: lib/phoenix_kit_publishing/renderer.ex:585
+#: lib/phoenix_kit_publishing/renderer.ex:696
 #, elixir-autogen, elixir-format
 msgid "Error rendering markdown"
 msgstr "Erreur lors du rendu du markdown"

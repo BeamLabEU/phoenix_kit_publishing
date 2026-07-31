@@ -752,7 +752,7 @@ msgstr "Accodamento…"
 msgid "Entries Cached"
 msgstr "Voci in cache"
 
-#: lib/phoenix_kit_publishing/renderer.ex:585
+#: lib/phoenix_kit_publishing/renderer.ex:696
 #, elixir-autogen, elixir-format
 msgid "Error rendering markdown"
 msgstr "Errore nel rendering del markdown"
