@@ -829,6 +829,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply, assign(socket, :ai_selected_prompt_uuid, prompt_uuid)}
   end
 
+  # These write the shared default prompt, not this post — but they're edit
+  # actions offered inside an editor that is telling the user it's read-only,
+  # and the buttons are disabled to match.
+  def handle_event("generate_default_translation_prompt", _params, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
+
+  def handle_event("regenerate_default_translation_prompt", _params, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
+
   def handle_event("generate_default_translation_prompt", _params, socket) do
     case Translation.generate_default_translation_prompt() do
       {:ok, prompt} ->
@@ -2169,6 +2180,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   defp media_filter_for_target(_target), do: :all
 
   defp handle_media_selected(socket, file_ids) do
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.readonly? or socket.assigns.translation_locked? do
+      # Every other write path checks this; the media picker didn't. A
+      # session whose lock had lapsed could still open the picker, choose a
+      # file, and have it assigned, broadcast to the real editor and
+      # autosaved — the one hole through which a spectator could overwrite
+      # the owner's featured image, OG image or audio.
+      {:noreply,
+       socket
+       |> assign(:show_media_selector, false)
+       |> assign(:media_selector_target, "featured_image_uuid")
+       |> assign(:inserting_image_component, false)
+       |> put_flash(:warning, gettext("Someone else is editing this post — nothing was changed."))}
+    else
+      do_handle_media_selected(socket, file_ids)
+    end
+  end
+
+  defp do_handle_media_selected(socket, file_ids) do
     file_uuid = List.first(file_ids)
     inserting_image_component = Map.get(socket.assigns, :inserting_image_component, false)
 
@@ -2534,6 +2565,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     type="button"
                     class="btn btn-outline btn-xs gap-1 [&.phx-click-loading]:pointer-events-none"
                     phx-click="generate_default_translation_prompt"
+                    disabled={edit_disabled?}
                   >
                     <.icon name="hero-sparkles" class="w-3 h-3 [.phx-click-loading_&]:hidden" />
                     <span class="hidden loading loading-spinner loading-xs [.phx-click-loading_&]:inline-block">
@@ -2546,6 +2578,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     type="button"
                     class="btn btn-warning btn-outline btn-xs gap-1 [&.phx-click-loading]:pointer-events-none"
                     phx-click="regenerate_default_translation_prompt"
+                    disabled={edit_disabled?}
                     title={gettext("This prompt predates the current format and may mistranslate. Click to update it.")}
                   >
                     <.icon name="hero-arrow-path" class="w-3 h-3 [.phx-click-loading_&]:hidden" />
@@ -2610,7 +2643,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   phx-click="translate_to_all_languages"
                   phx-disable-with={gettext("Enqueueing…")}
                   disabled={
-                    @ai_selected_endpoint_uuid == nil or
+                    edit_disabled? or
+                      @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
                       @ai_translation_status in [:enqueued, :in_progress]
                   }
@@ -2625,7 +2659,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   phx-click="translate_missing_languages"
                   phx-disable-with={gettext("Enqueueing…")}
                   disabled={
-                    @ai_selected_endpoint_uuid == nil or
+                    edit_disabled? or
+                      @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
                       @ai_translation_status in [:enqueued, :in_progress]
                   }
@@ -2640,7 +2675,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   phx-click="translate_to_this_language"
                   phx-disable-with={gettext("Translating…")}
                   disabled={
-                    @ai_selected_endpoint_uuid == nil or
+                    edit_disabled? or
+                      @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
                       @ai_translation_status in [:enqueued, :in_progress]
                   }
@@ -3011,6 +3047,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                             <button
                               type="button"
                               phx-click="open_media_selector"
+                              disabled={edit_disabled? or @viewing_older_version}
                               class="btn btn-primary btn-sm shadow-lg"
                             >
                               <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" />
@@ -3019,6 +3056,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                             <button
                               type="button"
                               phx-click="clear_featured_image"
+                              disabled={edit_disabled? or @viewing_older_version}
                               phx-disable-with={gettext("Removing…")}
                               class="btn btn-error btn-sm shadow-lg"
                             >
@@ -3034,6 +3072,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           <button
                             type="button"
                             phx-click="open_media_selector"
+                            disabled={edit_disabled? or @viewing_older_version}
                             class="btn btn-primary btn-sm flex-1"
                           >
                             <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" />
@@ -3042,6 +3081,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           <button
                             type="button"
                             phx-click="clear_featured_image"
+                            disabled={edit_disabled? or @viewing_older_version}
                             phx-disable-with={gettext("Removing…")}
                             class="btn btn-error btn-sm flex-1"
                           >
@@ -3056,8 +3096,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     <button
                       type="button"
                       phx-click="open_media_selector"
-                      class={"w-full border-2 border-dashed border-base-300 rounded-lg p-8 transition-all group #{if edit_disabled? or @viewing_older_version, do: "opacity-50 cursor-not-allowed", else: "hover:border-primary hover:bg-primary/5"}"}
                       disabled={edit_disabled? or @viewing_older_version}
+                      class={"w-full border-2 border-dashed border-base-300 rounded-lg p-8 transition-all group #{if edit_disabled? or @viewing_older_version, do: "opacity-50 cursor-not-allowed", else: "hover:border-primary hover:bg-primary/5"}"}
                     >
                       <div class="flex flex-col items-center gap-3 text-base-content/60 group-hover:text-primary transition-colors">
                         <.icon name="hero-photo" class="w-12 h-12" />
@@ -3219,6 +3259,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       :if={not (edit_disabled? or @viewing_older_version)}
                       type="button"
                       phx-click="open_media_selector"
+                      disabled={edit_disabled? or @viewing_older_version}
                       phx-value-field="audio_uuid"
                       class="btn btn-outline btn-sm shrink-0"
                     >
@@ -3232,6 +3273,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       }
                       type="button"
                       phx-click="clear_audio"
+                      disabled={edit_disabled? or @viewing_older_version}
                       class="btn btn-ghost btn-sm shrink-0"
                       title={gettext("Remove the audio version")}
                     >
@@ -3337,6 +3379,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                               <button
                                 type="button"
                                 phx-click="open_media_selector"
+                                disabled={edit_disabled? or @viewing_older_version}
                                 phx-value-field="og_image_uuid"
                                 class="btn btn-outline btn-xs flex-1"
                               >
@@ -3346,6 +3389,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                               <button
                                 type="button"
                                 phx-click="clear_og_image"
+                                disabled={edit_disabled? or @viewing_older_version}
                                 phx-disable-with={gettext("Removing…")}
                                 class="btn btn-outline btn-error btn-xs flex-1"
                               >
@@ -3364,6 +3408,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           <button
                             type="button"
                             phx-click="open_media_selector"
+                            disabled={edit_disabled? or @viewing_older_version}
                             phx-value-field="og_image_uuid"
                             class="btn btn-outline btn-xs w-full"
                           >
@@ -3492,6 +3537,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     type="button"
                     phx-click="clear_translation"
                     phx-disable-with={gettext("Clearing…")}
+                    disabled={edit_disabled?}
                     class="btn btn-outline btn-error btn-sm w-full gap-2"
                     data-confirm={
                       gettext(
@@ -3590,6 +3636,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             class="btn btn-primary"
             phx-click="create_version_from_source"
             phx-disable-with={gettext("Creating…")}
+            disabled={edit_disabled?}
           >
             <.icon name="hero-plus" class="w-4 h-4" />
             {gettext("Create Version")}
