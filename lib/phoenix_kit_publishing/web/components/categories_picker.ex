@@ -168,20 +168,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
             class="badge badge-soft badge-primary gap-1 py-2.5"
           >
             {PublishingCategory.translated_name(category, @language)}
-            <%!-- cursor-pointer is not redundant here: Tailwind v4's preflight
-                  stopped giving buttons a pointer, so a bare <button> reads as
-                  decoration. daisyUI's `btn` sets it, which is why this only
-                  bites buttons styled by hand. --%>
+            <%!-- Two things this button has to say, neither of them free.
+
+                  `cursor-pointer`: Tailwind v4's preflight stopped giving
+                  buttons a pointer, so a bare <button> reads as decoration.
+                  daisyUI's `btn` sets it, which is why this only bites
+                  buttons styled by hand.
+
+                  The spinner: removing a chip is a server round trip, and
+                  until it answers the x looks like it did nothing. LiveView
+                  puts `phx-click-loading` on the clicked element for exactly
+                  the in-flight window, so the glyph swaps for a spinner and
+                  further clicks are ignored — no double-fire, and the click
+                  is visibly acknowledged even when the connection is slow.
+                  On a fast link this is a blink; on a bad one it's the
+                  difference between "it worked" and clicking again. --%>
             <button
               :if={not @disabled}
               type="button"
-              class="cursor-pointer opacity-60 hover:opacity-100"
+              class="cursor-pointer opacity-60 hover:opacity-100 [&.phx-click-loading]:pointer-events-none [&.phx-click-loading]:opacity-100"
               aria-label={gettext("Remove %{name}", name: category.name)}
               phx-click="category_remove"
               phx-value-uuid={category.uuid}
               phx-target={@myself}
             >
-              <span class="hero-x-mark-mini h-3.5 w-3.5"></span>
+              <span class="hero-x-mark-mini h-3.5 w-3.5 [.phx-click-loading_&]:hidden"></span>
+              <span class="hidden loading loading-spinner loading-xs [.phx-click-loading_&]:inline-block">
+              </span>
             </button>
           </span>
         </div>

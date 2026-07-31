@@ -2253,12 +2253,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       </button>
       <div class="flex items-center gap-2">
         <%= unless @is_new_post do %>
+          <%!-- Preview SAVES before it navigates, so the gap between click
+                and anything happening is a database write, not a repaint.
+                Unmarked, a writer with a slow connection clicks it twice. --%>
           <button
             type="button"
-            class="btn btn-outline btn-xs sm:btn-sm shadow-none"
+            class="btn btn-outline btn-xs sm:btn-sm shadow-none [&.phx-click-loading]:pointer-events-none"
             phx-click="preview"
           >
-            <.icon name="hero-eye" class="w-4 h-4 sm:mr-1" />
+            <.icon name="hero-eye" class="w-4 h-4 sm:mr-1 [.phx-click-loading_&]:hidden" />
+            <span class="hidden loading loading-spinner loading-xs sm:mr-1 [.phx-click-loading_&]:inline-block">
+            </span>
             <span class="hidden sm:inline">{gettext("Preview")}</span>
           </button>
         <% end %>
@@ -2520,21 +2525,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                 <%= unless @ai_default_prompt_exists do %>
                   <button
                     type="button"
-                    class="btn btn-outline btn-xs gap-1"
+                    class="btn btn-outline btn-xs gap-1 [&.phx-click-loading]:pointer-events-none"
                     phx-click="generate_default_translation_prompt"
                   >
-                    <.icon name="hero-sparkles" class="w-3 h-3" />
+                    <.icon name="hero-sparkles" class="w-3 h-3 [.phx-click-loading_&]:hidden" />
+                    <span class="hidden loading loading-spinner loading-xs [.phx-click-loading_&]:inline-block">
+                    </span>
                     {gettext("Generate Default Prompt")}
                   </button>
                 <% end %>
                 <%= if @ai_default_prompt_exists and @ai_default_prompt_stale do %>
                   <button
                     type="button"
-                    class="btn btn-warning btn-outline btn-xs gap-1"
+                    class="btn btn-warning btn-outline btn-xs gap-1 [&.phx-click-loading]:pointer-events-none"
                     phx-click="regenerate_default_translation_prompt"
                     title={gettext("This prompt predates the current format and may mistranslate. Click to update it.")}
                   >
-                    <.icon name="hero-arrow-path" class="w-3 h-3" />
+                    <.icon name="hero-arrow-path" class="w-3 h-3 [.phx-click-loading_&]:hidden" />
+                    <span class="hidden loading loading-spinner loading-xs [.phx-click-loading_&]:inline-block">
+                    </span>
                     {gettext("Regenerate Default Prompt")}
                   </button>
                 <% end %>
