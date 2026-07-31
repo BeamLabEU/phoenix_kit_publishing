@@ -111,6 +111,29 @@ defmodule PhoenixKit.Modules.Publishing.RendererGalleryTest do
     assert html =~ "(--probe: 0)"
   end
 
+  test "the helix gets the page's width, not the text column's" do
+    html = gallery(four_images())
+
+    # The cylinder is wider than a text column, so confined to one it is
+    # sliced by two hard vertical edges — a box cutting through the middle of
+    # a rotation. Full-bleed by default, same lane system as <Showcase>.
+    assert html =~ ~s(class="pk-stretch")
+  end
+
+  test "align and stretch are honoured when given" do
+    narrow = gallery(four_images(), ~s(height="400" align="none"))
+    refute narrow =~ ~s(class="pk-stretch")
+  end
+
+  test "all four edges fade, not just top and bottom" do
+    html = gallery(four_images())
+
+    # Top/bottom hide the wrap point. Left/right hide the fact that the
+    # rotation continues past the frame.
+    assert html =~ "linear-gradient(to bottom,"
+    assert html =~ "linear-gradient(to right,"
+  end
+
   test "the backdrop and the depth cue both follow the theme" do
     html = gallery(four_images())
 

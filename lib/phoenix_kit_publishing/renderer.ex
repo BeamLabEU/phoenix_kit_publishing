@@ -134,9 +134,13 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     .pk-helix__scene{display:block;position:relative;height:var(--pk-hx-height,520px);perspective:var(--pk-hx-perspective,1200px);perspective-origin:50% 50%;overflow:hidden;background:var(--pk-hx-bg,var(--color-base-100,#fff));border-radius:12px}
     .pk-helix__world{display:block;position:absolute;inset:0;transform-style:preserve-3d}
     .pk-helix__card{position:absolute;left:50%;top:50%;width:var(--pk-hx-card-w,225px);height:var(--pk-hx-card-h,155px);aspect-ratio:auto;will-change:transform,opacity,filter;transform:var(--pk-hx-rest);animation:pk-hx-move var(--pk-hx-dur,80s) linear infinite,pk-hx-depth var(--pk-hx-rot,40s) linear infinite}
-    /* Fades the strand into the backdrop top and bottom, which is also what
-       hides the wrap point where a card jumps from the end back to the start. */
-    .pk-helix__vignette{display:block;position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,var(--pk-hx-bg,var(--color-base-100,#fff)) 0%,transparent 18%,transparent 82%,var(--pk-hx-bg,var(--color-base-100,#fff)) 100%)}
+    /* Fades the strand into the backdrop on all four sides.
+       Top and bottom hide the wrap, where a card jumps from the end of the
+       strand back to the start. Left and right exist for a different reason:
+       the cylinder is wider than the frame, so without them the rotation is
+       sliced by two hard vertical edges — a box cutting through the middle of
+       a turn, which reads as a mistake rather than a boundary. */
+    .pk-helix__vignette{display:block;position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,var(--pk-hx-bg,var(--color-base-100,#fff)) 0%,transparent 18%,transparent 82%,var(--pk-hx-bg,var(--color-base-100,#fff)) 100%),linear-gradient(to right,var(--pk-hx-bg,var(--color-base-100,#fff)) 0%,transparent 12%,transparent 88%,var(--pk-hx-bg,var(--color-base-100,#fff)) 100%)}
   }
 
   @keyframes pk-hx-move{
@@ -1097,6 +1101,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         </div>
         </figure>
         """
+        |> Phoenix.HTML.raw()
+        |> PageBuilder.Renderer.wrap_stretch(showcase_lane(attrs))
+        |> Safe.to_iodata()
+        |> IO.iodata_to_binary()
     end
   rescue
     error ->
