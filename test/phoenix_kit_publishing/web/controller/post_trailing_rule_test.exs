@@ -20,7 +20,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostTrailingRuleTest do
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
 
-  @rule "border-t border-base-200 pt-6"
+  # Bare `border-t`: the page's other rules use the default border colour, and
+  # naming a shade drew this one at oklch(0.96 …) against their oklch(0.21 …)
+  # — a line that was there in the DOM and invisible on the screen.
+  @rule "mt-6 border-t pt-4"
 
   setup do
     {:ok, _} = Settings.update_boolean_setting("publishing_enabled", true)

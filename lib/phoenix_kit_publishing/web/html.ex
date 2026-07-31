@@ -2255,8 +2255,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               The rule goes on whichever of the two comes first, not on both —
               two rules for one boundary reads as a table. Which one that is
               depends on the group's settings, hence the flag rather than a
-              fixed class. --%>
-        <% trailing_rule = "mt-8 border-t border-base-200 pt-6" %>
+              fixed class.
+
+              Bare `border-t`, deliberately: the header, comments and footer
+              rules all use the default border colour, which resolves to a
+              near-black oklch(0.21 …). Naming `border-base-200` here drew it
+              at oklch(0.96 …) — all but invisible, and visibly weaker than
+              the rules a few lines above and below it. --%>
+        <% trailing_rule = "mt-6 border-t pt-4" %>
         <div
           :if={post_categories != []}
           class={["flex flex-wrap gap-2", trailing_rule]}
