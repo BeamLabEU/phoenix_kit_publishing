@@ -259,6 +259,111 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     """
   end
 
+  @doc """
+  Drives `<Gallery motion="scroll">` where the browser has no scroll-driven
+  animations.
+
+  The gallery expresses scroll-linking in pure CSS (`animation-timeline`), and
+  that is the real implementation — this does nothing at all where it works.
+  But support is only around 84% of browsers: Firefox has it from 156, Safari
+  from 26. Everywhere else the `@supports` gate falls through to the drift
+  animation, which is a perfectly good gallery but silently not the feature
+  that was asked for.
+
+  So this is enhancement in the strict sense: no JS still gives you a turning
+  helix, a modern browser gives you the CSS one, and only the gap in between
+  is filled here.
+
+  It works by pausing the drift animations and setting their `currentTime`
+  from scroll position rather than re-implementing the geometry. Every card's
+  phase already lives in its own negative delay, so a single virtual clock
+  driven by scroll reproduces the exact arrangement CSS would have produced —
+  there is no second copy of the maths to drift out of step with the first.
+  """
+  def helix_scroll_fallback(assigns) do
+    ~H"""
+    {Phoenix.HTML.raw(helix_scroll_fallback_script())}
+    """
+  end
+
+  defp helix_scroll_fallback_script do
+    ~S"""
+    <script>
+    (function () {
+      if (window.__pkHelixScroll) return;
+      window.__pkHelixScroll = true;
+
+      function init() {
+        // Where the CSS works, leave it entirely alone.
+        if (window.CSS && CSS.supports && CSS.supports('animation-timeline: view()')) return;
+
+        var figures = document.querySelectorAll('.pk-helix--scroll');
+        if (!figures.length) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        var scenes = [];
+        figures.forEach(function (fig) {
+          var anims = [];
+          fig.querySelectorAll('.pk-helix__card').forEach(function (card) {
+            var list = card.getAnimations ? card.getAnimations({ subtree: true }) : [];
+            list.forEach(function (a) {
+              try { a.pause(); } catch (e) { return; }
+              anims.push(a);
+            });
+          });
+          if (!anims.length) return;
+
+          // One virtual clock for the whole gallery: the cards' own delays
+          // supply their phase, exactly as they do when it runs on time.
+          var span = 0;
+          anims.forEach(function (a) {
+            var t = a.effect && a.effect.getTiming ? a.effect.getTiming().duration : 0;
+            if (typeof t === 'number' && t > span) span = t;
+          });
+          if (!span) return;
+          scenes.push({ el: fig, anims: anims, span: span });
+        });
+        if (!scenes.length) return;
+
+        var ticking = false;
+        function apply() {
+          ticking = false;
+          var vh = window.innerHeight || document.documentElement.clientHeight;
+          scenes.forEach(function (s) {
+            var r = s.el.getBoundingClientRect();
+            // 0 as the figure's top edge reaches the bottom of the viewport,
+            // 1 as its bottom edge leaves the top — the same span the CSS
+            // `cover` range describes.
+            var total = r.height + vh;
+            var p = total > 0 ? (vh - r.top) / total : 0;
+            p = p < 0 ? 0 : p > 1 ? 1 : p;
+            var t = p * s.span;
+            s.anims.forEach(function (a) {
+              try { a.currentTime = t; } catch (e) {}
+            });
+          });
+        }
+        function onScroll() {
+          if (ticking) return;
+          ticking = true;
+          window.requestAnimationFrame(apply);
+        }
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll, { passive: true });
+        apply();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+    </script>
+    """
+  end
+
   defp reading_headings_assets do
     ~S"""
     <style>
@@ -1965,6 +2070,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       <.scrollbar_style_tag style={assigns[:scrollbar_style] || "default"} />
       <.reading_progress enabled={assigns[:scroll_progress_enabled] || false} />
       <.reading_headings enabled={assigns[:scroll_headings_enabled] || false} />
+      <.helix_scroll_fallback />
       <article class={["post-container mx-auto px-6 py-8", post_width_class(assigns[:post_width])]}>
         <%!-- Top back link (gated on the group's show_top_back_link setting,
           default on) — a compact muted twin of the footer link, hugging the

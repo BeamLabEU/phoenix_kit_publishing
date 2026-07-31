@@ -230,6 +230,28 @@ defmodule PhoenixKit.Modules.Publishing.RendererGalleryTest do
     refute card_rule =~ "animation-timeline:view()"
   end
 
+  test "the scroll fallback only runs where the CSS can't" do
+    source = File.read!("lib/phoenix_kit_publishing/web/html.ex")
+
+    [_, script] = String.split(source, "defp helix_scroll_fallback_script", parts: 2)
+    script = String.slice(script, 0, 3000)
+
+    # CSS is the real implementation — around 84% of browsers run it, and the
+    # script must not touch those. Firefox only gained animation-timeline in
+    # 156 and Safari in 26, which is the gap this fills.
+    assert script =~ "CSS.supports('animation-timeline: view()')"
+    assert script =~ "return"
+
+    # It drives the EXISTING drift animations rather than re-deriving the
+    # geometry, so there is no second copy of the maths to drift out of step.
+    assert script =~ "a.pause()"
+    assert script =~ "currentTime"
+    refute script =~ "rotateY"
+
+    # Someone who asked for less motion gets none of it.
+    assert script =~ "prefers-reduced-motion"
+  end
+
   test "drift mode emits no per-card keyframes" do
     # They're only needed where delays can't carry phase; emitting them always
     # would bloat every cached post body for nothing.
