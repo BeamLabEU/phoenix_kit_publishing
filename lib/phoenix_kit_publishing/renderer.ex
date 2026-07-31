@@ -55,6 +55,24 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|Audio|EntityForm)\s+([^>]*?)\/>/s
   @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|Audio|EntityForm|Showcase)\s*([^>]*)>(.*?)<\/\1>/s
 
+  # Every tag this module knows how to render. The editor hands this list to
+  # Leaf as `preserve_tags` so the visual mode treats each one as a single
+  # opaque object instead of markup it is free to normalise.
+  #
+  # This is not a nicety. A WYSIWYG surface round-trips through HTML, and a
+  # tag it does not recognise does not survive the return trip — open a post
+  # containing `<Showcase>`, touch anything, and the autosave writes back a
+  # body with the bands flattened to loose paragraphs. It is silent, it looks
+  # like nothing happened, and the only copy of the original is gone.
+  @component_tags ~w(Image CTA Headline Subheadline Video Audio EntityForm Showcase Note)
+
+  @doc """
+  The PHK component tags the renderer understands, for editors that must keep
+  them intact. See `@component_tags`.
+  """
+  @spec component_tags() :: [String.t()]
+  def component_tags, do: @component_tags
+
   @showcase_regex ~r/^<Showcase\s*([^>]*)>(.*)<\/Showcase>$/s
   @showcase_default_overlap 15
   @showcase_max_overlap 40

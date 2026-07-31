@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
   alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
@@ -887,6 +888,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         |> Phoenix.Component.assign(:content, updated_post.content)
         |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
         |> Phoenix.Component.assign(:has_pending_changes, false)
+        # This socket now matches the row again, so a later promotion should
+        # take the saved copy rather than re-adopting what it mirrored before.
+        |> Collaborative.clear_synced_from_owner()
         |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
         |> Phoenix.LiveView.push_event("set-content", %{content: updated_post.content})
         |> Phoenix.LiveView.put_flash(:info, gettext("Post updated by another user"))

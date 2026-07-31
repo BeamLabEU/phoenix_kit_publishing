@@ -44,6 +44,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   import Leaf, only: [leaf_editor: 1]
 
   alias PhoenixKit.Modules.Publishing.Hashtags
+  alias PhoenixKit.Modules.Publishing.Renderer
 
   # Submodule aliases
   alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
@@ -1795,7 +1796,48 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      )}
   end
 
+  # Presence has just promoted this socket from spectator to owner, which
+  # normally means "load the current row and start editing". It must not mean
+  # that when the socket is holding the previous owner's unsaved buffer: a
+  # spectator mirrors the owner keystroke by keystroke, so if the owner's tab
+  # died between autosaves, everything they typed since exists only here. A
+  # re-read would hand back the older saved copy and quietly delete it — the
+  # one failure mode where the writer never even learns there was something to
+  # recover.
   defp reload_post_on_lock_acquired(socket) do
+    if socket.assigns[:synced_from_owner?] do
+      adopt_synced_buffer(socket)
+    else
+      reload_saved_copy_on_lock_acquired(socket)
+    end
+  end
+
+  # Keep what is on screen and get it written down. Nothing is re-read: the
+  # whole point is that the row is behind this buffer, and pulling any of it
+  # back in would reintroduce the loss in a smaller shape. Autosave is armed
+  # rather than saving inline so a promotion storm — several spectators, one
+  # dying owner — collapses into one write per socket instead of a thundering
+  # herd, and so a failed write surfaces through the usual autosave banner.
+  defp adopt_synced_buffer(socket) do
+    socket
+    |> assign(:has_pending_changes, true)
+    |> Collaborative.clear_synced_from_owner()
+    |> push_event("changes-status", %{has_changes: true})
+    # Re-asserted because the editor is re-rendering out of read-only right
+    # now, and this is the moment the text stops being someone else's and
+    # becomes editable. There is no caret to disturb — this session has been
+    # watching, not typing — and the client applies it without echoing a
+    # change back, so it cannot start a broadcast loop.
+    |> push_event("set-content", %{content: socket.assigns.content})
+    |> schedule_autosave()
+    |> Collaborative.maybe_start_lock_expiration_timer()
+    |> put_flash(
+      :info,
+      gettext("You're the editor now. The previous editor's unsaved changes were kept.")
+    )
+  end
+
+  defp reload_saved_copy_on_lock_acquired(socket) do
     case re_read_post(socket, socket.assigns[:current_language]) do
       {:ok, post} ->
         form = Forms.post_form(post)
@@ -2753,6 +2795,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   debounce={400}
                   toolbar={[:image, :video]}
                   readonly={edit_disabled? or @viewing_older_version}
+                  preserve_tags={Renderer.component_tags()}
                   suggestions={[
                     %{
                       trigger: "#",
