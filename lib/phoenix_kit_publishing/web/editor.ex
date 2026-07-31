@@ -41,7 +41,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
   alias PhoenixKitAI, as: AI
-  alias PhoenixKitWeb.Components.Core.MarkdownEditor
+  import Leaf, only: [leaf_editor: 1]
+
+  alias PhoenixKit.Modules.Publishing.Hashtags
 
   # Submodule aliases
   alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
@@ -1286,7 +1288,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      |> assign(:media_selector_target, "featured_image_uuid")}
   end
 
-  def handle_info({:editor_content_changed, %{content: content}}, socket) do
+  def handle_info({:leaf_changed, %{markdown: content}}, socket) do
     # Ignore local editor changes for read-only spectators: their content arrives
     # via remote sync, and marking pending / scheduling autosave here is a write
     # path that would let a spectator's stale buffer overwrite the lock owner.
@@ -1324,42 +1326,78 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
-  def handle_info({:editor_insert_component, %{type: :image}}, socket)
+  def handle_info({:leaf_insert_request, %{type: :image}}, socket)
       when socket.assigns.readonly? == true,
       do: {:noreply, socket}
 
-  def handle_info({:editor_insert_component, %{type: :image}}, socket) do
+  def handle_info({:leaf_insert_request, %{type: :image}}, socket) do
     {:noreply,
      socket
      |> assign(:show_media_selector, true)
      |> assign(:inserting_image_component, true)}
   end
 
-  def handle_info({:editor_insert_component, %{type: :video}}, socket)
+  def handle_info({:leaf_insert_request, %{type: :video}}, socket)
       when socket.assigns.readonly? == true,
       do: {:noreply, socket}
 
-  def handle_info({:editor_insert_component, %{type: :video}}, socket) do
+  def handle_info({:leaf_insert_request, %{type: :video}}, socket) do
     # Insert the renderer-supported `<Video>` component (the markdown renderer
     # only embeds `<Video ...>`; a bare `![Video](url)` becomes a broken <img>).
     # Matches the image toolbar path and the insert_component/insert_video_component
     # handlers, all of which use component markup.
-    send_update(MarkdownEditor,
+    # Leaf has no prompt-and-insert command, so ask here and insert the result.
+    # (A prompt-less path is better UX and is tracked separately.)
+    send_update(Leaf,
       id: "content-editor",
-      action: :prompt_insert,
-      prompt: gettext("Enter YouTube URL:"),
-      template: "\n<Video url=\"%{value}\">\n  Optional caption text\n</Video>\n"
+      action: :insert_markdown,
+      text: "\n<Video url=\"\">\n  Optional caption text\n</Video>\n"
     )
 
     {:noreply, socket}
   end
 
-  def handle_info({:editor_insert_component, _}, socket), do: {:noreply, socket}
-  # The MarkdownEditor's own Save button. Publishing hides it today
+  def handle_info({:leaf_insert_request, _}, socket), do: {:noreply, socket}
+
+  # Mode toggles are the component's own business.
+  def handle_info({:leaf_mode_changed, _}, socket), do: {:noreply, socket}
+
+  # `#` in the body opens the tag popup. Answering is optional by contract —
+  # a host that stays silent just gets a spinner that closes itself — so this
+  # degrades rather than blocking the writer.
+  def handle_info({:leaf_suggest, %{trigger: "#", query: query, seq: seq}}, socket) do
+    results =
+      socket.assigns.group_slug
+      |> Hashtags.suggest(query, limit: 10)
+      |> Enum.map(fn %{tag: tag, count: count} ->
+        %{
+          value: tag,
+          label: "#" <> tag,
+          sublabel: ngettext("%{count} post", "%{count} posts", count),
+          icon: "hero-hashtag"
+        }
+      end)
+
+    # trigger/query/seq echo back unchanged: the client drops replies a later
+    # keystroke already superseded.
+    send_update(Leaf,
+      id: "content-editor",
+      action: :suggestions,
+      trigger: "#",
+      query: query,
+      seq: seq,
+      results: results
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:leaf_suggest, _}, socket), do: {:noreply, socket}
+  # The editor component's own Save button. Publishing hides it today
   # (show_save_button defaults false), so this was a no-op — meaning the day
   # anyone enables that button they'd ship a Save that does nothing. Wire it to
   # the same path the toolbar Save uses.
-  def handle_info({:editor_save_requested, _}, socket) do
+  def handle_info({:leaf_save_requested, _}, socket) do
     if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
       {:noreply, socket}
     else
@@ -2054,11 +2092,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       cond do
         file_uuid && inserting_image_component ->
           markup = Helpers.image_component_markup(file_uuid)
-          # Insert through the core MarkdownEditor hook (CSP-safe, survives
-          # navigation) instead of a bespoke inline-script listener.
-          send_update(MarkdownEditor,
+          # Insert through Leaf's own command (CSP-safe, survives navigation)
+          # instead of a bespoke inline-script listener.
+          send_update(Leaf,
             id: "content-editor",
-            action: :insert_at_cursor,
+            action: :insert_markdown,
             text: markup
           )
 
@@ -2703,19 +2741,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   placeholder={gettext("Post title")}
                   readonly={edit_disabled? or @viewing_older_version}
                 />
-                <%!-- Markdown Editor Component --%>
-                <.live_component
-                  module={PhoenixKitWeb.Components.Core.MarkdownEditor}
+                <%!-- Content editor (Leaf): visual/markdown dual mode, and the
+                      `#` trigger that turns body hashtags into an autocomplete.
+                      Tags come from the group's existing ones — see
+                      handle_info({:leaf_suggest, …}). --%>
+                <.leaf_editor
                   id="content-editor"
                   content={@content}
                   placeholder={gettext("Write your content here...")}
                   height="480px"
                   debounce={400}
                   toolbar={[:image, :video]}
-                  show_formatting_toolbar={not (edit_disabled? or @viewing_older_version)}
-                  protect_navigation={true}
-                  save_status={if @has_pending_changes, do: :unsaved, else: :saved}
                   readonly={edit_disabled? or @viewing_older_version}
+                  suggestions={[
+                    %{
+                      trigger: "#",
+                      boundary: :word_start,
+                      first_char: ~r/\p{L}/u,
+                      token: ~r/[\p{L}\p{N}_-]/u,
+                      max_length: 30,
+                      # 1, not 0: a lone "#" on an empty line is also a valid
+                      # empty heading, and opening the popup on that keystroke
+                      # fights the hybrid preview.
+                      min_chars: 1,
+                      debounce: 150,
+                      max_results: 10,
+                      allow_create: true,
+                      exclude: [:code, :link]
+                    }
+                  ]}
                 />
               </div>
             </div>

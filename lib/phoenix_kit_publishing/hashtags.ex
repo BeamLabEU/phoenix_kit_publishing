@@ -50,6 +50,8 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
 
   @max_tags 20
 
+  alias PhoenixKit.Modules.Publishing.ListingCache
+
   @doc "All hashtags in a document, first-spelling-wins, order-preserving."
   def extract(content) when is_binary(content) do
     stripped = Regex.replace(@masked_regions, content, @mask_sentinel)
@@ -93,6 +95,51 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
           else: full
       end)
     end
+  end
+
+  @doc """
+  Tags already used in a group, for the editor's `#` autocomplete: the
+  distinct tags across the group's posts, ranked prefix-match first, then by
+  how often they're used, then alphabetically.
+
+  Reads the listing cache (which already carries each post's tags), so typing
+  a `#` costs no database round trip. Returns
+  `[%{tag: "elixir", count: 12}]`, capped by `:limit`.
+  """
+  def suggest(group_slug, query, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 10)
+    needle = query |> to_string() |> String.trim() |> String.downcase()
+
+    group_slug
+    |> tag_counts()
+    |> Enum.filter(fn {tag, _count} -> needle == "" or String.contains?(tag, needle) end)
+    |> Enum.sort_by(fn {tag, count} ->
+      # Prefix matches lead, then the most-used, then alphabetical so the list
+      # is stable between keystrokes.
+      {if(String.starts_with?(tag, needle), do: 0, else: 1), -count, tag}
+    end)
+    |> Enum.take(limit)
+    |> Enum.map(fn {tag, count} -> %{tag: tag, count: count} end)
+  end
+
+  # Case-insensitive tally keyed on the downcased tag, keeping the spelling
+  # that occurs most often so the popup offers "Elixir" if that's what the
+  # group actually writes.
+  defp tag_counts(group_slug) do
+    case ListingCache.read(group_slug) do
+      {:ok, %{posts: posts}} -> posts
+      {:ok, posts} when is_list(posts) -> posts
+      _ -> []
+    end
+    |> Enum.flat_map(fn post -> get_in(post, [:metadata, :tags]) || [] end)
+    |> Enum.reduce(%{}, fn tag, acc ->
+      key = tag |> to_string() |> String.downcase()
+      Map.update(acc, key, 1, &(&1 + 1))
+    end)
+    |> Enum.to_list()
+  rescue
+    # The cache is a convenience, not a contract — never break typing over it.
+    _ -> []
   end
 
   @doc """

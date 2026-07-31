@@ -38,7 +38,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorReadonlyGuardsTest do
     socket = readonly_socket(%{has_pending_changes: false})
 
     assert {:noreply, result} =
-             Editor.handle_info({:editor_content_changed, %{content: "spectator edit"}}, socket)
+             Editor.handle_info(
+               {:leaf_changed,
+                %{editor_id: "content-editor", markdown: "spectator edit", html: ""}},
+               socket
+             )
 
     # No dirty-tracking / autosave scheduling happened.
     refute result.assigns[:has_pending_changes]

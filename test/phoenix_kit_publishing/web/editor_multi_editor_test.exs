@@ -68,7 +68,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorMultiEditorTest do
     _ = render(watcher)
 
     # Exactly how the MarkdownEditor component reports an edit.
-    send(owner.pid, {:editor_content_changed, %{content: "Live from the owner.", editor_id: "c"}})
+    send(
+      owner.pid,
+      {:leaf_changed, %{editor_id: "content-editor", markdown: "Live from the owner.", html: ""}}
+    )
+
     _ = render(owner)
     _ = render(watcher)
 
@@ -94,7 +98,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorMultiEditorTest do
 
     send(
       watcher.pid,
-      {:editor_content_changed, %{content: "Spectator scribble.", editor_id: "c"}}
+      {:leaf_changed, %{editor_id: "content-editor", markdown: "Spectator scribble.", html: ""}}
     )
 
     _ = render(watcher)

@@ -116,7 +116,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      send(view.pid, {:editor_content_changed, %{content: "Updated body.", editor_id: "c"}})
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "Updated body.", html: ""}}
+      )
+
       _ = render(view)
 
       assert assigns_of(view)[:content] == "Updated body."
@@ -173,7 +177,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       # only in the body never refreshed the lock: it lapsed mid-session, the
       # handler then dropped every keystroke, and Save persisted the stale
       # pre-lapse buffer.
-      send(view.pid, {:editor_content_changed, %{content: "Fresh prose.", editor_id: "x"}})
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "Fresh prose.", html: ""}}
+      )
+
       _ = render(view)
 
       # last_activity_at is System.monotonic_time(:second) — an integer.
@@ -422,7 +430,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       # straight into the form map. Without the title/slug being set, save
       # bails at the "Title is required" guard in Persistence.perform_save.
       _ = render_change(view, "update_meta", %{"title" => "Saved Title", "_target" => ["title"]})
-      send(view.pid, {:editor_content_changed, %{content: "## Body content", editor_id: "c"}})
+
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "## Body content", html: ""}}
+      )
+
       _ = render(view)
 
       html = render_click(view, "save", %{})
@@ -463,7 +476,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
       _ = render_change(view, "update_meta", %{"title" => "Saved Title", "_target" => ["title"]})
-      send(view.pid, {:editor_content_changed, %{content: "## Body", editor_id: "c"}})
+
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "## Body", html: ""}}
+      )
+
       _ = render(view)
 
       html = render_click(view, "save", %{})
@@ -602,8 +620,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
       # The MarkdownEditor toolbar sends these; there is no phx event for them.
-      send(view.pid, {:editor_insert_component, %{type: :video}})
-      send(view.pid, {:editor_insert_component, %{type: :image}})
+      send(view.pid, {:leaf_insert_request, %{type: :video}})
+      send(view.pid, {:leaf_insert_request, %{type: :image}})
       assert is_binary(render(view))
     end
 
@@ -614,7 +632,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      send(view.pid, {:editor_insert_component, %{type: :sandwich}})
+      send(view.pid, {:leaf_insert_request, %{type: :sandwich}})
       assert is_binary(render(view))
     end
 

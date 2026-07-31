@@ -99,6 +99,15 @@ defmodule PhoenixKitPublishing.MixProject do
       # publishing runs fine without it.
       {:phoenix_kit_comments, "~> 0.2", only: :test},
 
+      # The post editor. Leaf is a standalone package (phoenix_kit depends on it
+      # too, for the comment composer), so publishing declares it directly now
+      # that the editor calls it. The 0.4.1 floor is load-bearing: inline
+      # suggestions — the `{:leaf_suggest, …}` message, the `:suggestions`
+      # command and the caret popup that `#hashtag` autocomplete rides on —
+      # arrived in 0.4.0, and `:flush` lets a save collect the last keystrokes
+      # instead of whatever the debounce had settled.
+      {:leaf, "~> 0.4.1"},
+
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},
 
