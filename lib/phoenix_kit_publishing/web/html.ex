@@ -2246,7 +2246,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           already rendered as links to the same archives, so a chip row just
           repeated them. --%>
         <% post_categories = assigns[:post_categories] || [] %>
-        <div :if={post_categories != []} class="mt-8 flex flex-wrap gap-2">
+        <%!-- Everything else on this page announces a change of register with
+              a rule: the header closes with one, comments and the footer open
+              with one. These two sat between the prose and the comments on
+              margin alone, so the article appeared to trail off into its own
+              filing metadata.
+
+              The rule goes on whichever of the two comes first, not on both —
+              two rules for one boundary reads as a table. Which one that is
+              depends on the group's settings, hence the flag rather than a
+              fixed class. --%>
+        <% trailing_rule = "mt-8 border-t border-base-200 pt-6" %>
+        <div
+          :if={post_categories != []}
+          class={["flex flex-wrap gap-2", trailing_rule]}
+        >
           <.link
             :for={category <- post_categories}
             navigate={term_archive_path(@current_language, @group_slug, {:category, category.slug})}
@@ -2260,7 +2274,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           left mirrors the newest-first listing order. --%>
         <nav
           :if={assigns[:newer_post] || assigns[:older_post]}
-          class="mt-8 grid gap-4 sm:grid-cols-2"
+          class={[
+            "grid gap-4 sm:grid-cols-2",
+            if(post_categories == [], do: trailing_rule, else: "mt-8")
+          ]}
           aria-label={gettext("More posts")}
         >
           <.link
