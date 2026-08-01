@@ -761,12 +761,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     |> redirect(to: with_query_string(conn, url))
   end
 
-  defp with_query_string(%{query_string: qs}, url) when is_binary(qs) and qs != "" do
-    separator = if String.contains?(url, "?"), do: "&", else: "?"
-    url <> separator <> qs
+  @doc false
+  # Public only so the merge rules can be unit-tested without staging a
+  # canonical redirect; takes anything with a :query_string.
+  def with_query_string(%{query_string: qs}, url) when is_binary(qs) and qs != "" do
+    # Whatever the canonical URL already decided stays decided. The listing's
+    # canonical carries its own `?page=`, built from this same request, so
+    # appending the request's query string wholesale emitted `?page=2&page=2`
+    # — one value read, two written, in the URL search engines are told is
+    # the real one. Campaign params still ride along; the target just wins
+    # any key it names.
+    target_keys = url |> URI.parse() |> Map.get(:query) |> decoded_keys()
+
+    extra =
+      qs
+      |> URI.decode_query()
+      |> Enum.reject(fn {key, _} -> key in target_keys end)
+
+    case extra do
+      [] -> url
+      pairs -> url <> if(target_keys == [], do: "?", else: "&") <> URI.encode_query(pairs)
+    end
   end
 
-  defp with_query_string(_conn, url), do: url
+  def with_query_string(_conn, url), do: url
+
+  defp decoded_keys(nil), do: []
+  defp decoded_keys(query), do: query |> URI.decode_query() |> Map.keys()
 
   # Resolves the OG map for a post with per-field precedence:
   #

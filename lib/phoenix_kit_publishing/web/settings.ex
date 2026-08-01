@@ -135,7 +135,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     Settings.update_setting(@memory_cache_key, to_string(new_value))
 
     # If disabling memory cache, erase ALL listing-cache entries (every group +
-    # all three persistent_term prefixes) so a later re-enable can't serve stale
+    # both persistent_term prefixes) so a later re-enable can't serve stale
     # pre-disable data. The old loop only cleared the posts key for the groups it
     # happened to have loaded (L7).
     if !new_value, do: ListingCache.erase_all()

@@ -1148,6 +1148,12 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
     resolved_url_slug =
       case Map.fetch(params, "url_slug") do
+        # A key that's present but empty means "leave it alone", not "clear
+        # it". Taking it literally blanked the content row's slug AND filed
+        # the old one as a previous slug, so the post lost its URL and gained
+        # a redirect pointing at nothing. The editor always sends a string, so
+        # this is about programmatic callers passing a partial map.
+        {:ok, val} when val in [nil, ""] -> existing_url_slug
         {:ok, val} -> val
         :error -> existing_url_slug
       end

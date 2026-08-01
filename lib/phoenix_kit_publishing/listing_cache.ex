@@ -449,7 +449,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
 
   Used when memory caching is toggled off, so a later re-enable can't serve
   pre-disable data — `read/1` returns `:cache_miss` while disabled, but the stale
-  terms would otherwise still be present (under all three prefixes) the moment it's
+  terms would otherwise still be present (under both prefixes) the moment it's
   re-enabled. `:persistent_term` has no prefix-scan, so this filters the full term
   snapshot — fine for a rare admin toggle, never call it on a hot path.
   """
