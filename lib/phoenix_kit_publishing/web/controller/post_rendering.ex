@@ -115,7 +115,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
           # and left the dropdown unable to hold more than the active version.
           # A version that never shipped (plain draft, no published_at) stays
           # private.
-          if historically_published?(post) do
+          if publicly_browsable_version?(group_slug, post, version) do
             build_versioned_post_response(group_slug, post, version)
           else
             log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
@@ -129,6 +129,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     else
       {:error, :version_access_disabled}
     end
+  end
+
+  # Version history is a window onto a LIVE post's past, and both halves of
+  # that sentence have to be checked.
+  #
+  # `historically_published?/1` alone answered only "did this version ever
+  # ship", from the version's own row — which let two kinds of withdrawn
+  # content stay readable:
+  #
+  #   * Take a published post down (unpublish/archive). Its `/v/N` URLs kept
+  #     serving the full body: the post has no active version any more, but
+  #     the archived row still carries the `published_at` that the check read
+  #     as "was public once". Deliberately withdrawing a post has to close
+  #     every door, not just the canonical one.
+  #   * Give a never-published draft a publish date and set it to Archived —
+  #     both writable from an ordinary save, since only `"published"` is
+  #     reserved to `publish_version/4`. That forged the same "shipped once"
+  #     shape on a version that never shipped at all.
+  #
+  # So: the post must currently BE published (there is a live version to have
+  # history behind), and the requested version must be at or before it. A
+  # genuinely superseded version is always older than the one that replaced
+  # it; a draft waiting to go out is always newer.
+  defp publicly_browsable_version?(group_slug, post, version) do
+    {_allow_access, live_version} = get_cached_version_info(group_slug, post)
+
+    is_integer(live_version) and is_integer(version) and version <= live_version and
+      historically_published?(post)
   end
 
   # Published now, or archived after having been published at some point.
