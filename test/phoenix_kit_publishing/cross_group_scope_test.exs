@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.CrossGroupScopeTest do
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.TranslationManager
   alias PhoenixKit.Modules.Publishing.Versions
 
   setup do
@@ -65,5 +66,35 @@ defmodule PhoenixKit.Modules.Publishing.CrossGroupScopeTest do
 
   test "a malformed uuid is rejected rather than raising", ctx do
     assert {:error, :not_found} = Posts.trash_post(ctx.home, "not-a-uuid")
+  end
+
+  test "another group's slug cannot clear or delete a translation", ctx do
+    assert {:error, _} =
+             TranslationManager.clear_translation(
+               ctx.other,
+               ctx.post.uuid,
+               "en"
+             )
+
+    assert {:error, _} =
+             TranslationManager.delete_language(
+               ctx.other,
+               ctx.post.uuid,
+               "en"
+             )
+  end
+
+  test "a keyword list in the version position is refused, not bound to it", ctx do
+    # `version \\ nil, opts \\ []` means a 4-arg call binds its last argument
+    # to VERSION. An old-shape `clear_translation(g, u, l, actor_uuid: x)` would
+    # have silently become "clear version [actor_uuid: x]" and cleared nothing.
+    assert_raise FunctionClauseError, fn ->
+      TranslationManager.clear_translation(
+        ctx.home,
+        ctx.post.uuid,
+        "en",
+        actor_uuid: "someone"
+      )
+    end
   end
 end

@@ -50,4 +50,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.ReloadVersionTest do
     # latest (v2) and the editor silently switched versions.
     assert result.assigns.post.version == 1
   end
+
+  test "a tab with unsaved work keeps it instead of being reloaded over" do
+    {:ok, group} =
+      Groups.add_group("Reload #{System.unique_integer([:positive])}", mode: "slug")
+
+    {:ok, post} = Posts.create_post(group["slug"], %{title: "Mine", content: "saved body"})
+    lang = post[:language]
+    {:ok, read} = Publishing.read_post_by_uuid(post[:uuid], lang, 1)
+
+    # Two tabs of the SAME account are both owners — presence keys on the user,
+    # not the socket — so a save in one asks the other to reload. This one has
+    # typing in it that never reached the database.
+    socket = %Phoenix.LiveView.Socket{
+      id: "reload-dirty",
+      assigns: %{
+        __changed__: %{},
+        flash: %{},
+        group_slug: group["slug"],
+        current_language: lang,
+        current_version: 1,
+        post: read,
+        form: %{},
+        content: "half-written paragraph nobody has saved",
+        has_pending_changes: true
+      }
+    }
+
+    result = Persistence.reload_post(socket)
+
+    assert result.assigns.content == "half-written paragraph nobody has saved",
+           "the other tab's save overwrote work that was never saved anywhere"
+
+    assert result.assigns.has_pending_changes,
+           "the buffer was silently marked clean, so nothing would save it"
+  end
 end

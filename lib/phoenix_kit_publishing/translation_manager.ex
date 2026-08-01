@@ -146,7 +146,7 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
           {:ok, any()} | {:error, any()}
   def add_language_to_db(group_slug, post_uuid, language_code, version_number) do
     with raw_db_post when not is_nil(raw_db_post) <-
-           DBStorage.get_post_by_uuid(post_uuid, [:group]),
+           DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]),
          db_post = StaleFixer.fix_stale_post(raw_db_post),
          version when not is_nil(version) <-
            if(version_number,
@@ -240,8 +240,10 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
           pos_integer() | nil,
           keyword() | map()
         ) :: :ok | {:error, term()}
-  def clear_translation(group_slug, post_uuid, language_code, version \\ nil, opts \\ []) do
-    with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
+  def clear_translation(group_slug, post_uuid, language_code, version \\ nil, opts \\ [])
+      when is_nil(version) or is_integer(version) do
+    with db_post when not is_nil(db_post) <-
+           DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]),
          db_version when not is_nil(db_version) <- Shared.resolve_db_version(db_post, version),
          content when not is_nil(content) <-
            DBStorage.get_content(db_version.uuid, language_code),
@@ -293,8 +295,10 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
   """
   @spec delete_language(String.t(), String.t(), String.t(), integer() | nil, keyword() | map()) ::
           :ok | {:error, term()}
-  def delete_language(group_slug, post_uuid, language_code, version \\ nil, opts \\ []) do
-    with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
+  def delete_language(group_slug, post_uuid, language_code, version \\ nil, opts \\ [])
+      when is_nil(version) or is_integer(version) do
+    with db_post when not is_nil(db_post) <-
+           DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]),
          db_version when not is_nil(db_version) <- Shared.resolve_db_version(db_post, version),
          content when not is_nil(content) <-
            DBStorage.get_content(db_version.uuid, language_code),

@@ -873,8 +873,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
 
   @doc """
   Reload post when another tab/user saves (last-save-wins).
+
+  Unless this socket is holding work of its own. Two tabs open on the same
+  post are both owners when they belong to the same account — presence keys
+  on the user, not the socket — so saving in one told the other to reload,
+  and the reload overwrote whatever had been typed in the meantime and marked
+  it clean. Nothing warned, and there was nothing left to recover from.
+
+  A tab with unsaved changes keeps them and is told the row moved underneath
+  it, which is a conflict a person can resolve; the tab that has nothing
+  pending still reloads, which is what makes a reference tab follow along.
   """
   def reload_post(socket) do
+    if socket.assigns[:has_pending_changes] do
+      Phoenix.LiveView.put_flash(
+        socket,
+        :warning,
+        gettext(
+          "This post was saved somewhere else. Your unsaved changes are still here — saving will overwrite that copy."
+        )
+      )
+    else
+      do_reload_post(socket)
+    end
+  end
+
+  defp do_reload_post(socket) do
     group_slug = socket.assigns.group_slug
     current_language = socket.assigns[:current_language]
     current_version = socket.assigns[:current_version]
