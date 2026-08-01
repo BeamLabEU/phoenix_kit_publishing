@@ -51,19 +51,60 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   page and the fallback resolver. One predicate, so a scheduled post becomes
   public at one moment on every path that asks.
 
-  Both comparisons are UTC, matching how the rows are stored and how the
-  editor writes them.
+  Both sides of the comparison are the SITE's wall clock, not UTC.
+  `post_date`/`post_time` are stamped and edited in the configured
+  `time_zone` offset (`Posts.maybe_add_initial_timestamp/3`) and shown
+  as-is with no display conversion, so comparing them to `utc_now/0`
+  released an embargoed post `offset` hours early on a site west of UTC —
+  and held it back that long on a site east of it.
+
+  Pass `now` (from `site_now/0`) when testing many posts in one pass: the
+  offset comes from a settings read, and `filter_published/1` runs this
+  over the whole listing cache.
   """
   @spec scheduled_ahead?(map()) :: boolean()
-  def scheduled_ahead?(post) do
+  def scheduled_ahead?(post), do: scheduled_ahead?(post, site_now())
+
+  @spec scheduled_ahead?(map(), DateTime.t()) :: boolean()
+  def scheduled_ahead?(post, now) do
     timestamp_mode?(post[:mode]) and post[:date] != nil and
-      DateTime.compare(scheduled_at(post[:date], post[:time]), DateTime.utc_now()) == :gt
+      DateTime.compare(scheduled_at(post[:date], post[:time]), now) == :gt
   end
 
   defp scheduled_at(date, time) do
     # No time means the whole day is fair game from its first minute — the
     # old behaviour, kept for rows that predate a required post_time.
+    #
+    # "Etc/UTC" is a carrier for a naive wall clock here, not a claim about
+    # the zone: `now` is built the same way, so the two are comparable.
     DateTime.new!(date, time || ~T[00:00:00], "Etc/UTC")
+  end
+
+  @doc """
+  Now, on the site's wall clock — `DateTime.utc_now/0` shifted by the
+  configured `time_zone` offset, which is the clock timestamp-mode posts
+  are written and displayed on.
+
+  Hoist this out of a loop; every call is a settings read.
+  """
+  @spec site_now() :: DateTime.t()
+  def site_now, do: DateTime.add(DateTime.utc_now(), site_offset_seconds(), :second)
+
+  @doc """
+  The site's `time_zone` setting as a whole-hour offset in seconds (0 when
+  unset or unparseable). The one place that reading lives, so post
+  stamping, schedule release and feed dates can't drift apart.
+  """
+  @spec site_offset_seconds() :: integer()
+  def site_offset_seconds do
+    case Integer.parse(PhoenixKit.Settings.get_setting("time_zone", "0")) do
+      {offset_hours, ""} -> offset_hours * 3600
+      _ -> 0
+    end
+  rescue
+    # Settings unreachable (no DB yet, sandbox without an owner): UTC is the
+    # documented default and a scheduling check must not crash a page.
+    _ -> 0
   end
 
   # ---------------------------------------------------------------------------

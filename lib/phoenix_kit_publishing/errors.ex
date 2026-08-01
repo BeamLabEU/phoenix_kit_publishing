@@ -49,6 +49,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           :already_exists
           | :cache_miss
           | :cannot_delete_live
+          | :category_cycle
           | :conflicts_with_post_slug
           | :db_update_failed
           | :destination_exists
@@ -57,6 +58,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | :invalid_format
           | :invalid_mode
           | :invalid_name
+          | :invalid_order
           | :invalid_path
           | :invalid_slug
           | :invalid_status
@@ -69,6 +71,9 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | :no_uuid
           | :not_found
           | :not_published
+          | :params_not_applied
+          | :parent_not_found
+          | :parent_wrong_group
           | :post_not_found
           | :post_trashed
           | :resource_not_found
@@ -100,6 +105,10 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:already_exists), do: gettext("Already exists")
   def message(:cache_miss), do: gettext("Cache miss")
   def message(:cannot_delete_live), do: gettext("Cannot delete the live version")
+
+  def message(:category_cycle),
+    do: gettext("A category can't be moved inside itself or one of its own children")
+
   def message(:conflicts_with_post_slug), do: gettext("URL slug conflicts with another post")
   def message(:db_update_failed), do: gettext("Database update failed")
   def message(:destination_exists), do: gettext("Destination already exists")
@@ -108,6 +117,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:invalid_format), do: gettext("Invalid format")
   def message(:invalid_mode), do: gettext("Invalid mode")
   def message(:invalid_name), do: gettext("Invalid name")
+  def message(:invalid_order), do: gettext("Invalid order")
   def message(:invalid_path), do: gettext("Invalid path")
   def message(:invalid_slug), do: gettext("Invalid slug")
   def message(:invalid_status), do: gettext("Invalid status")
@@ -120,6 +130,12 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:no_uuid), do: gettext("No UUID")
   def message(:not_found), do: gettext("Not found")
   def message(:not_published), do: gettext("Not published")
+
+  def message(:params_not_applied),
+    do: gettext("Save the changes against the new version — creating one doesn't apply them")
+
+  def message(:parent_not_found), do: gettext("Parent category not found")
+  def message(:parent_wrong_group), do: gettext("Parent category belongs to another group")
   def message(:post_not_found), do: gettext("Post not found")
   def message(:post_trashed), do: gettext("Post is trashed")
   def message(:resource_not_found), do: gettext("Resource not found")

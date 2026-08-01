@@ -28,7 +28,6 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.StaleFixer
-  alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Date, as: UtilsDate
 
   # Suppress dialyzer false positives for pattern matches
@@ -717,11 +716,12 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # Shift a UTC datetime by the configured site `time_zone` (integer-hour offset,
   # default "0"). Mirrors the offset the display/edit layers use, so create/edit/
   # display all agree on a timestamp post's wall clock. Bad/missing setting → UTC.
+  #
+  # The offset itself comes from Constants, which is also what decides when a
+  # scheduled post goes live — a second copy of the reading here is how the
+  # clock a post is STAMPED on drifts from the clock it is RELEASED on.
   defp shift_to_site_timezone(datetime) do
-    case Integer.parse(Settings.get_setting("time_zone", "0")) do
-      {offset_hours, ""} -> DateTime.add(datetime, offset_hours * 3600, :second)
-      _ -> datetime
-    end
+    DateTime.add(datetime, Constants.site_offset_seconds(), :second)
   end
 
   defp resolve_timestamp_in_transaction(post_attrs, "timestamp", group_slug) do

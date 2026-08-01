@@ -18,6 +18,10 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
       assert Errors.message(:already_exists) == "Already exists"
       assert Errors.message(:cache_miss) == "Cache miss"
       assert Errors.message(:cannot_delete_live) == "Cannot delete the live version"
+
+      assert Errors.message(:category_cycle) ==
+               "A category can't be moved inside itself or one of its own children"
+
       assert Errors.message(:conflicts_with_post_slug) == "URL slug conflicts with another post"
       assert Errors.message(:db_update_failed) == "Database update failed"
       assert Errors.message(:destination_exists) == "Destination already exists"
@@ -26,6 +30,7 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
       assert Errors.message(:invalid_format) == "Invalid format"
       assert Errors.message(:invalid_mode) == "Invalid mode"
       assert Errors.message(:invalid_name) == "Invalid name"
+      assert Errors.message(:invalid_order) == "Invalid order"
       assert Errors.message(:invalid_path) == "Invalid path"
       assert Errors.message(:invalid_slug) == "Invalid slug"
       assert Errors.message(:invalid_status) == "Invalid status"
@@ -38,6 +43,12 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
       assert Errors.message(:no_uuid) == "No UUID"
       assert Errors.message(:not_found) == "Not found"
       assert Errors.message(:not_published) == "Not published"
+
+      assert Errors.message(:params_not_applied) ==
+               "Save the changes against the new version — creating one doesn't apply them"
+
+      assert Errors.message(:parent_not_found) == "Parent category not found"
+      assert Errors.message(:parent_wrong_group) == "Parent category belongs to another group"
       assert Errors.message(:post_not_found) == "Post not found"
       assert Errors.message(:post_trashed) == "Post is trashed"
       assert Errors.message(:resource_not_found) == "Resource not found"

@@ -82,23 +82,27 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
   def translated_name(%__MODULE__{} = category, language) when is_binary(language) do
     overrides = category.name_i18n || %{}
 
-    exact = Map.get(overrides, language)
-
-    base_match =
-      if exact in [nil, ""] do
-        base = LanguageHelpers.url_language_code(language) || language
-
-        Enum.find_value(overrides, fn {code, value} ->
-          if (LanguageHelpers.url_language_code(code) || code) == base and value not in [nil, ""],
-            do: value
-        end)
-      end
-
-    exact_or_nil = if exact in [nil, ""], do: nil, else: exact
-    exact_or_nil || base_match || category.name
+    present(Map.get(overrides, language)) ||
+      base_override(overrides, language) ||
+      category.name
   end
 
   def translated_name(%__MODULE__{} = category, _), do: category.name
+
+  # The form stores full codes ("fr-FR"); the public side asks by the short
+  # one ("fr"), so an exact miss falls back to any override sharing the base.
+  defp base_override(overrides, language) do
+    base = base_of(language)
+
+    Enum.find_value(overrides, fn {code, value} ->
+      if base_of(code) == base, do: present(value)
+    end)
+  end
+
+  defp base_of(code), do: LanguageHelpers.url_language_code(code) || code
+
+  defp present(value) when is_binary(value) and value != "", do: value
+  defp present(_), do: nil
 
   # Drop non-binary override values (nested maps from crafted params) and cap
   # lengths — same hardening as the group-name overrides.

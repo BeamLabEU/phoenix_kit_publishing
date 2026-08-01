@@ -10,9 +10,10 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.RendererTest do
 
   use ExUnit.Case, async: true
 
+  alias Phoenix.HTML.Safe
   alias PhoenixKit.Modules.Publishing.PageBuilder.Renderer
 
-  defp html(safe), do: safe |> Phoenix.HTML.Safe.to_iodata() |> IO.iodata_to_binary()
+  defp html(safe), do: safe |> Safe.to_iodata() |> IO.iodata_to_binary()
 
   describe "render/2 — unknown components" do
     test "wraps unknown component AST in <div class=\"unknown-component\">" do

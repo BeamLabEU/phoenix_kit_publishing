@@ -29,14 +29,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.Renderer
+  alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Modules.Publishing.Web.Controller.Fallback
   alias PhoenixKit.Modules.Publishing.Web.Controller.Feed
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
-  alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Web.Controller.Routing
-  alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
@@ -239,12 +239,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     # A note-panel comment redirects back with that panel's :target open;
     # a reply lands on its parent comment. (Error paths use the request's
     # view of the thread; success re-derives from the created comment.)
-    back_path =
-      cond do
-        note_id -> replace_anchor(back_path, "pk-note-panel-#{note_id}")
-        parent_uuid -> replace_anchor(back_path, "comment-#{parent_uuid}")
-        true -> back_path
-      end
+    back_path = comment_anchor(back_path, note_id, parent_uuid)
 
     case PublishingComments.create(post[:uuid], current_user_uuid(conn), content,
            parent_uuid: parent_uuid,
@@ -255,34 +250,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         # note_id, so replying inside a panel must reopen that panel even
         # though the reply form never carried note_id itself.
         success_path =
-          cond do
-            is_binary(comment.metadata["note_id"]) ->
-              replace_anchor(back_path, "pk-note-panel-#{comment.metadata["note_id"]}")
+          comment_anchor(back_path, comment.metadata["note_id"], comment.parent_uuid)
 
-            is_binary(comment.parent_uuid) ->
-              replace_anchor(back_path, "comment-#{comment.parent_uuid}")
-
-            true ->
-              back_path
-          end
-
-        # Don't claim "posted" for a row the reader can't see: with the
-        # comments module's moderation on, create returns status "pending",
-        # and the thread only lists published rows — so a success message
-        # followed by no visible comment reads as "the site ate it".
-        message =
-          if comment.status == "published" do
-            gettext("Comment posted.")
-          else
-            gettext("Thanks — your comment is awaiting review.")
-          end
-
-        comment_outcome(conn, :info, message, success_path)
+        comment_outcome(conn, :info, comment_posted_message(comment), success_path)
 
       {:error, reason} ->
         comment_outcome(conn, :error, comment_error_message(reason), back_path)
     end
   end
+
+  defp comment_anchor(path, note_id, _parent_uuid) when is_binary(note_id) and note_id != "",
+    do: replace_anchor(path, "pk-note-panel-#{note_id}")
+
+  defp comment_anchor(path, _note_id, parent_uuid) when is_binary(parent_uuid),
+    do: replace_anchor(path, "comment-#{parent_uuid}")
+
+  defp comment_anchor(path, _note_id, _parent_uuid), do: path
+
+  # Don't claim "posted" for a row the reader can't see: with the comments
+  # module's moderation on, create returns status "pending", and the thread
+  # only lists published rows — so a success message followed by no visible
+  # comment reads as "the site ate it".
+  #
+  # A literal, not `Constants.published?/1`: that is the PUBLISHING
+  # vocabulary, and its own docs say so — this is the comments module's
+  # status on a different table.
+  defp comment_posted_message(%{status: "published"}), do: gettext("Comment posted.")
+
+  defp comment_posted_message(_comment),
+    do: gettext("Thanks — your comment is awaiting review.")
 
   defp comment_error_message(:empty_comment), do: gettext("The comment can't be empty.")
   defp comment_error_message(:content_too_long), do: gettext("That comment is too long.")
@@ -382,36 +378,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     if group_slug && group_trashed?(group_slug) do
       handle_not_found(conn, :group_not_found)
     else
-      case parsed_path do
-        {:listing, group_slug} ->
-          handle_group_listing(conn, group_slug, language)
-
-        {:feed, group_slug, scope} ->
-          handle_feed(conn, group_slug, language, scope)
-
-        {:category, group_slug, category_slug} ->
-          handle_term_archive(conn, group_slug, language, {:category, category_slug})
-
-        {:tag, group_slug, tag} ->
-          handle_term_archive(conn, group_slug, language, {:tag, tag})
-
-        {:slug_post, group_slug, post_slug} ->
-          handle_post(conn, group_slug, {:slug, post_slug}, language)
-
-        {:timestamp_post, group_slug, date, time} ->
-          handle_post(conn, group_slug, {:timestamp, date, time}, language)
-
-        {:date_only_post, group_slug, date} ->
-          handle_date_only_url(conn, group_slug, date, language)
-
-        {:versioned_post, group_slug, post_slug, version} ->
-          handle_versioned_post(conn, group_slug, post_slug, version, language)
-
-        {:error, reason} ->
-          handle_not_found(conn, reason)
-      end
+      dispatch_parsed_path(conn, parsed_path, language)
     end
   end
+
+  defp dispatch_parsed_path(conn, {:listing, group_slug}, language),
+    do: handle_group_listing(conn, group_slug, language)
+
+  defp dispatch_parsed_path(conn, {:feed, group_slug, scope}, language),
+    do: handle_feed(conn, group_slug, language, scope)
+
+  defp dispatch_parsed_path(conn, {:category, group_slug, category_slug}, language),
+    do: handle_term_archive(conn, group_slug, language, {:category, category_slug})
+
+  defp dispatch_parsed_path(conn, {:tag, group_slug, tag}, language),
+    do: handle_term_archive(conn, group_slug, language, {:tag, tag})
+
+  defp dispatch_parsed_path(conn, {:slug_post, group_slug, post_slug}, language),
+    do: handle_post(conn, group_slug, {:slug, post_slug}, language)
+
+  defp dispatch_parsed_path(conn, {:timestamp_post, group_slug, date, time}, language),
+    do: handle_post(conn, group_slug, {:timestamp, date, time}, language)
+
+  defp dispatch_parsed_path(conn, {:date_only_post, group_slug, date}, language),
+    do: handle_date_only_url(conn, group_slug, date, language)
+
+  defp dispatch_parsed_path(conn, {:versioned_post, group_slug, post_slug, version}, language),
+    do: handle_versioned_post(conn, group_slug, post_slug, version, language)
+
+  defp dispatch_parsed_path(conn, {:error, reason}, _language),
+    do: handle_not_found(conn, reason)
 
   # Suppress dialyzer warning — catch-all is defensive fallback for unexpected route formats
   @dialyzer {:nowarn_function, extract_group_slug: 1}

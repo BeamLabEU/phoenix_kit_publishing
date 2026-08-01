@@ -22,13 +22,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
   # async: false — global settings rows.
   use ExUnit.Case, async: false
 
+  # This one doesn't go through ConnCase/LiveCase (it needs core's real
+  # router macro, not the test router), so it has to carry the tag those
+  # case templates add. Without it `mix test` fails on a checkout with no
+  # Postgres, which the suite is documented to survive — the sandbox
+  # checkout below is the first thing to raise.
+  @moduletag :integration
+
   import Phoenix.ConnTest
   import Plug.Conn, only: [get_resp_header: 2]
 
+  alias Ecto.Adapters.SQL.Sandbox
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
+  alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   @endpoint PhoenixKitPublishing.Test.DispatchEndpoint
   @prefix "/phoenix_kit"
@@ -37,8 +46,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
   defp unique_name, do: "dsp-#{System.unique_integer([:positive])}"
 
   setup do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(PhoenixKitPublishing.Test.Repo, shared: true)
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    pid = Sandbox.start_owner!(TestRepo, shared: true)
+    on_exit(fn -> Sandbox.stop_owner(pid) end)
 
     {:ok, _} = Settings.update_boolean_setting("publishing_enabled", true)
     {:ok, _} = Settings.update_boolean_setting("publishing_public_enabled", true)

@@ -8,6 +8,13 @@
   # the PLT and reports it as calling a nonexistent function.
   {"lib/phoenix_kit_publishing/web/editor.ex", :unknown_function},
 
+  # `PhoenixKitComments` is the same shape of optional plugin (see
+  # `Publishing.Comments`): no dependency here except `only: :test`, every
+  # call `Code.ensure_loaded?` + `function_exported?` guarded and rescued,
+  # and `@compile {:no_warn_undefined, …}` for the compiler. Dialyzer needs
+  # telling separately, exactly as it does for PhoenixKitOG above.
+  {"lib/phoenix_kit_publishing/comments.ex", :unknown_function},
+
   # Gettext.Backend expands into code that constructs %Expo.PluralForms{}
   # literals inline; that struct is @opaque in Expo, so dialyzer flags the
   # generated call to Gettext.Plural.plural/2 as a call_without_opaque

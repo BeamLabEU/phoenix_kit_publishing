@@ -560,9 +560,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   Excludes timestamp-mode posts with a future post_date.
   """
   def filter_published(posts) do
+    # One settings read for the whole pass — this runs over the listing cache
+    # (up to 5,000 entries) on every public request.
+    now = Constants.site_now()
+
     Enum.filter(posts, fn post ->
       post[:metadata] && Constants.published?(post.metadata.status) &&
-        not Constants.scheduled_ahead?(post)
+        not Constants.scheduled_ahead?(post, now)
     end)
   end
 

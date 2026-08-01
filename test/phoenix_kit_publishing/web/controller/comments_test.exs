@@ -11,8 +11,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
   alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
+  alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   defp unique_name, do: "cmt-#{System.unique_integer([:positive])}"
 
@@ -36,7 +38,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
     # Insert the user row directly — register_user/1 rides the rate-limiter
     # process, which the library test env doesn't start.
     user =
-      PhoenixKitPublishing.Test.Repo.insert!(%PhoenixKit.Users.Auth.User{
+      TestRepo.insert!(%PhoenixKit.Users.Auth.User{
         email: "commenter-#{System.unique_integer([:positive])}@example.com",
         hashed_password: "x",
         first_name: "Casey",
@@ -268,14 +270,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
       {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
 
       {:ok, _} =
-        PhoenixKit.Modules.Publishing.Posts.update_post(
+        Posts.update_post(
           slug,
           read,
           %{"content" => "Uses <Note note=\"The note body.\">a term</Note> here."},
           %{}
         )
 
-      note_id = PhoenixKit.Modules.Publishing.Renderer.note_dom_id("The note body.")
+      note_id = Renderer.note_dom_id("The note body.")
 
       conn =
         post_comment(
@@ -330,7 +332,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
           %{}
         )
 
-      note_id = PhoenixKit.Modules.Publishing.Renderer.note_dom_id("Threaded note.")
+      note_id = Renderer.note_dom_id("Threaded note.")
 
       {:ok, root} =
         PublishingComments.create(post.uuid, user.uuid, "Panel root", note_id: note_id)

@@ -18,7 +18,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
   """
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
+  alias PhoenixKit.Modules.Storage.URLSigner
 
   @doc """
   Renders the RSS 2.0 document for a group as iodata.
@@ -82,7 +84,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
 
   defp item_xml(post, group_slug, language, date_counts, base_url) do
     url = base_url <> PublishingHTML.build_post_url(group_slug, post, language, date_counts)
-    title = get_in(post, [:metadata, :title]) || Publishing.Constants.default_title()
+    title = get_in(post, [:metadata, :title]) || Constants.default_title()
 
     [
       "<item>\n",
@@ -124,7 +126,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
   defp enclosure(post, base_url) do
     case get_in(post, [:metadata, :audio_uuid]) do
       uuid when is_binary(uuid) and uuid != "" ->
-        url = base_url <> PhoenixKit.Modules.Storage.URLSigner.signed_url(uuid, "original")
+        url = base_url <> URLSigner.signed_url(uuid, "original")
         [~s(<enclosure url="), escape(url), ~s(" length="0" type="audio/mpeg"/>), "\n"]
 
       _ ->
@@ -151,6 +153,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
 
   # Effective publish instant, mirroring the listing's sort key: post_date(+time)
   # for timestamp-mode posts, the version's published_at otherwise. UTC.
+  #
+  # A timestamp post's date/time is the SITE's wall clock (see
+  # `Constants.site_now/0`), so it has to come back to UTC before it is
+  # stamped `+0000` — otherwise every item in the feed is dated by the site's
+  # own offset, and `lastBuildDate` with it.
   defp effective_datetime(post) do
     cond do
       match?(%Date{}, post[:date]) ->
@@ -160,7 +167,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
             _ -> ~T[00:00:00]
           end
 
-        DateTime.new!(post.date, time, "Etc/UTC")
+        post.date
+        |> DateTime.new!(time, "Etc/UTC")
+        |> DateTime.add(-Constants.site_offset_seconds(), :second)
 
       is_binary(get_in(post, [:metadata, :published_at])) ->
         case DateTime.from_iso8601(post.metadata.published_at) do

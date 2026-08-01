@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.StaleFixer
+  alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
@@ -716,7 +717,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
     totals =
       if group && group["views_enabled"] && posts != [] do
-        PhoenixKit.Modules.Publishing.Views.totals(Enum.map(posts, & &1.uuid))
+        Views.totals(Enum.map(posts, & &1.uuid))
       else
         %{}
       end

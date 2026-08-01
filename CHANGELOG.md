@@ -1,5 +1,82 @@
 # Changelog
 
+## 0.4.5 - 2026-08-01
+
+PR #37 — the publishing wave (Leaf editor, per-version categories,
+gallery/notes/audio/comments, RSS feeds, search, view counts and a security
+pass), plus the post-merge review fixes. 0.4.4 shipped before any of this
+landed, so this release carries the whole wave.
+
+### Added
+- **Categories** — hierarchical, per-group taxonomy (`Publishing.Categories`,
+  `PublishingCategory`), filed **per version** in `version.data["category_uuids"]`
+  so a reader on `?v=2` sees how v2 was filed. Admin tree at
+  `/admin/publishing/categories/:group` with drag reorder, "Move to…"
+  re-parenting (cycle-checked under a row lock) and a typeahead picker in the post
+  editor. Public archives at `/<group>/category/<slug>`, parent archives including
+  their children. Legacy post-level rows are drained on first cache regeneration.
+- **Body hashtags as the tag system** — writers type `#elixir` inline and the
+  version's tags derive from the prose on save; the separate tags field is gone.
+  Code regions, headings, URL fragments and Markdown links are excluded by
+  construction. Public tag archives at `/<group>/tag/<tag>`.
+- **RSS 2.0 feeds** per group and per category/tag archive
+  (`/<group>/feed.xml`), gated by `publishing_feeds_enabled`, with podcast-style
+  `<enclosure>` when a post carries an audio version.
+- **Public listing search** (`?q=`, plain GET, no JS) behind the group's
+  `search_enabled` setting.
+- **View counts** (`Publishing.Views`) — per-day rollups, bot-filtered and
+  session-deduped, no reader PII. `views_enabled` / `show_view_counts`.
+- **Comments** — guarded seam to the optional `phoenix_kit_comments` package:
+  dead-view thread, honeypot + signed time-trap form, per-note threads.
+- **`<Showcase>`, `<Gallery>`, `<Audio>` and `<Note>` components** — an
+  edge-bled image band, a CSS-only image helix (no JS; degrades to a plain grid),
+  inline audio, and author notes in footnote or slide-out-panel style.
+- **Leaf visual editor** replaces the old Markdown editor, with `preserve_tags`
+  wired to `Renderer.component_tags/0` so a WYSIWYG round trip can't flatten a
+  component.
+- **New group settings** — `listing_layout`, `notes_style`, `show_prev_next`,
+  `show_categories`, `search_enabled`, `views_enabled`, `show_view_counts`,
+  `comments_enabled`.
+
+### Fixed
+- **Scheduled posts went public at the wrong hour.** `post_date`/`post_time` are
+  stamped and displayed on the site's `time_zone` wall clock, but the new
+  release check compared them against UTC — so on a site west of UTC an embargoed
+  post appeared *early* by the offset (and late on a site east of it). The offset
+  now has one owner (`Constants.site_offset_seconds/0`), shared by the stamping
+  path so the two clocks cannot drift, and the release check runs on the site
+  clock. Only sites left at the `"0"` default were unaffected.
+- **RSS `pubDate` / `lastBuildDate` were off by the site's UTC offset** — same
+  root cause; the site-local instant is now converted back to UTC before it is
+  stamped `+0000`.
+- **A category-tree query fired on every keystroke in the post editor** — the
+  picker is a stateful LiveComponent, whose `update/2` runs on every parent
+  render. It now reuses the tree it holds and re-reads on search (where
+  freshness is load-bearing) or a group change.
+- **`Hashtags.suggest/3` returned lowercase tags** while documenting that it
+  keeps the group's own spelling; it now does, and folds both sides before
+  matching so the change can't cost a match.
+- **`mix test` failed without a database** — the new `dispatch_e2e_test.exs`
+  missed the `:integration` tag every other DB-backed test inherits from its
+  case template.
+- Removed two unreachable branches (`Hashtags.tag_counts/1`'s `%{posts: …}`
+  clause, `Categories.update_category/3`'s bare `:error`).
+
+### Changed
+- `show_tags` (per-group setting and `PublishingGroup.show_tags?/1`) is
+  **removed** — tags live in the prose now and the post-page chip row is gone.
+  Existing groups keep the key in their `data` JSONB, unread.
+- New error atoms registered with `Publishing.Errors` (`:params_not_applied`,
+  `:category_cycle`, `:parent_not_found`, `:parent_wrong_group`,
+  `:invalid_order`) so they render as sentences rather than
+  "Unexpected error: …".
+- `mix credo --strict` and `mix dialyzer` are green again (29 findings across
+  the wave: aliasing, nesting depth, four complexity hotspots, the
+  `PhoenixKitComments` optional-seam dialyzer ignore, and a `MapSet` opacity
+  violation in the category tree walk). Behaviour-preserving throughout.
+
+Full review: `dev_docs/pull_requests/2026/37-publishing-wave-leaf-categories-comments/CLAUDE_REVIEW.md`.
+
 ## 0.4.4 - 2026-07-25
 
 Documentation-only release. No code changes — published so the new README

@@ -89,12 +89,14 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
     else
       regex = if first?, do: @hashtag, else: @hashtag_mid
 
-      Regex.replace(regex, part, fn full, lead, tag ->
-        if MapSet.member?(allowed, String.downcase(tag)),
-          do: "#{lead}[##{tag}](#{url_fun.(tag)})",
-          else: full
-      end)
+      Regex.replace(regex, part, &link_tag(&1, &2, &3, url_fun, allowed))
     end
+  end
+
+  defp link_tag(full, lead, tag, url_fun, allowed) do
+    if MapSet.member?(allowed, String.downcase(tag)),
+      do: "#{lead}[##{tag}](#{url_fun.(tag)})",
+      else: full
   end
 
   @doc """
@@ -112,34 +114,60 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
 
     group_slug
     |> tag_counts()
-    |> Enum.filter(fn {tag, _count} -> needle == "" or String.contains?(tag, needle) end)
+    # Matching is case-insensitive on both sides: `tag_counts/1` returns the
+    # group's own spelling ("Elixir"), and typing "eli" has to find it.
+    |> Enum.filter(fn {tag, _count} -> needle == "" or String.contains?(fold(tag), needle) end)
     |> Enum.sort_by(fn {tag, count} ->
       # Prefix matches lead, then the most-used, then alphabetical so the list
       # is stable between keystrokes.
-      {if(String.starts_with?(tag, needle), do: 0, else: 1), -count, tag}
+      {if(String.starts_with?(fold(tag), needle), do: 0, else: 1), -count, fold(tag)}
     end)
     |> Enum.take(limit)
     |> Enum.map(fn {tag, count} -> %{tag: tag, count: count} end)
   end
 
+  defp fold(tag), do: String.downcase(tag)
+
   # Case-insensitive tally keyed on the downcased tag, keeping the spelling
   # that occurs most often so the popup offers "Elixir" if that's what the
-  # group actually writes.
+  # group actually writes. Ties go to the spelling seen first, so the list
+  # doesn't reshuffle as unrelated posts are published.
+  #
+  # Returns `[{display_tag, count}]` where the count is the case-insensitive
+  # total — `suggest/3` folds both sides before matching, so the returned
+  # spelling is a display detail and never affects filtering or ordering.
+  #
+  # `ListingCache.read/1` hands back a bare list of post maps, never a
+  # `%{posts: …}` envelope — the timestamps live under their own term key
+  # (see `cache_generated_at_key/1`), which is what the envelope was
+  # presumably remembered from.
   defp tag_counts(group_slug) do
     case ListingCache.read(group_slug) do
-      {:ok, %{posts: posts}} -> posts
       {:ok, posts} when is_list(posts) -> posts
       _ -> []
     end
     |> Enum.flat_map(fn post -> get_in(post, [:metadata, :tags]) || [] end)
     |> Enum.reduce(%{}, fn tag, acc ->
-      key = tag |> to_string() |> String.downcase()
-      Map.update(acc, key, 1, &(&1 + 1))
+      tag = to_string(tag)
+      key = String.downcase(tag)
+
+      Map.update(acc, key, {1, %{tag => 1}}, fn {total, spellings} ->
+        {total + 1, Map.update(spellings, tag, 1, &(&1 + 1))}
+      end)
     end)
-    |> Enum.to_list()
+    |> Enum.map(fn {_key, {total, spellings}} -> {most_used_spelling(spellings), total} end)
   rescue
     # The cache is a convenience, not a contract — never break typing over it.
     _ -> []
+  end
+
+  # Map iteration order isn't insertion order, so an equally-common pair of
+  # spellings would swap between cache rebuilds on count alone; the tag is
+  # the tie-break that pins one of them.
+  defp most_used_spelling(spellings) do
+    spellings
+    |> Enum.max_by(fn {tag, count} -> {count, tag} end)
+    |> elem(0)
   end
 
   @doc """

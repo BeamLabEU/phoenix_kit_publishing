@@ -42,13 +42,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
 
   @impl true
   def update(assigns, socket) do
-    tree = Categories.list_tree(assigns.group_slug)
+    socket = assign(socket, assigns)
+
+    # A stateful component's update/2 runs on EVERY parent render, and the
+    # parent here is the post editor — which re-renders on each keystroke.
+    # Reading the tree unconditionally put a two-table join on that path.
+    # The tree is re-read where it can actually have changed: on search
+    # (see the handler) and when the component is pointed at another group.
+    tree =
+      case {socket.assigns[:tree], socket.assigns[:tree_group]} do
+        {cached, group} when is_list(cached) and group == assigns.group_slug -> cached
+        _ -> Categories.list_tree(assigns.group_slug)
+      end
 
     {:ok,
      socket
-     |> assign(assigns)
      |> assign(:tree, tree)
-     |> assign(:selected_categories, resolve(tree, assigns.selected))}
+     |> assign(:tree_group, assigns.group_slug)
+     |> assign(:selected_categories, resolve(tree, socket.assigns.selected))}
   end
 
   @impl true

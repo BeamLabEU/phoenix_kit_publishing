@@ -75,16 +75,30 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         is_nil(c.parent_uuid) or not MapSet.member?(known, c.parent_uuid)
       end)
 
-    walk_tree(roots, by_parent, 0, MapSet.new())
+    walk_tree(roots, by_parent, 0, %{})
   end
 
+  # `seen` is a plain map used as a set, not a MapSet: this is seeded EMPTY
+  # and grows through the recursion, and dialyzer treats an empty MapSet and
+  # a populated one as different parameterisations of the same opaque type —
+  # a `call_without_opaque` on the very next `member?`. The other sets in
+  # this module (`known` above, `collect_subtree/3`) are seeded with their
+  # elements, so they don't hit it and stay MapSets.
+  #
+  # The set is per-branch, not global: it stops a corrupt parent chain
+  # looping forever, while a node legitimately reachable under two roots
+  # still renders under each.
   defp walk_tree(nodes, by_parent, depth, seen) do
     Enum.flat_map(nodes, fn node ->
-      if MapSet.member?(seen, node.uuid) do
+      if Map.has_key?(seen, node.uuid) do
         []
       else
         children = Map.get(by_parent, node.uuid, [])
-        [{node, depth} | walk_tree(children, by_parent, depth + 1, MapSet.put(seen, node.uuid))]
+
+        [
+          {node, depth}
+          | walk_tree(children, by_parent, depth + 1, Map.put(seen, node.uuid, true))
+        ]
       end
     end)
   end
@@ -179,30 +193,37 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
                category.group_uuid,
                category
              ) do
-        category
-        |> PublishingCategory.changeset(stringify_keys(attrs))
-        |> repo().update()
-        |> case do
-          {:ok, updated} ->
-            ActivityLog.log_manual(
-              "publishing.category.updated",
-              ActivityLog.actor_uuid(opts),
-              "publishing_category",
-              updated.uuid,
-              %{"slug" => updated.slug}
-            )
-
-            invalidate_group_cache(updated.group_uuid)
-            updated
-
-          {:error, changeset} ->
-            repo().rollback(changeset)
-        end
+        write_category_update(category, attrs, opts)
       else
+        # Every step returns `:ok` or a tagged `{:error, reason}` — there is
+        # no bare `:error` to catch here.
         {:error, reason} -> repo().rollback(reason)
-        :error -> repo().rollback(:invalid_parent)
       end
     end)
+  end
+
+  # Runs inside `update_category/3`'s transaction — `rollback/1` throws, so
+  # returning the struct is the only success path out of here.
+  defp write_category_update(category, attrs, opts) do
+    category
+    |> PublishingCategory.changeset(stringify_keys(attrs))
+    |> repo().update()
+    |> case do
+      {:ok, updated} ->
+        ActivityLog.log_manual(
+          "publishing.category.updated",
+          ActivityLog.actor_uuid(opts),
+          "publishing_category",
+          updated.uuid,
+          %{"slug" => updated.slug}
+        )
+
+        invalidate_group_cache(updated.group_uuid)
+        updated
+
+      {:error, changeset} ->
+        repo().rollback(changeset)
+    end
   end
 
   # A cycle check answers a question about the whole tree, so two re-parents
@@ -388,20 +409,21 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   defp renumber_siblings(uuids, by_uuid) do
     uuids
     |> Enum.with_index()
-    |> Enum.count(fn {uuid, index} ->
-      category = by_uuid[uuid]
+    |> Enum.count(fn {uuid, index} -> reposition(by_uuid[uuid], index) end)
+  end
 
-      if category.position != index do
-        case category
-             |> PublishingCategory.changeset(%{"position" => index})
-             |> repo().update() do
-          {:ok, _} -> true
-          {:error, changeset} -> repo().rollback(changeset)
-        end
-      else
-        false
-      end
-    end)
+  # True when the row actually moved, so the caller can count real changes —
+  # a drop that lands everything back where it was must not report a reorder.
+  defp reposition(%{position: index}, index), do: false
+
+  defp reposition(category, index) do
+    category
+    |> PublishingCategory.changeset(%{"position" => index})
+    |> repo().update()
+    |> case do
+      {:ok, _} -> true
+      {:error, changeset} -> repo().rollback(changeset)
+    end
   end
 
   # ===========================================================================

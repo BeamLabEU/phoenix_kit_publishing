@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.PageBuilder
+  alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio, as: AudioComponent
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Shared.Components.Image
@@ -597,24 +598,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     masked = mask_scanned_code(content)
 
     if masked =~ @note_regex do
-      parts = Regex.split(@note_regex, masked, include_captures: true)
-
       {iodata, notes} =
-        Enum.reduce(parts, {[], []}, fn part, {out, notes} ->
-          case Regex.run(@note_regex, part) do
-            [^part, body, phrase] ->
-              number = length(notes) + 1
-              # Occurrence of this exact body so far — duplicate note texts
-              # must not collide on the panel anchor (note_dom_id/2).
-              occurrence = Enum.count(notes, &(&1 == body)) + 1
-
-              {[note_ref_html(number, occurrence, body, phrase, notes_style) | out],
-               [body | notes]}
-
-            _ ->
-              {[part | out], notes}
-          end
-        end)
+        @note_regex
+        |> Regex.split(masked, include_captures: true)
+        |> Enum.reduce({[], []}, &take_note(&1, &2, notes_style))
 
       # Content stays masked here: the plain path unmasks inside
       # render_markdown_html/1, and the mixed path's re-mask is a no-op on
@@ -622,6 +609,25 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       {iodata |> Enum.reverse() |> IO.iodata_to_binary(), Enum.reverse(notes)}
     else
       {content, []}
+    end
+  end
+
+  # Split with include_captures alternates prose and whole `<Note>` tags, so a
+  # part that matches the regex in full IS a note; anything else passes through.
+  # `notes` accumulates bodies in reverse, which is what makes both the number
+  # and the duplicate-body occurrence a plain count of what came before.
+  defp take_note(part, {out, notes}, notes_style) do
+    case Regex.run(@note_regex, part) do
+      [^part, body, phrase] ->
+        number = length(notes) + 1
+        # Occurrence of this exact body so far — duplicate note texts must not
+        # collide on the panel anchor (note_dom_id/2).
+        occurrence = Enum.count(notes, &(&1 == body)) + 1
+
+        {[note_ref_html(number, occurrence, body, phrase, notes_style) | out], [body | notes]}
+
+      _ ->
+        {[part | out], notes}
     end
   end
 
@@ -1044,7 +1050,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       children: []
     }
 
-    PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio.render(assigns)
+    AudioComponent.render(assigns)
     |> PageBuilder.Renderer.wrap_stretch(attr_map)
     |> Safe.to_iodata()
     |> IO.iodata_to_binary()

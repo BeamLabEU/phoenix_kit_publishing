@@ -39,6 +39,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language, as: ControllerLanguage
+  alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
   alias PhoenixKitAI, as: AI
@@ -2249,7 +2250,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # wrong audio file is silent.
   defp media_allowed_for_target?(file_uuid, target)
        when target in ["audio_uuid", "audio_component"] do
-    case PhoenixKit.Modules.Storage.get_file(file_uuid) do
+    case Storage.get_file(file_uuid) do
       %{file_type: "audio"} -> true
       %{mime_type: mime} when is_binary(mime) -> String.starts_with?(mime, "audio/")
       _ -> false
@@ -2412,116 +2413,131 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   defp do_handle_media_selected(socket, file_ids) do
-    file_uuid = List.first(file_ids)
-    inserting_image_component = Map.get(socket.assigns, :inserting_image_component, false)
-    inserting_gallery = Map.get(socket.assigns, :inserting_gallery, false)
-    inserting_audio = Map.get(socket.assigns, :inserting_audio, false)
-
     {socket, autosave?} =
-      cond do
-        inserting_audio and file_uuid ->
-          send_update(Leaf,
-            id: "content-editor",
-            action: :insert_markdown,
-            text: Helpers.audio_component_markup(file_uuid)
-          )
-
-          {
-            socket
-            |> assign(:show_media_selector, false)
-            |> assign(:media_selector_target, "featured_image_uuid")
-            |> assign(:inserting_audio, false)
-            |> put_flash(:info, gettext("Audio player inserted")),
-            false
-          }
-
-        inserting_gallery and file_ids != [] ->
-          send_update(Leaf,
-            id: "content-editor",
-            action: :insert_markdown,
-            text: Helpers.gallery_markup(file_ids)
-          )
-
-          {
-            socket
-            |> assign(:show_media_selector, false)
-            |> assign(:media_selection_mode, :single)
-            |> assign(:media_selector_target, "featured_image_uuid")
-            |> assign(:inserting_gallery, false)
-            |> put_flash(:info, gettext("Gallery inserted")),
-            false
-          }
-
-        file_uuid && inserting_image_component ->
-          markup = Helpers.image_component_markup(file_uuid)
-          # Insert through Leaf's own command (CSP-safe, survives navigation)
-          # instead of a bespoke inline-script listener.
-          send_update(Leaf,
-            id: "content-editor",
-            action: :insert_markdown,
-            text: markup
-          )
-
-          {
-            socket
-            |> assign(:show_media_selector, false)
-            |> assign(:inserting_image_component, false)
-            |> put_flash(:info, gettext("Image component inserted")),
-            false
-          }
-
-        file_uuid &&
-            not media_allowed_for_target?(file_uuid, socket.assigns[:media_selector_target]) ->
-          # The shared selector has no audio filter, so a Choose click could
-          # attach a PNG to the audio slot: the post page would render a dead
-          # <audio> and the feed an <enclosure type="audio/mpeg"> pointing at
-          # an image. Refuse rather than store it.
-          {
-            socket
-            |> assign(:show_media_selector, false)
-            |> assign(:media_selector_target, "featured_image_uuid")
-            |> put_flash(:error, gettext("That file isn't audio — pick an audio file.")),
-            false
-          }
-
-        file_uuid ->
-          target = socket.assigns[:media_selector_target] || "featured_image_uuid"
-          new_form = Forms.update_form_with_media(socket.assigns.form, file_uuid, target)
-
-          flash =
-            case target do
-              "og_image_uuid" -> gettext("OG image selected")
-              "audio_uuid" -> gettext("Audio version selected")
-              _ -> gettext("Featured image selected")
-            end
-
-          socket =
-            socket
-            |> assign(:form, new_form)
-            |> assign(:has_pending_changes, true)
-            |> assign(:show_media_selector, false)
-            |> assign(:media_selector_target, "featured_image_uuid")
-            |> put_flash(:info, flash)
-            |> push_event("changes-status", %{has_changes: true})
-
-          # Immediate live-collab broadcast — without this, spectators only see
-          # the new image after the 500ms autosave fires + an editor_saved
-          # round-trip. Mirrors the wiring update_meta does for text fields.
-          Collaborative.broadcast_form_change(socket, :meta, new_form)
-          socket = Collaborative.touch_activity(socket)
-
-          {socket, true}
-
-        true ->
-          {socket
-           |> assign(:show_media_selector, false)
-           |> assign(:media_selector_target, "featured_image_uuid"), false}
-      end
+      apply_media_selection(socket, media_selection_kind(socket, file_ids), file_ids)
 
     socket = if autosave?, do: schedule_autosave(socket), else: socket
 
     {:noreply, socket}
   end
+
+  # Which of the five things a Choose click can mean. Named up front so each
+  # outcome is its own clause below — the branch order is load-bearing (an
+  # in-flight insertion mode wins over the plain slot assignment).
+  defp media_selection_kind(socket, file_ids) do
+    case insertion_mode(socket, file_ids) do
+      nil -> slot_selection_kind(socket, List.first(file_ids))
+      mode -> mode
+    end
+  end
+
+  # A body-insertion mode that a toolbar button armed, if one is in flight and
+  # the selection can satisfy it. Gallery is the only multi-file one.
+  defp insertion_mode(socket, file_ids) do
+    armed = fn key -> Map.get(socket.assigns, key, false) end
+    picked_one? = List.first(file_ids) != nil
+
+    cond do
+      armed.(:inserting_audio) and picked_one? -> :audio_component
+      armed.(:inserting_gallery) and file_ids != [] -> :gallery
+      armed.(:inserting_image_component) and picked_one? -> :image_component
+      true -> nil
+    end
+  end
+
+  defp slot_selection_kind(_socket, nil), do: :nothing
+
+  defp slot_selection_kind(socket, file_uuid) do
+    if media_allowed_for_target?(file_uuid, socket.assigns[:media_selector_target]),
+      do: :slot,
+      else: :wrong_type
+  end
+
+  defp apply_media_selection(socket, :audio_component, file_ids) do
+    send_update(Leaf,
+      id: "content-editor",
+      action: :insert_markdown,
+      text: Helpers.audio_component_markup(List.first(file_ids))
+    )
+
+    {socket
+     |> close_media_selector()
+     |> assign(:inserting_audio, false)
+     |> put_flash(:info, gettext("Audio player inserted")), false}
+  end
+
+  defp apply_media_selection(socket, :gallery, file_ids) do
+    send_update(Leaf,
+      id: "content-editor",
+      action: :insert_markdown,
+      text: Helpers.gallery_markup(file_ids)
+    )
+
+    {socket
+     |> close_media_selector()
+     |> assign(:media_selection_mode, :single)
+     |> assign(:inserting_gallery, false)
+     |> put_flash(:info, gettext("Gallery inserted")), false}
+  end
+
+  defp apply_media_selection(socket, :image_component, file_ids) do
+    # Insert through Leaf's own command (CSP-safe, survives navigation)
+    # instead of a bespoke inline-script listener.
+    send_update(Leaf,
+      id: "content-editor",
+      action: :insert_markdown,
+      text: Helpers.image_component_markup(List.first(file_ids))
+    )
+
+    {socket
+     |> assign(:show_media_selector, false)
+     |> assign(:inserting_image_component, false)
+     |> put_flash(:info, gettext("Image component inserted")), false}
+  end
+
+  # The shared selector has no audio filter, so a Choose click could attach a
+  # PNG to the audio slot: the post page would render a dead <audio> and the
+  # feed an <enclosure type="audio/mpeg"> pointing at an image. Refuse rather
+  # than store it.
+  defp apply_media_selection(socket, :wrong_type, _file_ids) do
+    {socket
+     |> close_media_selector()
+     |> put_flash(:error, gettext("That file isn't audio — pick an audio file.")), false}
+  end
+
+  defp apply_media_selection(socket, :slot, file_ids) do
+    target = socket.assigns[:media_selector_target] || "featured_image_uuid"
+    new_form = Forms.update_form_with_media(socket.assigns.form, List.first(file_ids), target)
+
+    socket =
+      socket
+      |> assign(:form, new_form)
+      |> assign(:has_pending_changes, true)
+      |> close_media_selector()
+      |> put_flash(:info, media_slot_flash(target))
+      |> push_event("changes-status", %{has_changes: true})
+
+    # Immediate live-collab broadcast — without this, spectators only see
+    # the new image after the 500ms autosave fires + an editor_saved
+    # round-trip. Mirrors the wiring update_meta does for text fields.
+    Collaborative.broadcast_form_change(socket, :meta, new_form)
+    socket = Collaborative.touch_activity(socket)
+
+    {socket, true}
+  end
+
+  defp apply_media_selection(socket, :nothing, _file_ids),
+    do: {close_media_selector(socket), false}
+
+  defp close_media_selector(socket) do
+    socket
+    |> assign(:show_media_selector, false)
+    |> assign(:media_selector_target, "featured_image_uuid")
+  end
+
+  defp media_slot_flash("og_image_uuid"), do: gettext("OG image selected")
+  defp media_slot_flash("audio_uuid"), do: gettext("Audio version selected")
+  defp media_slot_flash(_target), do: gettext("Featured image selected")
 
   @impl true
   def render(assigns) do

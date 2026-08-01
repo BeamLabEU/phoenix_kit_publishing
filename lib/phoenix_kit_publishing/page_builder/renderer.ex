@@ -3,6 +3,8 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
   Renders AST nodes to HTML by delegating to component modules.
   """
 
+  alias Phoenix.HTML.Safe
+
   @doc """
   Renders an AST node to HTML.
   """
@@ -101,7 +103,7 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
           ~s(<div class="pk-stretch" style="),
           style,
           ~s(">),
-          Phoenix.HTML.Safe.to_iodata(html),
+          Safe.to_iodata(html),
           "</div>"
         ])
     end
