@@ -16,7 +16,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingCategory
 
-  @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostFetching
   alias PhoenixKit.Modules.Publishing.Web.Controller.Translations
@@ -561,16 +560,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   Excludes timestamp-mode posts with a future post_date.
   """
   def filter_published(posts) do
-    today = Date.utc_today()
-
     Enum.filter(posts, fn post ->
-      post[:metadata] && post.metadata.status == "published" && not future_post?(post, today)
+      post[:metadata] && post.metadata.status == "published" &&
+        not Constants.scheduled_ahead?(post)
     end)
-  end
-
-  defp future_post?(post, today) do
-    post[:mode] in @timestamp_modes and post[:date] != nil and
-      Date.compare(post[:date], today) == :gt
   end
 
   @doc """

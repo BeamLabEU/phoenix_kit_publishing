@@ -345,10 +345,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
     end
   end
 
-  defp future_timestamp_post?(post) do
-    Constants.timestamp_mode?(post[:mode]) and post[:date] != nil and
-      Date.compare(post[:date], Date.utc_today()) == :gt
-  end
+  defp future_timestamp_post?(post), do: Constants.scheduled_ahead?(post)
 
   # ============================================================================
   # Helper Functions

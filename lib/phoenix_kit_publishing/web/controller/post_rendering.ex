@@ -16,7 +16,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
 
-  @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
@@ -57,7 +56,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def render_resolved_post(conn, group_slug, identifier, language) do
     case PostFetching.fetch_post(group_slug, identifier, language) do
       {:ok, post} ->
-        if post.metadata.status == "published" and not future_post?(post) do
+        if post.metadata.status == "published" and not Constants.scheduled_ahead?(post) do
           render_published_post(conn, group_slug, post, language)
         else
           log_404(conn, group_slug, identifier, language, :unpublished)
@@ -107,27 +106,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     internal_slug = SlugResolution.resolve_url_slug_to_internal(group_slug, url_slug, language)
 
     if post_allows_version_access?(group_slug, internal_slug, language) do
-      case Publishing.read_post(group_slug, internal_slug, language, version) do
-        {:ok, post} ->
-          # "Browse older versions" has to mean PREVIOUSLY published, not
-          # currently published: publishing a new version archives the one it
-          # replaces, so a live-status-only check made every historical URL 404
-          # and left the dropdown unable to hold more than the active version.
-          # A version that never shipped (plain draft, no published_at) stays
-          # private.
-          if publicly_browsable_version?(group_slug, post, version) do
-            build_versioned_post_response(group_slug, post, version)
-          else
-            log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
-            {:error, :unpublished}
-          end
-
-        {:error, reason} ->
-          log_404(conn, group_slug, {:slug, internal_slug, version}, language, reason)
-          {:error, reason}
-      end
+      render_browsable_version(conn, group_slug, internal_slug, version, language)
     else
       {:error, :version_access_disabled}
+    end
+  end
+
+  defp render_browsable_version(conn, group_slug, internal_slug, version, language) do
+    case Publishing.read_post(group_slug, internal_slug, language, version) do
+      {:ok, post} ->
+        # "Browse older versions" has to mean PREVIOUSLY published, not
+        # currently published: publishing a new version archives the one it
+        # replaces, so a live-status-only check made every historical URL 404
+        # and left the dropdown unable to hold more than the active version.
+        # A version that never shipped (plain draft, no published_at) stays
+        # private.
+        if publicly_browsable_version?(group_slug, post, version) do
+          build_versioned_post_response(group_slug, post, version)
+        else
+          log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
+          {:error, :unpublished}
+        end
+
+      {:error, reason} ->
+        log_404(conn, group_slug, {:slug, internal_slug, version}, language, reason)
+        {:error, reason}
     end
   end
 
@@ -465,11 +468,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
       user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
       path: conn.request_path
     )
-  end
-
-  defp future_post?(post) do
-    post[:mode] in @timestamp_modes and post[:date] != nil and
-      Date.compare(post[:date], Date.utc_today()) == :gt
   end
 
   defp canonical_redirect?(conn, language, canonical_language, canonical_url) do

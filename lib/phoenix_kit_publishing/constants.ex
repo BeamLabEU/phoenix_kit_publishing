@@ -37,6 +37,35 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @doc "Returns true if mode is a slug mode (atom or string)."
   def slug_mode?(mode), do: mode in @slug_modes
 
+  @doc """
+  True when a timestamp-mode post is scheduled for later and must not be
+  public yet.
+
+  A timestamp post is identified by a date AND a time, and the schedule was
+  read as a date alone — so anything set for later today went public at
+  midnight. Nine in the morning is a normal time to line up an announcement
+  for six in the evening, and the listing carried its title, excerpt and
+  image from the moment the day started.
+
+  Three copies of the date-only test had drifted into the listing, the post
+  page and the fallback resolver. One predicate, so a scheduled post becomes
+  public at one moment on every path that asks.
+
+  Both comparisons are UTC, matching how the rows are stored and how the
+  editor writes them.
+  """
+  @spec scheduled_ahead?(map()) :: boolean()
+  def scheduled_ahead?(post) do
+    timestamp_mode?(post[:mode]) and post[:date] != nil and
+      DateTime.compare(scheduled_at(post[:date], post[:time]), DateTime.utc_now()) == :gt
+  end
+
+  defp scheduled_at(date, time) do
+    # No time means the whole day is fair game from its first minute — the
+    # old behaviour, kept for rows that predate a required post_time.
+    DateTime.new!(date, time || ~T[00:00:00], "Etc/UTC")
+  end
+
   # ---------------------------------------------------------------------------
   # Statuses
   # ---------------------------------------------------------------------------

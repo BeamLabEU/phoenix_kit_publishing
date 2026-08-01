@@ -637,9 +637,15 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       ~s(<a class="pk-note-ref" id="pk-note-ref-#{number}" href="#{href}" data-note="),
       escape_html(body),
       ~s(">),
-      # Encode '#' in the phrase too: the ref is already an <a>, and the
-      # later hashtag pass must not nest a second anchor inside it.
-      String.replace(phrase, "#", "&#35;"),
+      # Escaped, not just #-encoded. The '#' still has to go (the ref is
+      # already an <a> and the later hashtag pass must not nest a second
+      # anchor inside it), and escape_html does that along with the rest.
+      # Admin markdown renders with `unsafe: true`, so leaving the phrase raw
+      # was not a way in that the body didn't already offer — but it sits
+      # inside an <a> this function is building, one line below the body's own
+      # escape, and the AI-translation and import paths write bodies no admin
+      # typed.
+      escape_html(phrase),
       ~s(<sup>#{number}</sup></a>)
     ]
   end
@@ -1296,6 +1302,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     (gallery_markdown_images(body) ++ gallery_uuid_images(body))
     |> Enum.sort_by(& &1.at)
     |> Enum.map(&Map.delete(&1, :at))
+    # Same scheme allow-list every other component's image goes through.
+    # Escaping alone let `![x](javascript:…)` reach a public `src`; browsers
+    # won't run a script URL from an `<img>`, so nothing was exploitable, but
+    # one component quietly trusting a scheme its siblings reject is how the
+    # next component that CAN run it gets written.
+    |> Enum.filter(&showcase_safe_src?(&1.src))
   end
 
   defp gallery_markdown_images(body) do
