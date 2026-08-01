@@ -114,6 +114,45 @@ defmodule PhoenixKit.Modules.Publishing.VersionCategoriesTest do
     assert Categories.backfill_version_categories(ctx.slug) == 0
   end
 
+  test "the backfill sets the one key and leaves the rest of the version alone", ctx do
+    # It used to read each version, put the key into the map it had read, and
+    # write the whole map back. Anything saved between the read and the write
+    # was inside that map in its old form, so the write reverted it — silently,
+    # and on every regenerate for as long as the legacy rows survived.
+    v = DBStorage.get_version(ctx.post.uuid, 1)
+
+    neighbours = %{
+      "featured_image_uuid" => "keep-me",
+      "tags" => ["a", "b"],
+      "seo_title" => "Kept",
+      "excerpt" => "Also kept"
+    }
+
+    {:ok, _} =
+      v
+      |> Ecto.Changeset.change(
+        data: v.data |> Map.delete("category_uuids") |> Map.merge(neighbours)
+      )
+      |> TestRepo.update()
+
+    TestRepo.insert_all(PublishingPostCategory, [
+      %{
+        post_uuid: ctx.post.uuid,
+        category_uuid: ctx.news.uuid,
+        inserted_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      }
+    ])
+
+    assert Categories.backfill_version_categories(ctx.slug) == 1
+    assert version_categories(ctx.post.uuid, 1) == [ctx.news.uuid]
+
+    after_data = DBStorage.get_version(ctx.post.uuid, 1).data
+
+    for {key, value} <- neighbours do
+      assert after_data[key] == value, "backfill clobbered #{key}"
+    end
+  end
+
   test "the backfill never overwrites a filing that is already there", ctx do
     {:ok, _} = Categories.replace_post_categories(ctx.post.uuid, [ctx.guides.uuid])
 

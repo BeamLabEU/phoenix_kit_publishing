@@ -158,7 +158,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   """
   @spec publish_version(String.t(), String.t(), integer(), keyword()) :: :ok | {:error, any()}
   def publish_version(group_slug, post_uuid, version, opts \\ []) do
-    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil ->
         ActivityLog.log_failed_mutation(
           "publishing.version.published",
@@ -225,7 +225,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   """
   @spec unpublish_post(String.t(), String.t(), keyword()) :: :ok | {:error, any()}
   def unpublish_post(group_slug, post_uuid, opts \\ []) do
-    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil ->
         ActivityLog.log_failed_mutation(
           "publishing.post.unpublished",
@@ -484,12 +484,13 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   @spec delete_version(String.t(), String.t(), integer(), keyword() | map()) ::
           :ok | {:error, term()}
   def delete_version(group_slug, post_uuid, version, opts \\ []) do
-    with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
+    with db_post when not is_nil(db_post) <-
+           DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]),
          db_version when not is_nil(db_version) <- DBStorage.get_version(db_post.uuid, version),
          :ok <- validate_version_deletable(db_post, db_version) do
       broadcast_id = db_post.uuid
 
-      case DBStorage.update_version(db_version, %{status: "archived"}) do
+      case archive_deleted_version(db_post, db_version) do
         {:ok, _} ->
           ListingCache.regenerate(group_slug)
           PublishingPubSub.broadcast_version_deleted(group_slug, broadcast_id, version)
@@ -557,6 +558,42 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     end
   end
 
+  # "Not the live one" is checked before the write, and between those two
+  # moments someone else can publish the very version being deleted —
+  # `publish_version/4` and `unpublish_post/3` both take the post row's lock
+  # for exactly this reason, and this path did not. The loser archived a
+  # version the winner had just made live, leaving `active_version_uuid`
+  # pointing at an archived row: the public page kept serving it (the join is
+  # on the pointer, not the status) while the admin list called it a draft,
+  # and `stale_fixer` doesn't repair that shape because the pointer isn't nil.
+  #
+  # Same lock, same re-read under it, and the deletion loses the race instead
+  # of silently winning it.
+  defp archive_deleted_version(db_post, db_version) do
+    repo = PhoenixKit.RepoHelper.repo()
+
+    repo.transaction(fn ->
+      lock_post!(repo, db_post.uuid)
+
+      fresh_post = DBStorage.get_post_by_uuid(db_post.uuid)
+      fresh_version = DBStorage.get_version(db_post.uuid, db_version.version_number)
+
+      cond do
+        is_nil(fresh_version) ->
+          repo.rollback(:not_found)
+
+        fresh_post && fresh_post.active_version_uuid == fresh_version.uuid ->
+          repo.rollback(:cannot_delete_live)
+
+        true ->
+          case DBStorage.update_version(fresh_version, %{status: "archived"}) do
+            {:ok, updated} -> updated
+            {:error, reason} -> repo.rollback(reason)
+          end
+      end
+    end)
+  end
+
   defp validate_version_deletable(db_post, db_version) do
     cond do
       db_post.active_version_uuid == db_version.uuid ->
@@ -588,7 +625,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   # ===========================================================================
 
   defp create_version_in_db(group_slug, post_uuid, source_version, _params, opts) do
-    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil -> {:error, :post_not_found}
       db_post -> do_create_version(group_slug, post_uuid, db_post, source_version, opts)
     end

@@ -449,22 +449,37 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     # Safe because the legacy rows are drained below: once the move is done
     # there is nothing left to re-apply, so a genuine "filed under nothing"
     # sticks from then on.
+    # One key, set in place. Reading each row and writing the whole `data`
+    # map back would hand a concurrent save's work to whichever statement
+    # committed second: the map was read before that save and still holds
+    # the old featured image, tags, SEO and excerpt, and the UPDATE simply
+    # waits for the save to commit and then overwrites all of it. Nothing
+    # errors and `updated_at` moves, so the revert looks like a fresh write.
+    #
+    # That window is open for as long as the legacy rows survive, and every
+    # regenerate re-enters it — which is every save, trash and publish in
+    # the group. `jsonb_set` touches the one key against the row as it is at
+    # UPDATE time, the way `unfile_deleted_category/1` already does.
     written =
-      from(v in PublishingVersion,
-        where: v.post_uuid in ^post_uuids,
-        where:
-          fragment("NOT (? \\? 'category_uuids')", v.data) or
-            fragment("? -> 'category_uuids' = '[]'::jsonb", v.data)
-      )
-      |> repo().all()
-      |> Enum.reduce(0, fn version, count ->
-        uuids = legacy |> Map.get(version.post_uuid, []) |> Enum.uniq()
-        data = Map.put(version.data || %{}, "category_uuids", uuids)
+      legacy
+      |> Enum.reduce(0, fn {post_uuid, uuids}, count ->
+        uuids = Enum.uniq(uuids)
 
-        case version |> Ecto.Changeset.change(data: data) |> repo().update() do
-          {:ok, _} -> count + 1
-          {:error, _} -> count
-        end
+        {updated, _} =
+          from(v in PublishingVersion,
+            where: v.post_uuid == ^post_uuid,
+            where:
+              fragment("NOT (? \\? 'category_uuids')", v.data) or
+                fragment("? -> 'category_uuids' = '[]'::jsonb", v.data),
+            update: [
+              set: [
+                data: fragment("jsonb_set(?, '{category_uuids}', ?::jsonb)", v.data, ^uuids)
+              ]
+            ]
+          )
+          |> repo().update_all([])
+
+        count + updated
       end)
 
     from(pc in PublishingPostCategory, where: pc.post_uuid in ^post_uuids)

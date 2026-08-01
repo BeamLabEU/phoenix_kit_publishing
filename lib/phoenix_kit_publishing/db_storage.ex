@@ -236,6 +236,35 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     |> maybe_preload(preloads)
   end
 
+  @doc """
+  The same fetch, but only if the post really belongs to `group_slug`.
+
+  Every group-scoped mutation takes a group from the page the caller is on
+  and a uuid from the event they sent, and those two are not checked against
+  each other by `get_post_by_uuid/2` — it looks up the uuid alone. A post
+  uuid is not a secret (the public comment form renders one), so the pairing
+  has to be verified rather than assumed: the group decides which cache to
+  rebuild, which topic to broadcast on, and what the audit row says the
+  actor touched. Answering for a post in another group gets all three wrong,
+  and would be a straightforward hole the moment permissions become
+  per-group rather than per-module.
+  """
+  @spec get_group_post_by_uuid(String.t(), String.t(), list()) :: PublishingPost.t() | nil
+  def get_group_post_by_uuid(group_slug, uuid, preloads \\ []) do
+    case Ecto.UUID.cast(uuid) do
+      {:ok, uuid} ->
+        from(p in PublishingPost,
+          join: g in assoc(p, :group),
+          where: p.uuid == ^uuid and g.slug == ^group_slug
+        )
+        |> repo().one()
+        |> maybe_preload(preloads)
+
+      :error ->
+        nil
+    end
+  end
+
   @doc "Lists posts in a group, optionally filtered by status. Excludes trashed by default."
   @spec list_posts(String.t(), String.t() | nil) :: [PublishingPost.t()]
   def list_posts(group_slug, status \\ nil) do

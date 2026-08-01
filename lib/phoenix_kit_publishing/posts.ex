@@ -334,7 +334,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   @spec restore_post(String.t(), String.t(), keyword() | map()) ::
           {:ok, String.t()} | {:error, term()}
   def restore_post(group_slug, post_uuid, opts \\ []) do
-    case DBStorage.get_post_by_uuid(post_uuid) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid) do
       nil ->
         ActivityLog.log_failed_mutation(
           "publishing.post.restored",
@@ -384,7 +384,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   @spec trash_post(String.t(), String.t(), keyword() | map()) ::
           {:ok, String.t()} | {:error, term()}
   def trash_post(group_slug, post_uuid, opts \\ []) do
-    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil ->
         ActivityLog.log_failed_mutation(
           "publishing.post.trashed",
@@ -1333,7 +1333,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     # "published" with no active version — admin shows published, public 404s (M4).
     version_attrs =
       %{data: new_data}
-      |> maybe_put(:status, deferred_publish_status(Map.get(params, "status")))
+      |> maybe_put(:status, save_writable_status(version, Map.get(params, "status")))
       |> maybe_put(:published_at, parse_published_at_from_params(params))
 
     case DBStorage.update_version(version, version_attrs) do
@@ -1404,6 +1404,39 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # through unchanged.
   defp deferred_publish_status("published"), do: nil
   defp deferred_publish_status(status), do: status
+
+  # The same reservation, in the other direction.
+  #
+  # A save carries the whole form, and a form is a snapshot of what the page
+  # knew when it loaded. Open a draft in two languages, publish from one, and
+  # the other still holds `status => "draft"`; its next autosave writes that
+  # back over the version the publish just made live. The post is then live by
+  # its pointer and a draft by its status — the public page still serves it,
+  # because the join follows the pointer, while the admin list says draft and
+  # `stale_fixer` won't repair it (it only heals a missing pointer).
+  #
+  # Taking a version down is `unpublish_post/3`'s job, where it happens under
+  # the post lock together with the pointer. So a plain save may set any status
+  # on a version that isn't live, and none at all on the one that is.
+  defp save_writable_status(version, status) do
+    status = deferred_publish_status(status)
+
+    if status && demotes_live_version?(version, status) do
+      nil
+    else
+      status
+    end
+  end
+
+  defp demotes_live_version?(%{uuid: version_uuid, post_uuid: post_uuid}, status)
+       when status in ["draft", "archived"] do
+    case DBStorage.get_post_by_uuid(post_uuid) do
+      %{active_version_uuid: ^version_uuid} -> true
+      _ -> false
+    end
+  end
+
+  defp demotes_live_version?(_version, _status), do: false
 
   defp parse_published_at_from_params(params) do
     case Map.get(params, "published_at") do
