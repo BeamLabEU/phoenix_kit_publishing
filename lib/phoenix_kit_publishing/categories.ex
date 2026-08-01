@@ -172,6 +172,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   def update_category(uuid, attrs, opts \\ []) do
     repo().transaction(fn ->
       with {:ok, category} <- get_category(uuid),
+           :ok <- lock_group_categories(category.group_uuid, attrs),
            :ok <-
              validate_parent(
                attrs["parent_uuid"] || attrs[:parent_uuid],
@@ -202,6 +203,24 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         :error -> repo().rollback(:invalid_parent)
       end
     end)
+  end
+
+  # A cycle check answers a question about the whole tree, so two re-parents
+  # in the same group have to take turns asking it. Both transactions used to
+  # read the tree as it was before either had written, so moving A under B and
+  # B under A at the same moment each looked fine on its own and left
+  # A → B → A. The tree is built from its roots, so both branches — and every
+  # category hanging off them — then vanished from the admin page entirely.
+  #
+  # Locking the group's rows before the check serialises only re-parenting;
+  # renames and other edits carry no parent_uuid and skip it.
+  defp lock_group_categories(group_uuid, attrs) do
+    if Map.has_key?(attrs, "parent_uuid") or Map.has_key?(attrs, :parent_uuid) do
+      from(c in PublishingCategory, where: c.group_uuid == ^group_uuid, lock: "FOR UPDATE")
+      |> repo().all()
+    end
+
+    :ok
   end
 
   @doc """

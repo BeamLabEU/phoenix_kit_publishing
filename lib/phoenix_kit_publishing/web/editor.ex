@@ -199,6 +199,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:ai_translation_languages, [])
       |> assign(:ai_translation_failures, 0)
       |> assign(:translation_locked?, false)
+      |> assign(:translations_in_flight, MapSet.new())
       |> assign(:show_translation_confirm, false)
       |> assign(:pending_translation_languages, [])
       |> assign(:translation_warnings, [])
@@ -243,7 +244,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     socket =
       socket
       |> assign(:endpoint_url, extract_endpoint_url(uri))
-      |> reset_translation_state()
+      |> reset_translation_state(params)
 
     handle_uuid_post_params(socket, post_uuid, params)
   end
@@ -253,7 +254,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     socket =
       socket
       |> assign(:endpoint_url, extract_endpoint_url(uri))
-      |> reset_translation_state()
+      |> reset_translation_state(params)
 
     handle_path_post_params(socket, path, params)
   end
@@ -262,15 +263,37 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply, socket}
   end
 
-  # Clear any in-flight translation lock/spinner when (re)loading a post scope.
-  # A version or language switch patches through handle_params, but completion
-  # events for the PREVIOUS scope are deliberately ignored — so without this the
-  # editor would stay locked behind a spinner until a full remount.
-  defp reset_translation_state(socket) do
+  # Clear the in-flight translation spinner when (re)loading a post scope. A
+  # version or language switch patches through handle_params, but completion
+  # events for the PREVIOUS scope are deliberately ignored — so without this
+  # the editor would stay locked behind a spinner until a full remount.
+  #
+  # The lock itself can't be cleared as freely. Switching away from a version
+  # the AI is writing and back again used to unlock the editor while the write
+  # was still in flight, and whichever save landed last won. So the versions
+  # with a translation running are remembered, and returning to one puts its
+  # lock back rather than starting fresh.
+  defp reset_translation_state(socket, params) do
     socket
-    |> assign(:translation_locked?, false)
+    |> assign(
+      :translation_locked?,
+      translation_running_for?(socket.assigns[:translations_in_flight], params)
+    )
     |> assign(:ai_translation_progress, nil)
   end
+
+  @doc false
+  # Whether the version these params are switching TO has a translation
+  # running. Public so the rule can be pinned without standing up the AI
+  # pipeline.
+  def translation_running_for?(in_flight, params) do
+    scope = params["v"] |> parse_version_param() |> version_scope()
+
+    MapSet.member?(in_flight || MapSet.new(), scope)
+  end
+
+  defp version_scope(nil), do: nil
+  defp version_scope(version), do: to_string(version)
 
   # Derive the public-facing origin (scheme://host[:port]) from the current
   # request URI so the edit page can show the same full public URL the post
@@ -1599,7 +1622,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
        |> assign(:ai_translation_total, length(target_languages))
        |> assign(:ai_translation_languages, target_languages)
        |> assign(:ai_translation_failures, 0)
-       |> assign(:translation_locked?, should_lock)}
+       |> assign(:translation_locked?, should_lock)
+       |> track_translation_in_flight(should_lock)}
     else
       {:noreply, socket}
     end
@@ -1830,6 +1854,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # Which versions have a translation running, so a switch away and back can
+  # restore the lock instead of dropping it mid-write.
+  defp track_translation_in_flight(socket, false), do: socket
+
+  defp track_translation_in_flight(socket, true) do
+    scope = current_version_scope(socket)
+    in_flight = socket.assigns[:translations_in_flight] || MapSet.new()
+
+    assign(socket, :translations_in_flight, MapSet.put(in_flight, scope))
+  end
+
+  defp release_translation_in_flight(socket) do
+    scope = current_version_scope(socket)
+    in_flight = socket.assigns[:translations_in_flight] || MapSet.new()
+
+    assign(socket, :translations_in_flight, MapSet.delete(in_flight, scope))
+  end
+
   defp bump_translation_progress(socket) do
     assign(socket, :ai_translation_progress, (socket.assigns[:ai_translation_progress] || 0) + 1)
   end
@@ -1857,6 +1899,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         |> assign(:ai_translation_status, :completed)
         |> assign(:ai_translation_languages, [])
         |> assign(:translation_locked?, false)
+        |> release_translation_in_flight()
         # Auto-close the translation modal/confirm on completion (was left open,
         # forcing a manual close).
         |> assign(:show_ai_translation, false)

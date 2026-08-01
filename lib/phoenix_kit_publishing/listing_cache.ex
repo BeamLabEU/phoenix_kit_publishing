@@ -211,11 +211,22 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
 
     generated_at = UtilsDate.utc_now() |> DateTime.to_iso8601()
 
-    # Two puts, not three: the loaded-at and generated-at timestamps were always
-    # written with the SAME value, and each :persistent_term.put triggers a global
-    # GC pass — wasteful under autosave traffic. Store the timestamp once (L12).
-    safe_persistent_term_put(persistent_term_key(group_slug), posts)
-    safe_persistent_term_put(cache_generated_at_key(group_slug), generated_at)
+    # Only install this snapshot if nothing fresher landed while we were
+    # reading it. The query takes a database snapshot when it starts, so a
+    # slow read that began before a trash/unpublish committed carries the post
+    # as it was; writing that on top of the newer snapshot re-listed a post
+    # that had just been taken down, and warm reads never regenerate, so it
+    # stayed listed until the next mutation. `start_time` is the monotonic
+    # reading taken before the query, which is exactly the ordering to compare.
+    if stale_snapshot?(group_slug, start_time) do
+      Logger.debug("[ListingCache] Discarded a slower regeneration for #{group_slug}")
+    else
+      # Two puts, not three: the loaded-at and generated-at timestamps were always
+      # written with the SAME value, and each :persistent_term.put triggers a global
+      # GC pass — wasteful under autosave traffic. Store the timestamp once (L12).
+      safe_persistent_term_put(persistent_term_key(group_slug), posts)
+      safe_persistent_term_put(cache_generated_at_key(group_slug), {generated_at, start_time})
+    end
 
     elapsed = System.monotonic_time(:millisecond) - start_time
 
@@ -714,8 +725,22 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   @spec cache_generated_at(String.t()) :: String.t() | nil
   def cache_generated_at(group_slug) do
     case safe_persistent_term_get(cache_generated_at_key(group_slug)) do
+      # The entry carries the monotonic reading the regeneration started at
+      # alongside the timestamp, so a slower one can tell it has been overtaken.
+      # A bare string is what older entries hold.
+      {:ok, {generated_at, _started_at}} -> generated_at
       {:ok, generated_at} -> generated_at
       :not_found -> nil
+    end
+  end
+
+  # True when a regeneration that started later has already installed its
+  # snapshot. An entry with no reading (or none at all) can't be compared, so
+  # the write goes ahead — the pre-existing behaviour.
+  defp stale_snapshot?(group_slug, start_time) do
+    case safe_persistent_term_get(cache_generated_at_key(group_slug)) do
+      {:ok, {_generated_at, started_at}} when is_integer(started_at) -> started_at > start_time
+      _ -> false
     end
   end
 

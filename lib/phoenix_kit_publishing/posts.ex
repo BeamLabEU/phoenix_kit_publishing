@@ -953,15 +953,13 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         do_update_post_in_db(db_post, post, params, group_slug, nil, audit_meta)
 
       true ->
+        # The slug used to be written here, before the transaction below — so a
+        # save that failed on its content (an over-long title, say) still moved
+        # the post to its new address. The UI reported a failed save while the
+        # old URL had already stopped working, and the redirect that would have
+        # covered it is recorded by the part that rolled back.
         desired_slug = Map.get(params, "slug", post.slug)
-
-        case maybe_update_db_slug(db_post, desired_slug, group_slug) do
-          {:ok, final_slug} ->
-            do_update_post_in_db(db_post, post, params, group_slug, final_slug, audit_meta)
-
-          {:error, _reason} = error ->
-            error
-        end
+        do_update_post_in_db(db_post, post, params, group_slug, desired_slug, audit_meta)
     end
   rescue
     e ->
@@ -1035,7 +1033,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  defp do_update_post_in_db(db_post, post, params, group_slug, final_slug, audit_meta) do
+  defp do_update_post_in_db(db_post, post, params, group_slug, desired_slug, audit_meta) do
     version_number = post[:version] || 1
     version = DBStorage.get_version(db_post.uuid, version_number)
 
@@ -1060,11 +1058,13 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         post: post,
         db_post: db_post,
         audit_meta: audit_meta,
-        legacy_promotions: legacy_promotions
+        legacy_promotions: legacy_promotions,
+        desired_slug: desired_slug,
+        group_slug: group_slug
       }
 
       with :ok <- validate_title_for_publish(language, new_status, new_title),
-           {:ok, db_post} <- persist_post_update(version, write_ctx) do
+           {:ok, {db_post, final_slug}} <- persist_post_update(version, write_ctx) do
         log_legacy_metadata_promoted(legacy_promotions, version, language)
         read_updated_post(db_post, group_slug, final_slug, language, version_number)
       end
@@ -1083,7 +1083,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     repo = PhoenixKit.RepoHelper.repo()
 
     repo.transaction(fn ->
-      with :ok <-
+      with {:ok, final_slug} <- resolve_slug_in_tx(ctx),
+           :ok <-
              upsert_post_content(
                version,
                ctx.language,
@@ -1094,12 +1095,19 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
              ),
            :ok <- update_version_defaults(version, ctx.params, ctx.post, ctx.legacy_promotions),
            {:ok, synced} <- maybe_sync_datetime_and_audit(ctx.db_post, ctx.params, ctx.audit_meta) do
-        synced
+        {synced, final_slug}
       else
         {:error, reason} -> repo.rollback(reason)
       end
     end)
   end
+
+  # Timestamp-mode posts have no slug to move; slug-mode ones rename here so
+  # the rename shares the fate of everything else in the save.
+  defp resolve_slug_in_tx(%{desired_slug: nil}), do: {:ok, nil}
+
+  defp resolve_slug_in_tx(ctx),
+    do: maybe_update_db_slug(ctx.db_post, ctx.desired_slug, ctx.group_slug)
 
   @default_title Constants.default_title()
 
