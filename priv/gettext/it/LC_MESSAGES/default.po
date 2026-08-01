@@ -2791,18 +2791,18 @@ msgstr "Le schede si sollevano leggermente al passaggio del mouse come invito al
 #, elixir-autogen, elixir-format
 msgid "%{count} result for “%{query}”"
 msgid_plural "%{count} results for “%{query}”"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%{count} risultato per «%{query}»"
+msgstr[1] "%{count} risultati per «%{query}»"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:406
 #, elixir-autogen, elixir-format
 msgid "A category can't be moved under one of its own subcategories."
-msgstr ""
+msgstr "Una categoria non può essere spostata sotto una delle proprie sottocategorie."
 
 #: lib/phoenix_kit_publishing/web/html.ex:929
 #, elixir-autogen, elixir-format
 msgid "All posts"
-msgstr ""
+msgstr "Tutti gli articoli"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:29
 #: lib/phoenix_kit_publishing/web/categories_live.ex:419
@@ -2810,139 +2810,139 @@ msgstr ""
 #: lib/phoenix_kit_publishing/web/listing.ex:1124
 #, elixir-autogen, elixir-format
 msgid "Categories"
-msgstr ""
+msgstr "Categorie"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:134
 #, elixir-autogen, elixir-format
 msgid "Category created"
-msgstr ""
+msgstr "Categoria creata"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:285
 #, elixir-autogen, elixir-format
 msgid "Category deleted — its children moved to the top level"
-msgstr ""
+msgstr "Categoria eliminata — le sue sottocategorie sono passate al livello principale"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:95
 #: lib/phoenix_kit_publishing/web/categories_live.ex:183
 #, elixir-autogen, elixir-format
 msgid "Category not found"
-msgstr ""
+msgstr "Categoria non trovata"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:133
 #, elixir-autogen, elixir-format
 msgid "Category updated"
-msgstr ""
+msgstr "Categoria aggiornata"
 
 #: lib/phoenix_kit_publishing/web/html.ex:917
 #, elixir-autogen, elixir-format
 msgid "Category: %{name}"
-msgstr ""
+msgstr "Categoria: %{name}"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:671
 #, elixir-autogen, elixir-format
 msgid "Chronological newer/older post links at the bottom of the post page."
-msgstr ""
+msgstr "Collegamenti cronologici all'articolo precedente/successivo in fondo alla pagina."
 
 #: lib/phoenix_kit_publishing/web/html.ex:910
 #, elixir-autogen, elixir-format
 msgid "Clear search"
-msgstr ""
+msgstr "Cancella la ricerca"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:289
 #, elixir-autogen, elixir-format
 msgid "Couldn't delete this category."
-msgstr ""
+msgstr "Impossibile eliminare questa categoria."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:401
 #, elixir-autogen, elixir-format
 msgid "Couldn't save this category — check the fields and try again."
-msgstr ""
+msgstr "Impossibile salvare questa categoria — controlla i campi e riprova."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:411
 #, elixir-autogen, elixir-format
 msgid "Couldn't save this category."
-msgstr ""
+msgstr "Impossibile salvare questa categoria."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:557
 #, elixir-autogen, elixir-format
 msgid "Create"
-msgstr ""
+msgstr "Crea"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:506
 #, elixir-autogen, elixir-format
 msgid "Delete"
-msgstr ""
+msgstr "Elimina"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:509
 #, elixir-autogen, elixir-format
 msgid "Delete “%{name}”? Its subcategories move to the top level and posts lose this category."
-msgstr ""
+msgstr "Eliminare «%{name}»? Le sue sottocategorie passano al livello principale e gli articoli perdono questa categoria."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:528
 #, elixir-autogen, elixir-format
 msgid "Edit category"
-msgstr ""
+msgstr "Modifica categoria"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:571
 #, elixir-autogen, elixir-format
 msgid "Emit a schema.org Article script on post pages for richer search results. Disable if your host builds its own structured data."
-msgstr ""
+msgstr "Aggiunge uno script schema.org Article alle pagine degli articoli per risultati di ricerca più ricchi. Disattivalo se la tua applicazione genera i propri dati strutturati."
 
 #: lib/phoenix_kit_publishing/web/listing.ex:1185
 #, elixir-autogen, elixir-format
 msgid "Filter posts…"
-msgstr ""
+msgstr "Filtra gli articoli…"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:293
 #, elixir-autogen, elixir-format
 msgid "Grid — cards with images"
-msgstr ""
+msgstr "Griglia — schede con immagini"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:569
 #, elixir-autogen, elixir-format
 msgid "JSON-LD Structured Data"
-msgstr ""
+msgstr "Dati strutturati JSON-LD"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:221
 #, elixir-autogen, elixir-format
 msgid "JSON-LD structured data disabled"
-msgstr ""
+msgstr "Dati strutturati JSON-LD disattivati"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:220
 #, elixir-autogen, elixir-format
 msgid "JSON-LD structured data enabled on post pages"
-msgstr ""
+msgstr "Dati strutturati JSON-LD attivati nelle pagine degli articoli"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:637
 #, elixir-autogen, elixir-format
 msgid "Linked category badges above the post content."
-msgstr ""
+msgstr "Etichette di categoria cliccabili sopra il contenuto dell'articolo."
 
 #: lib/phoenix_kit_publishing/web/edit.ex:294
 #, elixir-autogen, elixir-format
 msgid "List — horizontal rows with a thumbnail"
-msgstr ""
+msgstr "Elenco — righe orizzontali con miniatura"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:489
 #, elixir-autogen, elixir-format
 msgid "Listing layout"
-msgstr ""
+msgstr "Disposizione dell'elenco"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:295
 #, elixir-autogen, elixir-format
 msgid "Minimal — date and title only, no images"
-msgstr ""
+msgstr "Minimale — solo data e titolo, senza immagini"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2291
 #, elixir-autogen, elixir-format
 msgid "More posts"
-msgstr ""
+msgstr "Altri articoli"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:448
 #: lib/phoenix_kit_publishing/web/categories_live.ex:540
 #, elixir-autogen, elixir-format
 msgid "Name"
-msgstr ""
+msgstr "Nome"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:425
 #: lib/phoenix_kit_publishing/web/categories_live.ex:440
@@ -2950,621 +2950,621 @@ msgstr ""
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:238
 #, elixir-autogen, elixir-format
 msgid "New category"
-msgstr ""
+msgstr "Nuova categoria"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2299
 #, elixir-autogen, elixir-format
 msgid "Newer"
-msgstr ""
+msgstr "Più recenti"
 
 #: lib/phoenix_kit_publishing/web/listing.ex:1226
 #, elixir-autogen, elixir-format
 msgid "No posts match your filter"
-msgstr ""
+msgstr "Nessun articolo corrisponde al filtro"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1079
 #, elixir-autogen, elixir-format
 msgid "No posts match your search."
-msgstr ""
+msgstr "Nessun articolo corrisponde alla ricerca."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:164
 #: lib/phoenix_kit_publishing/web/categories_live.ex:395
 #, elixir-autogen, elixir-format
 msgid "None (top level)"
-msgstr ""
+msgstr "Nessuna (livello principale)"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2309
 #, elixir-autogen, elixir-format
 msgid "Older"
-msgstr ""
+msgstr "Meno recenti"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:546
 #, elixir-autogen, elixir-format
 msgid "Parent"
-msgstr ""
+msgstr "Categoria padre"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:547
 #, elixir-autogen, elixir-format
 msgid "Position"
-msgstr ""
+msgstr "Posizione"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:549
 #, elixir-autogen, elixir-format
 msgid "RSS Feeds"
-msgstr ""
+msgstr "Feed RSS"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:205
 #, elixir-autogen, elixir-format
 msgid "RSS feeds disabled — feed URLs return 404"
-msgstr ""
+msgstr "Feed RSS disattivati — gli URL dei feed restituiscono 404"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:204
 #, elixir-autogen, elixir-format
 msgid "RSS feeds enabled — every group serves /<group>/feed.xml"
-msgstr ""
+msgstr "Feed RSS attivati — ogni gruppo espone /<group>/feed.xml"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:496
 #, elixir-autogen, elixir-format
 msgid "Readers can search this group's published posts by title and text."
-msgstr ""
+msgstr "I lettori possono cercare gli articoli pubblicati di questo gruppo per titolo e testo."
 
 #: lib/phoenix_kit_publishing/web/html.ex:892
 #, elixir-autogen, elixir-format
 msgid "Search"
-msgstr ""
+msgstr "Cerca"
 
 #: lib/phoenix_kit_publishing/web/html.ex:887
 #, elixir-autogen, elixir-format
 msgid "Search posts…"
-msgstr ""
+msgstr "Cerca articoli…"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:551
 #, elixir-autogen, elixir-format
 msgid "Serve an RSS 2.0 feed for every group at /<group>/feed.xml (newest 50 published posts, per language)."
-msgstr ""
+msgstr "Espone un feed RSS 2.0 per ogni gruppo su /<group>/feed.xml (i 50 articoli pubblicati più recenti, per lingua)."
 
 #: lib/phoenix_kit_publishing/web/edit.ex:494
 #, elixir-autogen, elixir-format
 msgid "Show a search box"
-msgstr ""
+msgstr "Mostra un campo di ricerca"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:635
 #, elixir-autogen, elixir-format
 msgid "Show category chips"
-msgstr ""
+msgstr "Mostra le etichette di categoria"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:669
 #, elixir-autogen, elixir-format
 msgid "Show previous/next navigation"
-msgstr ""
+msgstr "Mostra la navigazione precedente/successivo"
 
 #: lib/phoenix_kit_publishing/web/html.ex:919
 #, elixir-autogen, elixir-format
 msgid "Tag: %{name}"
-msgstr ""
+msgstr "Tag: %{name}"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:400
 #, elixir-autogen, elixir-format
 msgid "That slug is already used in this group."
-msgstr ""
+msgstr "Questo slug è già usato in questo gruppo."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:409
 #, elixir-autogen, elixir-format
 msgid "The parent must belong to the same group."
-msgstr ""
+msgstr "La categoria padre deve appartenere allo stesso gruppo."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:544
 #, elixir-autogen, elixir-format
 msgid "auto from the name"
-msgstr ""
+msgstr "automatico dal nome"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2152
 #, elixir-autogen, elixir-format
 msgid "%{count} view"
 msgid_plural "%{count} views"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%{count} visualizzazione"
+msgstr[1] "%{count} visualizzazioni"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:663
 #, elixir-autogen, elixir-format
 msgid "A subtle 'N views' line on the post page."
-msgstr ""
+msgstr "Una discreta riga «N visualizzazioni» nella pagina dell'articolo."
 
 #: lib/phoenix_kit_publishing/web/edit.ex:651
 #, elixir-autogen, elixir-format
 msgid "Count views"
-msgstr ""
+msgstr "Conta le visualizzazioni"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:653
 #, elixir-autogen, elixir-format
 msgid "Per-day view counts; bot-filtered and session-deduped, no reader data stored."
-msgstr ""
+msgstr "Visualizzazioni giornaliere; bot filtrati e sessioni deduplicate, nessun dato del lettore memorizzato."
 
 #: lib/phoenix_kit_publishing/web/edit.ex:661
 #, elixir-autogen, elixir-format
 msgid "Show view counts"
-msgstr ""
+msgstr "Mostra il numero di visualizzazioni"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2327
 #, elixir-autogen, elixir-format
 msgid "%{count} comment"
 msgid_plural "%{count} comments"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%{count} commento"
+msgstr[1] "%{count} commenti"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:644
 #, elixir-autogen, elixir-format
 msgid "A comment thread under each post. Requires the Comments module; logged-in readers can post."
-msgstr ""
+msgstr "Un thread di commenti sotto ogni articolo. Richiede il modulo Commenti; possono scrivere i lettori autenticati."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3507
 #, elixir-autogen, elixir-format
 msgid "Audio version"
-msgstr ""
+msgstr "Versione audio"
 
 #: lib/phoenix_kit_publishing/web/controller.ex:275
 #, elixir-autogen, elixir-format
 msgid "Comment posted."
-msgstr ""
+msgstr "Commento pubblicato."
 
 #: lib/phoenix_kit_publishing/web/controller.ex:296
 #, elixir-autogen, elixir-format
 msgid "Couldn't post your comment — please try again."
-msgstr ""
+msgstr "Impossibile pubblicare il commento — riprova."
 
 #: lib/phoenix_kit_publishing/web/edit.ex:642
 #, elixir-autogen, elixir-format
 msgid "Enable comments"
-msgstr ""
+msgstr "Attiva i commenti"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2235
 #, elixir-autogen, elixir-format
 msgid "Listen to this post"
-msgstr ""
+msgstr "Ascolta questo articolo"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2001
 #: lib/phoenix_kit_publishing/web/html.ex:2351
 #, elixir-autogen, elixir-format
 msgid "Log in"
-msgstr ""
+msgstr "Accedi"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2330
 #, elixir-autogen, elixir-format
 msgid "No comments yet — be the first."
-msgstr ""
+msgstr "Ancora nessun commento — scrivi il primo."
 
 #: lib/phoenix_kit_publishing/web/controller.ex:208
 #, elixir-autogen, elixir-format
 msgid "Please log in to comment."
-msgstr ""
+msgstr "Accedi per commentare."
 
 #: lib/phoenix_kit_publishing/web/html.ex:1896
 #, elixir-autogen, elixir-format
 msgid "Post comment"
-msgstr ""
+msgstr "Pubblica commento"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1719
 #: lib/phoenix_kit_publishing/web/html.ex:1723
 #, elixir-autogen, elixir-format
 msgid "Reader"
-msgstr ""
+msgstr "Lettore"
 
 #: lib/phoenix_kit_publishing/web/controller.ex:288
 #, elixir-autogen, elixir-format
 msgid "That comment is too long."
-msgstr ""
+msgstr "Questo commento è troppo lungo."
 
 #: lib/phoenix_kit_publishing/web/controller.ex:196
 #, elixir-autogen, elixir-format
 msgid "That post is no longer available."
-msgstr ""
+msgstr "Questo articolo non è più disponibile."
 
 #: lib/phoenix_kit_publishing/web/controller.ex:287
 #, elixir-autogen, elixir-format
 msgid "The comment can't be empty."
-msgstr ""
+msgstr "Il commento non può essere vuoto."
 
 #: lib/phoenix_kit_publishing/web/controller.ex:205
 #, elixir-autogen, elixir-format
 msgid "The form expired — please try again."
-msgstr ""
+msgstr "Il modulo è scaduto — riprova."
 
 #: lib/phoenix_kit_publishing/web/html.ex:1895
 #, elixir-autogen, elixir-format
 msgid "Write a comment… (Markdown supported)"
-msgstr ""
+msgstr "Scrivi un commento… (Markdown supportato)"
 
 #: lib/phoenix_kit_publishing/page_builder/components/audio.ex:38
 #: lib/phoenix_kit_publishing/web/html.ex:2232
 #, elixir-autogen, elixir-format
 msgid "Your browser does not support the audio element."
-msgstr ""
+msgstr "Il tuo browser non supporta l'elemento audio."
 
 #: lib/phoenix_kit_publishing/web/html.ex:2353
 #, elixir-autogen, elixir-format
 msgid "to join the conversation."
-msgstr ""
+msgstr "per partecipare alla conversazione."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:207
 #, elixir-autogen, elixir-format
 msgid "Category moved"
-msgstr ""
+msgstr "Categoria spostata"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:461
 #, elixir-autogen, elixir-format
 msgid "Drag to reorder (among siblings)"
-msgstr ""
+msgstr "Trascina per riordinare (tra pari livello)"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:256
 #: lib/phoenix_kit_publishing/web/categories_live.ex:264
 #, elixir-autogen, elixir-format
 msgid "Failed to save the new order"
-msgstr ""
+msgstr "Impossibile salvare il nuovo ordine"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:582
 #, elixir-autogen, elixir-format
 msgid "Move"
-msgstr ""
+msgstr "Sposta"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:498
 #, elixir-autogen, elixir-format
 msgid "Move to…"
-msgstr ""
+msgstr "Sposta in…"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:568
 #, elixir-autogen, elixir-format
 msgid "Move “%{name}”"
-msgstr ""
+msgstr "Sposta «%{name}»"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:574
 #, elixir-autogen, elixir-format
 msgid "New parent"
-msgstr ""
+msgstr "Nuova categoria padre"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:492
 #, elixir-autogen, elixir-format
 msgid "New subcategory"
-msgstr ""
+msgstr "Nuova sottocategoria"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:436
 #, elixir-autogen, elixir-format
 msgid "No categories yet — create the first one."
-msgstr ""
+msgstr "Nessuna categoria — creane una."
 
 #: lib/phoenix_kit_publishing/web/html.ex:1972
 #, elixir-autogen, elixir-format
 msgid "%{count} comment on this note"
 msgid_plural "%{count} comments on this note"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%{count} commento su questa nota"
+msgstr[1] "%{count} commenti su questa nota"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1936
 #, elixir-autogen, elixir-format
 msgid "Author notes"
-msgstr ""
+msgstr "Note dell'autore"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:606
 #, elixir-autogen, elixir-format
 msgid "Author notes style"
-msgstr ""
+msgstr "Stile delle note dell'autore"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1948
 #: lib/phoenix_kit_publishing/web/html.ex:1964
 #, elixir-autogen, elixir-format
 msgid "Close note"
-msgstr ""
+msgstr "Chiudi la nota"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1996
 #, elixir-autogen, elixir-format
 msgid "Comment on this note…"
-msgstr ""
+msgstr "Commenta questa nota…"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:324
 #, elixir-autogen, elixir-format
 msgid "Footnotes — numbered refs, notes collected at the bottom"
-msgstr ""
+msgstr "Note a piè di pagina — riferimenti numerati, note raccolte in fondo"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1959
 #, elixir-autogen, elixir-format
 msgid "Note"
-msgstr ""
+msgstr "Nota"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1952
 #, elixir-autogen, elixir-format
 msgid "Note %{number}"
-msgstr ""
+msgstr "Nota %{number}"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1864
 #, elixir-autogen, elixir-format
 msgid "Post reply"
-msgstr ""
+msgstr "Pubblica risposta"
 
 #: lib/phoenix_kit_publishing/web/html.ex:1847
 #, elixir-autogen, elixir-format
 msgid "Reply"
-msgstr ""
+msgstr "Rispondi"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:325
 #, elixir-autogen, elixir-format
 msgid "Slide-out panel — click the phrase, note opens on the right"
-msgstr ""
+msgstr "Pannello laterale — clicca sulla frase, la nota si apre a destra"
 
 #: lib/phoenix_kit_publishing/web/controller.ex:291
 #, elixir-autogen, elixir-format
 msgid "The comment you replied to is no longer available."
-msgstr ""
+msgstr "Il commento a cui hai risposto non è più disponibile."
 
 #: lib/phoenix_kit_publishing/web/controller.ex:294
 #, elixir-autogen, elixir-format
 msgid "This thread is too deep to reply to."
-msgstr ""
+msgstr "Questo thread è troppo profondo per rispondere."
 
 #: lib/phoenix_kit_publishing/web/html.ex:1863
 #, elixir-autogen, elixir-format
 msgid "Write a reply…"
-msgstr ""
+msgstr "Scrivi una risposta…"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2003
 #, elixir-autogen, elixir-format
 msgid "to comment on this note."
-msgstr ""
+msgstr "per commentare questa nota."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3549
 #, elixir-autogen, elixir-format
 msgid "An audio file (e.g. a narration). Shows a player above the post and rides the RSS feed as a podcast enclosure."
-msgstr ""
+msgstr "Un file audio (ad esempio una narrazione). Mostra un lettore sopra l'articolo e accompagna il feed RSS come allegato podcast."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2494
 #, elixir-autogen, elixir-format
 msgid "Audio version selected"
-msgstr ""
+msgstr "Versione audio selezionata"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3532
 #, elixir-autogen, elixir-format
 msgid "Choose"
-msgstr ""
+msgstr "Scegli"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3543
 #, elixir-autogen, elixir-format
 msgid "Remove the audio version"
-msgstr ""
+msgstr "Rimuovi la versione audio"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:817
 #, elixir-autogen, elixir-format
 msgid "Audio version removed"
-msgstr ""
+msgstr "Versione audio rimossa"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:244
 #, elixir-autogen, elixir-format
 msgid "Order unchanged — use “Move to…” to change a parent."
-msgstr ""
+msgstr "Ordine invariato — usa «Sposta in…» per cambiare la categoria padre."
 
 #: lib/phoenix_kit_publishing/web/controller.ex:277
 #, elixir-autogen, elixir-format
 msgid "Thanks — your comment is awaiting review."
-msgstr ""
+msgstr "Grazie — il tuo commento è in attesa di revisione."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2483
 #, elixir-autogen, elixir-format
 msgid "That file isn't audio — pick an audio file."
-msgstr ""
+msgstr "Questo file non è audio — scegli un file audio."
 
 #: lib/phoenix_kit_publishing/web/editor/persistence.ex:130
 #, elixir-autogen, elixir-format
 msgid "That slug is taken — pick another to save."
-msgstr ""
+msgstr "Questo slug è già in uso — scegline un altro per salvare."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3485
 #, elixir-autogen, elixir-format
 msgid "Adds ?v=N access to this post's published versions. Off by default — only the live version is public."
-msgstr ""
+msgstr "Aggiunge l'accesso ?v=N alle versioni pubblicate di questo articolo. Disattivato per impostazione predefinita — è pubblica solo la versione attiva."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3236
 #, elixir-autogen, elixir-format
 msgid "From title"
-msgstr ""
+msgstr "Dal titolo"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3481
 #, elixir-autogen, elixir-format
 msgid "Let readers browse older versions"
-msgstr ""
+msgstr "Consenti ai lettori di sfogliare le versioni precedenti"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3233
 #, elixir-autogen, elixir-format
 msgid "Re-derive the slug from the current title"
-msgstr ""
+msgstr "Rigenera lo slug dal titolo attuale"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3231
 #, elixir-autogen, elixir-format
 msgid "Working…"
-msgstr ""
+msgstr "Elaborazione…"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2662
 #, elixir-autogen, elixir-format
 msgid "Resume editing"
-msgstr ""
+msgstr "Riprendi la modifica"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2658
 #, elixir-autogen, elixir-format
 msgid "Resuming…"
-msgstr ""
+msgstr "Ripresa…"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2076
 #, elixir-autogen, elixir-format
 msgid "Slug is required to save."
-msgstr ""
+msgstr "Lo slug è obbligatorio per salvare."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:693
 #, elixir-autogen, elixir-format
 msgid "Someone else is editing this post now — you can still watch."
-msgstr ""
+msgstr "Qualcun altro sta modificando questo articolo — puoi comunque osservare."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:696
 #, elixir-autogen, elixir-format
 msgid "You're editing again."
-msgstr ""
+msgstr "Stai modificando di nuovo."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2650
 #, elixir-autogen, elixir-format
 msgid "Your editing lock expired due to inactivity."
-msgstr ""
+msgstr "Il tuo blocco di modifica è scaduto per inattività."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:1970
 #, elixir-autogen, elixir-format
 msgid "You're the editor now. The previous editor's unsaved changes were kept."
-msgstr ""
+msgstr "Ora sei tu il redattore. Le modifiche non salvate del redattore precedente sono state mantenute."
 
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:216
 #, elixir-autogen, elixir-format
 msgid "No matching categories"
-msgstr ""
+msgstr "Nessuna categoria corrispondente"
 
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:190
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Remove %{name}"
-msgstr "Rimuovi"
+msgstr "Rimuovi %{name}"
 
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:242
 #, elixir-autogen, elixir-format
 msgid "Saved with the version, so each version keeps its own filing."
-msgstr ""
+msgstr "Salvato con la versione, così ogni versione mantiene la propria classificazione."
 
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:213
 #, elixir-autogen, elixir-format
 msgid "Search categories…"
-msgstr ""
+msgstr "Cerca categorie…"
 
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:215
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Searching…"
-msgstr ""
+msgstr "Ricerca…"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2408
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Someone else is editing this post — nothing was changed."
-msgstr ""
+msgstr "Qualcun altro sta modificando questo articolo — nulla è stato cambiato."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2325
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Author note"
-msgstr ""
+msgstr "Nota dell'autore"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2330
 #, elixir-autogen, elixir-format
 msgid "Call to action"
-msgstr ""
+msgstr "Invito all'azione"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2353
 #, elixir-autogen, elixir-format
 msgid "Heading"
-msgstr ""
+msgstr "Titolo"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2305
 #, elixir-autogen, elixir-format
 msgid "Headline (wide)"
-msgstr ""
+msgstr "Titolo grande (esteso)"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2344
 #, elixir-autogen, elixir-format
 msgid "Headline text"
-msgstr ""
+msgstr "Testo del titolo grande"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2310
 #, elixir-autogen, elixir-format
 msgid "Showcase band"
-msgstr ""
+msgstr "Fascia in evidenza"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2372
 #, elixir-autogen, elixir-format
 msgid "What should the reader do next?"
-msgstr ""
+msgstr "Cosa dovrebbe fare il lettore adesso?"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2349
 #, elixir-autogen, elixir-format
 msgid "Words beside the picture."
-msgstr ""
+msgstr "Testo accanto all'immagine."
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2365
 #, elixir-autogen, elixir-format
 msgid "Your note here"
-msgstr ""
+msgstr "La tua nota qui"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2364
 #, elixir-autogen, elixir-format
 msgid "the phrase"
-msgstr ""
+msgstr "la frase"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2320
 #, elixir-autogen, elixir-format
 msgid "Audio player"
-msgstr ""
+msgstr "Lettore audio"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2434
 #, elixir-autogen, elixir-format
 msgid "Audio player inserted"
-msgstr ""
+msgstr "Lettore audio inserito"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2315
 #, elixir-autogen, elixir-format
 msgid "Gallery (helix)"
-msgstr ""
+msgstr "Galleria (elica)"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2451
 #, elixir-autogen, elixir-format
 msgid "Gallery inserted"
-msgstr ""
+msgstr "Galleria inserita"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3776
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Saving will publish this version and archive v%{version}, which is live now."
-msgstr ""
+msgstr "Il salvataggio pubblicherà questa versione e archivierà la v%{version}, ora attiva."
 
 #: lib/phoenix_kit_publishing/comments.ex:220
 #, elixir-autogen, elixir-format
 msgid "New comment on your post"
-msgstr ""
+msgstr "Nuovo commento al tuo articolo"
 
 #: lib/phoenix_kit_publishing/comments.ex:219
 #, elixir-autogen, elixir-format
 msgid "Someone replied to your comment"
-msgstr ""
+msgstr "Qualcuno ha risposto al tuo commento"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:628
 #, elixir-autogen, elixir-format
 msgid "Drives the \"min read\" estimate. 200 suits English prose; lower it for dense or technical writing."
-msgstr ""
+msgstr "Determina la stima «min di lettura». 200 va bene per la prosa inglese; abbassala per testi densi o tecnici."
 
 #: lib/phoenix_kit_publishing/web/settings.ex:639
 #, elixir-autogen, elixir-format
 msgid "Editing lock timeout (minutes)"
-msgstr ""
+msgstr "Scadenza del blocco di modifica (minuti)"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:641
 #, elixir-autogen, elixir-format
 msgid "How long an idle editor keeps a post before it is released for someone else. A warning appears five minutes before."
-msgstr ""
+msgstr "Per quanto tempo un redattore inattivo mantiene un articolo prima che venga liberato per altri. Un avviso compare cinque minuti prima."
 
 #: lib/phoenix_kit_publishing/web/settings.ex:618
 #, elixir-autogen, elixir-format
 msgid "How many posts a listing page shows before paginating."
-msgstr ""
+msgstr "Quanti articoli mostrare in una pagina di elenco prima di impaginare."
 
 #: lib/phoenix_kit_publishing/web/settings.ex:617
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Posts per page"
-msgstr "Pagina dell'articolo"
+msgstr "Articoli per pagina"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:626
 #, elixir-autogen, elixir-format
 msgid "Reading speed (words per minute)"
-msgstr ""
+msgstr "Velocità di lettura (parole al minuto)"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:270
 #, elixir-autogen, elixir-format
 msgid "Setting updated"
-msgstr ""
+msgstr "Impostazione aggiornata"
 
 #: lib/phoenix_kit_publishing/web/editor/persistence.ex:893
 #, elixir-autogen, elixir-format
 msgid "This post was saved somewhere else. Your unsaved changes are still here — saving will overwrite that copy."
-msgstr ""
+msgstr "Questo articolo è stato salvato altrove. Le tue modifiche non salvate sono ancora qui — salvando sovrascriverai quella copia."
