@@ -11,7 +11,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
-  alias PhoenixKit.Utils.Date, as: UtilsDate
 
   # ============================================================================
   # Form Building
@@ -62,7 +61,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "published_at" => get_published_at(post),
       "featured_image_uuid" => Map.get(post.metadata, :featured_image_uuid, ""),
       "featured" => Map.get(post.metadata, :featured, false),
+      "allow_version_access" => Map.get(post.metadata, :allow_version_access, false),
+      # A list, unlike every other field here. It never reaches an <input>:
+      # the picker edits it through its own events and the save path reads it
+      # straight off the form, which is also what makes it participate in
+      # dirty-tracking and collaborative sync for free.
+      "category_uuids" => Map.get(post.metadata, :category_uuids, []),
       "url_slug" => get_url_slug_for_form(post),
+      "audio_uuid" => Map.get(post.metadata, :audio_uuid) || "",
       "og_title" => og_field(post, "title"),
       "og_description" => og_field(post, "description"),
       "og_image_uuid" => og_field(post, "image_uuid")
@@ -80,12 +86,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
     if title == Constants.default_title(), do: "", else: title
   end
 
-  defp get_published_at(post) do
-    post.metadata.published_at ||
-      UtilsDate.utc_now()
-      |> floor_datetime_to_minute()
-      |> DateTime.to_iso8601()
-  end
+  # A post with no published_at used to get a FRESH `now` on every call, so
+  # `dirty?/3` compared this call's minute against the last one and flipped the
+  # post to "Unsaved changes" the moment the clock ticked over — with nothing
+  # typed. Absent means absent; the writer picks a date or publishing stamps one.
+  defp get_published_at(post), do: post.metadata.published_at || ""
 
   defp get_url_slug_for_form(post) do
     url_slug_from_metadata = Map.get(post.metadata, :url_slug)
@@ -137,7 +142,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
         "published_at" => normalize_published_at(Map.get(form, "published_at")),
         "featured_image_uuid" => featured_image_uuid,
         "featured" => normalize_featured_flag(form),
+        "allow_version_access" => Map.get(form, "allow_version_access") in [true, "true", "on"],
+        # This rebuilds the form from a whitelist, so anything not named here
+        # is dropped — and this one runs on every keystroke. Left out, a
+        # category selection would survive exactly until the writer typed the
+        # next character in the title.
+        "category_uuids" => normalize_category_uuids(form),
         "url_slug" => url_slug,
+        "audio_uuid" => normalize_string(form, "audio_uuid"),
         "og_title" => normalize_string(form, "og_title"),
         "og_description" => normalize_string(form, "og_description"),
         "og_image_uuid" => normalize_string(form, "og_image_uuid")
@@ -160,7 +172,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "slug" => "",
       "featured_image_uuid" => "",
       "featured" => false,
+      "allow_version_access" => false,
+      "category_uuids" => [],
       "url_slug" => "",
+      "audio_uuid" => "",
       "og_title" => "",
       "og_description" => "",
       "og_image_uuid" => ""
@@ -170,6 +185,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   # idiom, or a boolean from base_form) into a plain boolean.
   defp normalize_featured_flag(form) do
     Map.get(form, "featured") in [true, "true", "on"]
+  end
+
+  # Missing key -> [] rather than nil, so the form always answers the same
+  # shape and the picker never has to guard. The save path distinguishes
+  # "not submitted" from "empty" further down, on the params map.
+  defp normalize_category_uuids(form) do
+    case Map.get(form, "category_uuids") do
+      list when is_list(list) -> list |> Enum.filter(&is_binary/1) |> Enum.uniq()
+      _ -> []
+    end
   end
 
   defp normalize_published_at(nil), do: ""

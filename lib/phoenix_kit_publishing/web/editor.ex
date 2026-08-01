@@ -32,6 +32,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   alias Phoenix.LiveView.JS
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -41,7 +42,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
   alias PhoenixKitAI, as: AI
-  alias PhoenixKitWeb.Components.Core.MarkdownEditor
+  import Leaf, only: [leaf_editor: 1]
+
+  alias PhoenixKit.Modules.Publishing.Hashtags
+  alias PhoenixKit.Modules.Publishing.Renderer
 
   # Submodule aliases
   alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
@@ -131,6 +135,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:group_slug, group_slug)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign(:show_media_selector, false)
+      |> assign(:autosave_blocked, nil)
       |> assign(:media_selector_target, "featured_image_uuid")
       |> assign(:media_selection_mode, :single)
       |> assign(:media_selected_uuids, MapSet.new())
@@ -165,7 +170,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:default_language_name, nil)
       |> assign(:available_languages, [])
       |> assign(:all_enabled_languages, [])
-      |> assign(:has_pending_changes, false)
+      |> Helpers.mark_clean()
       |> assign(:is_new_post, false)
       |> assign(:is_new_translation, false)
       |> assign(:editor_loading, false)
@@ -195,6 +200,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:ai_translation_languages, [])
       |> assign(:ai_translation_failures, 0)
       |> assign(:translation_locked?, false)
+      |> assign(:translations_in_flight, MapSet.new())
       |> assign(:show_translation_confirm, false)
       |> assign(:pending_translation_languages, [])
       |> assign(:translation_warnings, [])
@@ -239,7 +245,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     socket =
       socket
       |> assign(:endpoint_url, extract_endpoint_url(uri))
-      |> reset_translation_state()
+      |> reset_translation_state(params)
 
     handle_uuid_post_params(socket, post_uuid, params)
   end
@@ -249,7 +255,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     socket =
       socket
       |> assign(:endpoint_url, extract_endpoint_url(uri))
-      |> reset_translation_state()
+      |> reset_translation_state(params)
 
     handle_path_post_params(socket, path, params)
   end
@@ -258,15 +264,37 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply, socket}
   end
 
-  # Clear any in-flight translation lock/spinner when (re)loading a post scope.
-  # A version or language switch patches through handle_params, but completion
-  # events for the PREVIOUS scope are deliberately ignored — so without this the
-  # editor would stay locked behind a spinner until a full remount.
-  defp reset_translation_state(socket) do
+  # Clear the in-flight translation spinner when (re)loading a post scope. A
+  # version or language switch patches through handle_params, but completion
+  # events for the PREVIOUS scope are deliberately ignored — so without this
+  # the editor would stay locked behind a spinner until a full remount.
+  #
+  # The lock itself can't be cleared as freely. Switching away from a version
+  # the AI is writing and back again used to unlock the editor while the write
+  # was still in flight, and whichever save landed last won. So the versions
+  # with a translation running are remembered, and returning to one puts its
+  # lock back rather than starting fresh.
+  defp reset_translation_state(socket, params) do
     socket
-    |> assign(:translation_locked?, false)
+    |> assign(
+      :translation_locked?,
+      translation_running_for?(socket.assigns[:translations_in_flight], params)
+    )
     |> assign(:ai_translation_progress, nil)
   end
+
+  @doc false
+  # Whether the version these params are switching TO has a translation
+  # running. Public so the rule can be pinned without standing up the AI
+  # pipeline.
+  def translation_running_for?(in_flight, params) do
+    scope = params["v"] |> parse_version_param() |> version_scope()
+
+    MapSet.member?(in_flight || MapSet.new(), scope)
+  end
+
+  defp version_scope(nil), do: nil
+  defp version_scope(version), do: to_string(version)
 
   # Derive the public-facing origin (scheme://host[:port]) from the current
   # request URI so the edit page can show the same full public URL the post
@@ -437,7 +465,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:all_enabled_languages, all_enabled_languages)
       |> Helpers.assign_current_language(primary_language)
       |> assign(:current_path, Helpers.build_new_post_url(group_slug))
-      |> assign(:has_pending_changes, false)
+      |> Helpers.mark_clean()
       |> assign(:is_new_post, true)
       |> assign(:public_url, nil)
       |> assign(:form_key, form_key)
@@ -529,7 +557,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         :viewing_older_version,
         Versions.viewing_older_version?(current_version, available_versions, switch_to_lang)
       )
-      |> assign(:has_pending_changes, false)
+      |> Helpers.mark_clean()
       |> assign(:is_new_translation, true)
       |> assign(:public_url, nil)
       |> assign(:form_key, fk)
@@ -551,7 +579,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     form = Forms.post_form_with_primary_status(group_slug, post, version)
     fk = PublishingPubSub.generate_form_key(group_slug, post, :edit)
 
-    is_published = form["status"] == "published"
+    is_published = Constants.published?(form["status"])
 
     sock =
       socket
@@ -567,7 +595,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         :current_path,
         Helpers.build_edit_url(group_slug, post, version: version, lang: post.language)
       )
-      |> assign(:has_pending_changes, false)
+      |> Helpers.mark_clean()
       |> assign(:public_url, Helpers.build_public_url(post, post.language))
       |> assign(:form_key, fk)
       |> assign(:current_version, Map.get(post, :version, 1))
@@ -604,7 +632,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       # Clear stale flashes up front so a fresh slug-truncation warning set by
       # the slug-update step below survives this render (it used to be wiped by
       # a clear_flash at the END of the handler).
-      socket = clear_flash(socket)
+      # Keep :error — an autosave/save failure is the one message the writer
+      # must not lose, and this runs on every keystroke.
+      socket = clear_flash(socket, :info)
+      socket = clear_flash(socket, :warning)
       target = Map.get(params, "_target", [])
       params = prepare_meta_params(params, target, socket)
 
@@ -617,6 +648,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         process_slug_updates(socket, params, target, new_form)
 
       has_changes = Forms.dirty?(socket_with_slug.assigns.post, new_form, socket.assigns.content)
+
+      # Recompute the blocked reason on every edit, not just when a save runs.
+      # Otherwise fixing the cause leaves the warning up forever whenever the
+      # fix also makes the form clean (retyping the original title): nothing is
+      # pending, so no autosave fires, so nothing clears it.
+      socket_with_slug =
+        assign(socket_with_slug, :autosave_blocked, blocked_reason(socket_with_slug, new_form))
+
       language = Helpers.editor_language(socket.assigns)
 
       {updated_post, public_url} =
@@ -640,35 +679,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
-  def handle_event("update_content", %{"content" => content}, socket) do
-    socket = maybe_reclaim_lock(socket)
+  # Takes the lock back after an inactivity lapse. Needed as its OWN event
+  # because every editable control is disabled while readonly? is true, so the
+  # banner's old "start typing to resume" was impossible to act on.
+  def handle_event("resume_editing", _params, socket) do
+    socket = Collaborative.try_reclaim_lock(socket)
 
-    if socket.assigns.readonly? or socket.assigns.translation_locked? do
-      {:noreply, socket}
+    if socket.assigns[:readonly?] do
+      {:noreply,
+       put_flash(
+         socket,
+         :warning,
+         gettext("Someone else is editing this post now — you can still watch.")
+       )}
     else
-      has_changes = Forms.dirty?(socket.assigns.post, socket.assigns.form, content)
-
-      socket =
-        socket
-        |> assign(:content, content)
-        |> assign(:has_pending_changes, has_changes)
-        |> push_event("changes-status", %{has_changes: has_changes})
-
-      socket = if has_changes, do: schedule_autosave(socket), else: socket
-
-      Collaborative.broadcast_form_change(socket, :content, %{
-        content: content,
-        form: socket.assigns.form
-      })
-
-      socket = Collaborative.touch_activity(socket)
-
-      {:noreply, socket}
+      {:noreply, put_flash(socket, :info, gettext("You're editing again."))}
     end
   end
 
   def handle_event("regenerate_slug", _params, socket) do
-    if socket.assigns.group_mode == "slug" do
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.group_mode == "slug" and not socket.assigns.readonly? and
+         not socket.assigns.translation_locked? do
       title = socket.assigns.form["title"] || ""
 
       {socket, new_form, _slug_events} =
@@ -676,11 +709,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
       has_changes = Forms.dirty?(socket.assigns.post, new_form, socket.assigns.content)
 
-      {:noreply,
-       socket
-       |> assign(:form, new_form)
-       |> assign(:has_pending_changes, has_changes)
-       |> push_event("changes-status", %{has_changes: has_changes})}
+      # Marking dirty without arming autosave meant the regenerated slug sat
+      # unsaved until the writer happened to type elsewhere — the same hole
+      # clear_audio had.
+      socket =
+        socket
+        |> assign(:form, new_form)
+        |> assign(:has_pending_changes, has_changes)
+        |> push_event("changes-status", %{has_changes: has_changes})
+
+      socket = if has_changes, do: schedule_autosave(socket), else: socket
+      Collaborative.broadcast_form_change(socket, :meta, new_form)
+      socket = Collaborative.touch_activity(socket)
+
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -764,44 +806,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      |> assign(:show_media_selector, true)}
   end
 
-  def handle_event("open_image_component_selector", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_media_selector, true)
-     |> assign(:inserting_image_component, true)}
-  end
-
-  def handle_event("insert_component", %{"component" => "video"}, socket) do
-    send_update(MarkdownEditor,
-      id: "content-editor",
-      action: :prompt_insert,
-      prompt: gettext("Enter YouTube URL:"),
-      template: "\n<Video url=\"%{value}\">\n  Optional caption text\n</Video>\n"
-    )
-
-    {:noreply, socket}
-  end
-
-  def handle_event("insert_component", %{"component" => "cta"}, socket) do
-    template = """
-    <CTA primary="true" action="/your-link">Button Text</CTA>
-    """
-
-    send_update(MarkdownEditor, id: "content-editor", action: :insert_at_cursor, text: template)
-    {:noreply, socket}
-  end
-
-  def handle_event("insert_video_component", %{"url" => url}, socket) do
-    template = """
-
-    <Video url="#{url}">
-      Optional caption text
-    </Video>
-
-    """
-
-    send_update(MarkdownEditor, id: "content-editor", action: :insert_at_cursor, text: template)
-    {:noreply, socket}
+  # Clearing writes "" — the same signal the text input sends when emptied by
+  # hand — which the save path turns into a real removal (Posts.put_audio_uuid).
+  # Delegates to the shared clear pipeline so the clear actually PERSISTS: the
+  # first cut only marked the form dirty, so clicking X and then waiting left
+  # the field looking empty while the audio was still attached (autosave only
+  # ever fires from schedule_autosave/1). It also inherits the lock reclaim,
+  # the translation-lock guard, and the live broadcast to other editors.
+  def handle_event("clear_audio", _params, socket) do
+    clear_image_field(socket, "audio_uuid", gettext("Audio version removed"))
   end
 
   def handle_event("clear_featured_image", _params, socket),
@@ -839,6 +852,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
     {:noreply, assign(socket, :ai_selected_prompt_uuid, prompt_uuid)}
   end
+
+  # These write the shared default prompt, not this post — but they're edit
+  # actions offered inside an editor that is telling the user it's read-only,
+  # and the buttons are disabled to match.
+  def handle_event("generate_default_translation_prompt", _params, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
+
+  def handle_event("regenerate_default_translation_prompt", _params, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
 
   def handle_event("generate_default_translation_prompt", _params, socket) do
     case Translation.generate_default_translation_prompt() do
@@ -946,14 +970,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # Handle Events - Version Management
   # ============================================================================
 
-  def handle_event("toggle_version_access", %{"enabled" => enabled_str}, socket) do
-    if socket.assigns[:readonly?] do
-      {:noreply, socket}
-    else
-      do_toggle_version_access(socket, enabled_str == "true")
-    end
-  end
-
   def handle_event("switch_version", %{"version" => version_str}, socket) do
     # Parse defensively — a hand-crafted `?v=abc` would otherwise crash the LV on
     # String.to_integer/1 (L1). parse_version_param/1 returns nil on junk.
@@ -967,35 +983,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         {:noreply, socket}
 
       true ->
-        case Versions.read_version_post(socket, version) do
-          {:ok, version_post} ->
-            {socket, old_form_key, old_post_slug, new_form_key, actual_language} =
-              Versions.apply_version_switch(
-                socket,
-                version,
-                version_post,
-                &Forms.post_form_with_primary_status/3
-              )
+        # Flush pending edits BEFORE the switch replaces the buffer, the same
+        # way "preview" does. Cancelling the timer alone stopped a wrong-context
+        # save but still discarded the work; if the flush can't complete (blank
+        # title, slug conflict) we stay put and let the writer see why.
+        case flush_before_switch(socket) do
+          {:blocked, socket} ->
+            {:noreply, socket}
 
-            socket =
-              socket
-              |> Helpers.assign_current_language(actual_language)
-              |> Collaborative.cleanup_and_setup_collaborative_editing(old_form_key, new_form_key,
-                old_post_slug: old_post_slug
-              )
-
-            post = socket.assigns.post
-
-            url =
-              Helpers.build_edit_url(socket.assigns.group_slug, post,
-                version: version,
-                lang: actual_language
-              )
-
-            {:noreply, push_patch(socket, to: url, replace: true)}
-
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, gettext("Version not found"))}
+          {:ok, socket} ->
+            do_switch_version(socket, version)
         end
     end
   end
@@ -1042,9 +1039,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   def handle_event("create_version_from_source", _params, socket) do
-    case Versions.create_version_from_source(socket) do
-      {:ok, socket} -> {:noreply, socket}
-      {:error, socket} -> {:noreply, socket}
+    # Creating a version reads PERSISTED state and navigates away, so pending
+    # edits would be both excluded from the new version and lost.
+    case flush_before_switch(socket) do
+      {:blocked, socket} ->
+        {:noreply, socket}
+
+      {:ok, socket} ->
+        case Versions.create_version_from_source(socket) do
+          {:ok, socket} -> {:noreply, socket}
+          {:error, socket} -> {:noreply, socket}
+        end
     end
   end
 
@@ -1057,7 +1062,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       {:noreply,
        put_flash(socket, :warning, gettext("Save the post to enable language switching"))}
     else
-      do_switch_language(socket, new_language)
+      # Same policy as the version switch: the language buffer is about to be
+      # replaced, so outstanding edits get written first, and a flush that
+      # can't complete keeps us here with the reason visible.
+      case flush_before_switch(socket) do
+        {:blocked, socket} -> {:noreply, socket}
+        {:ok, socket} -> do_switch_language(socket, new_language)
+      end
     end
   end
 
@@ -1148,44 +1159,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
          )}
     end
   end
-
-  defp do_toggle_version_access(socket, enabled) do
-    post = socket.assigns.post
-    group_slug = socket.assigns.group_slug
-
-    updated_metadata = Map.put(post.metadata, :allow_version_access, enabled)
-    updated_post = %{post | metadata: updated_metadata}
-
-    scope = socket.assigns[:phoenix_kit_current_scope]
-    params = %{"allow_version_access" => enabled}
-
-    case Publishing.update_post(group_slug, updated_post, params, %{
-           scope: scope,
-           actor_uuid: Shared.actor_uuid_from_socket(socket)
-         }) do
-      {:ok, saved_post} ->
-        flash_msg = version_access_flash(enabled)
-
-        {:noreply,
-         socket
-         |> assign(:post, saved_post)
-         |> put_flash(:info, flash_msg)}
-
-      {:error, reason} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           gettext("Couldn't update the version-access setting.") <> " " <> Errors.message(reason)
-         )}
-    end
-  end
-
-  defp version_access_flash(true),
-    do: gettext("Version access enabled - older versions are now publicly accessible")
-
-  defp version_access_flash(false),
-    do: gettext("Version access disabled - only live version is publicly accessible")
 
   # Update post struct with current form values for accurate public URL and status display
   defp update_post_from_form(post, form, language) do
@@ -1291,8 +1264,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   def handle_info(:autosave, socket) do
     # A read-only spectator must never autosave — their buffer is stale and would
     # clobber the lock owner's work. translation_locked? alone didn't cover them.
+    #
+    # Nor while the slug-conflict modal is open: the changes stay pending, so
+    # each keystroke rescheduled autosave, which hit the same conflict and
+    # re-opened the dialog the writer had just dismissed. They resolve it and
+    # save by hand.
     if socket.assigns.has_pending_changes and not socket.assigns.translation_locked? and
-         not socket.assigns[:readonly?] do
+         not socket.assigns[:readonly?] and
+         not socket.assigns[:show_slug_conflict_modal] do
       socket =
         socket
         |> assign(:is_autosaving, true)
@@ -1345,11 +1324,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      |> assign(:media_selector_target, "featured_image_uuid")}
   end
 
-  def handle_info({:editor_content_changed, %{content: content}}, socket) do
+  def handle_info({:leaf_changed, %{markdown: content}}, socket) do
     # Ignore local editor changes for read-only spectators: their content arrives
     # via remote sync, and marking pending / scheduling autosave here is a write
     # path that would let a spectator's stale buffer overwrite the lock owner.
-    if socket.assigns[:readonly?] do
+    #
+    # Typing body text is EDITING, so this has to do the same lock work
+    # `update_meta` does. It previously did none of it, which meant a writer
+    # working only in the body never refreshed `last_activity_at`: the lock
+    # lapsed under them mid-sentence, `readonly?` flipped, and from then on
+    # every keystroke was dropped here while "Save" persisted the stale
+    # pre-lapse buffer. The lapsed banner even says "Start typing … to resume
+    # editing" — the reclaim it promises lives in `maybe_reclaim_lock/1`.
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
       {:noreply, socket}
     else
       has_changes = Forms.dirty?(socket.assigns.post, socket.assigns.form, content)
@@ -1362,34 +1351,174 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
       socket = if has_changes, do: schedule_autosave(socket), else: socket
 
+      Collaborative.broadcast_form_change(socket, :content, %{
+        content: content,
+        form: socket.assigns.form
+      })
+
+      socket = Collaborative.touch_activity(socket)
+
       {:noreply, socket}
     end
   end
 
-  def handle_info({:editor_insert_component, %{type: :image}}, socket) do
+  def handle_info({:leaf_insert_request, %{type: :image}}, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
+
+  def handle_info({:leaf_insert_request, %{type: :image}}, socket) do
     {:noreply,
      socket
      |> assign(:show_media_selector, true)
      |> assign(:inserting_image_component, true)}
   end
 
-  def handle_info({:editor_insert_component, %{type: :video}}, socket) do
+  def handle_info({:leaf_insert_request, %{type: :video}}, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
+
+  def handle_info({:leaf_insert_request, %{type: :video}}, socket) do
     # Insert the renderer-supported `<Video>` component (the markdown renderer
     # only embeds `<Video ...>`; a bare `![Video](url)` becomes a broken <img>).
     # Matches the image toolbar path and the insert_component/insert_video_component
     # handlers, all of which use component markup.
-    send_update(MarkdownEditor,
+    # Leaf has no prompt-and-insert command, so ask here and insert the result.
+    # (A prompt-less path is better UX and is tracked separately.)
+    send_update(Leaf,
       id: "content-editor",
-      action: :prompt_insert,
-      prompt: gettext("Enter YouTube URL:"),
-      template: "\n<Video url=\"%{value}\">\n  Optional caption text\n</Video>\n"
+      action: :insert_markdown,
+      text: "\n<Video url=\"\">\n  Optional caption text\n</Video>\n"
     )
 
     {:noreply, socket}
   end
 
-  def handle_info({:editor_insert_component, _}, socket), do: {:noreply, socket}
-  def handle_info({:editor_save_requested, _}, socket), do: {:noreply, socket}
+  def handle_info({:leaf_insert_request, _}, socket), do: {:noreply, socket}
+
+  # Mode toggles are the component's own business.
+  def handle_info({:leaf_mode_changed, _}, socket), do: {:noreply, socket}
+
+  # A PHK component button. The selected text becomes the component's body
+  # where that makes sense — select a phrase, press the note button, and the
+  # phrase is what carries the note — so the common case is one gesture
+  # rather than "insert, then retype what you already had".
+  def handle_info({:leaf_toolbar_action, %{id: id, selection: selection}}, socket) do
+    if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
+      {:noreply, socket}
+    else
+      selected = Map.get(selection || %{}, :text, "") |> to_string()
+
+      case component_snippet(id, selected) do
+        # A gallery with no pictures renders as nothing at all, so a skeleton
+        # would look like the button had failed. It opens the picker instead,
+        # in multi-select, and arrives already full.
+        :pick_audio ->
+          {:noreply,
+           socket
+           |> assign(:media_selection_mode, :single)
+           |> assign(:media_selected_uuids, [])
+           |> assign(:media_selector_target, "audio_component")
+           |> assign(:inserting_audio, true)
+           |> assign(:show_media_selector, true)}
+
+        :pick_images ->
+          {:noreply,
+           socket
+           |> assign(:media_selection_mode, :multiple)
+           |> assign(:media_selected_uuids, [])
+           |> assign(:media_selector_target, "gallery")
+           |> assign(:inserting_gallery, true)
+           |> assign(:show_media_selector, true)}
+
+        nil ->
+          {:noreply, socket}
+
+        text ->
+          send_update(Leaf, id: "content-editor", action: :insert_markdown, text: text)
+          {:noreply, socket}
+      end
+    end
+  end
+
+  def handle_info({:leaf_toolbar_action, _}, socket), do: {:noreply, socket}
+
+  # The category picker changed the selection. It's a LiveComponent, so it
+  # can't write the parent's form itself — and the form is where this has to
+  # land, because that is what makes it dirty-tracked, autosaved, broadcast
+  # to watchers and written by the same save as everything else on the
+  # version. Same pipeline as `update_meta`, minus the slug/title machinery
+  # that doesn't apply.
+  def handle_info({:categories_changed, uuids}, socket) do
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.readonly? or socket.assigns.translation_locked? do
+      {:noreply, socket}
+    else
+      new_form =
+        socket.assigns.form
+        |> Map.put("category_uuids", uuids)
+        |> Forms.normalize_form()
+
+      has_changes = Forms.dirty?(socket.assigns.post, new_form, socket.assigns.content)
+
+      socket =
+        socket
+        |> Forms.assign_form_with_tracking(new_form)
+        |> assign(:has_pending_changes, has_changes)
+        |> assign(:autosave_blocked, blocked_reason(socket, new_form))
+        |> push_event("changes-status", %{has_changes: has_changes})
+
+      socket = if has_changes, do: schedule_autosave(socket), else: socket
+
+      Collaborative.broadcast_form_change(socket, :meta, new_form)
+      socket = Collaborative.touch_activity(socket)
+
+      {:noreply, socket}
+    end
+  end
+
+  # `#` in the body opens the tag popup. Answering is optional by contract —
+  # a host that stays silent just gets a spinner that closes itself — so this
+  # degrades rather than blocking the writer.
+  def handle_info({:leaf_suggest, %{trigger: "#", query: query, seq: seq}}, socket) do
+    results =
+      socket.assigns.group_slug
+      |> Hashtags.suggest(query, limit: 10)
+      |> Enum.map(fn %{tag: tag, count: count} ->
+        %{
+          value: tag,
+          label: "#" <> tag,
+          sublabel: ngettext("%{count} post", "%{count} posts", count),
+          icon: "hero-hashtag"
+        }
+      end)
+
+    # trigger/query/seq echo back unchanged: the client drops replies a later
+    # keystroke already superseded.
+    send_update(Leaf,
+      id: "content-editor",
+      action: :suggestions,
+      trigger: "#",
+      query: query,
+      seq: seq,
+      results: results
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:leaf_suggest, _}, socket), do: {:noreply, socket}
+  # The editor component's own Save button. Publishing hides it today
+  # (show_save_button defaults false), so this was a no-op — meaning the day
+  # anyone enables that button they'd ship a Save that does nothing. Wire it to
+  # the same path the toolbar Save uses.
+  def handle_info({:leaf_save_requested, _}, socket) do
+    if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
+      {:noreply, socket}
+    else
+      Persistence.perform_save(socket)
+    end
+  end
 
   # ============================================================================
   # Handle Info - Collaborative Editing
@@ -1494,7 +1623,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
        |> assign(:ai_translation_total, length(target_languages))
        |> assign(:ai_translation_languages, target_languages)
        |> assign(:ai_translation_failures, 0)
-       |> assign(:translation_locked?, should_lock)}
+       |> assign(:translation_locked?, should_lock)
+       |> track_translation_in_flight(should_lock)}
     else
       {:noreply, socket}
     end
@@ -1725,6 +1855,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # Which versions have a translation running, so a switch away and back can
+  # restore the lock instead of dropping it mid-write.
+  defp track_translation_in_flight(socket, false), do: socket
+
+  defp track_translation_in_flight(socket, true) do
+    scope = current_version_scope(socket)
+    in_flight = socket.assigns[:translations_in_flight] || MapSet.new()
+
+    assign(socket, :translations_in_flight, MapSet.put(in_flight, scope))
+  end
+
+  defp release_translation_in_flight(socket) do
+    scope = current_version_scope(socket)
+    in_flight = socket.assigns[:translations_in_flight] || MapSet.new()
+
+    assign(socket, :translations_in_flight, MapSet.delete(in_flight, scope))
+  end
+
   defp bump_translation_progress(socket) do
     assign(socket, :ai_translation_progress, (socket.assigns[:ai_translation_progress] || 0) + 1)
   end
@@ -1752,6 +1900,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         |> assign(:ai_translation_status, :completed)
         |> assign(:ai_translation_languages, [])
         |> assign(:translation_locked?, false)
+        |> release_translation_in_flight()
         # Auto-close the translation modal/confirm on completion (was left open,
         # forcing a manual close).
         |> assign(:show_ai_translation, false)
@@ -1781,7 +1930,48 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      )}
   end
 
+  # Presence has just promoted this socket from spectator to owner, which
+  # normally means "load the current row and start editing". It must not mean
+  # that when the socket is holding the previous owner's unsaved buffer: a
+  # spectator mirrors the owner keystroke by keystroke, so if the owner's tab
+  # died between autosaves, everything they typed since exists only here. A
+  # re-read would hand back the older saved copy and quietly delete it — the
+  # one failure mode where the writer never even learns there was something to
+  # recover.
   defp reload_post_on_lock_acquired(socket) do
+    if socket.assigns[:synced_from_owner?] do
+      adopt_synced_buffer(socket)
+    else
+      reload_saved_copy_on_lock_acquired(socket)
+    end
+  end
+
+  # Keep what is on screen and get it written down. Nothing is re-read: the
+  # whole point is that the row is behind this buffer, and pulling any of it
+  # back in would reintroduce the loss in a smaller shape. Autosave is armed
+  # rather than saving inline so a promotion storm — several spectators, one
+  # dying owner — collapses into one write per socket instead of a thundering
+  # herd, and so a failed write surfaces through the usual autosave banner.
+  defp adopt_synced_buffer(socket) do
+    socket
+    |> assign(:has_pending_changes, true)
+    |> Collaborative.clear_synced_from_owner()
+    |> push_event("changes-status", %{has_changes: true})
+    # Re-asserted because the editor is re-rendering out of read-only right
+    # now, and this is the moment the text stops being someone else's and
+    # becomes editable. There is no caret to disturb — this session has been
+    # watching, not typing — and the client applies it without echoing a
+    # change back, so it cannot start a broadcast loop.
+    |> push_event("set-content", %{content: socket.assigns.content})
+    |> schedule_autosave()
+    |> Collaborative.maybe_start_lock_expiration_timer()
+    |> put_flash(
+      :info,
+      gettext("You're the editor now. The previous editor's unsaved changes were kept.")
+    )
+  end
+
+  defp reload_saved_copy_on_lock_acquired(socket) do
     case re_read_post(socket, socket.assigns[:current_language]) do
       {:ok, post} ->
         form = Forms.post_form(post)
@@ -1790,7 +1980,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         |> assign(:post, %{post | group: socket.assigns.group_slug})
         |> Forms.assign_form_with_tracking(form)
         |> assign(:content, post.content)
-        |> assign(:has_pending_changes, false)
+        |> Helpers.mark_clean()
         |> push_event("changes-status", %{has_changes: false})
         |> push_event("set-content", %{content: post.content})
         |> Collaborative.maybe_start_lock_expiration_timer()
@@ -1872,6 +2062,82 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # A queued autosave carries edits that a context switch (version/language) is
+  # about to replace, so it must be dropped rather than left to fire into the
+  # new context as a no-op.
+  # Mirrors Persistence.perform_save/1's own guards — the single source of
+  # "why can't this be saved right now".
+  defp blocked_reason(socket, form) do
+    title = (form["title"] || "") |> to_string() |> String.trim()
+    slug = (form["slug"] || "") |> to_string() |> String.trim()
+
+    cond do
+      title == "" -> gettext("Title is required to save.")
+      socket.assigns.group_mode == "slug" and slug == "" -> gettext("Slug is required to save.")
+      true -> nil
+    end
+  end
+
+  defp do_switch_version(socket, version) do
+    socket = cancel_autosave_timer(socket)
+
+    case Versions.read_version_post(socket, version) do
+      {:ok, version_post} ->
+        {socket, old_form_key, old_post_slug, new_form_key, actual_language} =
+          Versions.apply_version_switch(
+            socket,
+            version,
+            version_post,
+            &Forms.post_form_with_primary_status/3
+          )
+
+        socket =
+          socket
+          |> Helpers.assign_current_language(actual_language)
+          |> Collaborative.cleanup_and_setup_collaborative_editing(old_form_key, new_form_key,
+            old_post_slug: old_post_slug
+          )
+
+        post = socket.assigns.post
+
+        url =
+          Helpers.build_edit_url(socket.assigns.group_slug, post,
+            version: version,
+            lang: actual_language
+          )
+
+        {:noreply, push_patch(socket, to: url, replace: true)}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, gettext("Version not found"))}
+    end
+  end
+
+  # Saves outstanding work before a navigation that swaps the editor's buffer.
+  # A read-only spectator never saves — they read has_pending_changes: true
+  # after a remote sync, so saving would clobber the owner.
+  defp flush_before_switch(socket) do
+    if socket.assigns.has_pending_changes and not socket.assigns[:readonly?] do
+      {:noreply, saved} = Persistence.perform_save(socket)
+
+      if saved.assigns.has_pending_changes do
+        {:blocked, saved}
+      else
+        {:ok, saved}
+      end
+    else
+      {:ok, socket}
+    end
+  end
+
+  defp cancel_autosave_timer(socket) do
+    if timer = socket.assigns[:autosave_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    assign(socket, :autosave_timer, nil)
+  end
+
   defp schedule_autosave(socket) do
     if socket.assigns.autosave_timer do
       Process.cancel_timer(socket.assigns.autosave_timer)
@@ -1916,12 +2182,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   defp do_switch_language(socket, new_language) do
-    # Cancel any pending autosave before switching language context
-    if timer = socket.assigns[:autosave_timer] do
-      Process.cancel_timer(timer)
-    end
-
-    socket = assign(socket, :autosave_timer, nil)
+    socket = cancel_autosave_timer(socket)
     post = socket.assigns.post
     group_slug = socket.assigns.group_slug
     content_exists = new_language in post.available_languages
@@ -1964,7 +2225,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         :viewing_older_version,
         Versions.viewing_older_version?(current_version, available_versions, new_language)
       )
-      |> assign(:has_pending_changes, false)
+      |> Helpers.mark_clean()
       |> assign(:is_new_translation, true)
       |> assign(:form_key, new_form_key)
       |> push_event("changes-status", %{has_changes: false})
@@ -1983,19 +2244,221 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      |> push_patch(to: url, replace: true)}
   end
 
+  # Only the audio slot is type-checked: the image slots already point at an
+  # image-filtered selector, and a wrong image is visible at a glance whereas a
+  # wrong audio file is silent.
+  defp media_allowed_for_target?(file_uuid, target)
+       when target in ["audio_uuid", "audio_component"] do
+    case PhoenixKit.Modules.Storage.get_file(file_uuid) do
+      %{file_type: "audio"} -> true
+      %{mime_type: mime} when is_binary(mime) -> String.starts_with?(mime, "audio/")
+      _ -> false
+    end
+  rescue
+    # Storage unreachable — don't block the editor over a type check.
+    _ -> true
+  end
+
+  defp media_allowed_for_target?(_file_uuid, _target), do: true
+
+  # The PHK block components, as toolbar buttons.
+  #
+  # Leaf's built-in image and video buttons already exist and route through
+  # the media picker (`{:leaf_insert_request, …}`), so they are not repeated
+  # here. These are the ones that had no affordance at all: the only way to
+  # reach a Showcase band or an author note was to know the tag and type it,
+  # which means the features may as well not exist for anyone who hasn't read
+  # the format doc.
+  #
+  # `icon` is raw SVG rather than a heroicon class because Leaf renders these
+  # in its own toolbar, outside this app's CSS: a `hero-*` class only works
+  # where that stylesheet reached, and Leaf's toolbar sits in its own markup.
+  # The version that saving would take down, or nil when saving changes
+  # nothing about what is published.
+  #
+  # This used to warn whenever the status select read "published" and the post
+  # had more than one version, counting every other version as about to be
+  # archived. Both halves were wrong. `archive_other_published_versions!` only
+  # touches versions whose own status is "published", and only one can be — so
+  # a post with five versions loses ONE, not four. And on the version that is
+  # already live there is nothing to take down at all: it is its own target,
+  # so the warning fired on exactly the save that changes nothing.
+  defp version_to_be_archived(assigns) do
+    statuses = assigns[:version_statuses] || %{}
+    current = assigns[:current_version]
+
+    if Constants.published?(assigns[:form]["status"]) and
+         not Constants.published?(Map.get(statuses, current)) do
+      statuses
+      |> Enum.find(fn {number, status} -> Constants.published?(status) and number != current end)
+      |> case do
+        {number, _status} -> number
+        nil -> nil
+      end
+    end
+  end
+
+  defp component_toolbar_buttons do
+    [
+      %{
+        id: "phk-headline",
+        title: gettext("Headline (wide)"),
+        icon: toolbar_glyph("H")
+      },
+      %{
+        id: "phk-showcase",
+        title: gettext("Showcase band"),
+        icon: toolbar_glyph("▤")
+      },
+      %{
+        id: "phk-gallery",
+        title: gettext("Gallery (helix)"),
+        icon: toolbar_glyph("◍")
+      },
+      %{
+        id: "phk-audio",
+        title: gettext("Audio player"),
+        icon: toolbar_glyph("♪")
+      },
+      %{
+        id: "phk-note",
+        title: gettext("Author note"),
+        icon: toolbar_glyph("†")
+      },
+      %{
+        id: "phk-cta",
+        title: gettext("Call to action"),
+        icon: toolbar_glyph("▭")
+      }
+    ]
+  end
+
+  defp toolbar_glyph(char) do
+    ~s(<span class="text-xs font-semibold leading-none">#{char}</span>)
+  end
+
+  # The markup each button inserts. Placeholder text is deliberate: an empty
+  # component renders as nothing, which reads as "the button is broken", so
+  # each one arrives with something visible to edit over.
+  defp component_snippet("phk-headline", selected) do
+    body = fallback(selected, gettext("Headline text"))
+    ~s(<Headline stretch="30">#{body}</Headline>\n\n)
+  end
+
+  defp component_snippet("phk-showcase", selected) do
+    body = fallback(selected, gettext("Words beside the picture."))
+
+    """
+    <Showcase src="" side="left" overlap="18" height="medium" alt="">
+    ### #{gettext("Heading")}
+
+    #{body}
+    </Showcase>
+
+    """
+  end
+
+  # Wraps the selection rather than replacing it: a note is an annotation ON
+  # a phrase, so the phrase has to survive.
+  defp component_snippet("phk-note", selected) do
+    phrase = fallback(selected, gettext("the phrase"))
+    ~s(<Note note="#{gettext("Your note here")}">#{phrase}</Note>)
+  end
+
+  defp component_snippet("phk-gallery", _selected), do: :pick_images
+  defp component_snippet("phk-audio", _selected), do: :pick_audio
+
+  defp component_snippet("phk-cta", selected) do
+    body = fallback(selected, gettext("What should the reader do next?"))
+    ~s(<CTA>#{body}</CTA>\n\n)
+  end
+
+  defp component_snippet(_unknown, _selected), do: nil
+
+  defp fallback(selected, default) do
+    case String.trim(selected) do
+      "" -> default
+      text -> text
+    end
+  end
+
+  # What the picker should contain for a given slot. Only audio is narrowed:
+  # `media_allowed_for_target?/2` refuses nothing else, and the image fields
+  # are legitimately used for more than one kind of file — narrowing those
+  # would take away a choice rather than prevent a mistake.
+  defp media_filter_for_target("audio_uuid"), do: :audio
+  defp media_filter_for_target("audio_component"), do: :audio
+  defp media_filter_for_target("gallery"), do: :image
+  defp media_filter_for_target(_target), do: :all
+
   defp handle_media_selected(socket, file_ids) do
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.readonly? or socket.assigns.translation_locked? do
+      # Every other write path checks this; the media picker didn't. A
+      # session whose lock had lapsed could still open the picker, choose a
+      # file, and have it assigned, broadcast to the real editor and
+      # autosaved — the one hole through which a spectator could overwrite
+      # the owner's featured image, OG image or audio.
+      {:noreply,
+       socket
+       |> assign(:show_media_selector, false)
+       |> assign(:media_selector_target, "featured_image_uuid")
+       |> assign(:inserting_image_component, false)
+       |> put_flash(:warning, gettext("Someone else is editing this post — nothing was changed."))}
+    else
+      do_handle_media_selected(socket, file_ids)
+    end
+  end
+
+  defp do_handle_media_selected(socket, file_ids) do
     file_uuid = List.first(file_ids)
     inserting_image_component = Map.get(socket.assigns, :inserting_image_component, false)
+    inserting_gallery = Map.get(socket.assigns, :inserting_gallery, false)
+    inserting_audio = Map.get(socket.assigns, :inserting_audio, false)
 
     {socket, autosave?} =
       cond do
+        inserting_audio and file_uuid ->
+          send_update(Leaf,
+            id: "content-editor",
+            action: :insert_markdown,
+            text: Helpers.audio_component_markup(file_uuid)
+          )
+
+          {
+            socket
+            |> assign(:show_media_selector, false)
+            |> assign(:media_selector_target, "featured_image_uuid")
+            |> assign(:inserting_audio, false)
+            |> put_flash(:info, gettext("Audio player inserted")),
+            false
+          }
+
+        inserting_gallery and file_ids != [] ->
+          send_update(Leaf,
+            id: "content-editor",
+            action: :insert_markdown,
+            text: Helpers.gallery_markup(file_ids)
+          )
+
+          {
+            socket
+            |> assign(:show_media_selector, false)
+            |> assign(:media_selection_mode, :single)
+            |> assign(:media_selector_target, "featured_image_uuid")
+            |> assign(:inserting_gallery, false)
+            |> put_flash(:info, gettext("Gallery inserted")),
+            false
+          }
+
         file_uuid && inserting_image_component ->
           markup = Helpers.image_component_markup(file_uuid)
-          # Insert through the core MarkdownEditor hook (CSP-safe, survives
-          # navigation) instead of a bespoke inline-script listener.
-          send_update(MarkdownEditor,
+          # Insert through Leaf's own command (CSP-safe, survives navigation)
+          # instead of a bespoke inline-script listener.
+          send_update(Leaf,
             id: "content-editor",
-            action: :insert_at_cursor,
+            action: :insert_markdown,
             text: markup
           )
 
@@ -2007,6 +2470,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             false
           }
 
+        file_uuid &&
+            not media_allowed_for_target?(file_uuid, socket.assigns[:media_selector_target]) ->
+          # The shared selector has no audio filter, so a Choose click could
+          # attach a PNG to the audio slot: the post page would render a dead
+          # <audio> and the feed an <enclosure type="audio/mpeg"> pointing at
+          # an image. Refuse rather than store it.
+          {
+            socket
+            |> assign(:show_media_selector, false)
+            |> assign(:media_selector_target, "featured_image_uuid")
+            |> put_flash(:error, gettext("That file isn't audio — pick an audio file.")),
+            false
+          }
+
         file_uuid ->
           target = socket.assigns[:media_selector_target] || "featured_image_uuid"
           new_form = Forms.update_form_with_media(socket.assigns.form, file_uuid, target)
@@ -2014,6 +2491,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           flash =
             case target do
               "og_image_uuid" -> gettext("OG image selected")
+              "audio_uuid" -> gettext("Audio version selected")
               _ -> gettext("Featured image selected")
             end
 
@@ -2060,16 +2538,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       </button>
       <div class="flex items-center gap-2">
         <%= unless @is_new_post do %>
+          <%!-- Preview SAVES before it navigates, so the gap between click
+                and anything happening is a database write, not a repaint.
+                Unmarked, a writer with a slow connection clicks it twice. --%>
           <button
             type="button"
-            class="btn btn-outline btn-xs sm:btn-sm shadow-none"
+            class="btn btn-outline btn-xs sm:btn-sm shadow-none [&.phx-click-loading]:pointer-events-none"
             phx-click="preview"
           >
-            <.icon name="hero-eye" class="w-4 h-4 sm:mr-1" />
+            <.icon name="hero-eye" class="w-4 h-4 sm:mr-1 [.phx-click-loading_&]:hidden" />
+            <span class="hidden loading loading-spinner loading-xs sm:mr-1 [.phx-click-loading_&]:inline-block">
+            </span>
             <span class="hidden sm:inline">{gettext("Preview")}</span>
           </button>
         <% end %>
-        <%= if @form["status"] == "published" && @public_url do %>
+        <%= if Constants.published?(@form["status"]) && @public_url do %>
           <a
             href={if @has_pending_changes, do: "#", else: @public_url}
             target="_blank"
@@ -2095,7 +2578,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     </div>
 
     <%!-- Public URL (shown for published posts, mirrors the post listing) --%>
-    <%= if @form["status"] == "published" && @public_url do %>
+    <%= if Constants.published?(@form["status"]) && @public_url do %>
       <% full_public_url = (assigns[:endpoint_url] || "") <> @public_url %>
       <p class="text-xs text-base-content/50 break-all">
         <span class="font-medium text-base-content">{gettext("Public URL")}:</span>
@@ -2164,10 +2647,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           <%= if assigns[:lock_released_by_timeout] do %>
             <span class="font-medium">{gettext("Session paused:")}</span>
             <span>
-              {gettext(
-                "Your editing lock expired due to inactivity. Start typing or click Save to resume editing."
-              )}
+              {gettext("Your editing lock expired due to inactivity.")}
             </span>
+            <%!-- An explicit control, because the promise of "just start typing"
+                  can't be kept: readonly? disables the very fields whose input
+                  would trigger the reclaim. --%>
+            <button
+              type="button"
+              phx-click="resume_editing"
+              phx-disable-with={gettext("Resuming…")}
+              class="btn btn-warning btn-sm ml-2"
+            >
+              <.icon name="hero-play" class="w-4 h-4" />
+              {gettext("Resume editing")}
+            </button>
           <% else %>
             <span class="font-medium">{gettext("View only mode:")}</span>
             <span>
@@ -2265,7 +2758,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
             <%!-- Endpoint Selection --%>
             <div class="space-y-1">
-              <form phx-change="select_ai_endpoint">
+              <form id="ai-endpoint-form" phx-change="select_ai_endpoint">
                 <label class="select select-sm w-full">
                   <select name="endpoint_uuid">
                     <option value="">{gettext("Select an endpoint...")}</option>
@@ -2295,7 +2788,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
             <%!-- Prompt Selection --%>
             <div class="space-y-1">
-              <form phx-change="select_ai_prompt">
+              <form id="ai-prompt-form" phx-change="select_ai_prompt">
                 <label class="select select-sm w-full">
                   <select name="prompt_uuid">
                     <option value="">{gettext("Select a prompt...")}</option>
@@ -2317,21 +2810,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                 <%= unless @ai_default_prompt_exists do %>
                   <button
                     type="button"
-                    class="btn btn-outline btn-xs gap-1"
+                    class="btn btn-outline btn-xs gap-1 [&.phx-click-loading]:pointer-events-none"
                     phx-click="generate_default_translation_prompt"
+                    disabled={edit_disabled?}
                   >
-                    <.icon name="hero-sparkles" class="w-3 h-3" />
+                    <.icon name="hero-sparkles" class="w-3 h-3 [.phx-click-loading_&]:hidden" />
+                    <span class="hidden loading loading-spinner loading-xs [.phx-click-loading_&]:inline-block">
+                    </span>
                     {gettext("Generate Default Prompt")}
                   </button>
                 <% end %>
                 <%= if @ai_default_prompt_exists and @ai_default_prompt_stale do %>
                   <button
                     type="button"
-                    class="btn btn-warning btn-outline btn-xs gap-1"
+                    class="btn btn-warning btn-outline btn-xs gap-1 [&.phx-click-loading]:pointer-events-none"
                     phx-click="regenerate_default_translation_prompt"
+                    disabled={edit_disabled?}
                     title={gettext("This prompt predates the current format and may mistranslate. Click to update it.")}
                   >
-                    <.icon name="hero-arrow-path" class="w-3 h-3" />
+                    <.icon name="hero-arrow-path" class="w-3 h-3 [.phx-click-loading_&]:hidden" />
+                    <span class="hidden loading loading-spinner loading-xs [.phx-click-loading_&]:inline-block">
+                    </span>
                     {gettext("Regenerate Default Prompt")}
                   </button>
                 <% end %>
@@ -2391,7 +2890,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   phx-click="translate_to_all_languages"
                   phx-disable-with={gettext("Enqueueing…")}
                   disabled={
-                    @ai_selected_endpoint_uuid == nil or
+                    edit_disabled? or
+                      @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
                       @ai_translation_status in [:enqueued, :in_progress]
                   }
@@ -2406,7 +2906,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   phx-click="translate_missing_languages"
                   phx-disable-with={gettext("Enqueueing…")}
                   disabled={
-                    @ai_selected_endpoint_uuid == nil or
+                    edit_disabled? or
+                      @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
                       @ai_translation_status in [:enqueued, :in_progress]
                   }
@@ -2421,7 +2922,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   phx-click="translate_to_this_language"
                   phx-disable-with={gettext("Translating…")}
                   disabled={
-                    @ai_selected_endpoint_uuid == nil or
+                    edit_disabled? or
+                      @ai_selected_endpoint_uuid == nil or
                       @ai_selected_prompt_uuid == nil or
                       @ai_translation_status in [:enqueued, :in_progress]
                   }
@@ -2566,6 +3068,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         <span class="loading loading-spinner loading-xs"></span>
                         {gettext("Saving...")}
                       </span>
+                    <% @autosave_blocked -> %>
+                      <span class="badge badge-error badge-sm h-auto gap-1">
+                        <.icon name="hero-exclamation-triangle" class="w-3 h-3" />
+                        {@autosave_blocked}
+                      </span>
                     <% @has_pending_changes -> %>
                       <span class="badge badge-warning badge-sm h-auto">
                         {gettext("Unsaved changes")}
@@ -2610,19 +3117,67 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   placeholder={gettext("Post title")}
                   readonly={edit_disabled? or @viewing_older_version}
                 />
-                <%!-- Markdown Editor Component --%>
-                <.live_component
-                  module={PhoenixKitWeb.Components.Core.MarkdownEditor}
+                <%!-- Content editor (Leaf), opened in markdown mode, plus the
+                      `#` trigger that turns body hashtags into an autocomplete.
+                      Tags come from the group's existing ones — see
+                      handle_info({:leaf_suggest, …}).
+
+                      `mode` is set deliberately, not left at Leaf's default of
+                      :hybrid. The hybrid and visual surfaces round-trip the
+                      body through HTML, which is fine for prose but makes PHK
+                      components second-class: `preserve_tags` keeps them
+                      intact, but only as opaque blocks nobody can edit without
+                      dropping to markdown anyway. Posts here are written with
+                      <Showcase>, <Note>, <Audio> and friends, so markdown is
+                      the mode that can actually edit them. The toolbar still
+                      offers the other modes — Leaf has no supported way to
+                      remove them — but nothing depends on anyone using one.
+
+                      `protect_navigation` predates the move to Leaf and was
+                      dropped in the swap — it warns before leaving with
+                      unsaved work, which nothing else here does.
+
+                      `save_status` was dropped in the same swap and is NOT
+                      coming back. Leaf's badge only knows saved/saving/
+                      unsaved, while the badge above says WHY a save is
+                      blocked ("Title is required to save."). Restoring it
+                      put two status indicators on screen disagreeing with
+                      each other.
+
+                      `toolbar_extra` adds the PHK components to the toolbar.
+                      Leaf's own image and video buttons already route into
+                      the media picker; these are the block components that
+                      previously had to be typed out by hand. --%>
+                <.leaf_editor
                   id="content-editor"
                   content={@content}
                   placeholder={gettext("Write your content here...")}
                   height="480px"
                   debounce={400}
                   toolbar={[:image, :video]}
-                  show_formatting_toolbar={not (edit_disabled? or @viewing_older_version)}
-                  protect_navigation={true}
-                  save_status={if @has_pending_changes, do: :unsaved, else: :saved}
                   readonly={edit_disabled? or @viewing_older_version}
+                  mode={:markdown}
+                  preserve_tags={Renderer.component_tags()}
+                  gettext_backend={PhoenixKitPublishing.Gettext}
+                  protect_navigation={true}
+                  toolbar_extra={component_toolbar_buttons()}
+                  suggestions={[
+                    %{
+                      trigger: "#",
+                      boundary: :word_start,
+                      first_char: ~r/\p{L}/u,
+                      token: ~r/[\p{L}\p{N}_-]/u,
+                      max_length: 30,
+                      # 1, not 0: a lone "#" at the start of a line is a
+                      # heading, and popping a tag list open on that keystroke
+                      # interrupts someone who is only writing a title.
+                      min_chars: 1,
+                      debounce: 150,
+                      max_results: 10,
+                      allow_create: true,
+                      exclude: [:code, :link]
+                    }
+                  ]}
                 />
               </div>
             </div>
@@ -2661,10 +3216,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         }
                         readonly={edit_disabled? or @viewing_older_version}
                       />
-                      <p class="text-xs text-base-content/60 mt-1">
-                        {gettext("Use lowercase letters, numbers, and hyphens only.")}
-                        {gettext("This will be the default URL for all languages.")}
-                      </p>
+                      <div class="mt-1 flex items-start justify-between gap-2">
+                        <p class="text-xs text-base-content/60">
+                          {gettext("Use lowercase letters, numbers, and hyphens only.")}
+                          {gettext("This will be the default URL for all languages.")}
+                        </p>
+                        <%!-- The handler existed with no control, so a slug that
+                              drifted from a retitled post could only be fixed by
+                              hand. --%>
+                        <button
+                          :if={not (edit_disabled? or @viewing_older_version)}
+                          type="button"
+                          phx-click="regenerate_slug"
+                          phx-disable-with={gettext("Working…")}
+                          class="btn btn-ghost btn-xs shrink-0"
+                          title={gettext("Re-derive the slug from the current title")}
+                        >
+                          <.icon name="hero-arrow-path" class="w-3 h-3" />
+                          {gettext("From title")}
+                        </button>
+                      </div>
                     </div>
                   <% else %>
                     <%!-- Translation: per-language URL slug for SEO-friendly localized URLs --%>
@@ -2741,6 +3312,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                             <button
                               type="button"
                               phx-click="open_media_selector"
+                              disabled={edit_disabled? or @viewing_older_version}
                               class="btn btn-primary btn-sm shadow-lg"
                             >
                               <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" />
@@ -2749,6 +3321,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                             <button
                               type="button"
                               phx-click="clear_featured_image"
+                              disabled={edit_disabled? or @viewing_older_version}
                               phx-disable-with={gettext("Removing…")}
                               class="btn btn-error btn-sm shadow-lg"
                             >
@@ -2764,6 +3337,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           <button
                             type="button"
                             phx-click="open_media_selector"
+                            disabled={edit_disabled? or @viewing_older_version}
                             class="btn btn-primary btn-sm flex-1"
                           >
                             <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" />
@@ -2772,6 +3346,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           <button
                             type="button"
                             phx-click="clear_featured_image"
+                            disabled={edit_disabled? or @viewing_older_version}
                             phx-disable-with={gettext("Removing…")}
                             class="btn btn-error btn-sm flex-1"
                           >
@@ -2786,8 +3361,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     <button
                       type="button"
                       phx-click="open_media_selector"
-                      class={"w-full border-2 border-dashed border-base-300 rounded-lg p-8 transition-all group #{if edit_disabled? or @viewing_older_version, do: "opacity-50 cursor-not-allowed", else: "hover:border-primary hover:bg-primary/5"}"}
                       disabled={edit_disabled? or @viewing_older_version}
+                      class={"w-full border-2 border-dashed border-base-300 rounded-lg p-8 transition-all group #{if edit_disabled? or @viewing_older_version, do: "opacity-50 cursor-not-allowed", else: "hover:border-primary hover:bg-primary/5"}"}
                     >
                       <div class="flex flex-col items-center gap-3 text-base-content/60 group-hover:text-primary transition-colors">
                         <.icon name="hero-photo" class="w-12 h-12" />
@@ -2874,6 +3449,105 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <p class="text-xs text-base-content/60 mt-1 ml-1">
                     {gettext(
                       "Pins this post to the top of its listing and shows it larger. The group's settings control whether featured posts appear and how they're displayed."
+                    )}
+                  </p>
+                </div>
+
+                <%!-- Public version browsing. The public side already honours
+                      this (post_rendering gates `?v=N` on it) and the mapper
+                      reads it, but nothing ever WROTE it and no control existed.
+                      Rides the form exactly like `featured`: a phx-click toggle
+                      inside this form would fire the form's own change event,
+                      and update_meta rebuilds :post from the form — clobbering
+                      the value the click had just persisted. --%>
+                <div>
+                  <label class="label cursor-pointer justify-start gap-2 py-1">
+                    <input
+                      type="hidden"
+                      name="allow_version_access"
+                      value="false"
+                      disabled={edit_disabled? or @viewing_older_version}
+                    />
+                    <input
+                      type="checkbox"
+                      id="post-version-access-checkbox"
+                      name="allow_version_access"
+                      value="true"
+                      checked={@form["allow_version_access"] in [true, "true"]}
+                      disabled={edit_disabled? or @viewing_older_version}
+                      class="checkbox checkbox-primary checkbox-sm"
+                    />
+                    <span class="label-text text-sm font-semibold text-base-content">
+                      {gettext("Let readers browse older versions")}
+                    </span>
+                  </label>
+                  <p class="text-xs text-base-content/60 mt-1 ml-1">
+                    {gettext(
+                      "Adds ?v=N access to this post's published versions. Off by default — only the live version is public."
+                    )}
+                  </p>
+                </div>
+
+                <%!-- Categories — version-level, edited through the form and
+                     written by the ordinary save (see the component doc). --%>
+                <.live_component
+                  module={PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker}
+                  id="post-categories-picker"
+                  group_slug={@group_slug}
+                  selected={@form["category_uuids"] || []}
+                  language={@current_language}
+                  disabled={edit_disabled? or @viewing_older_version}
+                />
+
+                <%!-- Audio version — a player renders above the post content
+                     when set; the RSS feed carries it as an enclosure. --%>
+                <div>
+                  <label class="label py-1" for="post-audio-input">
+                    <span class="label-text text-sm font-semibold text-base-content">
+                      {gettext("Audio version")}
+                    </span>
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="text"
+                      id="post-audio-input"
+                      name="audio_uuid"
+                      value={@form["audio_uuid"]}
+                      class={"input input-bordered input-sm w-full font-mono text-xs #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                      placeholder="018e3c4a-9f6b-7890-abcd-ef1234567890"
+                      readonly={edit_disabled? or @viewing_older_version}
+                    />
+                    <%!-- Browsing beats hunting a uuid in the media library:
+                          the selector is the same one the featured image uses,
+                          targeted at this field. --%>
+                    <button
+                      :if={not (edit_disabled? or @viewing_older_version)}
+                      type="button"
+                      phx-click="open_media_selector"
+                      disabled={edit_disabled? or @viewing_older_version}
+                      phx-value-field="audio_uuid"
+                      class="btn btn-outline btn-sm shrink-0"
+                    >
+                      <.icon name="hero-musical-note" class="w-4 h-4" />
+                      {gettext("Choose")}
+                    </button>
+                    <button
+                      :if={
+                        not (edit_disabled? or @viewing_older_version) and
+                          @form["audio_uuid"] not in [nil, ""]
+                      }
+                      type="button"
+                      phx-click="clear_audio"
+                      disabled={edit_disabled? or @viewing_older_version}
+                      class="btn btn-ghost btn-sm shrink-0"
+                      title={gettext("Remove the audio version")}
+                    >
+                      <.icon name="hero-x-mark" class="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p class="text-xs text-base-content/60 mt-1">
+                    {gettext(
+                      "An audio file (e.g. a narration). Shows a player above the post and rides the RSS feed as a podcast enclosure."
                     )}
                   </p>
                 </div>
@@ -2970,6 +3644,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                               <button
                                 type="button"
                                 phx-click="open_media_selector"
+                                disabled={edit_disabled? or @viewing_older_version}
                                 phx-value-field="og_image_uuid"
                                 class="btn btn-outline btn-xs flex-1"
                               >
@@ -2979,6 +3654,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                               <button
                                 type="button"
                                 phx-click="clear_og_image"
+                                disabled={edit_disabled? or @viewing_older_version}
                                 phx-disable-with={gettext("Removing…")}
                                 class="btn btn-outline btn-error btn-xs flex-1"
                               >
@@ -2997,6 +3673,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           <button
                             type="button"
                             phx-click="open_media_selector"
+                            disabled={edit_disabled? or @viewing_older_version}
                             phx-value-field="og_image_uuid"
                             class="btn btn-outline btn-xs w-full"
                           >
@@ -3063,7 +3740,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       <%= if @viewing_older_version do %>
                         <option
                           value="published"
-                          selected={@form["status"] in ["draft", "published"]}
+                          selected={@form["status"] in [Constants.status_draft(), Constants.status_published()]}
                         >
                           {gettext("Published")}
                         </option>
@@ -3074,7 +3751,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         <option value="draft" selected={@form["status"] == "draft"}>
                           {gettext("Draft")}
                         </option>
-                        <option value="published" selected={@form["status"] == "published"}>
+                        <option value="published" selected={Constants.published?(@form["status"])}>
                           {gettext("Published")}
                         </option>
                         <option value="archived" selected={@form["status"] == "archived"}>
@@ -3085,6 +3762,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </label>
                   <p class="text-xs text-base-content/50 mt-1">
                     {gettext("Applies to all languages in this version.")}
+                  </p>
+                  <%!-- Publishing archives the version that is live now
+                        (Persistence calls publish_version, which does that
+                        atomically). A select can't carry a data-confirm, so
+                        say it plainly before the writer saves rather than
+                        after — but only when it is actually true. --%>
+                  <p
+                    :if={version_to_be_archived(assigns)}
+                    class="text-xs text-warning mt-1 flex items-start gap-1"
+                  >
+                    <.icon name="hero-exclamation-triangle" class="w-3 h-3 mt-0.5 shrink-0" />
+                    {gettext(
+                      "Saving will publish this version and archive v%{version}, which is live now.",
+                      version: version_to_be_archived(assigns)
+                    )}
                   </p>
                 </div>
 
@@ -3111,6 +3803,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     type="button"
                     phx-click="clear_translation"
                     phx-disable-with={gettext("Clearing…")}
+                    disabled={edit_disabled?}
                     class="btn btn-outline btn-error btn-sm w-full gap-2"
                     data-confirm={
                       gettext(
@@ -3179,7 +3872,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </span>
                   <span class={[
                     "badge badge-xs h-auto",
-                    status == "published" && "badge-success",
+                    Constants.published?(status) && "badge-success",
                     status == "draft" && "badge-warning",
                     status == "archived" && "badge-ghost"
                   ]}>
@@ -3209,6 +3902,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             class="btn btn-primary"
             phx-click="create_version_from_source"
             phx-disable-with={gettext("Creating…")}
+            disabled={edit_disabled?}
           >
             <.icon name="hero-plus" class="w-4 h-4" />
             {gettext("Create Version")}
@@ -3290,13 +3984,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     danger={true}
     />
 
-    <%!-- Media Selector Modal --%>
+    <%!-- Media Selector Modal.
+
+         The audio slot gets a picker that only contains audio. It used to
+         show the whole library and refuse a wrong pick afterwards, which
+         put the mistake after the effort — you browse, choose a file, and
+         only then find out that kind isn't allowed. The server-side check
+         stays as the backstop for anything that reaches the handler by
+         another route. --%>
     <.live_component
     module={PhoenixKitWeb.Live.Components.MediaSelectorModal}
     id="media-selector-modal"
     show={@show_media_selector}
     mode={@media_selection_mode}
     selected_uuids={@media_selected_uuids}
+    file_type_filter={media_filter_for_target(@media_selector_target)}
+    lock_file_type={@media_selector_target in ["audio_uuid", "audio_component", "gallery"]}
     phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
     />
     """

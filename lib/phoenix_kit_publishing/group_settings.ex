@@ -69,6 +69,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "listing_layout",
+        type: :enum,
+        allowed: Constants.listing_layouts(),
+        default: Constants.default_listing_layout(),
+        scope: :listing,
+        label: "Listing layout",
+        description:
+          "How the listing renders its (non-band) posts: \"grid\" (card grid), \"list\" (horizontal thumbnail rows), or \"minimal\" (date — title lines, no images). The Featured/Latest bands keep their own layout/style.",
+        depends_on: nil
+      },
+      %{
         key: "show_post_count",
         type: :boolean,
         allowed: @boolean_allowed,
@@ -76,6 +87,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         scope: :listing,
         label: "Show the post count",
         description: "Show the total number of posts under the listing title.",
+        depends_on: nil
+      },
+      %{
+        key: "search_enabled",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :listing,
+        label: "Search box",
+        description:
+          "Show a search box on the public listing (?q= GET form, no JS needed). Matches are a case-insensitive substring over each post's published title and body in the reader's language.",
         depends_on: nil
       },
       %{
@@ -200,6 +222,20 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "notes_style",
+        type: :enum,
+        allowed: Constants.notes_styles(),
+        default: Constants.default_notes_style(),
+        scope: :post,
+        label: "Author notes style",
+        description:
+          "How <Note> annotations display: \"footnotes\" — numbered references " <>
+            "with a collected Notes section at the bottom (plus hover popovers) — " <>
+            "or \"panel\" — clicking the annotated phrase slides out a right-side " <>
+            "panel with the note and its own comment thread.",
+        depends_on: nil
+      },
+      %{
         key: "post_date_position",
         type: :enum,
         allowed: Constants.post_date_positions(),
@@ -243,6 +279,60 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "show_prev_next",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Previous/next navigation",
+        description:
+          "Show chronological \"newer / older\" post links at the bottom of the post page, within the same group and language.",
+        depends_on: nil
+      },
+      %{
+        key: "show_categories",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Category chips",
+        description:
+          "Show the post's categories as linked chips above the content, each leading to its archive page.",
+        depends_on: nil
+      },
+      %{
+        key: "comments_enabled",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Comments",
+        description:
+          "Show a comment thread under posts (requires the phoenix_kit_comments module; logged-in readers can post).",
+        depends_on: nil
+      },
+      %{
+        key: "views_enabled",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Count views",
+        description:
+          "Track post views as per-day counts. Bot-filtered and session-deduped; no reader data is stored beyond the counts.",
+        depends_on: nil
+      },
+      %{
+        key: "show_view_counts",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :post,
+        label: "Show view counts",
+        description: "Show a \"N views\" line on the post page.",
+        depends_on: "views_enabled"
+      },
+      %{
         key: "show_reading_time",
         type: :boolean,
         allowed: @boolean_allowed,
@@ -250,16 +340,6 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         scope: :post,
         label: "Reading time",
         description: "Show an estimated \"N min read\" under the title.",
-        depends_on: nil
-      },
-      %{
-        key: "show_tags",
-        type: :boolean,
-        allowed: @boolean_allowed,
-        default: false,
-        scope: :post,
-        label: "Tags",
-        description: "Show the post's tags as chips under the header.",
         depends_on: nil
       },
       %{

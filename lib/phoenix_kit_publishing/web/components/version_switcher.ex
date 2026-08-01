@@ -24,6 +24,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
       />
   """
 
+  alias PhoenixKit.Modules.Publishing.Constants
+
   use Phoenix.Component
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
@@ -60,7 +62,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
     # Only ONE version should show as live - the one users will see publicly
     live_version =
       sorted_versions
-      |> Enum.filter(fn v -> Map.get(assigns.version_statuses, v) == "published" end)
+      |> Enum.filter(fn v -> Constants.published?(Map.get(assigns.version_statuses, v)) end)
       |> Enum.max(fn -> nil end)
 
     assigns =
@@ -161,7 +163,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
     color =
       cond do
         is_live -> "bg-success"
-        status == "published" -> "bg-info"
+        Constants.published?(status) -> "bg-info"
         status == "draft" -> "bg-warning"
         status == "archived" -> "bg-base-content/40"
         true -> "bg-base-content/20"

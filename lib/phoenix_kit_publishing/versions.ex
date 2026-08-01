@@ -48,7 +48,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       db_post ->
         db_post.uuid
         |> DBStorage.list_versions()
-        |> Enum.find(&(&1.status == "published"))
+        |> Enum.find(&Constants.published?(&1.status))
         |> case do
           nil -> {:error, :no_published_version}
           v -> {:ok, v.version_number}
@@ -121,8 +121,12 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   @doc """
   Creates a new version of a slug-mode post by copying from the latest version.
 
-  The new version starts as draft with status: "draft".
-  Content and metadata updates from params are applied to the new version.
+  The new version starts as draft with status: "draft", carrying a copy of
+  the source version's content.
+
+  `params` must be empty — this branches a version, it does not edit one.
+  Passing anything returns `{:error, :params_not_applied}`; save the changes
+  with `Posts.update_post/4` against the version this returns.
 
   Note: For more control over which version to branch from, use `create_version_from/5`.
   """
@@ -158,7 +162,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   """
   @spec publish_version(String.t(), String.t(), integer(), keyword()) :: :ok | {:error, any()}
   def publish_version(group_slug, post_uuid, version, opts \\ []) do
-    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil ->
         ActivityLog.log_failed_mutation(
           "publishing.version.published",
@@ -225,7 +229,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   """
   @spec unpublish_post(String.t(), String.t(), keyword()) :: :ok | {:error, any()}
   def unpublish_post(group_slug, post_uuid, opts \\ []) do
-    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil ->
         ActivityLog.log_failed_mutation(
           "publishing.post.unpublished",
@@ -323,7 +327,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   defp archive_other_published_versions!(repo, versions, target_version_number) do
     for v <- versions,
         v.version_number != target_version_number,
-        v.status == "published" do
+        Constants.published?(v.status) do
       case DBStorage.update_version(v, %{status: "archived"}) do
         {:ok, _} -> :ok
         {:error, reason} -> repo.rollback(reason)
@@ -334,8 +338,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   defp publish_and_activate!(repo, db_post, target_version) do
     publish_attrs =
       if target_version.published_at,
-        do: %{status: "published"},
-        else: %{status: "published", published_at: UtilsDate.utc_now()}
+        do: %{status: Constants.status_published()},
+        else: %{status: Constants.status_published(), published_at: UtilsDate.utc_now()}
 
     case DBStorage.update_version(target_version, publish_attrs) do
       {:ok, published_version} ->
@@ -484,12 +488,13 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   @spec delete_version(String.t(), String.t(), integer(), keyword() | map()) ::
           :ok | {:error, term()}
   def delete_version(group_slug, post_uuid, version, opts \\ []) do
-    with db_post when not is_nil(db_post) <- DBStorage.get_post_by_uuid(post_uuid, [:group]),
+    with db_post when not is_nil(db_post) <-
+           DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]),
          db_version when not is_nil(db_version) <- DBStorage.get_version(db_post.uuid, version),
          :ok <- validate_version_deletable(db_post, db_version) do
       broadcast_id = db_post.uuid
 
-      case DBStorage.update_version(db_version, %{status: "archived"}) do
+      case archive_deleted_version(db_post, db_version) do
         {:ok, _} ->
           ListingCache.regenerate(group_slug)
           PublishingPubSub.broadcast_version_deleted(group_slug, broadcast_id, version)
@@ -557,6 +562,46 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     end
   end
 
+  # "Not the live one" is checked before the write, and between those two
+  # moments someone else can publish the very version being deleted —
+  # `publish_version/4` and `unpublish_post/3` both take the post row's lock
+  # for exactly this reason, and this path did not. The loser archived a
+  # version the winner had just made live, leaving `active_version_uuid`
+  # pointing at an archived row: the public page kept serving it (the join is
+  # on the pointer, not the status) while the admin list called it a draft,
+  # and `stale_fixer` doesn't repair that shape because the pointer isn't nil.
+  #
+  # Same lock, same re-read under it, and the deletion loses the race instead
+  # of silently winning it.
+  defp archive_deleted_version(db_post, db_version) do
+    repo = PhoenixKit.RepoHelper.repo()
+
+    repo.transaction(fn ->
+      lock_post!(repo, db_post.uuid)
+
+      fresh_post = DBStorage.get_post_by_uuid(db_post.uuid)
+      fresh_version = DBStorage.get_version(db_post.uuid, db_version.version_number)
+
+      archive_under_lock!(repo, fresh_post, fresh_version)
+    end)
+  end
+
+  defp archive_under_lock!(repo, fresh_post, fresh_version) do
+    cond do
+      is_nil(fresh_version) ->
+        repo.rollback(:not_found)
+
+      fresh_post && fresh_post.active_version_uuid == fresh_version.uuid ->
+        repo.rollback(:cannot_delete_live)
+
+      true ->
+        case DBStorage.update_version(fresh_version, %{status: "archived"}) do
+          {:ok, updated} -> updated
+          {:error, reason} -> repo.rollback(reason)
+        end
+    end
+  end
+
   defp validate_version_deletable(db_post, db_version) do
     cond do
       db_post.active_version_uuid == db_version.uuid ->
@@ -587,8 +632,19 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   # Private helpers
   # ===========================================================================
 
+  # Both public entry points have always taken a `params` map, documented as
+  # "content and metadata updates are applied to the new version", and neither
+  # ever applied it — the argument reached here and was dropped. Every caller
+  # in this repo passes an empty map, so nothing lost work; an integration that
+  # trusted the docs would have watched a version get cloned over the edit it
+  # thought it was saving, and been handed a success tuple saying otherwise.
+  # Say no out loud instead: branch, then save through the normal update path.
+  defp create_version_in_db(_group_slug, _post_uuid, _source_version, params, _opts)
+       when params not in [nil, %{}],
+       do: {:error, :params_not_applied}
+
   defp create_version_in_db(group_slug, post_uuid, source_version, _params, opts) do
-    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil -> {:error, :post_not_found}
       db_post -> do_create_version(group_slug, post_uuid, db_post, source_version, opts)
     end

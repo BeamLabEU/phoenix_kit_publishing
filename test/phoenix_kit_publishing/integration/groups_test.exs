@@ -237,12 +237,12 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
 
       {:ok, updated} =
         Groups.update_group(group["slug"], %{
-          "show_tags" => "true",
+          "show_post_count" => "true",
           "post_width" => "wide",
           "listing_sort" => "oldest"
         })
 
-      assert updated["show_tags"] == true
+      assert updated["show_post_count"] == true
       assert updated["post_width"] == "wide"
       assert updated["listing_sort"] == "oldest"
     end

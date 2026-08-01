@@ -17,8 +17,11 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
 
+  @status_published Constants.status_published()
+
   @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -53,7 +56,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     date = if is_binary(date), do: Date.from_iso8601!(date), else: date
 
     group_slug
-    |> DBStorage.list_posts_timestamp_mode("published", date: date)
+    |> DBStorage.list_posts_timestamp_mode(Constants.status_published(), date: date)
     |> Enum.map(&(Time.to_string(&1.post_time) |> String.slice(0, 5)))
     |> Enum.uniq()
     |> Enum.sort()
@@ -333,7 +336,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   @spec restore_post(String.t(), String.t(), keyword() | map()) ::
           {:ok, String.t()} | {:error, term()}
   def restore_post(group_slug, post_uuid, opts \\ []) do
-    case DBStorage.get_post_by_uuid(post_uuid) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid) do
       nil ->
         ActivityLog.log_failed_mutation(
           "publishing.post.restored",
@@ -383,7 +386,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   @spec trash_post(String.t(), String.t(), keyword() | map()) ::
           {:ok, String.t()} | {:error, term()}
   def trash_post(group_slug, post_uuid, opts \\ []) do
-    case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
+    case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil ->
         ActivityLog.log_failed_mutation(
           "publishing.post.trashed",
@@ -660,6 +663,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
          post_slug
        ) do
     final_attrs = resolve_timestamp_in_transaction(post_attrs, mode, group_slug)
+    content = Shared.fetch_option(opts, :content) || ""
 
     with {:ok, db_post} <- DBStorage.create_post(final_attrs),
          {:ok, db_version} <-
@@ -667,19 +671,32 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
              post_uuid: db_post.uuid,
              version_number: 1,
              status: "draft",
-             created_by_uuid: created_by_uuid
+             created_by_uuid: created_by_uuid,
+             data: initial_version_data(content)
            }),
          {:ok, _content} <-
            DBStorage.create_content(%{
              version_uuid: db_version.uuid,
              language: primary_language,
              title: Shared.fetch_option(opts, :title) || "",
-             content: Shared.fetch_option(opts, :content) || "",
+             content: content,
              url_slug: post_slug
            }) do
       db_post
     else
       {:error, reason} -> repo.rollback(reason)
+    end
+  end
+
+  # The body is the only source of tags, so a create that carries content has
+  # to derive them too — the editor's first save would otherwise be what
+  # "registers" the tags, and a post created with content in one shot (import,
+  # API, fixtures) rendered its #hashtags as archive links while being missing
+  # from those very archives.
+  defp initial_version_data(content) do
+    case Hashtags.extract(content) do
+      [] -> %{}
+      tags -> %{"tags" => tags}
     end
   end
 
@@ -938,15 +955,13 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         do_update_post_in_db(db_post, post, params, group_slug, nil, audit_meta)
 
       true ->
+        # The slug used to be written here, before the transaction below — so a
+        # save that failed on its content (an over-long title, say) still moved
+        # the post to its new address. The UI reported a failed save while the
+        # old URL had already stopped working, and the redirect that would have
+        # covered it is recorded by the part that rolled back.
         desired_slug = Map.get(params, "slug", post.slug)
-
-        case maybe_update_db_slug(db_post, desired_slug, group_slug) do
-          {:ok, final_slug} ->
-            do_update_post_in_db(db_post, post, params, group_slug, final_slug, audit_meta)
-
-          {:error, _reason} = error ->
-            error
-        end
+        do_update_post_in_db(db_post, post, params, group_slug, desired_slug, audit_meta)
     end
   rescue
     e ->
@@ -1020,7 +1035,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  defp do_update_post_in_db(db_post, post, params, group_slug, final_slug, audit_meta) do
+  defp do_update_post_in_db(db_post, post, params, group_slug, desired_slug, audit_meta) do
     version_number = post[:version] || 1
     version = DBStorage.get_version(db_post.uuid, version_number)
 
@@ -1045,11 +1060,13 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         post: post,
         db_post: db_post,
         audit_meta: audit_meta,
-        legacy_promotions: legacy_promotions
+        legacy_promotions: legacy_promotions,
+        desired_slug: desired_slug,
+        group_slug: group_slug
       }
 
       with :ok <- validate_title_for_publish(language, new_status, new_title),
-           {:ok, db_post} <- persist_post_update(version, write_ctx) do
+           {:ok, {db_post, final_slug}} <- persist_post_update(version, write_ctx) do
         log_legacy_metadata_promoted(legacy_promotions, version, language)
         read_updated_post(db_post, group_slug, final_slug, language, version_number)
       end
@@ -1068,7 +1085,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     repo = PhoenixKit.RepoHelper.repo()
 
     repo.transaction(fn ->
-      with :ok <-
+      with {:ok, final_slug} <- resolve_slug_in_tx(ctx),
+           :ok <-
              upsert_post_content(
                version,
                ctx.language,
@@ -1079,16 +1097,23 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
              ),
            :ok <- update_version_defaults(version, ctx.params, ctx.post, ctx.legacy_promotions),
            {:ok, synced} <- maybe_sync_datetime_and_audit(ctx.db_post, ctx.params, ctx.audit_meta) do
-        synced
+        {synced, final_slug}
       else
         {:error, reason} -> repo.rollback(reason)
       end
     end)
   end
 
+  # Timestamp-mode posts have no slug to move; slug-mode ones rename here so
+  # the rename shares the fate of everything else in the save.
+  defp resolve_slug_in_tx(%{desired_slug: nil}), do: {:ok, nil}
+
+  defp resolve_slug_in_tx(ctx),
+    do: maybe_update_db_slug(ctx.db_post, ctx.desired_slug, ctx.group_slug)
+
   @default_title Constants.default_title()
 
-  defp validate_title_for_publish(language, "published", title)
+  defp validate_title_for_publish(language, @status_published, title)
        when title in ["", @default_title] do
     primary_language = LanguageHelpers.get_primary_language()
 
@@ -1133,6 +1158,12 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
     resolved_url_slug =
       case Map.fetch(params, "url_slug") do
+        # A key that's present but empty means "leave it alone", not "clear
+        # it". Taking it literally blanked the content row's slug AND filed
+        # the old one as a previous slug, so the post lost its URL and gained
+        # a redirect pointing at nothing. The editor always sends a string, so
+        # this is about programmatic callers passing a partial map.
+        {:ok, val} when val in [nil, ""] -> existing_url_slug
         {:ok, val} -> val
         :error -> existing_url_slug
       end
@@ -1298,9 +1329,17 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         Map.get(params, "description", post_metadata[:description])
       )
       |> maybe_put_version_field("seo_title", Map.get(params, "seo_title"))
-      |> maybe_put_version_field("tags", Map.get(params, "tags"))
+      |> maybe_put_version_field("tags", resolve_tags(version, params))
+      |> maybe_put_version_field("category_uuids", resolve_category_uuids(params))
       |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
       |> maybe_put_version_field("featured", normalize_featured(Map.get(params, "featured")))
+      # Public `?v=N` browsing is gated on this and the mapper reads it, but no
+      # write path existed — so the setting could never actually be turned on.
+      |> maybe_put_version_field(
+        "allow_version_access",
+        normalize_featured(Map.get(params, "allow_version_access"))
+      )
+      |> put_audio_uuid(Map.get(params, "audio_uuid"))
 
     # Also update version-level status and published_at if provided.
     # "published" is NEVER written here — it is set atomically with
@@ -1310,7 +1349,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     # "published" with no active version — admin shows published, public 404s (M4).
     version_attrs =
       %{data: new_data}
-      |> maybe_put(:status, deferred_publish_status(Map.get(params, "status")))
+      |> maybe_put(:status, save_writable_status(version, Map.get(params, "status")))
       |> maybe_put(:published_at, parse_published_at_from_params(params))
 
     case DBStorage.update_version(version, version_attrs) do
@@ -1321,6 +1360,51 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   defp maybe_put_version_field(data, _key, nil), do: data
   defp maybe_put_version_field(data, key, value), do: Map.put(data, key, value)
+
+  # nil = the field wasn't submitted, leave it alone. "" = the picker was
+  # cleared, so DROP the key instead of storing a blank every reader has to
+  # special-case. Dropping is safe for this key specifically because
+  # "audio_uuid" is not in @legacy_promotable_keys — for a promotable key
+  # (e.g. featured_image_uuid) an absent key is the signal to re-promote the
+  # legacy content-level value, so deleting would resurrect what the user
+  # just cleared.
+  defp put_audio_uuid(data, nil), do: data
+
+  defp put_audio_uuid(data, value) when is_binary(value) do
+    if String.trim(value) == "",
+      do: Map.delete(data, "audio_uuid"),
+      else: Map.put(data, "audio_uuid", value)
+  end
+
+  defp put_audio_uuid(data, _value), do: data
+
+  # Tags ARE body hashtags (boss call 2026-07-28), and the body is their ONLY
+  # source: a save carrying content re-derives the version's tags as the union
+  # of hashtags across all of its language bodies (the just-saved row is
+  # already upserted in this transaction, so a fresh read sees it); a save
+  # without content leaves tags alone. A caller-supplied "tags" list is
+  # deliberately ignored — a second way to set tags would let a post carry a
+  # tag that appears nowhere in its prose, which is exactly the state the
+  # post page can no longer display now that the chip row is gone.
+  defp resolve_tags(version, params) do
+    if is_binary(Map.get(params, "content")) do
+      DBStorage.batch_load_contents([version.uuid])
+      |> Map.get(version.uuid, [])
+      |> Hashtags.extract_all()
+    end
+  end
+
+  # Categories filed against this version. `nil` (key absent) leaves the
+  # existing filing alone, so a save that doesn't carry the field — an
+  # autosave from a context that never loaded the picker, a translation
+  # write — can't quietly unfile a post. An empty list is a real answer:
+  # somebody removed the last chip, and that has to stick.
+  defp resolve_category_uuids(params) do
+    case Map.get(params, "category_uuids") do
+      list when is_list(list) -> list |> Enum.filter(&is_binary/1) |> Enum.uniq()
+      _ -> nil
+    end
+  end
 
   # Normalizes the editor's "featured" checkbox into a boolean for version.data.
   # `nil` (key absent) is preserved so a save that doesn't carry the field leaves
@@ -1334,8 +1418,41 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # Drop a "published" status so it is never written outside publish_version/4's
   # atomic transaction (see update_version_defaults/4). draft/archived/nil pass
   # through unchanged.
-  defp deferred_publish_status("published"), do: nil
+  defp deferred_publish_status(@status_published), do: nil
   defp deferred_publish_status(status), do: status
+
+  # The same reservation, in the other direction.
+  #
+  # A save carries the whole form, and a form is a snapshot of what the page
+  # knew when it loaded. Open a draft in two languages, publish from one, and
+  # the other still holds `status => "draft"`; its next autosave writes that
+  # back over the version the publish just made live. The post is then live by
+  # its pointer and a draft by its status — the public page still serves it,
+  # because the join follows the pointer, while the admin list says draft and
+  # `stale_fixer` won't repair it (it only heals a missing pointer).
+  #
+  # Taking a version down is `unpublish_post/3`'s job, where it happens under
+  # the post lock together with the pointer. So a plain save may set any status
+  # on a version that isn't live, and none at all on the one that is.
+  defp save_writable_status(version, status) do
+    status = deferred_publish_status(status)
+
+    if status && demotes_live_version?(version, status) do
+      nil
+    else
+      status
+    end
+  end
+
+  defp demotes_live_version?(%{uuid: version_uuid, post_uuid: post_uuid}, status)
+       when status in ["draft", "archived"] do
+    case DBStorage.get_post_by_uuid(post_uuid) do
+      %{active_version_uuid: ^version_uuid} -> true
+      _ -> false
+    end
+  end
+
+  defp demotes_live_version?(_version, _status), do: false
 
   defp parse_published_at_from_params(params) do
     case Map.get(params, "published_at") do

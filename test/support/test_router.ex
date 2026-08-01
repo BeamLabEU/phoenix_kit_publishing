@@ -45,6 +45,7 @@ defmodule PhoenixKitPublishing.Test.Router do
       live("/", Index, :index, as: :publishing_index)
       live("/new-group", New, :new, as: :publishing_new)
       live("/edit-group/:group", Edit, :edit, as: :publishing_edit_group)
+      live("/categories/:group", CategoriesLive, :index, as: :publishing_categories)
       live("/:group", Listing, :group, as: :publishing_listing)
       live("/:group/edit", Editor, :edit, as: :publishing_editor_root)
       live("/:group/new", Editor, :new, as: :publishing_editor_new)
@@ -73,6 +74,11 @@ defmodule PhoenixKitPublishing.Test.Router do
     get("/:language/:group/*path", PhoenixKit.Modules.Publishing.Web.Controller, :show)
     get("/:group", PhoenixKit.Modules.Publishing.Web.Controller, :show)
     get("/:group/*path", PhoenixKit.Modules.Publishing.Web.Controller, :show)
+    # Root-form only: production's RouterDispatch discriminator decides
+    # localized-vs-root per request; this flat router can't, and a
+    # "/:language/:group/*path" POST here would swallow 2-segment root
+    # posts as language+group. Tests submit prefixless.
+    post("/:group/*path", PhoenixKit.Modules.Publishing.Web.Controller, :create_comment)
   end
 
   # Pulls a test-configured scope out of the calling test process's

@@ -166,7 +166,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
       versions
       |> Enum.sort(:desc)
       |> Enum.find(fn version ->
-        Publishing.get_version_status(group_slug, post_slug, version, language) == "published"
+        Constants.published?(
+          Publishing.get_version_status(group_slug, post_slug, version, language)
+        )
       end)
 
     case published_version do
@@ -338,17 +340,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   # 302-ping-pong between each other forever.
   defp published_timestamp_url(group_slug, identifier, date, time, lang) do
     with {:ok, post} <- Publishing.read_post(group_slug, identifier, lang),
-         true <- post.metadata.status == "published" and not future_timestamp_post?(post) do
+         true <- Constants.published?(post.metadata.status) and not future_timestamp_post?(post) do
       {:ok, build_timestamp_url(group_slug, date, time, lang)}
     else
       _ -> nil
     end
   end
 
-  defp future_timestamp_post?(post) do
-    Constants.timestamp_mode?(post[:mode]) and post[:date] != nil and
-      Date.compare(post[:date], Date.utc_today()) == :gt
-  end
+  defp future_timestamp_post?(post), do: Constants.scheduled_ahead?(post)
 
   # ============================================================================
   # Helper Functions

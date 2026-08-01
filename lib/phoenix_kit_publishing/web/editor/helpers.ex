@@ -134,7 +134,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   Builds the public URL for a post.
   """
   def build_public_url(post, language) do
-    if Map.get(post.metadata, :status) == "published" do
+    if Constants.published?(Map.get(post.metadata, :status)) do
       build_url_for_mode(post, language)
     else
       nil
@@ -193,6 +193,58 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
     # already sanitised in alt_from_filename/1.)
     safe_uuid = String.replace(file_uuid, ~r/[^0-9a-fA-F-]/, "")
     ~s(\n<Image file_uuid="#{safe_uuid}" alt="#{alt_from_file(file_uuid)}"/>\n)
+  end
+
+  @doc """
+  Marks the editor clean — to us AND to Leaf.
+
+  "The content is saved now" has to be said twice, because two things track
+  it independently: `has_pending_changes`, which drives the badge and arms
+  autosave, and Leaf's own snapshot, which drives its navigation guard. Only
+  the first was ever set, so the guard believed every saved post still had
+  unsaved work and challenged the reader on every refresh and every attempt
+  to leave.
+
+  One function rather than a line at each of the dozen places that go clean,
+  because that is exactly the shape that drifted the first time.
+
+  Ordering is deliberate: `send_update` is processed after the current
+  handler returns, so Leaf's re-baseline lands after any `set-content` this
+  same pipeline pushed. Reversed, it would snapshot the content being
+  replaced and read dirty immediately.
+  """
+  def mark_clean(socket) do
+    Phoenix.LiveView.send_update(Leaf, id: "content-editor", action: :mark_saved)
+    Phoenix.Component.assign(socket, :has_pending_changes, false)
+  end
+
+  @doc """
+  A `<Gallery>` block wrapping one `<Image>` line per chosen file.
+
+  Uuids rather than signed URLs: the URL is then resolved at render time, so
+  the post survives a change of storage prefix or signing secret instead of
+  carrying a frozen link that quietly rots.
+  """
+  def gallery_markup(file_uuids) when is_list(file_uuids) do
+    lines =
+      file_uuids
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map_join("\n", fn uuid ->
+        safe = String.replace(uuid, ~r/[^0-9a-fA-F-]/, "")
+        ~s(<Image file_uuid="#{safe}" alt="#{alt_from_file(uuid)}"/>)
+      end)
+
+    ~s(\n<Gallery height="520" radius="420" turns="2">\n#{lines}\n</Gallery>\n)
+  end
+
+  @doc """
+  An inline `<Audio>` player for a chosen file. Distinct from the sidebar's
+  "Audio version", which is the whole post read aloud — this one drops a
+  player at the cursor.
+  """
+  def audio_component_markup(file_uuid) when is_binary(file_uuid) do
+    safe = String.replace(file_uuid, ~r/[^0-9a-fA-F-]/, "")
+    ~s(\n<Audio file_uuid="#{safe}" title="#{alt_from_file(file_uuid)}"/>\n)
   end
 
   defp alt_from_file(file_uuid) do

@@ -409,6 +409,8 @@ Add new error atoms by extending `@type error_atom`, the doctest example, and ad
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group override for the render cache |
 | `publishing_show_language_switcher` | `true` | Render the in-page language switcher on listing + post pages. Disable when the host layout already provides one (see "Language switcher integration" below) |
 | `publishing_render_og_tags` | `true` | Render OpenGraph + Twitter Card meta tags **in-page** (inside the public body) so social previews work even when the host root layout doesn't render the forwarded `:og` assign in `<head>`. Disable when the host renders `:og` in `<head>` itself, to avoid duplicate tags (see "OpenGraph metadata" below) |
+| `publishing_feeds_enabled` | `true` | Serve an RSS 2.0 feed per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the requested language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → feed URLs 404 (never the smart fallback — a feed URL must not redirect to HTML) |
+| `publishing_render_jsonld` | `true` | Emit a schema.org `Article` JSON-LD script in-page on post pages (same body-placement rationale as the OG tags; built from the same refined `:og` map). `escape: :html_safe` on the encode so no value can close the script tag early |
 
 ### Per-group display settings (group `data` JSONB)
 
@@ -448,13 +450,16 @@ a11y-safe cover); `minimal` = text-only accent-border editorial band; `top` =
 strength, band height, and text placement are deliberately hardcoded (5-AI
 panel consensus: good defaults over option bloat).
 
-**Admin post-status classification** (2026-07-21): the admin group page
-classifies each post by its LIVE state — `list_posts_with_metadata` passes an
-`:effective_status` override ("published" iff the post's ACTIVE version exists
-and is published, the same rule the public `list_posts_for_listing` applies) —
-while still mapping the LATEST version for editing context. Deliberate split:
-`metadata.status` is the post-level truth (tabs/counts/status select), the
-per-language/per-version maps stay version-accurate. Versions are an ARCHIVAL
+**Admin post-status classification** (2026-07-21; title added 2026-07-27):
+the admin group page shows each post by its LIVE state —
+`list_posts_with_metadata` passes `:effective_status`,
+`:effective_published_at`, AND `:effective_title` overrides (all read from
+the ACTIVE published version, the same rule the public
+`list_posts_for_listing` applies) — while still mapping the LATEST version
+for editing context. Deliberate split: `metadata.status`/`title`/publish
+date are the card-level truth (what readers see), the
+per-language/per-version maps stay version-accurate so the editor lands on
+the newest draft. Versions are an ARCHIVAL
 tool here (retain old legal text, branch a rewrite) — do not surface
 "unpublished edits" style pending-work flags in listings (boss call).
 
@@ -467,13 +472,10 @@ uuid-keyed — the public group map exposes `"uuid"` for this). One field
 per-merge `:group_updated` broadcast (see `log_translated/3`). The Edit Group
 LV wires it via `AITranslate.Embed` + `FormGlue` with a params-map
 `GroupAITranslateBinding` (deliberately not `@behaviour` — the callbacks type
-an Ecto changeset). ⚠️ The tabs render through a **forward-compat dodge**
-(`ai_tabs/1` in `web/edit.ex`): phoenix_kit_ai's `ai_multilang_tabs/1` is
-unreleased — the dodge dispatches to it when exported and otherwise renders
-the identical hand-placed layout from components that exist in the published
-0.16.0, so the Hex pin keeps compiling. **TODO(floor-bump): when the
-phoenix_kit_ai floor includes the release shipping `ai_multilang_tabs`, delete
-the dodge and import the component directly.**
+an Ecto changeset). The editor imports `ai_multilang_tabs/1` directly —
+shipped in phoenix_kit_ai **0.17.0** (2026-07-21), and the mix.exs floor is
+`~> 0.17` accordingly. (The interim forward-compat dodge that let 0.4.3 build
+against 0.16.0 was dropped once the release landed.)
 
 Two write-path behaviors to know: `update_group/3` is **lenient** (an
 out-of-whitelist enum value is ignored, a non-truthy bool becomes `false` — the
@@ -531,6 +533,26 @@ same fetched group map also feeds the controller's
 `assign_group_display_config/2`, one fetch per request), and the all-groups
 overview cards. Admin surfaces intentionally show the canonical primary-language
 name. `display_settings_render_test.exs` pins the reach.
+
+## Comments (optional seam)
+
+`PhoenixKit.Modules.Publishing.Comments` is a guarded seam to the optional
+`phoenix_kit_comments` package (same posture as the `phoenix_kit_og` seam —
+no dep in mix.exs except `only: :test`; every call `Code.ensure_loaded?` +
+rescued). When the module is installed AND enabled AND a group's
+`comments_enabled` setting is on, post pages render a dead-view comment
+thread (`resource_type "publishing_post"`, sanitized markdown via the
+comments module's renderer) and a plain POST form — Phoenix-first, no JS.
+Submission rides new POST routes in core's publishing dispatch scope
+(method-agnostic rewrite) to `Controller.create_comment/2`, guarded in
+order: module/public/group gates → honeypot (`website` field; filled =
+pretend success) → signed time-trap (`Phoenix.Token`, 3s–1day window) →
+post-in-published-set check → logged-in user. Every outcome redirects back
+with a flash. **Logged-in only for now** — the comments schema
+`validate_required`s `user_uuid`; guest commenting is a cross-repo
+follow-up (nullable user + author fields in BeamLab's comments module).
+Moderation uses the comments module's own admin (statuses + bulk updates);
+a publishing-scoped moderation surface is a follow-up.
 
 ## Language switcher integration
 
@@ -681,8 +703,8 @@ PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` direct
 
 ## External Dependencies
 
-- **PhoenixKit** (`~> 1.7.132`) — Module behaviour, Settings API, shared components, RepoHelper
-- **PhoenixKitAI** (`~> 0.3`) — the AI-translation pipeline lives here (moved out of core): the
+- **PhoenixKit** (`~> 1.7.189`) — Module behaviour, Settings API, shared components, RepoHelper
+- **PhoenixKitAI** (`~> 0.17`) — the AI-translation pipeline lives here (moved out of core): the
   `PhoenixKitAI.Translatable` adapter behaviour (publishing's `AITranslatable` implements it),
   `PhoenixKitAI.{Translations,TranslateWorker,Translation}`, and the `AITranslate` modal UI. The
   per-language Oban fan-out + the LLM call (`PhoenixKitAI.ask_with_prompt/4`, OpenRouter) are owned

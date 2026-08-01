@@ -33,12 +33,16 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @scrollbar_styles Constants.scrollbar_styles()
   @default_listing_sort Constants.default_listing_sort()
   @listing_sorts Constants.listing_sorts()
+  @default_listing_layout Constants.default_listing_layout()
+  @listing_layouts Constants.listing_layouts()
   @default_timeline_granularity Constants.default_timeline_granularity()
   @timeline_granularities Constants.timeline_granularities()
   @default_post_date_position Constants.default_post_date_position()
   @post_date_positions Constants.post_date_positions()
   @default_post_width Constants.default_post_width()
   @post_widths Constants.post_widths()
+  @default_notes_style Constants.default_notes_style()
+  @notes_styles Constants.notes_styles()
   @type_regex ~r/^[a-z][a-z0-9-]{0,31}$/
 
   @type_item_names %{
@@ -293,8 +297,10 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # not a hand-maintained copy).
   @bool_setting_keys ~w(featured_enabled newest_enabled scroll_progress_enabled
                         scroll_headings_enabled scroll_timeline_enabled show_breadcrumbs
-                        show_featured_image show_reading_time show_tags show_post_count
-                        show_top_back_link listing_image_links listing_animations)
+                        show_featured_image show_reading_time show_post_count
+                        show_top_back_link listing_image_links listing_animations
+                        show_prev_next search_enabled show_categories
+                        views_enabled show_view_counts comments_enabled)
   @enum_settings [
     {"featured_layout", @featured_layouts},
     {"featured_style", @band_styles},
@@ -303,8 +309,10 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     {"scrollbar_style", @scrollbar_styles},
     {"scroll_timeline_granularity", @timeline_granularities},
     {"listing_sort", @listing_sorts},
+    {"listing_layout", @listing_layouts},
     {"post_date_position", @post_date_positions},
-    {"post_width", @post_widths}
+    {"post_width", @post_widths},
+    {"notes_style", @notes_styles}
   ]
 
   @doc false
@@ -698,16 +706,23 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "scroll_timeline_granularity" =>
         Map.get(data, "scroll_timeline_granularity", @default_timeline_granularity),
       "listing_sort" => Map.get(data, "listing_sort", @default_listing_sort),
+      "listing_layout" => Map.get(data, "listing_layout", @default_listing_layout),
       "show_breadcrumbs" => Map.get(data, "show_breadcrumbs", false),
       "post_date_position" => Map.get(data, "post_date_position", @default_post_date_position),
       "post_width" => Map.get(data, "post_width", @default_post_width),
+      "notes_style" => Map.get(data, "notes_style", @default_notes_style),
       "show_featured_image" => Map.get(data, "show_featured_image", false),
       "show_reading_time" => Map.get(data, "show_reading_time", false),
-      "show_tags" => Map.get(data, "show_tags", false),
       "show_post_count" => Map.get(data, "show_post_count", false),
       "show_top_back_link" => Map.get(data, "show_top_back_link", true),
       "listing_image_links" => Map.get(data, "listing_image_links", true),
       "listing_animations" => Map.get(data, "listing_animations", true),
+      "show_prev_next" => Map.get(data, "show_prev_next", false),
+      "search_enabled" => Map.get(data, "search_enabled", false),
+      "show_categories" => Map.get(data, "show_categories", false),
+      "views_enabled" => Map.get(data, "views_enabled", false),
+      "show_view_counts" => Map.get(data, "show_view_counts", false),
+      "comments_enabled" => Map.get(data, "comments_enabled", false),
       "name_i18n" => name_i18n_map(data)
     }
   end

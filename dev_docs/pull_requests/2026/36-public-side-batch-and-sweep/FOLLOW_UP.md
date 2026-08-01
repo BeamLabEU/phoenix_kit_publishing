@@ -9,7 +9,7 @@ records what they found and what happened to each finding.
 
 | Finding | Severity | Outcome |
 |---|---|---|
-| Group editor imported unreleased `ai_multilang_tabs` — hard compile error against published phoenix_kit_ai 0.16.0 | CRITICAL | Fixed — forward-compat dodge (`ai_tabs/1`, function_exported? + apply per the document_creator/projects precedent). Standalone suite green against the Hex pin. Delete at floor bump (AGENTS.md TODO) |
+| Group editor imported unreleased `ai_multilang_tabs` — hard compile error against published phoenix_kit_ai 0.16.0 | CRITICAL | Resolved — phoenix_kit_ai 0.17.0 (2026-07-21) ships `ai_multilang_tabs`; the floor was raised to `~> 0.17` post-merge. (Interim history: a forward-compat dodge was built, removed at the boss's direction, and rode into the upstream 0.4.3 release via a merge race before the release made it moot) |
 | `GroupAITranslatable.put_translation` logged nothing, dropped the actor | HIGH | Fixed — `publishing.group.updated` (mode auto, actor from opts, locale-agnostic metadata) per merged language; pinned |
 | Per-merge `:group_updated` broadcast → N full listing reloads per translation run | MEDIUM | Fixed by removal — matches sibling adapters; core's `:translation_completed` carries the signal |
 | `broadcast_updated` bare rescue swallowed exceptions silently | MEDIUM | Moot — the broadcast (and its rescue) was removed |
@@ -38,9 +38,11 @@ records what they found and what happened to each finding.
 
 ## Gates
 
-`mix precommit` clean; **1237 tests / 0 failures** against BOTH the published
-phoenix_kit_ai 0.16.0 (no overrides) and the local checkout; features
-browser-verified in the parent app throughout the session.
+`mix precommit` clean; **1237 tests / 0 failures** at PR time against the
+local phoenix_kit_ai checkout (`PHOENIX_KIT_AI_PATH=../phoenix_kit_ai`);
+re-verified post-merge against the published phoenix_kit_ai 0.17.0 with no
+overrides once the gating release shipped. Features browser-verified in the
+parent app throughout the session.
 
 ## Open
 

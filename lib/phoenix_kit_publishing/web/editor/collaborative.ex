@@ -13,10 +13,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
   require Logger
 
-  # Lock expires after 30 minutes of inactivity
-  @lock_timeout_seconds 30 * 60
-  # Warn 5 minutes before expiration
-  @lock_warning_seconds 25 * 60
+  # How long an idle editor keeps the lock, in minutes. A setting because the
+  # right number is a fact about the team, not about the software: 30 minutes
+  # is generous for a newsroom passing a story around and impatient for
+  # someone drafting an essay over lunch. Whoever is waiting for the lock and
+  # whoever is thinking are the same person's colleagues.
+  @default_lock_timeout_minutes 30
+  # Always warn this long before it goes, so the notice is useful at any
+  # timeout rather than proportionally silly at short ones.
+  @lock_warning_lead_seconds 5 * 60
   # Check every minute
   @lock_check_interval_ms 60_000
 
@@ -48,7 +53,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
       subscribe_to_post_translations(socket)
       subscribe_to_post_versions(socket)
 
+      # Cleared up front: switching language or version rebuilds this socket
+      # around a different row, so a marker left over from the previous one
+      # would make the next promotion adopt a buffer for the wrong content.
       socket
+      |> clear_synced_from_owner()
       |> assign_editing_role(form_key)
       |> maybe_broadcast_editor_joined()
       |> maybe_load_spectator_state(form_key)
@@ -221,6 +230,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     |> Phoenix.Component.assign(:lock_owner_user, nil)
     |> Phoenix.Component.assign(:spectators, [])
     |> Phoenix.Component.assign(:other_viewers, [])
+    |> clear_synced_from_owner()
   end
 
   defp populate_presence_info(socket, form_key) do
@@ -363,10 +373,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     content =
       Map.get(form_state, :content) || Map.get(form_state, "content") || socket.assigns.content
 
+    # Unlike a live edit, this sync fires for every spectator the moment they
+    # arrive, whether or not the owner has touched anything. When the owner is
+    # simply sitting on the post, it carries exactly what this socket already
+    # read from the row — so calling that "unsaved changes" would badge a
+    # watcher who is looking at saved text, and would make a later promotion
+    # adopt-and-rewrite a paragraph nobody edited.
+    ahead? = content != socket.assigns.content or form != socket.assigns.form
+
     socket
     |> Phoenix.Component.assign(:form, form)
     |> Phoenix.Component.assign(:content, content)
-    |> Phoenix.Component.assign(:has_pending_changes, true)
+    |> then(fn socket ->
+      if ahead? do
+        socket
+        |> Phoenix.Component.assign(:has_pending_changes, true)
+        |> mark_synced_from_owner()
+      else
+        socket
+      end
+    end)
     |> Phoenix.LiveView.push_event("set-content", %{content: content})
     |> Phoenix.LiveView.push_event("form-updated", %{form: form})
   end
@@ -388,6 +414,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     socket
     |> Phoenix.Component.assign(:form, new_form)
     |> Phoenix.Component.assign(:post, updated_post)
+    |> mark_synced_from_owner()
     |> Phoenix.LiveView.push_event("form-updated", %{form: new_form})
   end
 
@@ -395,6 +422,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     socket
     |> Phoenix.Component.assign(:content, content)
     |> Phoenix.Component.assign(:form, form)
+    |> mark_synced_from_owner()
     |> Phoenix.LiveView.push_event("set-content", %{content: content})
     |> Phoenix.LiveView.push_event("form-updated", %{form: form})
   end
@@ -402,6 +430,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   def apply_remote_form_change(socket, _payload) do
     # Ignore unrecognized payload types
     socket
+  end
+
+  @doc """
+  Records that this socket is holding the owner's unsaved buffer.
+
+  A spectator mirrors the owner keystroke by keystroke, so between the owner's
+  last autosave and their next one, this socket is the only place that text
+  exists outside the owner's browser. If presence then promotes this spectator
+  — the owner closed the tab, lost the network, crashed — the promotion path
+  must adopt what it is already showing instead of re-reading the older saved
+  row, which would silently delete the difference.
+
+  The flag means "the buffer I hold is ahead of the database". It is set for
+  exactly the window that matters — from the owner's keystroke until their
+  autosave lands — because anything that brings this socket back in line with
+  the row clears it: a reload after someone else's save, or a promotion that
+  chose the saved copy.
+  """
+  def mark_synced_from_owner(socket) do
+    Phoenix.Component.assign(socket, :synced_from_owner?, true)
+  end
+
+  @doc """
+  Clears the ahead-of-database marker. See `mark_synced_from_owner/1`.
+  """
+  def clear_synced_from_owner(socket) do
+    Phoenix.Component.assign(socket, :synced_from_owner?, false)
   end
 
   # ============================================================================
@@ -465,12 +520,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
       cond do
         # Lock expired - release it
-        inactive_seconds >= @lock_timeout_seconds ->
+        inactive_seconds >= lock_timeout_seconds() ->
           release_lock_due_to_inactivity(socket)
 
         # Approaching expiration - warn user
-        inactive_seconds >= @lock_warning_seconds && !socket.assigns[:lock_warning_shown] ->
-          minutes_left = div(@lock_timeout_seconds - inactive_seconds, 60)
+        inactive_seconds >= lock_timeout_seconds() - @lock_warning_lead_seconds &&
+            !socket.assigns[:lock_warning_shown] ->
+          minutes_left = div(lock_timeout_seconds() - inactive_seconds, 60)
 
           socket
           |> Phoenix.Component.assign(:lock_warning_shown, true)
@@ -489,6 +545,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     else
       socket
     end
+  end
+
+  # Minutes, read per check so a change takes effect without a restart. Clamped
+  # low: a timeout under a minute would release the lock between keystrokes.
+  defp lock_timeout_seconds do
+    minutes =
+      case PhoenixKit.Settings.get_setting_cached("publishing_editor_lock_minutes") do
+        value when is_integer(value) and value > 0 ->
+          value
+
+        value when is_binary(value) ->
+          case Integer.parse(value) do
+            {n, _} when n > 0 -> n
+            _ -> @default_lock_timeout_minutes
+          end
+
+        _ ->
+          @default_lock_timeout_minutes
+      end
+
+    max(minutes, 1) * 60
   end
 
   @doc """

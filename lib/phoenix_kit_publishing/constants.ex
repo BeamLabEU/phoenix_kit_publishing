@@ -37,13 +37,70 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @doc "Returns true if mode is a slug mode (atom or string)."
   def slug_mode?(mode), do: mode in @slug_modes
 
+  @doc """
+  True when a timestamp-mode post is scheduled for later and must not be
+  public yet.
+
+  A timestamp post is identified by a date AND a time, and the schedule was
+  read as a date alone — so anything set for later today went public at
+  midnight. Nine in the morning is a normal time to line up an announcement
+  for six in the evening, and the listing carried its title, excerpt and
+  image from the moment the day started.
+
+  Three copies of the date-only test had drifted into the listing, the post
+  page and the fallback resolver. One predicate, so a scheduled post becomes
+  public at one moment on every path that asks.
+
+  Both comparisons are UTC, matching how the rows are stored and how the
+  editor writes them.
+  """
+  @spec scheduled_ahead?(map()) :: boolean()
+  def scheduled_ahead?(post) do
+    timestamp_mode?(post[:mode]) and post[:date] != nil and
+      DateTime.compare(scheduled_at(post[:date], post[:time]), DateTime.utc_now()) == :gt
+  end
+
+  defp scheduled_at(date, time) do
+    # No time means the whole day is fair game from its first minute — the
+    # old behaviour, kept for rows that predate a required post_time.
+    DateTime.new!(date, time || ~T[00:00:00], "Etc/UTC")
+  end
+
   # ---------------------------------------------------------------------------
   # Statuses
   # ---------------------------------------------------------------------------
 
-  @post_statuses ["draft", "published", "archived", "trashed"]
-  @content_statuses ["draft", "published", "archived"]
-  @group_statuses ["active", "trashed"]
+  @status_draft "draft"
+  @status_published "published"
+  @status_archived "archived"
+  @status_trashed "trashed"
+
+  @post_statuses [@status_draft, @status_published, @status_archived, @status_trashed]
+  @content_statuses [@status_draft, @status_published, @status_archived]
+  @group_statuses ["active", @status_trashed]
+
+  @doc ~S|The `"draft"` status.|
+  def status_draft, do: @status_draft
+
+  @doc ~S|The `"published"` status.|
+  def status_published, do: @status_published
+
+  @doc ~S|The `"archived"` status.|
+  def status_archived, do: @status_archived
+
+  @doc ~S|The `"trashed"` status.|
+  def status_trashed, do: @status_trashed
+
+  @doc """
+  True for the published status.
+
+  Note this is the *publishing* vocabulary. The comments module has its own
+  `"published"` status on a different table, and the two are unrelated — a
+  comment being published says nothing about the post it hangs off. Don't
+  reach for this when checking a comment.
+  """
+  @spec published?(String.t() | nil) :: boolean()
+  def published?(status), do: status == @status_published
 
   @doc "Valid post statuses: draft, published, archived, trashed."
   def post_statuses, do: @post_statuses
@@ -148,6 +205,24 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
 
   @doc ~S|Default public-listing sort order ("newest" first).|
   def default_listing_sort, do: @default_listing_sort
+
+  @listing_layouts ["grid", "list", "minimal"]
+  @default_listing_layout "grid"
+
+  @doc ~S|Valid public-listing layouts: "grid" (card grid), "list" (thumbnail rows), or "minimal" (date — title lines, no images).|
+  def listing_layouts, do: @listing_layouts
+
+  @doc ~S|Default public-listing layout ("grid").|
+  def default_listing_layout, do: @default_listing_layout
+
+  @notes_styles ["footnotes", "panel"]
+  @default_notes_style "footnotes"
+
+  @doc ~S|Valid author-note display styles: "footnotes" (numbered refs + a collected bottom section + hover popovers) or "panel" (clicking the phrase slides a right-side panel out with the note and its comments).|
+  def notes_styles, do: @notes_styles
+
+  @doc ~S|Default author-note display style ("footnotes" — the original layout).|
+  def default_notes_style, do: @default_notes_style
 
   @post_date_positions ["above", "below", "hidden"]
   @default_post_date_position "below"

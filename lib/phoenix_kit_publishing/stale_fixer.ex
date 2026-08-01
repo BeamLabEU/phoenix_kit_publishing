@@ -345,7 +345,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     active_uuid = post.active_version_uuid
     version = Enum.find(ctx.versions, &(&1.uuid == active_uuid))
 
-    if is_nil(version) or version.status != "published" do
+    if is_nil(version) or not Constants.published?(version.status) do
       Logger.info(
         "[Publishing] Clearing stale active_version_uuid for post #{post.uuid}: " <>
           "version #{inspect(active_uuid)} is #{if version, do: version.status, else: "missing"}"
@@ -745,7 +745,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   # version — the admin list shows it published while the public page 404s.
   # Demote those orphans back to draft so the two views agree.
   defp demote_orphaned_published_versions(%{active_version_uuid: nil} = post, ctx) do
-    orphans = Enum.filter(ctx.versions, &(&1.status == "published"))
+    orphans = Enum.filter(ctx.versions, &Constants.published?(&1.status))
 
     for v <- orphans do
       Logger.info(
@@ -761,7 +761,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   defp demote_orphaned_published_versions(_post, _ctx), do: :ok
 
   defp fix_multiple_published_versions(post, ctx) do
-    published = Enum.filter(ctx.versions, &(&1.status == "published"))
+    published = Enum.filter(ctx.versions, &Constants.published?(&1.status))
 
     if length(published) > 1 do
       # Keep the highest version number, archive the rest
@@ -800,7 +800,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   defp reconcile_active_version(post, versions) do
     active_version = Enum.find(versions, &(&1.uuid == post.active_version_uuid))
 
-    if is_nil(active_version) or active_version.status != "published" do
+    if is_nil(active_version) or not Constants.published?(active_version.status) do
       Logger.info(
         "[Publishing] Reconcile: post #{post.uuid} active_version_uuid points to " <>
           "#{if active_version, do: "#{active_version.status} version", else: "non-existent version"}, clearing"
@@ -813,7 +813,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   defp reconcile_trashed_post(%{trashed_at: nil}, _versions), do: :ok
 
   defp reconcile_trashed_post(post, versions) do
-    published_versions = Enum.filter(versions, &(&1.status == "published"))
+    published_versions = Enum.filter(versions, &Constants.published?(&1.status))
 
     if published_versions != [] do
       Logger.info(
@@ -828,7 +828,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   end
 
   defp demote_non_published_version_content(versions) do
-    non_published_versions = Enum.reject(versions, &(&1.status == "published"))
+    non_published_versions = Enum.reject(versions, &Constants.published?(&1.status))
 
     for v <- non_published_versions do
       demote_published_content(v.uuid)
@@ -839,7 +839,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   # Leaves "draft" and "archived" content untouched.
   defp demote_published_content(version_uuid) do
     contents = DBStorage.list_contents(version_uuid)
-    published = Enum.filter(contents, &(&1.status == "published"))
+    published = Enum.filter(contents, &Constants.published?(&1.status))
 
     if published != [] do
       Logger.info(

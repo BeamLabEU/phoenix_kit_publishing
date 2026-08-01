@@ -132,9 +132,20 @@ Application.put_env(:phoenix_kit_publishing, :test_repo_available, repo_availabl
 # via `elixirc_paths(:test)` so we don't need to load them explicitly.
 if repo_available do
   {:ok, _} = PhoenixKitPublishing.Test.Endpoint.start_link()
+  {:ok, _} = PhoenixKitPublishing.Test.DispatchEndpoint.start_link()
 end
 
 # Exclude integration tests when DB is not available
 exclude = if repo_available, do: [], else: [:integration]
+
+# Tests for behaviour that exists in local core but not in the released pin
+# `mix.exs` resolves to. They fail against Hex not because anything is wrong
+# but because the feature isn't there yet, so the default run skips them:
+#
+#     PHOENIX_KIT_PATH=../phoenix_kit mix test --include needs_unreleased_core
+#
+# Currently: the media selector's `lock_file_type` (audio-only picker).
+# Delete the tag from the tests and this line once core ships it.
+exclude = exclude ++ [:needs_unreleased_core]
 
 ExUnit.start(exclude: exclude)

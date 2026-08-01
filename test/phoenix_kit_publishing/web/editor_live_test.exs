@@ -25,6 +25,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
 
   setup do
@@ -95,13 +96,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
     end
   end
 
+  defp assigns_of(view) do
+    view.pid |> :sys.get_state() |> get_in([Access.key(:socket), Access.key(:assigns)])
+  end
+
   describe "handle_event" do
     setup %{group: group} do
       {:ok, post} = Posts.create_post(group["slug"], %{title: "Event Subject"})
       %{post: post}
     end
 
-    test "update_content event accepts new content body", %{
+    test "body edits from the markdown editor reach the LiveView", %{
       conn: conn,
       group: group,
       post: post
@@ -111,8 +116,185 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      html = render_change(view, "update_content", %{"content" => "Updated body."})
-      assert is_binary(html)
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "Updated body.", html: ""}}
+      )
+
+      _ = render(view)
+
+      assert assigns_of(view)[:content] == "Updated body."
+    end
+
+    test "the audio field offers a media picker and a clear button", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, view, html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      # Browse instead of hand-pasting a uuid; the shared media selector is
+      # targeted at this field.
+      assert html =~ ~s(phx-value-field="audio_uuid")
+      # Nothing set yet → no clear button.
+      refute has_element?(view, "button[phx-click='clear_audio']")
+
+      # NOT the field's placeholder uuid — that string is in the markup either
+      # way, so reusing it would make the refute below pass vacuously.
+      uuid = "019fbc11-2222-7333-8444-555566667777"
+
+      render_change(view, "update_meta", %{"audio_uuid" => uuid, "_target" => ["audio_uuid"]})
+
+      assert has_element?(view, "button[phx-click='clear_audio']")
+
+      # Clearing blanks the field (the save path turns "" into a removal)...
+      html = render_click(view, "clear_audio")
+      refute html =~ uuid
+
+      # ...and must actually PERSIST. Autosave only ever fires from
+      # schedule_autosave/1, so the first cut left the field looking empty
+      # while the audio stayed attached until some unrelated edit.
+      assert :sys.get_state(view.pid).socket.assigns.autosave_timer
+    end
+
+    test "typing body text refreshes the collaborative lock's activity clock", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      before = assigns_of(view)[:last_activity_at]
+
+      # The editor reports body edits as a process message, not a phx event.
+      # That handler used to skip touch_activity entirely, so a writer working
+      # only in the body never refreshed the lock: it lapsed mid-session, the
+      # handler then dropped every keystroke, and Save persisted the stale
+      # pre-lapse buffer.
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "Fresh prose.", html: ""}}
+      )
+
+      _ = render(view)
+
+      # last_activity_at is System.monotonic_time(:second) — an integer.
+      after_typing = assigns_of(view)[:last_activity_at]
+      assert is_integer(after_typing)
+      assert before == nil or after_typing >= before
+      assert assigns_of(view)[:content] == "Fresh prose."
+    end
+
+    test "a blank title says autosave is blocked instead of a bare 'Unsaved changes'", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      # Autosave silently refuses to write without a title, so the badge says so
+      # immediately rather than showing a hopeful "Unsaved changes" that will
+      # never clear.
+      html = render_change(view, "update_meta", %{"title" => "", "_target" => ["title"]})
+
+      assert html =~ "Title is required"
+      refute html =~ "Unsaved changes"
+
+      # An autosave cycle in that state must not change the story.
+      send(view.pid, :autosave)
+      assert render(view) =~ "Title is required"
+      refute assigns_of(view)[:autosave_blocked] == nil
+
+      # ...and clears as soon as the cause is fixed. This has to happen on the
+      # EDIT, not on a save: retyping the original title makes the form clean
+      # again, so no autosave fires and a save-only reset left the warning up
+      # forever (caught in the browser, not by the first version of this test).
+      html =
+        render_change(view, "update_meta", %{"title" => "Event Subject", "_target" => ["title"]})
+
+      assert assigns_of(view)[:autosave_blocked] == nil
+      refute html =~ "Title is required"
+    end
+
+    test "the editor exposes the affordances its handlers implement", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      {:ok, view, html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      # Both features existed with no control at all, so they were unreachable
+      # while their tests kept them looking covered. Worse, allow_version_access
+      # had no WRITE path either: the public route gated on it and the mapper
+      # read it, but nothing ever stored it.
+      assert html =~ ~s(phx-click="regenerate_slug")
+      assert html =~ ~s(name="allow_version_access")
+
+      view |> element("button[phx-click='regenerate_slug']") |> render_click()
+
+      # It rides the form (a phx-click inside this form would trip the form's
+      # own change event, and update_meta would rebuild :post over the top).
+      render_change(view, "update_meta", %{
+        "allow_version_access" => "true",
+        "_target" => ["allow_version_access"]
+      })
+
+      assert assigns_of(view)[:form]["allow_version_access"] == true
+    end
+
+    test "warns before a save takes the live version down", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
+      {:ok, _v2} = Versions.create_version_from(group["slug"], post[:uuid], 1)
+
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit?v=2")
+
+      # A <select> can't carry a data-confirm, so the consequence has to be
+      # stated before the writer saves.
+      html =
+        render_change(view, "update_meta", %{"status" => "published", "_target" => ["status"]})
+
+      assert html =~ "which is live now"
+      assert html =~ "archive v1"
+    end
+
+    test "no publish warning when there is nothing live to take down", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      # This used to warn on any post with more than one version, counting
+      # them all as about to be archived. Publishing only archives a version
+      # whose own status is "published", and here none is.
+      {:ok, _v2} = Versions.create_version_from(group["slug"], post[:uuid], 1)
+
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      html =
+        render_change(view, "update_meta", %{"status" => "published", "_target" => ["status"]})
+
+      refute html =~ "which is live now"
     end
 
     test "keeps the slug-truncation warning while the title stays over the URL cap",
@@ -271,7 +453,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       # straight into the form map. Without the title/slug being set, save
       # bails at the "Title is required" guard in Persistence.perform_save.
       _ = render_change(view, "update_meta", %{"title" => "Saved Title", "_target" => ["title"]})
-      _ = render_change(view, "update_content", %{"content" => "## Body content"})
+
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "## Body content", html: ""}}
+      )
+
+      _ = render(view)
 
       html = render_click(view, "save", %{})
       assert is_binary(html)
@@ -311,7 +499,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
       _ = render_change(view, "update_meta", %{"title" => "Saved Title", "_target" => ["title"]})
-      _ = render_change(view, "update_content", %{"content" => "## Body"})
+
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "## Body", html: ""}}
+      )
+
+      _ = render(view)
 
       html = render_click(view, "save", %{})
 
@@ -441,39 +635,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(render_click(view, "select_ai_prompt", %{"prompt_uuid" => "fake-prompt"}))
     end
 
-    test "insert_component handlers add component to content body",
+    test "toolbar inserts route through the markdown editor component",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =
         conn
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      assert is_binary(render_click(view, "insert_component", %{"component" => "video"}))
-      assert is_binary(render_click(view, "insert_component", %{"component" => "cta"}))
+      # The MarkdownEditor toolbar sends these; there is no phx event for them.
+      send(view.pid, {:leaf_insert_request, %{type: :video}})
+      send(view.pid, {:leaf_insert_request, %{type: :image}})
+      assert is_binary(render(view))
     end
 
-    test "insert_video_component accepts a URL",
+    test "an unknown insert type is ignored",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =
         conn
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      html =
-        render_click(view, "insert_video_component", %{"url" => "https://example.com/v.mp4"})
-
-      assert is_binary(html)
-    end
-
-    test "toggle_version_access updates the assign",
-         %{conn: conn, group: group, post: post} do
-      {:ok, view, _html} =
-        conn
-        |> put_test_scope(fake_scope())
-        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
-
-      assert is_binary(render_click(view, "toggle_version_access", %{"enabled" => "true"}))
-      assert is_binary(render_click(view, "toggle_version_access", %{"enabled" => "false"}))
+      send(view.pid, {:leaf_insert_request, %{type: :sandwich}})
+      assert is_binary(render(view))
     end
 
     test "translate_to_all_languages early-returns when AI is disabled",

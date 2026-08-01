@@ -91,8 +91,22 @@ defmodule PhoenixKitPublishing.MixProject do
       # older core, but the floor should track what's actually required).
       pk_dep(:phoenix_kit, "~> 1.7.189"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
-      # `AITranslatable` adapter plugs into.
-      pk_dep(:phoenix_kit_ai, "~> 0.4"),
+      # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
+      # which the group editor imports directly.
+      pk_dep(:phoenix_kit_ai, "~> 0.17"),
+      # Test-only: exercises the OPTIONAL comments seam (public thread + POST
+      # form). Production installs opt in by adding the package themselves —
+      # publishing runs fine without it.
+      {:phoenix_kit_comments, "~> 0.2", only: :test},
+
+      # The post editor. Leaf is a standalone package (phoenix_kit depends on it
+      # too, for the comment composer), so publishing declares it directly now
+      # that the editor calls it. The 0.4.1 floor is load-bearing: inline
+      # suggestions — the `{:leaf_suggest, …}` message, the `:suggestions`
+      # command and the caret popup that `#hashtag` autocomplete rides on —
+      # arrived in 0.4.0, and `:flush` lets a save collect the last keystrokes
+      # instead of whatever the debounce had settled.
+      {:leaf, "~> 0.4.1"},
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},

@@ -41,16 +41,23 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `listing_sort` - Public listing order: `"newest"` or `"oldest"` by effective
     publish date (post date for timestamp groups, published-at for slug groups).
     Default `"newest"`.
+  - `listing_layout` - How the public listing renders its (non-band) posts:
+    `"grid"` (card grid), `"list"` (horizontal thumbnail rows), or `"minimal"`
+    (date — title lines, no images). The Featured/Latest bands are unaffected —
+    they have their own layout/style settings. Default `"grid"`.
   - `show_breadcrumbs` - Show the breadcrumb trail on this group's public listing
     and post pages (default `false`).
   - `post_date_position` - Where a post's date renders relative to the title on the
     post page: `"above"`, `"below"`, or `"hidden"`. Default `"below"`.
   - `post_width` - Post-page content column width: `"narrow"`, `"normal"`, or
     `"wide"`. Default `"normal"`.
+  - `notes_style` - How author `<Note>` annotations display on the post page:
+    `"footnotes"` (numbered refs + a collected bottom section + hover popovers)
+    or `"panel"` (clicking the phrase slides out a right-side panel with the
+    note and its comments). Default `"footnotes"`.
   - `show_featured_image` - Show the post's featured image at the top of the post
     page (default `false`).
   - `show_reading_time` - Show an estimated reading time on the post page (default `false`).
-  - `show_tags` - Show the post's tags on the post page (default `false`).
   - `show_post_count` - Show the total post count under the title on the group's
     public listing (default `false`).
   - `show_top_back_link` - Show the subtle "Back to <group>" link at the top of
@@ -60,6 +67,16 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `listing_animations` - Hover animations on listing cards (a subtle lift +
     shadow cue that the card is clickable; default `true`). Motion-reduce
     users never see the lift regardless.
+  - `show_prev_next` - Chronological "newer / older" post navigation at the
+    bottom of the post page, within the same group + language (default `false`).
+  - `show_categories` - Linked category chips on the post page (default `false`).
+  - `views_enabled` - Count post views (per-day rollups; session-deduped,
+    bot-filtered, no reader PII — see `Publishing.Views`). Default `false`.
+  - `show_view_counts` - Show the "N views" line on the post page (needs
+    `views_enabled`; default `false`).
+  - `search_enabled` - A search box on the public listing (`?q=`, plain GET —
+    no JS required); matches are a case-insensitive substring over the active
+    published version's per-language title + body (default `false`).
   - `name_i18n` - Per-language overrides for the group's display name, keyed by
     language code (e.g. `%{"et" => "Blogi"}`). The primary-language name lives in
     the `name` column; secondary languages fall back to it when absent. The slug
@@ -194,6 +211,10 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   def listing_sort(%__MODULE__{data: data}),
     do: Map.get(data, "listing_sort", Publishing.Constants.default_listing_sort())
 
+  @doc ~S|Returns the public-listing layout ("grid"/"list"/"minimal"; default "grid").|
+  def listing_layout(%__MODULE__{data: data}),
+    do: Map.get(data, "listing_layout", Publishing.Constants.default_listing_layout())
+
   @doc "Returns whether the breadcrumb trail shows on this group's public pages (default false)."
   def show_breadcrumbs?(%__MODULE__{data: data}), do: Map.get(data, "show_breadcrumbs", false)
 
@@ -205,15 +226,16 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   def post_width(%__MODULE__{data: data}),
     do: Map.get(data, "post_width", Publishing.Constants.default_post_width())
 
+  @doc ~S|Returns the author-note display style ("footnotes"/"panel"; default "footnotes").|
+  def notes_style(%__MODULE__{data: data}),
+    do: Map.get(data, "notes_style", Publishing.Constants.default_notes_style())
+
   @doc "Returns whether a post's featured image shows at the top of the post page (default false)."
   def show_featured_image?(%__MODULE__{data: data}),
     do: Map.get(data, "show_featured_image", false)
 
   @doc "Returns whether an estimated reading time shows on the post page (default false)."
   def show_reading_time?(%__MODULE__{data: data}), do: Map.get(data, "show_reading_time", false)
-
-  @doc "Returns whether a post's tags show on the post page (default false)."
-  def show_tags?(%__MODULE__{data: data}), do: Map.get(data, "show_tags", false)
 
   @doc "Returns whether the post count shows on the group's public listing (default false)."
   def show_post_count?(%__MODULE__{data: data}), do: Map.get(data, "show_post_count", false)
@@ -229,6 +251,18 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc "Returns whether listing cards animate on hover (default true)."
   def listing_animations?(%__MODULE__{data: data}),
     do: Map.get(data, "listing_animations", true)
+
+  @doc "Returns whether the post page shows chronological prev/next links (default false)."
+  def show_prev_next?(%__MODULE__{data: data}), do: Map.get(data, "show_prev_next", false)
+
+  @doc "Returns whether the post page shows linked category chips (default false)."
+  def show_categories?(%__MODULE__{data: data}), do: Map.get(data, "show_categories", false)
+
+  @doc ~S|Returns whether the post page shows the "N views" line (default false).|
+  def show_view_counts?(%__MODULE__{data: data}), do: Map.get(data, "show_view_counts", false)
+
+  @doc "Returns whether the public listing shows a search box (default false)."
+  def search_enabled?(%__MODULE__{data: data}), do: Map.get(data, "search_enabled", false)
 
   @doc "Returns the per-language display-name overrides map (language code => name)."
   def name_translations(%__MODULE__{data: data}) do

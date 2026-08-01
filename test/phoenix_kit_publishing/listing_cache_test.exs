@@ -296,4 +296,43 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheRegenerateTest do
       assert listed.metadata.status == "published"
     end
   end
+
+  describe "snapshot ordering" do
+    test "a regeneration that started earlier does not overwrite a newer one",
+         %{group_slug: group_slug} do
+      # Stand in for a regeneration that has already landed, carrying a
+      # monotonic reading from the future so anything starting now looks older.
+      ahead = System.monotonic_time(:millisecond) + 60_000
+
+      :persistent_term.put(
+        ListingCache.cache_generated_at_key(group_slug),
+        {"2126-04-27T00:00:00Z", ahead}
+      )
+
+      :persistent_term.put(ListingCache.persistent_term_key(group_slug), [:fresh])
+
+      assert ListingCache.regenerate(group_slug, broadcast: false) == :ok
+
+      assert :persistent_term.get(ListingCache.persistent_term_key(group_slug)) == [:fresh],
+             "a read that began before the newer one committed put its stale posts back"
+
+      # And once nothing newer is recorded, the regeneration lands normally.
+      :persistent_term.erase(ListingCache.cache_generated_at_key(group_slug))
+      assert ListingCache.regenerate(group_slug, broadcast: false) == :ok
+      assert :persistent_term.get(ListingCache.persistent_term_key(group_slug)) != [:fresh]
+    end
+
+    test "cache_generated_at reads both the new shape and a bare legacy string",
+         %{group_slug: group_slug} do
+      key = ListingCache.cache_generated_at_key(group_slug)
+
+      :persistent_term.put(key, {"2026-04-27T00:00:00Z", 123})
+      assert ListingCache.cache_generated_at(group_slug) == "2026-04-27T00:00:00Z"
+
+      :persistent_term.put(key, "2026-04-27T00:00:00Z")
+      assert ListingCache.cache_generated_at(group_slug) == "2026-04-27T00:00:00Z"
+
+      :persistent_term.erase(key)
+    end
+  end
 end

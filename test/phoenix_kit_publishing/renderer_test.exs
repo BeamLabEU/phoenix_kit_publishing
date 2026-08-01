@@ -643,4 +643,54 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
       refute html =~ "<script>"
     end
   end
+
+  describe "component image and note-phrase hardening" do
+    test "a gallery drops an image whose scheme its siblings reject" do
+      # Showcase and Audio run every src through an http/https/root-relative
+      # allow-list; the gallery only escaped the string. Nothing was
+      # exploitable — a browser won't run a script URL from an <img> — but one
+      # component trusting a scheme the others refuse is the inconsistency
+      # worth closing, not the payload.
+      html =
+        Renderer.render_markdown("""
+        <Gallery>
+        ![bad](javascript:alert(1))
+        ![good](https://example.com/ok.png)
+        </Gallery>
+        """)
+
+      refute html =~ "javascript:"
+      assert html =~ "https://example.com/ok.png"
+    end
+
+    test "a gallery keeps root-relative sources" do
+      html =
+        Renderer.render_markdown(
+          "<Gallery>\n![a](/uploads/a.png)\n![b](/uploads/b.png)\n</Gallery>"
+        )
+
+      assert html =~ "/uploads/a.png"
+      assert html =~ "/uploads/b.png"
+    end
+
+    test "a note's visible phrase is escaped, like its body" do
+      html = Renderer.render_markdown(~s|Text <Note note="body">a<b>bold</b>c</Note> more|)
+
+      # The phrase lands inside an <a> this renderer is building. Escaped, the
+      # tag shows as text instead of opening an element mid-anchor.
+      assert html =~ "&lt;b&gt;bold&lt;/b&gt;"
+    end
+
+    test "a hashtag inside a note phrase doesn't become a nested anchor" do
+      html = Renderer.render_markdown(~s|Text <Note note="body">see #elixir</Note> more|)
+
+      # The phrase already sits inside the note's own <a>. The encoding that
+      # keeps the later hashtag pass off it happens before the markdown
+      # renderer, which decodes it again on the way out — so the thing to
+      # assert is the outcome, not the entity.
+      ref = Regex.run(~r|<a class="[^"]*pk-note-ref"[^>]*>.*?</a>|s, html) |> hd()
+      refute ref =~ ~r|<a [^>]*href="[^"]*hashtag|
+      assert ref =~ "#elixir"
+    end
+  end
 end

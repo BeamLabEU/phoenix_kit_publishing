@@ -212,6 +212,154 @@ There is no longer a pure-XML PageBuilder flow; Markdown is the primary content 
 
 ---
 
+## Stretch / align — breaking out of the text column
+
+Every PHK component accepts two optional layout attributes, applied by the
+renderer (no per-component support needed):
+
+| Attribute | Values | Effect |
+|-----------|--------|--------|
+| `stretch` | `1`–`100` | The element renders that many percent **wider than the text column**, centered — `stretch="20"` is 20% wider (10% overhang each side). |
+| `align` | `wide` \| `full` | Presets: `wide` = +30%; `full` = full-bleed to the viewport edge (1rem gutter). |
+
+```markdown
+<Image src="hero.jpg" alt="Skyline" stretch="20" />
+<Headline align="wide">A title that escapes the column</Headline>
+<Video src="launch.mp4" align="full" />
+```
+
+Rules of thumb:
+
+- An explicit `stretch` wins when both are given.
+- The overhang is automatically clamped to the space between the column and
+  the viewport — on phones the element simply stays in the column. No JS.
+- Invalid values (`0`, `>100`, non-numbers, unknown `align`) are ignored and
+  the component renders normally.
+
+---
+
+## Audio — `<Audio>` and the post audio version
+
+Inline audio in the body:
+
+```markdown
+<Audio file_uuid="018e3c4a-…" title="Episode 12" caption="42 min" />
+<Audio src="https://cdn.example.com/ep12.mp3" />
+```
+
+Renders a native `<audio controls preload="none">` player — no JavaScript,
+streamed on demand. `file_uuid` resolves through Storage's signed URLs (same
+as `<Image>`); `src` accepts http(s) or root-relative URLs only.
+
+Separately, the post editor's **Audio version** field (a Media ID) attaches
+an audio rendition of the whole post — e.g. a narration. It renders as a
+player above the content, and the group's RSS feed carries it as a podcast
+`<enclosure>`, so a group whose posts have audio versions is subscribable in
+podcast apps.
+
+---
+
+## Showcase bands — `<Showcase>`
+
+An image bled to one edge with text on the other, the two sharing an
+overlap so the words sit partly over the picture:
+
+```markdown
+<Showcase file_uuid="018e3c4a-…" side="left" overlap="18" alt="The bedroom">
+### Paintings, reconstructed
+
+Excitingly recreated and brought to life. Step into Van Gogh's bedroom!
+</Showcase>
+```
+
+The body is ordinary Markdown (heading, paragraphs, links). Attributes:
+
+| Attribute | Values | Effect |
+|-----------|--------|--------|
+| `file_uuid` / `src` | Media ID / URL | The image. `file_uuid` resolves through Storage (`file_variant` picks the variant, default `large`); `src` takes an http(s) or root-relative URL. |
+| `alt` | text | Image alt text. Always set it. |
+| `side` | `left` \| `right` | Which edge the image bleeds to. Default `left`. |
+| `overlap` | `0`–`40` | How much of the band the image and text share, in percent. Default `15`. |
+| `tone` | `page` \| `dark` \| `light` \| `none` | How the band is coloured. `page` (default) uses the page's own `base-100`/`base-content`, so there is no visible slab beside the image — the picture dissolves into the page. `dark` and `light` paint a deliberate band (dark background + light text, or the inverse) for a section that should stand apart. `none` inherits the theme and skips the tint entirely. |
+| `height` | `short` \| `medium` \| `tall` \| `120`–`1200` | How tall the image area is: `short` = 18rem, `medium` = 26rem, `tall` = 38rem, or a plain pixel count. Omit it to keep the image's natural shape — which on a full-bleed band can be very tall. `object-fit: cover` crops to whatever you pick. |
+| `align` / `stretch` | `full` \| `wide` \| `none` \| `1`–`100` | How far the band reaches past the text column. `align="full"` (the default here) runs to the page edge, `align="wide"` adds 30%, `stretch="20"` adds 20%, and `align="none"` keeps the band inside the column like ordinary prose. |
+
+Behaviour worth knowing:
+
+- The overlap is a real CSS grid track shared by the image and the text —
+  the browser lays it out, there is no JavaScript.
+- The image is blended into the band colour on the side the text comes
+  from, and **the wider the overlap, the earlier that blend starts**, so
+  the text stays readable.
+- On narrow screens the two stack, the overlap becomes total, and the tint
+  becomes a full vertical wash over the image.
+- An unusable `src` (or none) renders the text on its own rather than an
+  empty band.
+- The band's height is the taller of the image area and the text, so a long
+  paragraph still gets the room it needs even with `height="short"`.
+
+---
+
+## Author notes — `<Note>`
+
+Annotate a phrase to clarify it for readers:
+
+```markdown
+The design uses <Note note="Content-addressed: the key is a hash of the bytes.">CAS storage</Note> under the hood.
+```
+
+Two display styles, chosen per group in the group's settings ("Author
+notes style"):
+
+- **Footnotes** (default) — the phrase gets a superscript number linking to
+  a collected **Notes** section at the bottom of the post, plus a
+  hover/focus popover showing the note text (pure CSS, no JavaScript).
+- **Slide-out panel** — clicking the phrase slides a panel out from the
+  right side with the note text; when the group has commenting enabled,
+  readers can comment on that specific note inside the panel (the hover
+  popover still works). Also pure CSS (`:target`), no JavaScript.
+
+- Numbering is automatic and sequential through the document.
+- A note's comment thread is anchored to the note's *text* (a content
+  hash), not its number — inserting an earlier note doesn't detach
+  comments; rewording the note does.
+- The `note` text is plain text; it cannot contain double quotes (use
+  apostrophes) and HTML in it is shown literally, never executed.
+- A literal `<Note>` inside a code fence is left as code.
+
+---
+
+## Hashtags — tags live in the body
+
+Tags are written inline as `#hashtags` — there is no separate tags field in
+the editor. On save, the post's tag list is derived from the text (union
+across all of the version's languages), and on the public page each hashtag
+renders as a link to that tag's archive.
+
+```markdown
+We shipped the new importer today. #elixir #changelog
+```
+
+What counts as a hashtag: `#` followed immediately by a letter, at the start
+of a line or after whitespace/`(`. Letters are Unicode; digits, `_` and `-`
+may follow (up to 30 chars). By construction this excludes:
+
+- Markdown headings (`# Title` — the space breaks the match);
+- URL fragments (`…/page#section` — no preceding whitespace);
+- anything in code fences or inline backticks;
+- anything inside a Markdown link — `[jump](#section)` stays an anchor,
+  and a `#word` in link text stays part of that link.
+
+Dedup is case-insensitive keeping the first spelling; capped at 20 per post.
+To remove a tag, remove it from the text and save.
+
+The body is the **only** source of tags: there is no tags field, and a
+`"tags"` list passed programmatically is ignored. That keeps the invariant
+that every tag a post carries is visible in its prose — which is why the
+post page no longer lists tags separately.
+
+---
+
 ## Best practices
 
 - **Let Markdown do the heavy lifting.** Use inline components only when you need structured UI blocks.

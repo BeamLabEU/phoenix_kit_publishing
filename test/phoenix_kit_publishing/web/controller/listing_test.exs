@@ -70,9 +70,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ListingTest do
       assert length(Listing.filter_published(posts)) == 1
     end
 
-    test "includes today's timestamp posts" do
-      posts = [build_timestamp_post(Date.utc_today(), ~T[12:00:00])]
+    test "includes a timestamp post once its moment has passed" do
+      # Take the date and the time from the SAME moment — an hour before
+      # midnight-plus-a-bit is yesterday, and stamping that clock time onto
+      # today's date describes a moment still to come.
+      then_ = DateTime.add(DateTime.utc_now(), -3600, :second)
+
+      posts = [build_timestamp_post(DateTime.to_date(then_), DateTime.to_time(then_))]
       assert length(Listing.filter_published(posts)) == 1
+    end
+
+    test "excludes a post scheduled for later today" do
+      # A timestamp post is a date AND a time, and reading the schedule as a
+      # date alone published anything set for later today at midnight —
+      # lining something up at nine for six in the evening put its title,
+      # excerpt and image in the listing all day.
+      soon = DateTime.add(DateTime.utc_now(), 3600, :second)
+
+      posts = [build_timestamp_post(DateTime.to_date(soon), DateTime.to_time(soon))]
+      assert Listing.filter_published(posts) == []
     end
 
     test "does not exclude future slug-mode posts" do

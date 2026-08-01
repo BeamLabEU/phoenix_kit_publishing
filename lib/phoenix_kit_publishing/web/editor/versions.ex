@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -47,7 +48,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   def apply_version_switch(socket, version, version_post, form_builder_fn) do
     group_slug = socket.assigns.group_slug
     form = form_builder_fn.(group_slug, version_post, version)
-    is_published = form["status"] == "published"
+    is_published = Constants.published?(form["status"])
     actual_language = version_post.language
     new_form_key = PublishingPubSub.generate_form_key(group_slug, version_post, :edit)
 
@@ -67,7 +68,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
       |> Phoenix.Component.assign(:available_languages, version_post.available_languages)
       |> Phoenix.Component.assign(:editing_published_version, is_published)
       |> Phoenix.Component.assign(:viewing_older_version, false)
-      |> Phoenix.Component.assign(:has_pending_changes, false)
+      |> Helpers.mark_clean()
       |> Phoenix.Component.assign(:form_key, new_form_key)
       |> Phoenix.Component.assign(:saved_status, form["status"])
       |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
@@ -197,7 +198,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
       :post,
       Map.merge(socket.assigns.post, %{current_version: nil})
     )
-    |> Phoenix.Component.assign(:has_pending_changes, false)
+    |> Helpers.mark_clean()
     |> Phoenix.LiveView.put_flash(
       :error,
       gettext("All versions of this post have been deleted. Please navigate away.")
@@ -216,7 +217,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
     |> Phoenix.Component.assign(:available_versions, updated_versions)
     |> Phoenix.Component.assign(:current_version, surviving_version)
     |> Phoenix.Component.assign(:content, fresh_post.content)
-    |> Phoenix.Component.assign(:has_pending_changes, false)
+    |> Helpers.mark_clean()
     |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
     |> Phoenix.LiveView.put_flash(
       :warning,

@@ -55,6 +55,11 @@ defmodule PhoenixKitPublishing.Routes do
            :edit,
            as: :publishing_edit_group_localized
 
+      live "/admin/publishing/categories/:group",
+           PhoenixKit.Modules.Publishing.Web.CategoriesLive,
+           :index,
+           as: :publishing_categories_localized
+
       live "/admin/publishing/:group", PhoenixKit.Modules.Publishing.Web.Listing, :group,
         as: :publishing_group_localized
 
@@ -107,6 +112,11 @@ defmodule PhoenixKitPublishing.Routes do
            PhoenixKit.Modules.Publishing.Web.Edit,
            :edit,
            as: :publishing_edit_group
+
+      live "/admin/publishing/categories/:group",
+           PhoenixKit.Modules.Publishing.Web.CategoriesLive,
+           :index,
+           as: :publishing_categories
 
       live "/admin/publishing/:group", PhoenixKit.Modules.Publishing.Web.Listing, :group,
         as: :publishing_group

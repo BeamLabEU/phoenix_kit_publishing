@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   - **Content** — per-language: title, body, url_slug (for routing)
   """
 
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingPost
@@ -78,6 +79,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       content_updated_at: content.updated_at,
       metadata: build_metadata(post, version, content, effective_status, effective_published_at)
     }
+    |> maybe_override_title(opts)
   end
 
   @doc """
@@ -144,6 +146,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       language_titles: Map.new(all_contents, fn c -> {c.language, c.title} end),
       language_excerpts: Map.new(all_contents, fn c -> {c.language, extract_excerpt(c)} end)
     }
+    |> maybe_override_title(opts)
   end
 
   # ===========================================================================
@@ -160,6 +163,28 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
      Keyword.get(opts, :effective_published_at) || published_at}
   end
 
+  # The admin listing's live-title override (see the caller in DBStorage):
+  # applied AFTER the map is built so the per-language/per-version maps stay
+  # version-accurate — only the card-level metadata.title follows the live
+  # version. A no-op when the opt is absent (every non-admin path).
+  defp maybe_override_title(map, opts) do
+    map =
+      case Keyword.get(opts, :effective_title) do
+        title when is_binary(title) and title != "" ->
+          put_in(map, [:metadata, :title], title)
+
+        _ ->
+          map
+      end
+
+    # Present only for published posts: the version number the admin card's
+    # edit links pin (published → open the live version; drafts → newest).
+    case Keyword.get(opts, :effective_live_version) do
+      n when is_integer(n) -> Map.put(map, :live_version, n)
+      _ -> map
+    end
+  end
+
   defp get_group_slug(%PublishingPost{group: %{slug: slug}}), do: slug
   defp get_group_slug(%PublishingPost{} = _post), do: nil
 
@@ -169,7 +194,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
     active_uuid = Map.get(post, :active_version_uuid)
 
     if not is_nil(active_uuid) and active_uuid == version_uuid do
-      "published"
+      Constants.status_published()
     else
       version.status
     end
@@ -189,6 +214,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
       featured: PublishingVersion.get_featured(version),
       tags: PublishingVersion.get_tags(version),
+      category_uuids: PublishingVersion.get_category_uuids(version),
+      audio_uuid: PublishingVersion.get_audio_uuid(version),
       og: PublishingContent.get_og(content)
     }
   end
@@ -203,7 +230,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       allow_version_access: false,
       published_at: nil,
       featured_image_uuid: nil,
-      featured: false
+      featured: false,
+      category_uuids: []
     }
   end
 
@@ -218,7 +246,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       allow_version_access: PublishingVersion.get_allow_version_access(version),
       published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
-      featured: PublishingVersion.get_featured(version)
+      featured: PublishingVersion.get_featured(version),
+      tags: PublishingVersion.get_tags(version),
+      category_uuids: PublishingVersion.get_category_uuids(version),
+      audio_uuid: PublishingVersion.get_audio_uuid(version)
     }
   end
 
@@ -232,7 +263,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       allow_version_access: PublishingVersion.get_allow_version_access(version),
       published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
-      featured: PublishingVersion.get_featured(version)
+      featured: PublishingVersion.get_featured(version),
+      tags: PublishingVersion.get_tags(version),
+      category_uuids: PublishingVersion.get_category_uuids(version),
+      audio_uuid: PublishingVersion.get_audio_uuid(version)
     }
   end
 
@@ -287,7 +321,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
 
   defp merge_published_statuses(latest_statuses, published_statuses) do
     Map.merge(latest_statuses, published_statuses, fn _lang, latest, published ->
-      if published == "published", do: "published", else: latest
+      if Constants.published?(published), do: Constants.status_published(), else: latest
     end)
   end
 

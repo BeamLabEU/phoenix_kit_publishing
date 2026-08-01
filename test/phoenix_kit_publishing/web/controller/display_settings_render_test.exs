@@ -336,6 +336,118 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
     end
   end
 
+  describe "listing: listing_layout" do
+    test "grid by default, with the bottom-pinned card footer", %{conn: conn, group_slug: slug} do
+      html = listing_html(conn, slug)
+      assert html =~ "md:grid-cols-2 lg:grid-cols-3"
+      # The date + Read More row pins to the card bottom (mt-auto, not a
+      # content-following margin) so buttons line up across a grid row.
+      assert html =~ "card-actions justify-between items-center mt-auto pt-4"
+      assert html =~ "Read More"
+    end
+
+    test "minimal renders date — title lines: no grid, no images, no buttons", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"listing_layout" => "minimal"})
+      html = listing_html(conn, slug)
+
+      assert html =~ "divide-y divide-base-200"
+      assert html =~ "Display Post"
+      refute html =~ "md:grid-cols-2 lg:grid-cols-3"
+      refute html =~ "Read More"
+      # The whole line links to the post; the date cell renders even with no
+      # date so titles stay aligned.
+      assert html =~ ~r/<time[^>]*class="w-44 shrink-0/
+    end
+
+    test "list renders horizontal row cards with the Read More footer", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"listing_layout" => "list"})
+      html = listing_html(conn, slug)
+
+      assert html =~ "sm:card-side"
+      refute html =~ "md:grid-cols-2 lg:grid-cols-3"
+      assert html =~ "Read More"
+    end
+
+    test "an out-of-whitelist layout value is ignored (stays grid)", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"listing_layout" => "carousel"})
+      assert listing_html(conn, slug) =~ "md:grid-cols-2 lg:grid-cols-3"
+    end
+
+    test "minimal leaves the Featured band untouched", %{conn: conn, group_slug: slug, post: post} do
+      {:ok, _} = Posts.update_post(slug, post, %{"featured" => "true"}, %{})
+      set!(slug, %{"listing_layout" => "minimal"})
+      html = listing_html(conn, slug)
+
+      assert html =~ "Featured"
+      # The band card renders normally; the (empty) minimal list renders no rows.
+      refute html =~ "divide-y divide-base-200\"><li"
+    end
+  end
+
+  describe "post page: show_prev_next" do
+    setup %{group_slug: slug} do
+      {:ok, second} =
+        Posts.create_post(slug, %{
+          title: "Second Post",
+          slug: "second-post",
+          content: "Newer content."
+        })
+
+      :ok = Versions.publish_version(slug, second.uuid, 1)
+      {:ok, _} = Posts.update_post(slug, second, %{"published_at" => "2031-06-01T00:00:00Z"}, %{})
+      :ok
+    end
+
+    test "off by default", %{conn: conn, group_slug: slug} do
+      html = post_html(conn, slug, "display-post")
+      refute html =~ "Newer"
+      refute html =~ "Older"
+    end
+
+    test "on: the older post links its newer neighbor and vice versa", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      set!(slug, %{"show_prev_next" => "true"})
+
+      older_page = post_html(conn, slug, "display-post")
+      assert older_page =~ "Newer"
+      assert older_page =~ "Second Post"
+      refute older_page =~ ">Older<"
+
+      newer_page = post_html(conn, slug, "second-post")
+      assert newer_page =~ "Older"
+      assert newer_page =~ "Display Post"
+      refute newer_page =~ ">Newer<"
+    end
+  end
+
+  describe "post page: JSON-LD structured data" do
+    test "Article script on by default, off via the site setting", %{
+      conn: conn,
+      group_slug: slug
+    } do
+      html = post_html(conn, slug, "display-post")
+      assert html =~ ~s(type="application/ld+json")
+      assert html =~ ~s("@type":"Article")
+      assert html =~ "Display Post"
+
+      {:ok, _} = Settings.update_boolean_setting("publishing_render_jsonld", false)
+      html = post_html(conn, slug, "display-post")
+      refute html =~ ~s(type="application/ld+json")
+      {:ok, _} = Settings.update_boolean_setting("publishing_render_jsonld", true)
+    end
+  end
+
   # ==========================================================================
   # Post page
   # ==========================================================================

@@ -117,7 +117,6 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       assert PublishingGroup.post_width(group) == "normal"
       assert PublishingGroup.show_featured_image?(group) == false
       assert PublishingGroup.show_reading_time?(group) == false
-      assert PublishingGroup.show_tags?(group) == false
       assert PublishingGroup.show_post_count?(group) == false
       assert PublishingGroup.show_top_back_link?(group) == true
       assert PublishingGroup.listing_image_links?(group) == true
@@ -144,7 +143,6 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
           "post_width" => "wide",
           "show_featured_image" => true,
           "show_reading_time" => true,
-          "show_tags" => true,
           "show_post_count" => true,
           "show_top_back_link" => false,
           "listing_image_links" => false,
@@ -169,7 +167,6 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       assert PublishingGroup.post_width(group) == "wide"
       assert PublishingGroup.show_featured_image?(group) == true
       assert PublishingGroup.show_reading_time?(group) == true
-      assert PublishingGroup.show_tags?(group) == true
       assert PublishingGroup.show_post_count?(group) == true
       assert PublishingGroup.show_top_back_link?(group) == false
       assert PublishingGroup.listing_image_links?(group) == false

@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
@@ -72,6 +73,83 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   rescue
     _ -> true
   end
+
+  @doc """
+  Whether group RSS feeds are served (`publishing_feeds_enabled`, default on).
+  Read by the controller's feed branch and by the listing's autodiscovery link.
+  """
+  def feeds_enabled? do
+    Settings.get_boolean_setting("publishing_feeds_enabled", true)
+  rescue
+    _ -> true
+  end
+
+  # Whether the post page emits the JSON-LD Article script (default on).
+  # Invisible to readers; a host that builds its own structured data can
+  # disable it site-wide.
+  defp jsonld_enabled? do
+    Settings.get_boolean_setting("publishing_render_jsonld", true)
+  rescue
+    _ -> true
+  end
+
+  @doc """
+  Renders the JSON-LD `Article` structured-data script for a post page, built
+  from the same `:og` map the meta tags use (title/description/image/url are
+  already override- and plugin-refined there) plus the post's publish date.
+  Rendered in-page for the same reason as the OG tags: search engines read
+  body placement, and the host owns `<head>`.
+  """
+  attr :og, :map, default: nil
+  attr :post, :map, required: true
+  attr :language, :string, required: true
+
+  def jsonld_script(assigns) do
+    data = article_jsonld(assigns.og, assigns.post, assigns.language)
+    # escape: :html_safe encodes angle brackets as unicode escapes inside
+    # JSON strings, so no value can smuggle a closing script tag and break
+    # out of the element.
+    assigns = assign(assigns, :json, data && Jason.encode!(data, escape: :html_safe))
+
+    ~H"""
+    <script :if={@json} type="application/ld+json">
+      <%= Phoenix.HTML.raw(@json) %>
+    </script>
+    """
+  end
+
+  defp article_jsonld(og, post, language) do
+    if og && og[:title] do
+      %{
+        "@context" => "https://schema.org",
+        "@type" => "Article",
+        "headline" => og[:title],
+        "inLanguage" => language
+      }
+      |> maybe_put_jsonld("description", og[:description])
+      |> maybe_put_jsonld("image", og[:image])
+      |> maybe_put_jsonld("mainEntityOfPage", og[:url])
+      |> maybe_put_jsonld("datePublished", jsonld_date_published(post))
+      |> maybe_put_jsonld("publisher", %{
+        "@type" => "Organization",
+        "name" => Settings.get_project_title()
+      })
+    end
+  end
+
+  # The effective publish date, matching the feed/listing notion: post_date for
+  # timestamp-mode posts, the version's published_at otherwise. Safe access —
+  # a post map may lack either field.
+  defp jsonld_date_published(post) do
+    case post[:date] do
+      %Date{} = date -> Date.to_iso8601(date)
+      _ -> get_in(post, [:metadata, :published_at])
+    end
+  end
+
+  defp maybe_put_jsonld(map, _key, nil), do: map
+  defp maybe_put_jsonld(map, _key, ""), do: map
+  defp maybe_put_jsonld(map, key, value), do: Map.put(map, key, value)
 
   # ===========================================================================
   # Scroll navigation (per-group). Additive visuals only — never replaces native
@@ -178,6 +256,111 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       <div id="pk-headings-config" data-label={gettext("On this page")} hidden></div>
       {Phoenix.HTML.raw(reading_headings_assets())}
     <% end %>
+    """
+  end
+
+  @doc """
+  Drives `<Gallery motion="scroll">` where the browser has no scroll-driven
+  animations.
+
+  The gallery expresses scroll-linking in pure CSS (`animation-timeline`), and
+  that is the real implementation — this does nothing at all where it works.
+  But support is only around 84% of browsers: Firefox has it from 156, Safari
+  from 26. Everywhere else the `@supports` gate falls through to the drift
+  animation, which is a perfectly good gallery but silently not the feature
+  that was asked for.
+
+  So this is enhancement in the strict sense: no JS still gives you a turning
+  helix, a modern browser gives you the CSS one, and only the gap in between
+  is filled here.
+
+  It works by pausing the drift animations and setting their `currentTime`
+  from scroll position rather than re-implementing the geometry. Every card's
+  phase already lives in its own negative delay, so a single virtual clock
+  driven by scroll reproduces the exact arrangement CSS would have produced —
+  there is no second copy of the maths to drift out of step with the first.
+  """
+  def helix_scroll_fallback(assigns) do
+    ~H"""
+    {Phoenix.HTML.raw(helix_scroll_fallback_script())}
+    """
+  end
+
+  defp helix_scroll_fallback_script do
+    ~S"""
+    <script>
+    (function () {
+      if (window.__pkHelixScroll) return;
+      window.__pkHelixScroll = true;
+
+      function init() {
+        // Where the CSS works, leave it entirely alone.
+        if (window.CSS && CSS.supports && CSS.supports('animation-timeline: view()')) return;
+
+        var figures = document.querySelectorAll('.pk-helix--scroll');
+        if (!figures.length) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        var scenes = [];
+        figures.forEach(function (fig) {
+          var anims = [];
+          fig.querySelectorAll('.pk-helix__card').forEach(function (card) {
+            var list = card.getAnimations ? card.getAnimations({ subtree: true }) : [];
+            list.forEach(function (a) {
+              try { a.pause(); } catch (e) { return; }
+              anims.push(a);
+            });
+          });
+          if (!anims.length) return;
+
+          // One virtual clock for the whole gallery: the cards' own delays
+          // supply their phase, exactly as they do when it runs on time.
+          var span = 0;
+          anims.forEach(function (a) {
+            var t = a.effect && a.effect.getTiming ? a.effect.getTiming().duration : 0;
+            if (typeof t === 'number' && t > span) span = t;
+          });
+          if (!span) return;
+          scenes.push({ el: fig, anims: anims, span: span });
+        });
+        if (!scenes.length) return;
+
+        var ticking = false;
+        function apply() {
+          ticking = false;
+          var vh = window.innerHeight || document.documentElement.clientHeight;
+          scenes.forEach(function (s) {
+            var r = s.el.getBoundingClientRect();
+            // 0 as the figure's top edge reaches the bottom of the viewport,
+            // 1 as its bottom edge leaves the top — the same span the CSS
+            // `cover` range describes.
+            var total = r.height + vh;
+            var p = total > 0 ? (vh - r.top) / total : 0;
+            p = p < 0 ? 0 : p > 1 ? 1 : p;
+            var t = p * s.span;
+            s.anims.forEach(function (a) {
+              try { a.currentTime = t; } catch (e) {}
+            });
+          });
+        }
+        function onScroll() {
+          if (ticking) return;
+          ticking = true;
+          window.requestAnimationFrame(apply);
+        }
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll, { passive: true });
+        apply();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+    </script>
     """
   end
 
@@ -571,7 +754,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                     )}</span>
                   </div>
 
-                  <div class="card-actions justify-end mt-4">
+                  <div class="card-actions justify-end mt-auto pt-4">
                     <.link
                       navigate={group_listing_path(@current_language, group["slug"])}
                       class="btn btn-sm btn-primary"
@@ -622,6 +805,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       }
     >
       <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
+      <%!-- Feed autodiscovery — body placement for the same reason as the OG
+        tags (the host owns <head>); feed readers scan the whole document. --%>
+      <link
+        :if={feeds_enabled?() && assigns[:group]}
+        rel="alternate"
+        type="application/rss+xml"
+        title={Publishing.translated_group_name(@group, @current_language)}
+        href={feed_path(@current_language, @group["slug"])}
+      />
       <.scrollbar_style_tag style={(assigns[:group] && @group["scrollbar_style"]) || "default"} />
       <.scroll_timeline
         enabled={(assigns[:group] && @group["scroll_timeline_enabled"]) || false}
@@ -678,7 +870,65 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               />
             </div>
           <% end %>
+          <%!-- Search (gated on the group's search_enabled setting). Plain GET
+            form — dead views, works without JS; the controller reads ?q=. --%>
+          <form
+            :if={assigns[:group] && @group["search_enabled"]}
+            method="get"
+            action={group_listing_path(@current_language, @group["slug"])}
+            class="mt-4 flex max-w-md items-center gap-2"
+          >
+            <label class="input input-sm input-bordered flex flex-1 items-center gap-2">
+              <.icon name="hero-magnifying-glass" class="w-4 h-4 opacity-50" />
+              <input
+                type="search"
+                name="q"
+                value={assigns[:search_query]}
+                placeholder={gettext("Search posts…")}
+                class="grow"
+                maxlength="100"
+              />
+            </label>
+            <button type="submit" class="btn btn-sm btn-primary">{gettext("Search")}</button>
+          </form>
         </header>
+        <%!-- Search-results heading — the bands are suppressed in search mode,
+          matches render in the group's regular listing layout below. --%>
+        <div :if={assigns[:search_query]} class="mb-6 flex flex-wrap items-center gap-3">
+          <h2 class="text-lg font-semibold">
+            {ngettext(
+              "%{count} result for “%{query}”",
+              "%{count} results for “%{query}”",
+              @total_count,
+              query: @search_query
+            )}
+          </h2>
+          <.link
+            navigate={group_listing_path(@current_language, @group["slug"])}
+            class="link text-sm text-base-content/60"
+          >
+            {gettext("Clear search")}
+          </.link>
+        </div>
+        <%!-- Category/tag archive heading — same shape as the search heading. --%>
+        <div :if={assigns[:term_filter]} class="mb-6 flex flex-wrap items-center gap-3">
+          <h2 class="text-lg font-semibold">
+            <%= if @term_filter.type == :category do %>
+              {gettext("Category: %{name}", name: @term_filter.label)}
+            <% else %>
+              {gettext("Tag: %{name}", name: @term_filter.label)}
+            <% end %>
+            <span class="ml-1 text-sm font-normal text-base-content/60">
+              {ngettext("%{count} post", "%{count} posts", @term_filter.count)}
+            </span>
+          </h2>
+          <.link
+            navigate={group_listing_path(@current_language, @group["slug"])}
+            class="link text-sm text-base-content/60"
+          >
+            {gettext("All posts")}
+          </.link>
+        </div>
         <% featured_posts = assigns[:featured_posts] || [] %>
         <% featured_layout = assigns[:featured_layout] || "hero" %>
         <% featured_style = assigns[:featured_style] || "classic" %>
@@ -746,20 +996,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           </section>
         <% end %>
 
-        <%!-- Posts Grid --%>
+        <%!-- Posts — layout per the group's listing_layout setting. The
+          Featured/Latest bands above are deliberately unaffected: they carry
+          their own layout/style settings. --%>
+        <% listing_layout = (assigns[:group] && @group["listing_layout"]) || "grid" %>
         <%= if @posts != [] do %>
-          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <.listing_post_card
-              :for={post <- @posts}
-              post={post}
-              group_slug={@group["slug"]}
-              current_language={@current_language}
-              date_counts={date_counts}
-              variant={:grid}
-              image_links={image_links}
-              animations={animations}
-            />
-          </div>
+          <%= case listing_layout do %>
+            <% "minimal" -> %>
+              <ul class="divide-y divide-base-200">
+                <.listing_post_line
+                  :for={post <- @posts}
+                  post={post}
+                  group_slug={@group["slug"]}
+                  current_language={@current_language}
+                  date_counts={date_counts}
+                  animations={animations}
+                />
+              </ul>
+            <% "list" -> %>
+              <div class="flex flex-col gap-4">
+                <.listing_post_row
+                  :for={post <- @posts}
+                  post={post}
+                  group_slug={@group["slug"]}
+                  current_language={@current_language}
+                  date_counts={date_counts}
+                  image_links={image_links}
+                  animations={animations}
+                />
+              </div>
+            <% _ -> %>
+              <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <.listing_post_card
+                  :for={post <- @posts}
+                  post={post}
+                  group_slug={@group["slug"]}
+                  current_language={@current_language}
+                  date_counts={date_counts}
+                  variant={:grid}
+                  image_links={image_links}
+                  animations={animations}
+                />
+              </div>
+          <% end %>
           <%!-- Pagination --%>
           <%= if @total_pages > 1 do %>
             <div class="join mt-8 flex justify-center">
@@ -795,7 +1074,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               >
               </path>
             </svg>
-            <span>{gettext("No published posts yet.")}</span>
+            <span>
+              <%= if assigns[:search_query] do %>
+                {gettext("No posts match your search.")}
+              <% else %>
+                {gettext("No published posts yet.")}
+              <% end %>
+            </span>
           </div>
         <% end %>
       </div>
@@ -930,7 +1215,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           </p>
         <% end %>
 
-        <div class="card-actions justify-between items-center mt-4">
+        <%!-- mt-auto (not a content-following margin) pins the date + button
+          row to the card bottom, so cards whose content differs in height
+          still line their buttons up across a grid row. --%>
+        <div class="card-actions justify-between items-center mt-auto pt-4">
           <%= if has_publication_date?(@post) do %>
             <time class="text-xs text-base-content/60" datetime={@post.metadata.published_at || ""}>
               {format_post_date(@post, @group_slug, @date_counts)}
@@ -955,6 +1243,140 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
   defp card_figure_class(variant) when variant in [:featured_hero, :newest_hero],
     do: "lg:w-2/5 h-56 lg:h-auto overflow-hidden bg-base-300"
+
+  # ---------------------------------------------------------------------------
+  # Minimal listing line — the "minimal" listing_layout: one date — title row
+  # per post, no image, no excerpt, no button. The whole row links to the post.
+  # The fixed-width date cell keeps titles left-aligned down the list; it
+  # renders (empty) even for date-less posts for the same reason.
+  # ---------------------------------------------------------------------------
+  attr :post, :map, required: true
+  attr :group_slug, :string, required: true
+  attr :current_language, :string, required: true
+  attr :date_counts, :map, required: true
+  attr :animations, :boolean, default: true
+
+  defp listing_post_line(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :post_url,
+        build_post_url(
+          assigns.group_slug,
+          assigns.post,
+          assigns.current_language,
+          assigns.date_counts
+        )
+      )
+
+    ~H"""
+    <li data-post-date={effective_post_date(@post)}>
+      <.link
+        navigate={@post_url}
+        class={[
+          "group -mx-2 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 rounded-lg px-2 py-3 sm:flex-nowrap",
+          @animations && "transition-colors hover:bg-base-200/60"
+        ]}
+      >
+        <%!-- w-44 fits the full "%B %d, %Y" dates format_post_date/3 emits
+          ("September 15, 2024"); the ellipsis guards the rare same-day
+          "… at HH:MM" suffix instead of letting it overlap the title. --%>
+        <time
+          class="w-44 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm tabular-nums text-base-content/60"
+          datetime={@post.metadata.published_at || ""}
+        >
+          {if has_publication_date?(@post), do: format_post_date(@post, @group_slug, @date_counts)}
+        </time>
+        <h2 class="min-w-0 text-base font-medium group-hover:text-primary">
+          {@post.metadata.title}
+        </h2>
+      </.link>
+    </li>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # List row — the "list" listing_layout: a horizontal card per post with a
+  # left thumbnail (when the post has one), title + excerpt, and the shared
+  # bottom-pinned date/Read-More footer.
+  # ---------------------------------------------------------------------------
+  attr :post, :map, required: true
+  attr :group_slug, :string, required: true
+  attr :current_language, :string, required: true
+  attr :date_counts, :map, required: true
+  attr :image_links, :boolean, default: true
+  attr :animations, :boolean, default: true
+
+  defp listing_post_row(assigns) do
+    assigns =
+      assigns
+      |> assign(:img, featured_image_url(assigns.post, "medium"))
+      |> assign(:excerpt, post_card_excerpt(assigns.post))
+      |> assign(
+        :post_url,
+        build_post_url(
+          assigns.group_slug,
+          assigns.post,
+          assigns.current_language,
+          assigns.date_counts
+        )
+      )
+
+    ~H"""
+    <article
+      class={[
+        "card sm:card-side bg-base-200 shadow-md",
+        @animations && "transition hover:shadow-lg motion-safe:hover:-translate-y-0.5"
+      ]}
+      data-post-date={effective_post_date(@post)}
+    >
+      <%= if @img do %>
+        <figure class="h-40 w-full shrink-0 overflow-hidden bg-base-300 sm:h-auto sm:w-48">
+          <%= if @image_links do %>
+            <.link navigate={@post_url} class="block h-full w-full" tabindex="-1" aria-hidden="true">
+              <img
+                src={@img}
+                alt={@post.metadata.title || gettext("Featured image")}
+                class={[
+                  "h-full w-full object-cover",
+                  @animations && "transition-opacity hover:opacity-90"
+                ]}
+                loading="lazy"
+              />
+            </.link>
+          <% else %>
+            <img
+              src={@img}
+              alt={@post.metadata.title || gettext("Featured image")}
+              class="h-full w-full object-cover"
+              loading="lazy"
+            />
+          <% end %>
+        </figure>
+      <% end %>
+      <div class="card-body p-5">
+        <h2 class="card-title text-lg">
+          <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
+        </h2>
+        <p :if={@excerpt && @excerpt != ""} class="line-clamp-2 text-sm text-base-content/70">
+          {@excerpt}
+        </p>
+        <div class="card-actions mt-auto items-center justify-between pt-2">
+          <%= if has_publication_date?(@post) do %>
+            <time class="text-xs text-base-content/60" datetime={@post.metadata.published_at || ""}>
+              {format_post_date(@post, @group_slug, @date_counts)}
+            </time>
+          <% else %>
+            <span class="text-xs text-base-content/60"></span>
+          <% end %>
+          <.link navigate={@post_url} class="btn btn-sm btn-primary">
+            {gettext("Read More →")}
+          </.link>
+        </div>
+      </div>
+    </article>
+    """
+  end
 
   # ---------------------------------------------------------------------------
   # Band cards — the Featured/Latest bands' style-aware wrapper.
@@ -1182,7 +1604,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       ]}
       data-post-date={effective_post_date(@post)}
     >
-      <div class="flex flex-col gap-2">
+      <%!-- h-full so the footer's mt-auto can pin to the bottom when this
+        card is grid-stretched next to a taller sibling. --%>
+      <div class="flex h-full flex-col gap-2">
         <.band_badge band={@band} />
         <h3 class="text-2xl font-bold tracking-tight lg:text-3xl">
           <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
@@ -1267,7 +1691,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
   defp band_card_footer(assigns) do
     ~H"""
-    <div class="mt-2 flex items-center justify-between gap-4">
+    <div class="mt-auto flex items-center justify-between gap-4 pt-2">
       <%= if has_publication_date?(@post) do %>
         <time class="text-xs text-base-content/60" datetime={@post.metadata.published_at || ""}>
           {format_post_date(@post, @group_slug, @date_counts)}
@@ -1279,6 +1703,325 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         {gettext("Read More →")}
       </.link>
     </div>
+    """
+  end
+
+  # Comment author display: full name, else the email's local part.
+  defp comment_author_name(%{user: %{} = user}) do
+    name =
+      [Map.get(user, :first_name), Map.get(user, :last_name)]
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.join(" ")
+
+    cond do
+      name != "" -> name
+      is_binary(Map.get(user, :email)) -> user.email |> String.split("@") |> List.first()
+      true -> gettext("Reader")
+    end
+  end
+
+  defp comment_author_name(_), do: gettext("Reader")
+
+  defp can_comment?(assigns) do
+    match?(%{user: %{}}, assigns[:phoenix_kit_current_scope])
+  end
+
+  # Progressive enhancement for every comment form on the page (main
+  # thread, replies, note panels): with JS, the POST goes over fetch and
+  # the #comments / #pk-note-panels sections are re-fetched and swapped in
+  # place — no page reload, scroll and the open panel (:target) survive.
+  # Without JS (or on any fetch failure) the plain form POST still works.
+  # Same inline-script pattern as reading_progress/1 on these dead views.
+  defp comment_fetch_assets do
+    """
+    <script>
+    (function () {
+      if (window.__pkCommentFetch) return;
+      window.__pkCommentFetch = true;
+      function showError(form, message) {
+        var note = form.querySelector('[data-pk-comment-error]');
+        if (!note) {
+          note = document.createElement('p');
+          note.setAttribute('data-pk-comment-error', '');
+          note.className = 'text-error text-xs';
+          form.insertBefore(note, form.querySelector('textarea'));
+        }
+        note.textContent = message || 'Something went wrong — please try again.';
+      }
+      // Success path AFTER the server stored the comment: re-fetch the page
+      // and swap the thread sections. MUST NOT fall back to form.submit()
+      // from here — the POST already succeeded, a resubmit would duplicate
+      // the comment. Any failure downgrades to a plain reload (a GET).
+      function refreshSections() {
+        return fetch(window.location.pathname + window.location.search, {
+          credentials: 'same-origin'
+        })
+          .then(function (resp) {
+            if (!resp.ok) throw new Error('refetch failed');
+            return resp.text();
+          })
+          .then(function (html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var stale = false;
+            ['comments', 'pk-note-panels'].forEach(function (id) {
+              var cur = document.getElementById(id);
+              var next = doc.getElementById(id);
+              if (cur && next) cur.replaceWith(next);
+              else if (cur && !next) stale = true;
+            });
+            if (stale) throw new Error('sections vanished');
+            // Swapping the :target node drops the :target CSS match in
+            // browsers — re-open the hash's panel by class.
+            var hash = window.location.hash.slice(1);
+            var target = hash && document.getElementById(hash);
+            if (target && target.classList.contains('pk-note-panel')) {
+              target.classList.add('pk-open');
+            }
+          })
+          .catch(function () { window.location.reload(); });
+      }
+      // Real fragment navigation (opening another panel, the ✕/backdrop
+      // close links) hands control back to :target — clear the class.
+      window.addEventListener('hashchange', function () {
+        document.querySelectorAll('.pk-note-panel.pk-open').forEach(function (el) {
+          el.classList.remove('pk-open');
+        });
+      });
+      document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form.matches || !form.matches('form[data-pk-comment-form]')) return;
+        if (!window.fetch || !window.DOMParser || form.dataset.pkNative) return;
+        e.preventDefault();
+        var btn = form.querySelector('button[type=submit], input[type=submit]');
+        if (btn) btn.disabled = true;
+        fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'x-pk-comment-fetch': '1' },
+          credentials: 'same-origin'
+        })
+          .then(function (resp) { return resp.json(); })
+          .then(function (data) { return data; }, function () { return null; })
+          .then(function (data) {
+            if (data === null) {
+              // The POST failed, or its response wasn't JSON (proxy error,
+              // auth redirect, dropped connection). We CANNOT tell whether
+              // the server stored the comment, so we must not resubmit —
+              // a lost success response would post it twice. Reload instead:
+              // the reader sees the real state and can retype if needed.
+              window.location.reload();
+              return;
+            }
+            if (!data.ok) {
+              showError(form, data.message);
+              if (btn) btn.disabled = false;
+              return;
+            }
+            return refreshSections();
+          });
+      });
+    })();
+    </script>
+    """
+  end
+
+  # One comment in the thread, recursively rendering its replies. The reply
+  # form hides behind <details> — open/close works with no JS, several can
+  # be open at once, and nothing scroll-jumps.
+  defp comment_node(assigns) do
+    assigns = Map.put_new(assigns, :note_id, nil)
+
+    ~H"""
+    <li id={"comment-#{@comment.uuid}"}>
+      <div class="flex items-baseline gap-2 text-sm">
+        <span class="font-semibold">{comment_author_name(@comment)}</span>
+        <time class="text-xs text-base-content/50" datetime={DateTime.to_iso8601(@comment.inserted_at)}>
+          {Calendar.strftime(@comment.inserted_at, "%Y-%m-%d %H:%M")}
+        </time>
+      </div>
+      <div class="mt-1 text-sm">
+        {Publishing.Comments.render_content(@comment.content)}
+      </div>
+      <details :if={@can_comment} class="mt-1">
+        <summary class="cursor-pointer select-none text-xs text-base-content/50 hover:text-primary">
+          {gettext("Reply")}
+        </summary>
+        <div class="mt-2">
+          <%!-- note_id rides along for ANCHORING only: on a validation error
+                the controller redirects back, and without it the fragment
+                points at a comment inside a closed panel, bouncing a no-JS
+                reader out of the panel they were typing in. Threading still
+                comes from the parent alone (the seam ignores a client
+                note_id on replies). --%>
+          <.comment_form
+            action={@form_action}
+            post_uuid={@post_uuid}
+            token={@form_token}
+            parent_uuid={@comment.uuid}
+            note_id={@note_id}
+            compact={true}
+            placeholder={gettext("Write a reply…")}
+            submit_label={gettext("Post reply")}
+          />
+        </div>
+      </details>
+      <ol
+        :if={@comment.children != []}
+        class="mt-4 space-y-4 border-l-2 border-base-200 pl-4 sm:pl-5"
+      >
+        <.comment_node
+          :for={child <- @comment.children}
+          comment={child}
+          form_action={@form_action}
+          post_uuid={@post_uuid}
+          form_token={@form_token}
+          can_comment={@can_comment}
+          note_id={@note_id}
+        />
+      </ol>
+    </li>
+    """
+  end
+
+  # The POST comment form — shared by the top-level thread, per-comment
+  # reply <details>, and the note panels. Same protections everywhere:
+  # CSRF, honeypot, signed time-trap token; parent_uuid/note_id thread it.
+  defp comment_form(assigns) do
+    assigns =
+      assigns
+      |> Map.put_new(:parent_uuid, nil)
+      |> Map.put_new(:note_id, nil)
+      |> Map.put_new(:compact, false)
+      |> Map.put_new(:placeholder, gettext("Write a comment… (Markdown supported)"))
+      |> Map.put_new(:submit_label, gettext("Post comment"))
+
+    ~H"""
+    <form method="post" action={@action} data-pk-comment-form class="space-y-2">
+      <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+      <input type="hidden" name="post_uuid" value={@post_uuid} />
+      <input type="hidden" name="ft" value={@token} />
+      <input :if={@parent_uuid} type="hidden" name="parent_uuid" value={@parent_uuid} />
+      <input :if={@note_id} type="hidden" name="note_id" value={@note_id} />
+      <%!-- Honeypot — visually hidden; anything typed here is a bot. --%>
+      <div class="hidden" aria-hidden="true">
+        <label>
+          Website <input type="text" name="website" tabindex="-1" autocomplete="off" />
+        </label>
+      </div>
+      <textarea
+        name="content"
+        rows={if @compact, do: "2", else: "4"}
+        required
+        maxlength="10000"
+        placeholder={@placeholder}
+        class="textarea textarea-bordered w-full"
+      ></textarea>
+      <button type="submit" class={["btn btn-primary", if(@compact, do: "btn-xs", else: "btn-sm")]}>
+        {@submit_label}
+      </button>
+    </form>
+    """
+  end
+
+  @doc """
+  The right-side slide-out panels for "panel" notes style. CSS-only:
+  hidden off-canvas until the panel is the URL :target (the note ref in
+  the body links to it); the backdrop and ✕ link back to the ref, which
+  both closes the panel and returns the reader to the annotated phrase.
+  Public so the editor preview can render the same panels (with
+  commenting off) — preview must match production.
+  """
+  def note_panels(assigns) do
+    ~H"""
+    <section id="pk-note-panels" aria-label={gettext("Author notes")}>
+      <%!-- Closing a note used to point back at its reference marker in the
+        prose, on the reasoning that it returns you to what you were reading.
+        But opening a panel scrolls nothing — the panel is fixed — so you were
+        never taken away, and the "return" was a 440px jump to wherever the
+        browser chose to align that marker.
+
+        Closing instead targets this: fixed, one pixel, always inside the
+        viewport. `:target` moves off the panel so it shuts, and there is
+        nothing to scroll into view because it is already there. --%>
+      <span id="pk-note-dismiss" class="pk-note-dismiss" aria-hidden="true"></span>
+      <div :for={note <- @post_notes} id={"pk-note-panel-#{note.id}"} class="pk-note-panel">
+        <a href="#pk-note-dismiss" class="pk-note-panel-backdrop" aria-label={gettext("Close note")}>
+        </a>
+        <aside
+          role="dialog"
+          aria-label={gettext("Note %{number}", number: note.number)}
+          tabindex="-1"
+          class="bg-base-100 shadow-2xl border-l border-base-200"
+        >
+          <header class="flex items-center justify-between gap-2 border-b border-base-200 px-4 py-3">
+            <span class="text-sm font-semibold">
+              <span class="badge badge-primary badge-sm align-middle">{note.number}</span>
+              {gettext("Note")}
+            </span>
+            <a
+              href="#pk-note-dismiss"
+              class="btn btn-ghost btn-xs btn-circle"
+              aria-label={gettext("Close note")}
+            >
+              ✕
+            </a>
+          </header>
+          <div class="px-4 py-3 text-sm leading-relaxed">{note.body}</div>
+          <div :if={@comments_enabled} class="border-t border-base-200 px-4 py-3">
+            <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-base-content/50">
+              {ngettext(
+                "%{count} comment on this note",
+                "%{count} comments on this note",
+                Publishing.Comments.tree_size(Map.get(@note_comments, note.id, []))
+              )}
+            </h3>
+            <ol class="mb-4 space-y-4">
+              <.comment_node
+                :for={comment <- Map.get(@note_comments, note.id, [])}
+                comment={comment}
+                form_action={@form_action <> "#pk-note-panel-#{note.id}"}
+                post_uuid={@post_uuid}
+                form_token={@form_token}
+                can_comment={@can_comment}
+                note_id={note.id}
+              />
+            </ol>
+            <%= if @can_comment do %>
+              <.comment_form
+                action={@form_action <> "#pk-note-panel-#{note.id}"}
+                post_uuid={@post_uuid}
+                token={@form_token}
+                note_id={note.id}
+                compact={true}
+                placeholder={gettext("Comment on this note…")}
+              />
+            <% else %>
+              <div class="text-xs text-base-content/60">
+                <.link navigate={PhoenixKit.Utils.Routes.path("/users/log-in")} class="link">
+                  {gettext("Log in")}
+                </.link>
+                {gettext("to comment on this note.")}
+              </div>
+            <% end %>
+          </div>
+        </aside>
+      </div>
+    </section>
+    <style>
+      /* .pk-open mirrors :target — replacing a :target node in the DOM
+         (the fetch enhancement's section swap) makes browsers drop the
+         :target match, so the script re-opens the hash's panel by class. */
+      .pk-note-dismiss{position:fixed;top:0;left:0;width:1px;height:1px;pointer-events:none}
+    .pk-note-panel{position:fixed;inset:0;z-index:60;visibility:hidden;pointer-events:none}
+      .pk-note-panel:target,.pk-note-panel.pk-open{visibility:visible;pointer-events:auto}
+      .pk-note-panel-backdrop{position:absolute;inset:0;background:rgb(0 0 0/.25);opacity:0;transition:opacity .2s ease}
+      .pk-note-panel:target .pk-note-panel-backdrop,.pk-note-panel.pk-open .pk-note-panel-backdrop{opacity:1}
+      .pk-note-panel aside{position:absolute;top:0;right:0;bottom:0;width:min(26rem,92vw);overflow-y:auto;transform:translateX(100%);transition:transform .25s ease}
+      .pk-note-panel:target aside,.pk-note-panel.pk-open aside{transform:none}
+      @media (prefers-reduced-motion: reduce){
+        .pk-note-panel-backdrop,.pk-note-panel aside{transition:none}
+      }
+    </style>
     """
   end
 
@@ -1325,9 +2068,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       }
     >
       <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
+      <.jsonld_script
+        :if={jsonld_enabled?()}
+        og={assigns[:og]}
+        post={@post}
+        language={@current_language}
+      />
       <.scrollbar_style_tag style={assigns[:scrollbar_style] || "default"} />
       <.reading_progress enabled={assigns[:scroll_progress_enabled] || false} />
       <.reading_headings enabled={assigns[:scroll_headings_enabled] || false} />
+      <.helix_scroll_fallback />
       <article class={["post-container mx-auto px-6 py-8", post_width_class(assigns[:post_width])]}>
         <%!-- Top back link (gated on the group's show_top_back_link setting,
           default on) — a compact muted twin of the footer link, hugging the
@@ -1398,6 +2148,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           <div :if={assigns[:show_reading_time]} class="text-sm text-base-content/60 mt-2">
             {reading_time_label(@html_content)}
           </div>
+          <div :if={(assigns[:view_count] || 0) > 0} class="text-sm text-base-content/60 mt-2">
+            {ngettext("%{count} view", "%{count} views", @view_count)}
+          </div>
           <%!-- Toolbar row renders only when at least one tool does — an empty
             flex row still costs its mt-4, leaving an awkward gap under the
             title on single-language public views with no admin session. --%>
@@ -1467,15 +2220,154 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <% end %>
           </div>
         </header>
-        <%!-- Tags (gated on the group's show_tags setting) --%>
-        <% post_tags = if assigns[:show_tags], do: post_tag_list(@post), else: [] %>
-        <div :if={post_tags != []} class="flex flex-wrap gap-2 mb-8">
-          <span :for={tag <- post_tags} class="badge badge-outline badge-sm">{tag}</span>
-        </div>
+        <%!-- Audio version — present whenever the live version carries one. --%>
+        <% audio_uuid = Map.get(@post.metadata, :audio_uuid) %>
+        <figure :if={audio_uuid} class="mb-8">
+          <audio
+            controls
+            preload="none"
+            class="w-full"
+            src={PhoenixKit.Modules.Storage.URLSigner.signed_url(audio_uuid, "original")}
+          >
+            {gettext("Your browser does not support the audio element.")}
+          </audio>
+          <figcaption class="mt-1 text-xs text-base-content/60">
+            {gettext("Listen to this post")}
+          </figcaption>
+        </figure>
         <%!-- Post Content --%>
         <div class="markdown-content max-w-none">
           {raw(@html_content)}
         </div>
+        <%!-- Categories (gated on show_categories) — chips link to their
+          archives. They sit BELOW the content: they're filing metadata, not
+          something a reader needs before the first paragraph. Tags aren't
+          listed at all any more — they live inline in the prose as #hashtags,
+          already rendered as links to the same archives, so a chip row just
+          repeated them. --%>
+        <% post_categories = assigns[:post_categories] || [] %>
+        <%!-- Everything else on this page announces a change of register with
+              a rule: the header closes with one, comments and the footer open
+              with one. These two sat between the prose and the comments on
+              margin alone, so the article appeared to trail off into its own
+              filing metadata.
+
+              The rule goes on whichever of the two comes first, not on both —
+              two rules for one boundary reads as a table. Which one that is
+              depends on the group's settings, hence the flag rather than a
+              fixed class.
+
+              Bare `border-t`, deliberately: the header, comments and footer
+              rules all use the default border colour, which resolves to a
+              near-black oklch(0.21 …). Naming `border-base-200` here drew it
+              at oklch(0.96 …) — all but invisible, and visibly weaker than
+              the rules a few lines above and below it. --%>
+        <% trailing_rule = "mt-6 border-t pt-4" %>
+        <div
+          :if={post_categories != []}
+          class={["flex flex-wrap gap-2", trailing_rule]}
+        >
+          <.link
+            :for={category <- post_categories}
+            navigate={term_archive_path(@current_language, @group_slug, {:category, category.slug})}
+            class="badge badge-primary badge-outline badge-sm hover:badge-primary"
+          >
+            {PublishingCategory.translated_name(category, @current_language)}
+          </.link>
+        </div>
+        <%!-- Chronological neighbors (gated on the group's show_prev_next
+          setting; either side absent at the chronology's edge). Newer on the
+          left mirrors the newest-first listing order. --%>
+        <nav
+          :if={assigns[:newer_post] || assigns[:older_post]}
+          class={[
+            "grid gap-4 sm:grid-cols-2",
+            # Following the categories, this is the second half of one
+            # trailing block rather than a new section, so it sits close. The
+            # old `mt-8` was sized for a boundary it used to mark itself and
+            # left a gap nearly as tall as the chips row above it.
+            if(post_categories == [], do: trailing_rule, else: "mt-4")
+          ]}
+          aria-label={gettext("More posts")}
+        >
+          <.link
+            :if={assigns[:newer_post]}
+            navigate={@newer_post.url}
+            class="group flex flex-col gap-1 rounded-lg border border-base-200 p-4 transition-colors hover:border-primary/40"
+          >
+            <span class="inline-flex items-center gap-1 text-xs text-base-content/50">
+              <.icon name="hero-arrow-left" class="w-3 h-3" /> {gettext("Newer")}
+            </span>
+            <span class="font-medium group-hover:text-primary">{@newer_post.title}</span>
+          </.link>
+          <.link
+            :if={assigns[:older_post]}
+            navigate={@older_post.url}
+            class="group flex flex-col gap-1 rounded-lg border border-base-200 p-4 text-right transition-colors hover:border-primary/40 sm:col-start-2"
+          >
+            <span class="inline-flex items-center justify-end gap-1 text-xs text-base-content/50">
+              {gettext("Older")} <.icon name="hero-arrow-right" class="w-3 h-3" />
+            </span>
+            <span class="font-medium group-hover:text-primary">{@older_post.title}</span>
+          </.link>
+        </nav>
+        <%!-- Comments (gated on comments_enabled + the optional comments
+          module). Dead-view thread + plain POST form — works with no JS;
+          the controller handles honeypot/time-trap/auth and redirects back
+          here with a flash. --%>
+        <%!-- The enhancement script lives OUTSIDE #comments: that section
+          gets swapped by the script itself, and a document-level listener
+          shouldn't ride a subtree it replaces. --%>
+        <div :if={assigns[:comments_enabled]} class="hidden" aria-hidden="true">
+          {Phoenix.HTML.raw(comment_fetch_assets())}
+        </div>
+        <section :if={assigns[:comments_enabled]} id="comments" class="mt-10 border-t pt-6">
+          {Publishing.Comments.content_styles()}
+          <h2 class="mb-4 text-lg font-semibold">
+            {ngettext("%{count} comment", "%{count} comments", @post_comment_count)}
+          </h2>
+          <div :if={@post_comments == []} class="mb-6 text-sm text-base-content/60">
+            {gettext("No comments yet — be the first.")}
+          </div>
+          <ol class="mb-8 space-y-5">
+            <.comment_node
+              :for={comment <- @post_comments}
+              comment={comment}
+              form_action={build_post_url(@group_slug, @post, @current_language) <> "#comments"}
+              post_uuid={@post.uuid}
+              form_token={assigns[:comment_form_token]}
+              can_comment={can_comment?(assigns)}
+            />
+          </ol>
+          <%= if can_comment?(assigns) do %>
+            <.comment_form
+              action={build_post_url(@group_slug, @post, @current_language) <> "#comments"}
+              post_uuid={@post.uuid}
+              token={assigns[:comment_form_token]}
+            />
+          <% else %>
+            <div class="rounded-lg border border-dashed border-base-300 p-4 text-sm text-base-content/60">
+              <.link navigate={PhoenixKit.Utils.Routes.path("/users/log-in")} class="link">
+                {gettext("Log in")}
+              </.link>
+              {gettext("to join the conversation.")}
+            </div>
+          <% end %>
+        </section>
+        <%!-- Author-note slide-out panels ("panel" notes style). Pure CSS:
+          a note ref in the body targets its panel; :target slides it in
+          from the right — no JS. Each panel carries the note text and,
+          when commenting is on, that note's own comment thread. --%>
+        <.note_panels
+          :if={assigns[:post_notes] != nil and assigns.post_notes != []}
+          post_notes={@post_notes}
+          note_comments={assigns[:note_comments] || %{}}
+          comments_enabled={assigns[:comments_enabled]}
+          form_action={build_post_url(@group_slug, @post, @current_language)}
+          post_uuid={@post.uuid}
+          form_token={assigns[:comment_form_token]}
+          can_comment={can_comment?(assigns)}
+        />
         <%!-- Post Footer — same compact muted link as the top, no button chrome. --%>
         <footer class="mt-6 border-t pt-2">
           <.link
@@ -1516,6 +2408,48 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       "" -> base_path
       encoded -> base_path <> "?" <> encoded
     end
+  end
+
+  @doc """
+  Builds the public URL for a group's RSS feed (`…/<group>/feed.xml`) or a
+  term archive's (`…/<group>/category/<slug>/feed.xml`, `…/tag/<tag>/feed.xml`),
+  with the same locale-prefix rules as `group_listing_path/3`.
+  """
+  def feed_path(language, group_slug, scope \\ nil) do
+    language =
+      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+
+    tail =
+      case scope do
+        {:category, slug} -> ["category", slug, "feed.xml"]
+        {:tag, tag} -> ["tag", tag, "feed.xml"]
+        nil -> ["feed.xml"]
+      end
+
+    segments =
+      if LanguageHelpers.use_language_prefix?(language),
+        do: [language, group_slug | tail],
+        else: [group_slug | tail]
+
+    build_public_path(segments)
+  end
+
+  @doc """
+  Public URL for a category archive (`…/<group>/category/<slug>`) or tag
+  archive (`…/<group>/tag/<tag>`).
+  """
+  def term_archive_path(language, group_slug, {type, value}) do
+    language =
+      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+
+    tail = [to_string(type), value]
+
+    segments =
+      if LanguageHelpers.use_language_prefix?(language),
+        do: [language, group_slug | tail],
+        else: [group_slug | tail]
+
+    build_public_path(segments)
   end
 
   @doc """
@@ -1826,7 +2760,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   defp post_width_class("wide"), do: "max-w-6xl"
   defp post_width_class(_), do: "max-w-4xl"
 
-  # Estimates reading time from the rendered HTML at ~200 words/min (min 1 min).
+  # Estimates reading time from the rendered HTML (min 1 min).
+  #
+  # The rate is a setting because 200 wpm is an English prose figure, and the
+  # label is shown to whoever the site is written for: dense technical writing
+  # is read slower, a language with longer words counts fewer of them for the
+  # same reading, and a site can simply disagree. Hardcoding it made the one
+  # number on the page that is a claim about the READER unarguable.
   defp reading_time_label(html) when is_binary(html) do
     words =
       html
@@ -1834,21 +2774,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       |> String.split(~r/\s+/, trim: true)
       |> length()
 
-    minutes = max(1, ceil(words / 200))
+    minutes = max(1, ceil(words / reading_words_per_minute()))
     ngettext("%{count} min read", "%{count} min read", minutes)
   end
 
   defp reading_time_label(_), do: ""
 
-  # Extracts a clean list of tag strings from a post's metadata.
-  defp post_tag_list(%{metadata: %{tags: tags}}) when is_list(tags) do
-    tags
-    |> Enum.map(&to_string/1)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
-  end
+  @default_reading_wpm 200
 
-  defp post_tag_list(_), do: []
+  defp reading_words_per_minute do
+    case Settings.get_setting_cached("publishing_reading_wpm") do
+      nil ->
+        @default_reading_wpm
+
+      value when is_integer(value) and value > 0 ->
+        value
+
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {n, _} when n > 0 -> n
+          _ -> @default_reading_wpm
+        end
+
+      _ ->
+        @default_reading_wpm
+    end
+  end
 
   # Formats a timestamp post's date for display (e.g., "December 31, 2025")
   defp format_timestamp_date(post) do
@@ -1984,7 +2935,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         flag: translation.flag || "",
         url: translation.url,
         current: translation.current || false,
-        status: "published",
+        status: Constants.status_published(),
         exists: true
       }
     end)

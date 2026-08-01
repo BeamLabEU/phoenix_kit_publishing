@@ -8,6 +8,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
 
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Persistence
+
   import Ecto.Query, only: [from: 2]
 
   alias PhoenixKit.Modules.Publishing
@@ -261,6 +263,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Actually enqueues the translation job (after confirmation if needed).
   """
   def do_enqueue_translation(socket, target_languages) do
+    # Flush pending source edits FIRST. The worker reads the source text back
+    # out of the DB, and enqueueing also locks this editor — so unsaved prose
+    # would be translated from the previous saved copy while its own queued
+    # autosave took the locked no-op branch and dropped the timer.
+    case flush_source_before_enqueue(socket) do
+      {:blocked, socket} -> {:noreply, socket}
+      {:ok, socket} -> do_enqueue_translation_now(socket, target_languages)
+    end
+  end
+
+  defp flush_source_before_enqueue(socket) do
+    if socket.assigns[:has_pending_changes] and not socket.assigns[:readonly?] do
+      {:noreply, saved} = Persistence.perform_save(socket)
+
+      if saved.assigns.has_pending_changes do
+        {:blocked, saved}
+      else
+        {:ok, saved}
+      end
+    else
+      {:ok, socket}
+    end
+  end
+
+  defp do_enqueue_translation_now(socket, target_languages) do
     user = socket.assigns[:phoenix_kit_current_scope]
     user_uuid = if user, do: user.user.uuid, else: nil
     post = socket.assigns.post

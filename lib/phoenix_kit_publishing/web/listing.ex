@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
@@ -57,9 +58,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       |> assign(:translating_posts, %{})
       |> assign(:pending_post_updates, %{})
       |> assign(:visible_count, 20)
+      |> assign(:post_search, "")
       |> assign(:post_view_mode, default_mode)
       |> assign(:post_status_counts, status_counts)
       |> assign(:mount_group_slug, group_slug)
+      |> assign_view_totals()
 
     {:ok, socket}
   end
@@ -118,11 +121,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     {:noreply, assign(socket, :visible_count, socket.assigns.visible_count + 20)}
   end
 
+  def handle_event("search_posts", %{"q" => q}, socket) do
+    {:noreply,
+     socket
+     |> assign(:post_search, String.slice(q, 0, 100))
+     |> assign(:visible_count, 20)}
+  end
+
   def handle_event("refresh", _params, socket) do
     {:noreply, reload_current_view(socket)}
   end
 
-  @valid_post_views ["published", "draft", "archived", "trashed"]
+  @status_draft Constants.status_draft()
+  @status_published Constants.status_published()
+  @status_archived Constants.status_archived()
+  @valid_post_views Constants.post_statuses()
 
   def handle_event("switch_post_view", %{"mode" => mode}, socket)
       when mode in @valid_post_views do
@@ -192,7 +205,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     group_slug = socket.assigns.group_slug
 
     uuid = params["uuid"]
-    url = Helpers.build_edit_url(group_slug, %{uuid: uuid}, lang: lang_code)
+
+    url =
+      Helpers.build_edit_url(group_slug, %{uuid: uuid},
+        lang: lang_code,
+        version: live_version_for(socket, uuid)
+      )
 
     {:noreply, push_navigate(socket, to: url)}
   end
@@ -202,7 +220,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
     case params["uuid"] do
       uuid when is_binary(uuid) and uuid != "" ->
-        url = Helpers.build_edit_url(group_slug, %{uuid: uuid}, lang: lang_code)
+        url =
+          Helpers.build_edit_url(group_slug, %{uuid: uuid},
+            lang: lang_code,
+            version: live_version_for(socket, uuid)
+          )
+
         {:noreply, push_navigate(socket, to: url)}
 
       _ ->
@@ -221,8 +244,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       ) do
     new_status =
       case current_status do
-        "draft" -> "published"
-        "published" -> "archived"
+        @status_draft -> @status_published
+        @status_published -> @status_archived
         "archived" -> "draft"
         _ -> "draft"
       end
@@ -257,6 +280,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     |> assign(:posts, posts)
     |> assign(:post_status_counts, build_status_counts(all_posts, trashed_count))
     |> assign(:loading, false)
+    |> assign_view_totals()
   end
 
   defp build_status_counts(posts, trashed_count) do
@@ -487,6 +511,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         socket
         |> assign(:posts, filtered_posts)
         |> assign(:post_status_counts, build_status_counts(all_posts, trashed_count))
+        |> assign_view_totals()
     end
   end
 
@@ -674,6 +699,57 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
+  # The live (published) version number for an admin-card edit link — nil for
+  # unpublished posts, which then open the newest revision (build_edit_url
+  # drops a nil version param).
+  defp live_version_for(socket, uuid) do
+    Enum.find_value(socket.assigns[:posts] || [], fn post ->
+      if post[:uuid] == uuid, do: post[:live_version]
+    end)
+  end
+
+  # Batched all-time view totals for the loaded posts — %{} when the group
+  # doesn't count views, so the card meta renders nothing.
+  defp assign_view_totals(socket) do
+    group = socket.assigns[:current_group]
+    posts = socket.assigns[:posts] || []
+
+    totals =
+      if group && group["views_enabled"] && posts != [] do
+        PhoenixKit.Modules.Publishing.Views.totals(Enum.map(posts, & &1.uuid))
+      else
+        %{}
+      end
+
+    assign(socket, :view_totals, totals)
+  end
+
+  # Case-insensitive substring over the primary title, slug, and every
+  # per-language title — an admin searching "Blogi" finds the post whose
+  # Estonian translation carries it even while the list shows English.
+  defp filter_posts_by_search(posts, query) do
+    case String.trim(query) do
+      "" ->
+        posts
+
+      trimmed ->
+        needle = String.downcase(trimmed)
+
+        Enum.filter(posts, fn post ->
+          haystack =
+            [
+              post.metadata.title || "",
+              post[:slug] || "",
+              post[:language_titles] |> Kernel.||(%{}) |> Map.values() |> Enum.join(" ")
+            ]
+            |> Enum.join(" ")
+            |> String.downcase()
+
+          String.contains?(haystack, needle)
+        end)
+    end
+  end
+
   defp load_date_time_settings do
     Settings.get_settings_cached(
       ["date_format", "time_format", "time_zone"],
@@ -719,6 +795,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     |> assign(:posts, filtered_posts)
     |> assign(:post_view_mode, default_mode)
     |> assign(:visible_count, 20)
+    |> assign(:post_search, "")
+    |> assign_view_totals()
     |> assign(:endpoint_url, extract_endpoint_url(uri))
     |> assign(:post_status_counts, status_counts)
     |> assign(:loading, false)
@@ -726,11 +804,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   defp default_tab_mode(status_counts) do
     cond do
-      Map.get(status_counts, "published", 0) > 0 -> "published"
+      Map.get(status_counts, @status_published, 0) > 0 -> @status_published
       Map.get(status_counts, "draft", 0) > 0 -> "draft"
       Map.get(status_counts, "archived", 0) > 0 -> "archived"
       Map.get(status_counts, "trashed", 0) > 0 -> "trashed"
-      true -> "published"
+      true -> @status_published
     end
   end
 
@@ -808,7 +886,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     version_statuses = Map.get(post, :version_statuses, %{})
 
     version_statuses
-    |> Enum.find(fn {_version, status} -> status == "published" end)
+    |> Enum.find(fn {_version, status} -> Constants.published?(status) end)
     |> case do
       {version, _status} -> version
       nil -> nil
@@ -830,11 +908,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     # 1. Check for published version
     published =
       version_statuses
-      |> Enum.find(fn {_version, status} -> status == "published" end)
+      |> Enum.find(fn {_version, status} -> Constants.published?(status) end)
 
     case published do
       {version, _status} ->
-        {version, "published", :live}
+        {version, @status_published, :live}
 
       nil ->
         find_draft_or_latest_version(version_statuses, available_versions, post)
@@ -948,7 +1026,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
-  defp apply_status_change(group_slug, post_uuid, "published", actor_uuid) do
+  defp apply_status_change(group_slug, post_uuid, @status_published, actor_uuid) do
     case Publishing.read_post_by_uuid(post_uuid) do
       {:ok, post} ->
         Publishing.publish_version(group_slug, post_uuid, post[:version] || 1,
@@ -1015,7 +1093,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content">
         {(@current_group && @current_group["name"]) || @group_slug || gettext("Group")}
       </h1>
-      <% has_published = Map.get(@post_status_counts, "published", 0) > 0 %>
+      <% has_published = Map.get(@post_status_counts, Constants.status_published(), 0) > 0 %>
       <%= if has_published do %>
         <div class="text-sm text-base-content/60 mt-0.5">
           <p>
@@ -1039,6 +1117,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         >
           <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" /> {gettext("Refresh")}
         </button>
+        <.link
+          navigate={Routes.path("/admin/publishing/categories/#{group_slug}")}
+          class="btn btn-outline btn-sm shadow-none"
+        >
+          <.icon name="hero-tag" class="w-4 h-4 mr-1" /> {gettext("Categories")}
+        </.link>
         <.link
           navigate={Routes.path("/admin/publishing/edit-group/#{group_slug}")}
           class="btn btn-outline btn-sm shadow-none"
@@ -1088,6 +1172,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
           </div>
         <% end %>
 
+        <%!-- Admin post filter — in-memory over the already-loaded set (all
+          posts live in assigns; visible_count only truncates display), so it
+          matches across every language title + slug instantly. --%>
+        <form :if={not @loading} phx-change="search_posts" class="mb-3" onsubmit="return false">
+          <label class="input input-sm input-bordered flex w-full max-w-xs items-center gap-2">
+            <.icon name="hero-magnifying-glass" class="w-4 h-4 opacity-50" />
+            <input
+              type="search"
+              name="q"
+              value={@post_search}
+              placeholder={gettext("Filter posts…")}
+              phx-debounce="200"
+              maxlength="100"
+              class="grow"
+            />
+          </label>
+        </form>
+
         <%= if @loading do %>
           <%!-- Skeleton placeholders matching post card layout.
                Uses bg-base-200 instead of DaisyUI skeleton class because
@@ -1115,19 +1217,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
             <% end %>
           </div>
         <% else %>
-          <%= if @posts == [] do %>
+          <% filtered_posts = filter_posts_by_search(@posts, @post_search) %>
+          <%= if filtered_posts == [] do %>
             <div class="text-center py-8 text-base-content/60">
-              <%= if @post_view_mode == "trashed" do %>
-                <.icon name="hero-trash" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p class="text-sm">{gettext("Trash is empty")}</p>
-              <% else %>
-                <.icon name="hero-document-text" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p class="text-sm">{gettext("No posts found")}</p>
+              <%= cond do %>
+                <% @post_search != "" and @posts != [] -> %>
+                  <.icon name="hero-magnifying-glass" class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p class="text-sm">{gettext("No posts match your filter")}</p>
+                <% @post_view_mode == "trashed" -> %>
+                  <.icon name="hero-trash" class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p class="text-sm">{gettext("Trash is empty")}</p>
+                <% true -> %>
+                  <.icon name="hero-document-text" class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p class="text-sm">{gettext("No posts found")}</p>
               <% end %>
             </div>
           <% else %>
             <% date_counts = PublishingHTML.build_date_counts(@posts) %>
-            <% visible_posts = Enum.take(@posts, @visible_count) %>
+            <% visible_posts = Enum.take(filtered_posts, @visible_count) %>
             <div class="grid gap-4">
               <%= for post <- visible_posts do %>
                 <% group_slug =
@@ -1156,14 +1263,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                         <span>
                           {format_datetime(post, @phoenix_kit_current_user, @date_time_settings)}
                         </span>
+                        <span :if={@view_totals[post.uuid]} class="inline-flex items-center gap-1">
+                          <.icon name="hero-eye" class="w-3 h-3" />
+                          {@view_totals[post.uuid]}
+                        </span>
                         <%!-- Version info (show published version and count) --%>
                         <%= if is_versioned do %>
                           <% {display_version, display_status, _label} =
                             get_display_version(post) %>
                           <span class={[
                             "badge badge-xs gap-1",
-                            display_status == "published" && "badge-success",
-                            display_status != "published" && "badge-ghost"
+                            Constants.published?(display_status) && "badge-success",
+                            !Constants.published?(display_status) && "badge-ghost"
                           ]}>
                             <%= if version_count > 1 do %>
                               {ngettext("%{count} version", "%{count} versions", version_count,
@@ -1179,10 +1290,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                         <%= if @post_view_mode == "trashed" do %>
                           {post.metadata.title || gettext("Untitled post")}
                         <% else %>
+                          <%!-- Published posts open pinned to the LIVE version
+                            (what readers see); drafts open the newest revision.
+                            All versions stay editable (variant versioning). --%>
                           <.link
                             href={
-                              PhoenixKit.Utils.Routes.path(
-                                "/admin/publishing/#{group_slug}/#{post.uuid}/edit?lang=#{post_primary_lang}"
+                              Helpers.build_edit_url(group_slug, post,
+                                lang: post_primary_lang,
+                                version: post[:live_version]
                               )
                             }
                             class="hover:text-primary transition-colors"
@@ -1191,7 +1306,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                           </.link>
                         <% end %>
                       </h3>
-                      <%= if post_status == "published" and @post_view_mode != "trashed" do %>
+                      <%= if Constants.published?(post_status) and @post_view_mode != "trashed" do %>
                         <p class="text-xs text-base-content/50">
                           <span class="font-medium text-base-content">
                             {gettext("Public URL")}:
@@ -1227,7 +1342,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                             <input type="hidden" name="uuid" value={post[:uuid]} />
                             <div class={[
                               "inline-flex items-center h-[2.5em] rounded-lg border transition-colors",
-                              post_status == "published" &&
+                              Constants.published?(post_status) &&
                                 "bg-success/10 border-success/20 hover:bg-success/20",
                               post_status == "draft" &&
                                 "bg-warning/10 border-warning/20 hover:bg-warning/20",
@@ -1236,7 +1351,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                             ]}>
                               <label class={[
                                 "select text-xs font-medium min-h-0 h-full pl-2.5 pr-7 bg-transparent border-none focus:outline-none cursor-pointer w-auto",
-                                post_status == "published" && "text-success",
+                                Constants.published?(post_status) && "text-success",
                                 post_status == "draft" && "text-warning",
                                 post_status == "archived" && "text-base-content/60"
                               ]}>
@@ -1244,7 +1359,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                                   <option value="draft" selected={post_status == "draft"}>
                                     {gettext("Draft")}
                                   </option>
-                                  <option value="published" selected={post_status == "published"}>
+                                  <option value="published" selected={Constants.published?(post_status)}>
                                     {gettext("Published")}
                                   </option>
                                   <option value="archived" selected={post_status == "archived"}>
@@ -1338,7 +1453,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                 </div>
               <% end %>
             </div>
-            <%= if length(@posts) > @visible_count do %>
+            <%= if length(filtered_posts) > @visible_count do %>
               <div class="flex justify-center mt-4">
                 <button
                   type="button"

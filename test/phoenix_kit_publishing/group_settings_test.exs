@@ -68,7 +68,6 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
       assert defaults["post_width"] == PublishingGroup.post_width(empty)
       assert defaults["show_featured_image"] == PublishingGroup.show_featured_image?(empty)
       assert defaults["show_reading_time"] == PublishingGroup.show_reading_time?(empty)
-      assert defaults["show_tags"] == PublishingGroup.show_tags?(empty)
       assert defaults["show_post_count"] == PublishingGroup.show_post_count?(empty)
       assert defaults["show_top_back_link"] == PublishingGroup.show_top_back_link?(empty)
       assert defaults["listing_image_links"] == PublishingGroup.listing_image_links?(empty)
@@ -85,7 +84,7 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
     test "normalizes booleans and enums and preserves unknown keys" do
       params = %{
         "post_width" => "wide",
-        "show_tags" => "true",
+        "show_post_count" => "true",
         "featured_enabled" => false,
         # not governed by this module — must pass through untouched
         "name" => "My Blog"
@@ -93,16 +92,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
 
       assert {:ok, out} = GroupSettings.validate_params(params)
       assert out["post_width"] == "wide"
-      assert out["show_tags"] == true
+      assert out["show_post_count"] == true
       assert out["featured_enabled"] == false
       assert out["name"] == "My Blog"
     end
 
     test "accepts on/off and true/false string forms for booleans" do
-      assert {:ok, %{"show_tags" => true}} = GroupSettings.validate_params(%{"show_tags" => "on"})
+      assert {:ok, %{"show_post_count" => true}} =
+               GroupSettings.validate_params(%{"show_post_count" => "on"})
 
-      assert {:ok, %{"show_tags" => false}} =
-               GroupSettings.validate_params(%{"show_tags" => "off"})
+      assert {:ok, %{"show_post_count" => false}} =
+               GroupSettings.validate_params(%{"show_post_count" => "off"})
     end
 
     test "rejects an out-of-range enum value with a helpful reason" do
@@ -113,8 +113,8 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
     end
 
     test "rejects a non-boolean value for a boolean setting" do
-      assert {:error, [%{key: "show_tags", reason: reason}]} =
-               GroupSettings.validate_params(%{"show_tags" => "maybe"})
+      assert {:error, [%{key: "show_post_count", reason: reason}]} =
+               GroupSettings.validate_params(%{"show_post_count" => "maybe"})
 
       assert reason =~ "boolean"
     end
@@ -134,9 +134,9 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
       # update_group/3 only matches string keys — if the validated result kept
       # atom keys, feeding it to update_group would silently persist nothing.
       assert {:ok, out} =
-               GroupSettings.validate_params(%{post_width: "wide", show_tags: true})
+               GroupSettings.validate_params(%{post_width: "wide", show_post_count: true})
 
-      assert out == %{"post_width" => "wide", "show_tags" => true}
+      assert out == %{"post_width" => "wide", "show_post_count" => true}
       refute Map.has_key?(out, :post_width)
     end
 

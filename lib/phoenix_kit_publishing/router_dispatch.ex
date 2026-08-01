@@ -115,11 +115,15 @@ defmodule PhoenixKitPublishing.RouterDispatch do
   routes (also nested under the prefix).
   """
   @spec maybe_rewrite(Plug.Conn.t(), String.t()) :: {:rewrite, Plug.Conn.t()} | :pass
-  # Public publishing routes are read-only — only GET/HEAD are rewritten. Without
-  # this a host's `POST /blog/...` (blog being a group) would be diverted into the
-  # GET-only internal scope and 404, shadowing the host's own form/webhook route.
+  # GET/HEAD (reads) and POST (the public comment form, routed to the internal
+  # scope's `post` routes) are rewritten. Everything else (PUT/DELETE/PATCH —
+  # shapes publishing never serves) still passes through, so a host's own
+  # webhook/API route on a group-colliding path keeps working. NOTE: a host
+  # POST route on a URL that IS a known group's path is shadowed by the
+  # comment route — same trade-off the GET catch-all always had, with the
+  # same escape (rename the group or the host route).
   def maybe_rewrite(%Plug.Conn{method: method}, url_prefix)
-      when is_binary(url_prefix) and method not in ["GET", "HEAD"],
+      when is_binary(url_prefix) and method not in ["GET", "HEAD", "POST"],
       do: :pass
 
   def maybe_rewrite(%Plug.Conn{path_info: path_info} = conn, url_prefix)

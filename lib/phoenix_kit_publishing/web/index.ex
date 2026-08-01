@@ -299,7 +299,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       slug: group_slug,
       mode: db_group["mode"],
       posts_count: length(posts),
-      published_count: Map.get(status_counts, "published", 0),
+      published_count: Map.get(status_counts, Constants.status_published(), 0),
       draft_count: Map.get(status_counts, "draft", 0),
       archived_count: Map.get(status_counts, "archived", 0),
       languages: languages,

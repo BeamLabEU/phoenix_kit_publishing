@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Preview do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
   alias PhoenixKit.Utils.Routes
@@ -238,7 +239,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Preview do
 
         dp ->
           status = Map.get(dp.metadata, :status, "draft")
-          {status, status == "published"}
+          {status, Constants.published?(status)}
       end
 
     socket

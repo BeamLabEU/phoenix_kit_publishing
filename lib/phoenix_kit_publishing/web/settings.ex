@@ -20,6 +20,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @render_cache_key "publishing_render_cache_enabled"
   @show_language_switcher_key "publishing_show_language_switcher"
   @render_og_tags_key "publishing_render_og_tags"
+  @feeds_enabled_key "publishing_feeds_enabled"
+  @render_jsonld_key "publishing_render_jsonld"
   @slug_style_key "publishing_slug_style"
   @valid_slug_styles ~w(transliterate unicode ascii)
 
@@ -58,7 +60,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
         :render_og_tags,
         Settings.get_boolean_setting(@render_og_tags_key, true)
       )
+      |> assign(:feeds_enabled, Settings.get_boolean_setting(@feeds_enabled_key, true))
+      |> assign(:render_jsonld, Settings.get_boolean_setting(@render_jsonld_key, true))
       |> assign(:slug_style, Settings.get_setting(@slug_style_key, "transliterate"))
+      |> assign_numbers()
       |> assign(
         :memory_cache_enabled,
         Settings.get_setting(@memory_cache_key, "true") == "true"
@@ -130,7 +135,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     Settings.update_setting(@memory_cache_key, to_string(new_value))
 
     # If disabling memory cache, erase ALL listing-cache entries (every group +
-    # all three persistent_term prefixes) so a later re-enable can't serve stale
+    # both persistent_term prefixes) so a later re-enable can't serve stale
     # pre-disable data. The old loop only cleared the posts key for the groups it
     # happened to have loaded (L7).
     if !new_value, do: ListingCache.erase_all()
@@ -186,6 +191,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      )}
   end
 
+  def handle_event("toggle_feeds_enabled", _params, socket) do
+    new_value = !socket.assigns.feeds_enabled
+    Settings.update_boolean_setting(@feeds_enabled_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:feeds_enabled, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do: gettext("RSS feeds enabled — every group serves /<group>/feed.xml"),
+         else: gettext("RSS feeds disabled — feed URLs return 404")
+       )
+     )}
+  end
+
+  def handle_event("toggle_render_jsonld", _params, socket) do
+    new_value = !socket.assigns.render_jsonld
+    Settings.update_boolean_setting(@render_jsonld_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:render_jsonld, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do: gettext("JSON-LD structured data enabled on post pages"),
+         else: gettext("JSON-LD structured data disabled")
+       )
+     )}
+  end
+
   def handle_event("change_slug_style", %{"slug_style" => style}, socket)
       when style in @valid_slug_styles do
     Settings.update_setting(@slug_style_key, style)
@@ -200,6 +237,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   end
 
   def handle_event("change_slug_style", _params, socket), do: {:noreply, socket}
+
+  # Three numbers that were previously not settable at all. `posts_per_page`
+  # is the sharpest case: the reader was already there in the code, so the
+  # setting existed and simply had no control — changing it meant editing the
+  # settings table by hand.
+  #
+  # One handler for all three, keyed by field, because they differ only in
+  # their bounds. Values are clamped rather than rejected: a number typed into
+  # a box is a preference, and refusing it outright over a typo helps nobody.
+  @number_settings %{
+    "publishing_posts_per_page" => {1, 200, 20},
+    "publishing_reading_wpm" => {50, 1000, 200},
+    "publishing_editor_lock_minutes" => {1, 480, 30}
+  }
+
+  def handle_event("change_number_setting", %{"field" => field, "value" => value}, socket)
+      when is_map_key(@number_settings, field) do
+    {min, max, default} = Map.fetch!(@number_settings, field)
+
+    number =
+      case Integer.parse(to_string(value)) do
+        {n, _} -> n |> max(min) |> min(max)
+        :error -> default
+      end
+
+    Settings.update_setting(field, to_string(number))
+
+    {:noreply,
+     socket
+     |> assign_numbers()
+     |> put_flash(:info, gettext("Setting updated"))}
+  end
+
+  def handle_event("change_number_setting", _params, socket), do: {:noreply, socket}
 
   def handle_event("clear_render_cache", _params, socket) do
     Renderer.clear_all_cache()
@@ -272,6 +343,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   end
 
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  defp assign_numbers(socket) do
+    Enum.reduce(@number_settings, socket, fn {key, {_min, _max, default}}, acc ->
+      assign(acc, String.to_atom(key), number_setting(key, default))
+    end)
+  end
+
+  defp number_setting(key, default) do
+    case Settings.get_setting(key, nil) do
+      nil ->
+        default
+
+      value when is_integer(value) ->
+        value
+
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {n, _} -> n
+          :error -> default
+        end
+
+      _ ->
+        default
+    end
+  end
 
   defp refresh_groups(socket) do
     groups = db_groups_to_maps()
@@ -448,6 +544,46 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
 
           <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
             <div class="flex items-center gap-3">
+              <.icon name="hero-rss" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("RSS Feeds")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "Serve an RSS 2.0 feed for every group at /<group>/feed.xml (newest 50 published posts, per language)."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@feeds_enabled}
+              phx-click="toggle_feeds_enabled"
+            />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-code-bracket" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("JSON-LD Structured Data")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "Emit a schema.org Article script on post pages for richer search results. Disable if your host builds its own structured data."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@render_jsonld}
+              phx-click="toggle_render_jsonld"
+            />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
               <.icon name="hero-link" class="w-5 h-5 text-base-content/70" />
               <div>
                 <p class="font-medium">{gettext("Slug Style")}</p>
@@ -458,7 +594,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                 </p>
               </div>
             </div>
-            <form phx-change="change_slug_style">
+            <form id="setting-slug-style" phx-change="change_slug_style">
               <label class="select select-bordered select-sm">
                 <select name="slug_style">
                   <option value="transliterate" selected={@slug_style == "transliterate"}>
@@ -474,6 +610,41 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               </label>
             </form>
           </div>
+
+          <.number_setting
+            field="publishing_posts_per_page"
+            value={@publishing_posts_per_page}
+            label={gettext("Posts per page")}
+            hint={gettext("How many posts a listing page shows before paginating.")}
+            min="1"
+            max="200"
+          />
+
+          <.number_setting
+            field="publishing_reading_wpm"
+            value={@publishing_reading_wpm}
+            label={gettext("Reading speed (words per minute)")}
+            hint={
+              gettext(
+                "Drives the \"min read\" estimate. 200 suits English prose; lower it for dense or technical writing."
+              )
+            }
+            min="50"
+            max="1000"
+          />
+
+          <.number_setting
+            field="publishing_editor_lock_minutes"
+            value={@publishing_editor_lock_minutes}
+            label={gettext("Editing lock timeout (minutes)")}
+            hint={
+              gettext(
+                "How long an idle editor keeps a post before it is released for someone else. A warning appears five minutes before."
+              )
+            }
+            min="1"
+            max="480"
+          />
 
           <div class="text-xs text-base-content/50">
             <p>
@@ -805,6 +976,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
         </div>
       </div>
     </div>
+    </div>
+    """
+  end
+
+  attr :field, :string, required: true
+  attr :value, :integer, required: true
+  attr :label, :string, required: true
+  attr :hint, :string, required: true
+  attr :min, :string, required: true
+  attr :max, :string, required: true
+
+  # `phx-change` on the form rather than the input, and the field name travels
+  # as a hidden value so one handler serves every number here.
+  defp number_setting(assigns) do
+    ~H"""
+    <div class="flex items-center justify-between gap-4 py-3 border-t border-base-200">
+      <div>
+        <p class="font-medium">{@label}</p>
+        <p class="text-xs text-base-content/60">{@hint}</p>
+      </div>
+      <%!-- The id is required, not decorative: without one LiveView silently
+            disables form recovery, so a reconnect mid-edit loses the value. --%>
+      <form id={"setting-#{@field}"} phx-change="change_number_setting" class="shrink-0">
+        <input type="hidden" name="field" value={@field} />
+        <input
+          type="number"
+          name="value"
+          value={@value}
+          min={@min}
+          max={@max}
+          phx-debounce="600"
+          class="input input-bordered input-sm w-24"
+        />
+      </form>
     </div>
     """
   end

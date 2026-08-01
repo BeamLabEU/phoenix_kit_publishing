@@ -26,12 +26,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Categories
+  alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Web.Controller.Fallback
+  alias PhoenixKit.Modules.Publishing.Web.Controller.Feed
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
+  alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Web.Controller.Routing
+  alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
@@ -143,6 +148,199 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     end
   end
 
+  @doc """
+  Public comment submission (the dead-view POST form on post pages).
+
+  Guards, in order: module+public on, the group exists and has
+  comments_enabled, the comments seam is available, honeypot empty, the
+  signed form token is 3s–1day old (bots submit instantly; stale tabs
+  re-render), the post uuid belongs to the group's published set, and the
+  reader is logged in. Plain form posts get a flash + redirect back to the
+  post (or the group listing when the post can't be resolved); requests
+  from the page's fetch enhancement (`x-pk-comment-fetch` header) get a
+  JSON verdict instead so the client can swap the thread in place.
+  """
+  def create_comment(conn, params) do
+    group_slug = params["group"]
+
+    with true <- Publishing.enabled?() and public_enabled?(),
+         {:ok, group} <- Publishing.get_group(group_slug),
+         true <- Map.get(group, "comments_enabled", false),
+         true <- PublishingComments.available?() do
+      handle_comment_submission(conn, group, params)
+    else
+      _ -> handle_not_found(conn, :group_not_found)
+    end
+  end
+
+  defp handle_comment_submission(conn, group, params) do
+    group_slug = group["slug"]
+    language = params["language"] || Language.get_default_language()
+    post_uuid = params["post_uuid"]
+
+    post =
+      Listing.chronological_posts(group_slug, language)
+      |> Enum.find(&(&1[:uuid] == post_uuid))
+
+    back_path =
+      case post do
+        nil -> PublishingHTML.group_listing_path(language, group_slug)
+        post -> PublishingHTML.build_post_url(group_slug, post, language) <> "#comments"
+      end
+
+    cond do
+      is_nil(post) ->
+        comment_outcome(
+          conn,
+          :error,
+          gettext("That post is no longer available."),
+          PublishingHTML.group_listing_path(language, group_slug)
+        )
+
+      # Honeypot: a filled "website" field is a bot — pretend success.
+      params["website"] not in [nil, ""] ->
+        comment_outcome(conn, :silent, nil, back_path)
+
+      not comment_token_valid?(conn, params["ft"]) ->
+        comment_outcome(conn, :error, gettext("The form expired — please try again."), back_path)
+
+      is_nil(current_user_uuid(conn)) ->
+        comment_outcome(conn, :error, gettext("Please log in to comment."), back_path)
+
+      true ->
+        submit_comment(conn, post, params, back_path)
+    end
+  end
+
+  # One exit point for every comment-POST outcome. The plain form flow
+  # flashes + redirects; the fetch-enhanced flow (x-pk-comment-fetch,
+  # set by the page's progressive-enhancement script) gets JSON so the
+  # client can swap the thread in place instead of reloading. :silent =
+  # the honeypot's pretend-success (no flash, ok to the bot either way).
+  defp comment_outcome(conn, kind, message, path) do
+    if get_req_header(conn, "x-pk-comment-fetch") != [] do
+      case kind do
+        :error -> conn |> put_status(422) |> json(%{ok: false, message: message})
+        _ -> json(conn, %{ok: true, message: message})
+      end
+    else
+      case kind do
+        :silent -> redirect(conn, to: path)
+        kind -> conn |> put_flash(kind, message) |> redirect(to: path)
+      end
+    end
+  end
+
+  defp submit_comment(conn, post, params, back_path) do
+    content = params["content"] |> to_string() |> String.trim()
+    note_id = comment_note_id(params)
+    parent_uuid = comment_parent_uuid(params)
+
+    # A note-panel comment redirects back with that panel's :target open;
+    # a reply lands on its parent comment. (Error paths use the request's
+    # view of the thread; success re-derives from the created comment.)
+    back_path =
+      cond do
+        note_id -> replace_anchor(back_path, "pk-note-panel-#{note_id}")
+        parent_uuid -> replace_anchor(back_path, "comment-#{parent_uuid}")
+        true -> back_path
+      end
+
+    case PublishingComments.create(post[:uuid], current_user_uuid(conn), content,
+           parent_uuid: parent_uuid,
+           note_id: note_id
+         ) do
+      {:ok, comment} ->
+        # Anchor from the stored truth: a reply INHERITS its parent's
+        # note_id, so replying inside a panel must reopen that panel even
+        # though the reply form never carried note_id itself.
+        success_path =
+          cond do
+            is_binary(comment.metadata["note_id"]) ->
+              replace_anchor(back_path, "pk-note-panel-#{comment.metadata["note_id"]}")
+
+            is_binary(comment.parent_uuid) ->
+              replace_anchor(back_path, "comment-#{comment.parent_uuid}")
+
+            true ->
+              back_path
+          end
+
+        # Don't claim "posted" for a row the reader can't see: with the
+        # comments module's moderation on, create returns status "pending",
+        # and the thread only lists published rows — so a success message
+        # followed by no visible comment reads as "the site ate it".
+        message =
+          if comment.status == "published" do
+            gettext("Comment posted.")
+          else
+            gettext("Thanks — your comment is awaiting review.")
+          end
+
+        comment_outcome(conn, :info, message, success_path)
+
+      {:error, reason} ->
+        comment_outcome(conn, :error, comment_error_message(reason), back_path)
+    end
+  end
+
+  defp comment_error_message(:empty_comment), do: gettext("The comment can't be empty.")
+  defp comment_error_message(:content_too_long), do: gettext("That comment is too long.")
+
+  defp comment_error_message(:parent_not_found),
+    do: gettext("The comment you replied to is no longer available.")
+
+  defp comment_error_message(:max_depth_exceeded),
+    do: gettext("This thread is too deep to reply to.")
+
+  defp comment_error_message(_), do: gettext("Couldn't post your comment — please try again.")
+
+  # A note anchor is the url-safe digest Renderer.note_dom_id/1 emits —
+  # anything else is a crafted payload and is dropped (the comment then
+  # posts as a regular thread comment rather than erroring).
+  defp comment_note_id(params) do
+    case params["note_id"] do
+      note_id when is_binary(note_id) ->
+        if Regex.match?(~r/^[A-Za-z0-9_-]{4,32}$/, note_id), do: note_id, else: nil
+
+      _ ->
+        nil
+    end
+  end
+
+  # UUID-cast up front: the value is echoed into the redirect anchor
+  # (#comment-<uuid>), so junk must never travel that far.
+  defp comment_parent_uuid(params) do
+    with parent_uuid when is_binary(parent_uuid) <- params["parent_uuid"],
+         {:ok, _} <- Ecto.UUID.cast(parent_uuid) do
+      parent_uuid
+    else
+      _ -> nil
+    end
+  end
+
+  defp replace_anchor(path, anchor) do
+    [base | _] = String.split(path, "#", parts: 2)
+    base <> "#" <> anchor
+  end
+
+  # 3s minimum (instant submits are bots), 1 day maximum (stale tabs).
+  defp comment_token_valid?(conn, token) when is_binary(token) do
+    case Phoenix.Token.verify(conn, "pk_pub_comment", token, max_age: 86_400) do
+      {:ok, signed_at} -> System.system_time(:second) - signed_at >= 3
+      _ -> false
+    end
+  end
+
+  defp comment_token_valid?(_conn, _), do: false
+
+  defp current_user_uuid(conn) do
+    case conn.assigns[:phoenix_kit_current_scope] do
+      %{user: %{uuid: uuid}} when is_binary(uuid) -> uuid
+      _ -> nil
+    end
+  end
+
   # When `Language.detect_*` reinterprets which segment is the group and which
   # is the language, downstream code (including the smart-fallback in
   # `Controller.Fallback`) needs to see the corrected `group`/`path` on
@@ -188,6 +386,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         {:listing, group_slug} ->
           handle_group_listing(conn, group_slug, language)
 
+        {:feed, group_slug, scope} ->
+          handle_feed(conn, group_slug, language, scope)
+
+        {:category, group_slug, category_slug} ->
+          handle_term_archive(conn, group_slug, language, {:category, category_slug})
+
+        {:tag, group_slug, tag} ->
+          handle_term_archive(conn, group_slug, language, {:tag, tag})
+
         {:slug_post, group_slug, post_slug} ->
           handle_post(conn, group_slug, {:slug, post_slug}, language)
 
@@ -229,12 +436,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # ============================================================================
 
   defp handle_group_listing(conn, group_slug, language) do
-    case Listing.render_group_listing(conn, group_slug, language, conn.params) do
+    result =
+      case search_param(conn) do
+        nil -> Listing.render_group_listing(conn, group_slug, language, conn.params)
+        query -> Listing.render_search_results(conn, group_slug, language, query, conn.params)
+      end
+
+    case result do
       {:ok, assigns} ->
         listing_url = PublishingHTML.group_listing_path(assigns.current_language, group_slug)
-
-        base_url =
-          "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
+        base_url = base_url(conn)
 
         conn
         |> assign(:page_title, assigns.page_title)
@@ -254,6 +465,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
         |> assign(:breadcrumbs, assigns.breadcrumbs)
+        |> assign(:search_query, Map.get(assigns, :search_query))
         |> assign(:og, %{
           # page_title is the language-resolved display name (listing.ex) — keep
           # the social preview in the same language as the visible <h1>/<title>.
@@ -274,6 +486,115 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       {:error, reason} ->
         handle_not_found(conn, reason)
     end
+  end
+
+  # ============================================================================
+  # Feed Handler
+  # ============================================================================
+
+  # RSS 2.0 for a group (scope nil) or a category/tag archive within it. A
+  # missing/trashed group, an unknown term, or the feeds kill-switch all 404
+  # — a feed URL must never smart-fallback into an HTML redirect (readers
+  # would ingest the listing page as a broken feed).
+  defp handle_feed(conn, group_slug, language, scope) do
+    with true <- PublishingHTML.feeds_enabled?(),
+         {:ok, group} <- Publishing.get_group(group_slug),
+         {:ok, all_posts, _term_label} <-
+           Listing.scoped_chronological_posts(group_slug, language, scope) do
+      # date_counts over the WHOLE scoped set, not the 50-item window —
+      # a same-day sibling outside the window must still force the
+      # time-segment URL form for timestamp items.
+      posts = Enum.take(all_posts, feed_item_limit())
+
+      xml =
+        Feed.render_rss(group, posts,
+          base_url: base_url(conn),
+          language: language,
+          date_counts: PublishingHTML.build_date_counts(all_posts),
+          scope: scope
+        )
+
+      conn
+      |> put_resp_content_type("application/rss+xml")
+      |> send_resp(200, IO.iodata_to_binary(xml))
+    else
+      _ ->
+        conn
+        |> put_status(:not_found)
+        |> put_view(html: PhoenixKitWeb.ErrorHTML)
+        |> render(:"404")
+    end
+  end
+
+  # Category / tag archive: the listing template with the term's posts and a
+  # results heading; the Featured/Latest bands are suppressed. An unknown
+  # category 404s via the fallback (the group exists, so it redirects to the
+  # listing with the "closest match" flash — same policy as a missing post).
+  defp handle_term_archive(conn, group_slug, language, term) do
+    case Listing.render_term_archive(conn, group_slug, language, term) do
+      {:ok, assigns} ->
+        listing_url = PublishingHTML.group_listing_path(assigns.current_language, group_slug)
+        base_url = base_url(conn)
+
+        conn
+        |> assign(:page_title, assigns.page_title)
+        |> assign(:group, assigns.group)
+        |> assign(:posts, assigns.posts)
+        |> assign(:featured_posts, assigns.featured_posts)
+        |> assign(:featured_layout, assigns.featured_layout)
+        |> assign(:featured_style, assigns.featured_style)
+        |> assign(:newest_posts, assigns.newest_posts)
+        |> assign(:newest_layout, assigns.newest_layout)
+        |> assign(:newest_style, assigns.newest_style)
+        |> assign(:date_counts, assigns.date_counts)
+        |> assign(:current_language, assigns.current_language)
+        |> assign_publishing_render_context(assigns.translations)
+        |> assign(:page, assigns.page)
+        |> assign(:per_page, assigns.per_page)
+        |> assign(:total_count, assigns.total_count)
+        |> assign(:total_pages, assigns.total_pages)
+        |> assign(:breadcrumbs, assigns.breadcrumbs)
+        |> assign(:search_query, nil)
+        |> assign(:term_filter, assigns.term_filter)
+        |> assign(:og, %{
+          title: assigns.page_title,
+          url: base_url <> listing_url,
+          locale: og_locale(assigns.current_language),
+          type: "website"
+        })
+        |> render(:index)
+
+      {:error, reason} ->
+        handle_not_found(conn, reason)
+    end
+  end
+
+  # Feeds serve the reader's backlog: one page of the listing is too little
+  # (a catch-up reader misses posts), unbounded is abuse-prone. 50 mirrors
+  # the common default of major feed generators.
+  defp feed_item_limit, do: 50
+
+  # The trimmed, length-capped ?q= search param — nil when absent/blank, so
+  # the listing branch only enters search mode on a real query. The 100-char
+  # cap bounds the ILIKE pattern a client can make the DB scan for.
+  defp search_param(conn) do
+    # fetch_query_params (idempotent) rather than conn.params — ?q= is a
+    # query param by definition, and a minimal host/test endpoint without
+    # Plug.Parsers never merges the query string into conn.params.
+    case Plug.Conn.fetch_query_params(conn).query_params["q"] do
+      q when is_binary(q) ->
+        case String.trim(q) do
+          "" -> nil
+          trimmed -> String.slice(trimmed, 0, 100)
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp base_url(conn) do
+    "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
   end
 
   # ============================================================================
@@ -302,6 +623,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           "Edit Post"
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
+        |> assign_post_neighbors(
+          Map.get(assigns, :group, %{}),
+          group_slug,
+          assigns.current_language,
+          assigns.post
+        )
+        |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
+        |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect_301, url} ->
@@ -363,6 +694,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           "Edit Post"
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
+        |> assign_post_neighbors(
+          Map.get(assigns, :group, %{}),
+          group_slug,
+          assigns.current_language,
+          assigns.post
+        )
+        |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
+        |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
         |> render(:show)
 
       {:redirect, url} ->
@@ -420,12 +761,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     |> redirect(to: with_query_string(conn, url))
   end
 
-  defp with_query_string(%{query_string: qs}, url) when is_binary(qs) and qs != "" do
-    separator = if String.contains?(url, "?"), do: "&", else: "?"
-    url <> separator <> qs
+  @doc false
+  # Public only so the merge rules can be unit-tested without staging a
+  # canonical redirect; takes anything with a :query_string.
+  def with_query_string(%{query_string: qs}, url) when is_binary(qs) and qs != "" do
+    # Whatever the canonical URL already decided stays decided. The listing's
+    # canonical carries its own `?page=`, built from this same request, so
+    # appending the request's query string wholesale emitted `?page=2&page=2`
+    # — one value read, two written, in the URL search engines are told is
+    # the real one. Campaign params still ride along; the target just wins
+    # any key it names.
+    target_keys = url |> URI.parse() |> Map.get(:query) |> decoded_keys()
+
+    extra =
+      qs
+      |> URI.decode_query()
+      |> Enum.reject(fn {key, _} -> key in target_keys end)
+
+    case extra do
+      [] -> url
+      pairs -> url <> if(target_keys == [], do: "?", else: "&") <> URI.encode_query(pairs)
+    end
   end
 
-  defp with_query_string(_conn, url), do: url
+  def with_query_string(_conn, url), do: url
+
+  defp decoded_keys(nil), do: []
+  defp decoded_keys(query), do: query |> URI.decode_query() |> Map.keys()
 
   # Resolves the OG map for a post with per-field precedence:
   #
@@ -565,8 +927,115 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       post_width: Constants.default_post_width(),
       show_featured_image: false,
       show_reading_time: false,
-      show_tags: false,
-      show_top_back_link: true
+      show_top_back_link: true,
+      show_prev_next: false,
+      show_categories: false,
+      show_view_counts: false
+    }
+  end
+
+  # View counting + the optional count chip. Recording mutates the session
+  # (the dedup marker), so it must run before render. Recording is async —
+  # the displayed count may lag the reader's own visit by a beat, which is
+  # why the chip hides at zero instead of greeting the first reader with
+  # "0 views".
+  defp track_post_view(conn, group, post) do
+    if Map.get(group, "views_enabled", false) do
+      conn = Views.maybe_record_view(conn, post.uuid)
+
+      if Map.get(group, "show_view_counts", false) do
+        assign(conn, :view_count, Views.total(post.uuid))
+      else
+        assign(conn, :view_count, nil)
+      end
+    else
+      assign(conn, :view_count, nil)
+    end
+  end
+
+  # Comment-thread assigns for the post page: the published thread + a signed
+  # time-trap token for the form (a bot that posts instantly fails the age
+  # check). Only fetched when the group's comments_enabled is on AND the
+  # optional comments module is present+enabled.
+  defp assign_post_comments(conn, group, post) do
+    if Map.get(group, "comments_enabled", false) and PublishingComments.available?() do
+      # The post's real note ids, so a comment anchored to a note that no
+      # longer exists folds back into the main thread instead of vanishing.
+      known_note_ids = Enum.map(conn.assigns[:post_notes] || [], & &1.id)
+      page = PublishingComments.for_post_page(post.uuid, known_note_ids)
+
+      conn
+      |> assign(:comments_enabled, true)
+      |> assign(:post_comments, page.thread)
+      |> assign(:post_comment_count, page.count)
+      |> assign(:note_comments, page.note_comments)
+      |> assign(
+        :comment_form_token,
+        Phoenix.Token.sign(conn, "pk_pub_comment", System.system_time(:second))
+      )
+    else
+      # Full default set — a host layout referencing these must not
+      # KeyError just because commenting is off.
+      conn
+      |> assign(:comments_enabled, false)
+      |> assign(:post_comments, [])
+      |> assign(:post_comment_count, 0)
+      |> assign(:note_comments, %{})
+      |> assign(:comment_form_token, nil)
+    end
+  end
+
+  # The author notes for the slide-out panels — only extracted when the
+  # group renders notes in panel style (the footnotes style keeps them
+  # inside the cached body HTML).
+  defp assign_post_notes(conn, group, post) do
+    if PostRendering.group_notes_style(group) == "panel" do
+      assign(conn, :post_notes, Renderer.list_notes(post.content))
+    else
+      assign(conn, :post_notes, [])
+    end
+  end
+
+  # The post's categories for the chips row — only fetched when the group
+  # shows them.
+  #
+  # Read off the post map rather than by post uuid, because the map is the
+  # version being rendered: someone on `?v=2` sees how v2 was filed, not how
+  # the live version is filed today. Resolving uuids to rows is a lookup
+  # against the group's category list, which is small and already cached.
+  defp assign_post_categories(conn, group, post) do
+    if Map.get(group, "show_categories", false) do
+      uuids = Map.get(post.metadata || %{}, :category_uuids, [])
+      assign(conn, :post_categories, Categories.categories_by_uuids(post.group, uuids))
+    else
+      assign(conn, :post_categories, [])
+    end
+  end
+
+  # Chronological prev/next links for the post page, gated on the group's
+  # show_prev_next setting so the (cache-backed) whole-group pass only runs
+  # for groups that display the nav. Neighbors are same-group + same-language.
+  defp assign_post_neighbors(conn, group, group_slug, language, post) do
+    if Map.get(group, "show_prev_next", false) do
+      %{newer: newer, older: older, date_counts: date_counts} =
+        Listing.neighbor_posts(group_slug, language, post.uuid)
+
+      conn
+      |> assign(:newer_post, neighbor_link(newer, group_slug, language, date_counts))
+      |> assign(:older_post, neighbor_link(older, group_slug, language, date_counts))
+    else
+      conn
+      |> assign(:newer_post, nil)
+      |> assign(:older_post, nil)
+    end
+  end
+
+  defp neighbor_link(nil, _group_slug, _language, _date_counts), do: nil
+
+  defp neighbor_link(post, group_slug, language, date_counts) do
+    %{
+      title: get_in(post, [:metadata, :title]) || Constants.default_title(),
+      url: PublishingHTML.build_post_url(group_slug, post, language, date_counts)
     }
   end
 

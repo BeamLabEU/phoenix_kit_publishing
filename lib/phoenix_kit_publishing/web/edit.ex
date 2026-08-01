@@ -10,15 +10,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
 
   import PhoenixKitAI.Components.AITranslate,
     only: [
-      ai_translate_button: 1,
-      ai_translate_hint: 1,
-      ai_translate_modal: 1,
-      ai_translate_progress: 1
+      ai_multilang_tabs: 1,
+      ai_translate_modal: 1
     ]
 
   import PhoenixKitWeb.Components.MultilangForm,
     only: [
-      multilang_tabs: 1,
       multilang_fields_wrapper: 1,
       mount_multilang: 1,
       handle_switch_language: 2
@@ -184,59 +181,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, socket}
   end
 
-  # Forward-compat dodge (the document_creator/projects `function_exported?`
-  # pattern): `ai_multilang_tabs/1` ships in the NEXT phoenix_kit_ai release —
-  # the published 0.16.0 this module's `~> 0.4` pin can resolve does not have
-  # it, and importing a missing function is a hard compile error for Hex
-  # consumers. Until the floor includes the release, dispatch at runtime and
-  # fall back to the identical hand-placed layout built from components that
-  # DO exist in 0.16.0.
-  #
-  # Cleanup at floor-bump (tracked in AGENTS.md): when mix.exs raises the
-  # phoenix_kit_ai floor past the release that ships ai_multilang_tabs, delete
-  # ai_tabs/1 + ai_tabs_fallback/1 and call <.ai_multilang_tabs> directly
-  # (import it in `only:`). The dynamic-module call keeps the compiler from
-  # warning about the function's absence in the published 0.16.0.
-  defp ai_tabs(assigns) do
-    mod = PhoenixKitAI.Components.AITranslate
-
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :ai_multilang_tabs, 1) do
-      # apply/3, not a direct call — the compiler would warn (and
-      # warnings-as-errors fail) on the function's absence in the published
-      # phoenix_kit_ai 0.16.0. Same shape as the document_creator/projects
-      # forward-compat dodges.
-      # credo:disable-for-next-line Credo.Check.Refactor.Apply
-      apply(mod, :ai_multilang_tabs, [assigns])
-    else
-      ai_tabs_fallback(assigns)
-    end
-  end
-
-  # Mirrors ai_multilang_tabs' anatomy 1:1 (tabs + button/progress/hint row
-  # gated on the tabs' own visibility condition) so both dispatch paths render
-  # identically.
-  defp ai_tabs_fallback(assigns) do
-    ~H"""
-    <.multilang_tabs
-      multilang_enabled={@multilang_enabled}
-      language_tabs={@language_tabs}
-      current_lang={@current_lang}
-      class={@class}
-    />
-    <div
-      :if={
-        @ai_translate[:enabled] == true and @multilang_enabled and
-          match?([_, _ | _], @language_tabs)
-      }
-      class={@ai_row_class}
-    >
-      <.ai_translate_button ai_translate={@ai_translate} />
-      <.ai_translate_progress ai_translate={@ai_translate} />
-      <.ai_translate_hint ai_translate={@ai_translate} />
-    </div>
-    """
-  end
-
   defp find_group(slug) do
     Publishing.list_groups()
     |> Enum.find(&(&1["slug"] == slug))
@@ -248,13 +192,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "name_i18n" => group["name_i18n"] || %{},
       "slug" => group["slug"],
       "listing_sort" => group["listing_sort"],
+      "listing_layout" => group["listing_layout"],
       "show_post_count" => group["show_post_count"],
       "show_breadcrumbs" => group["show_breadcrumbs"],
       "post_date_position" => group["post_date_position"],
       "post_width" => group["post_width"],
+      "notes_style" => group["notes_style"],
       "show_featured_image" => group["show_featured_image"],
       "show_reading_time" => group["show_reading_time"],
-      "show_tags" => group["show_tags"],
       "featured_enabled" => group["featured_enabled"],
       "featured_layout" => group["featured_layout"],
       "featured_style" => group["featured_style"],
@@ -264,6 +209,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "show_top_back_link" => group["show_top_back_link"],
       "listing_image_links" => group["listing_image_links"],
       "listing_animations" => group["listing_animations"],
+      "show_prev_next" => group["show_prev_next"],
+      "search_enabled" => group["search_enabled"],
+      "show_categories" => group["show_categories"],
+      "views_enabled" => group["views_enabled"],
+      "comments_enabled" => group["comments_enabled"],
+      "show_view_counts" => group["show_view_counts"],
       "scrollbar_style" => group["scrollbar_style"],
       "scroll_progress_enabled" => group["scroll_progress_enabled"],
       "scroll_headings_enabled" => group["scroll_headings_enabled"],
@@ -335,6 +286,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     ]
   end
 
+  # Label/value pairs for the listing-layout <select>. Values must match
+  # Publishing.Constants.listing_layouts/0.
+  defp listing_layout_options do
+    [
+      {gettext("Grid — cards with images"), "grid"},
+      {gettext("List — horizontal rows with a thumbnail"), "list"},
+      {gettext("Minimal — date and title only, no images"), "minimal"}
+    ]
+  end
+
   # Label/value pairs for the post-date-position <select>. Values must match
   # Publishing.Constants.post_date_positions/0.
   defp post_date_position_options do
@@ -352,6 +313,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       {gettext("Narrow"), "narrow"},
       {gettext("Normal"), "normal"},
       {gettext("Wide"), "wide"}
+    ]
+  end
+
+  # Label/value pairs for the author-notes-style <select>. Values must match
+  # Publishing.Constants.notes_styles/0. These ARE the two styles' proper
+  # names — keep the labels descriptive so writers know what each one does.
+  defp notes_style_options do
+    [
+      {gettext("Footnotes — numbered refs, notes collected at the bottom"), "footnotes"},
+      {gettext("Slide-out panel — click the phrase, note opens on the right"), "panel"}
     ]
   end
 
@@ -399,9 +370,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                 @show_multilang_tabs && "rounded-lg border border-base-200 bg-base-200/40 p-4"
               }>
                 <%!-- Bundled tabs + AI-translate row (canonical placement:
-                  a compact row tucked under the tabs). Rendered through a
-                  forward-compat dodge — see ai_tabs/1. --%>
-                <.ai_tabs
+                  a compact row tucked under the tabs). --%>
+                <.ai_multilang_tabs
                   :if={@show_multilang_tabs}
                   multilang_enabled={@multilang_enabled}
                   language_tabs={@language_tabs}
@@ -514,6 +484,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   options={listing_sort_options()}
                 />
 
+                <.select
+                  field={@form[:listing_layout]}
+                  label={gettext("Listing layout")}
+                  options={listing_layout_options()}
+                />
+
+                <.checkbox field={@form[:search_enabled]}>
+                  {gettext("Show a search box")}
+                  <:description>
+                    {gettext("Readers can search this group's published posts by title and text.")}
+                  </:description>
+                </.checkbox>
+
                 <.checkbox field={@form[:show_post_count]}>
                   {gettext("Show the post count")}
                   <:description>
@@ -618,6 +601,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   options={post_date_position_options()}
                 />
 
+                <.select
+                  field={@form[:notes_style]}
+                  label={gettext("Author notes style")}
+                  options={notes_style_options()}
+                />
+
                 <.checkbox field={@form[:show_breadcrumbs]}>
                   {gettext("Show the breadcrumb trail")}
                   <:description>
@@ -642,17 +631,53 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   </:description>
                 </.checkbox>
 
+                <.checkbox field={@form[:show_categories]}>
+                  {gettext("Show category chips")}
+                  <:description>
+                    {gettext("Linked category badges above the post content.")}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:comments_enabled]}>
+                  {gettext("Enable comments")}
+                  <:description>
+                    {gettext(
+                      "A comment thread under each post. Requires the Comments module; logged-in readers can post."
+                    )}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:views_enabled]}>
+                  {gettext("Count views")}
+                  <:description>
+                    {gettext(
+                      "Per-day view counts; bot-filtered and session-deduped, no reader data stored."
+                    )}
+                  </:description>
+                </.checkbox>
+
+                <div :if={checked?(@form[:views_enabled].value)} class="pl-8">
+                  <.checkbox field={@form[:show_view_counts]}>
+                    {gettext("Show view counts")}
+                    <:description>
+                      {gettext("A subtle 'N views' line on the post page.")}
+                    </:description>
+                  </.checkbox>
+                </div>
+
+                <.checkbox field={@form[:show_prev_next]}>
+                  {gettext("Show previous/next navigation")}
+                  <:description>
+                    {gettext(
+                      "Chronological newer/older post links at the bottom of the post page."
+                    )}
+                  </:description>
+                </.checkbox>
+
                 <.checkbox field={@form[:show_reading_time]}>
                   {gettext("Show the reading time")}
                   <:description>
                     {gettext("An estimated 'N min read' under the title.")}
-                  </:description>
-                </.checkbox>
-
-                <.checkbox field={@form[:show_tags]}>
-                  {gettext("Show the post's tags")}
-                  <:description>
-                    {gettext("The post's tags as chips under the header.")}
                   </:description>
                 </.checkbox>
 
