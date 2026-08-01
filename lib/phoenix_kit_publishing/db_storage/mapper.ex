@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   - **Content** — per-language: title, body, url_slug (for routing)
   """
 
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingPost
@@ -193,7 +194,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
     active_uuid = Map.get(post, :active_version_uuid)
 
     if not is_nil(active_uuid) and active_uuid == version_uuid do
-      "published"
+      Constants.status_published()
     else
       version.status
     end
@@ -320,7 +321,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
 
   defp merge_published_statuses(latest_statuses, published_statuses) do
     Map.merge(latest_statuses, published_statuses, fn _lang, latest, published ->
-      if published == "published", do: "published", else: latest
+      if Constants.published?(published), do: Constants.status_published(), else: latest
     end)
   end
 

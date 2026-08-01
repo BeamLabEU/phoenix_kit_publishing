@@ -10,11 +10,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Date, as: UtilsDate
   alias PhoenixKit.Utils.Routes
+
+  @status_published Constants.status_published()
 
   @impl true
   def mount(params, _session, socket) do
@@ -115,12 +118,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
     end
   end
 
-  def version_status_badge_class("published"), do: "badge-success"
+  def version_status_badge_class(@status_published), do: "badge-success"
   def version_status_badge_class("draft"), do: "badge-warning"
   def version_status_badge_class("archived"), do: "badge-ghost"
   def version_status_badge_class(_), do: "badge-ghost"
 
-  def language_status_color("published"), do: "bg-success"
+  def language_status_color(@status_published), do: "bg-success"
   def language_status_color("draft"), do: "bg-warning"
   def language_status_color("archived"), do: "bg-base-content/20"
   def language_status_color(_), do: "bg-base-content/20"

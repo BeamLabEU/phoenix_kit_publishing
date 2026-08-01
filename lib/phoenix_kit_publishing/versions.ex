@@ -48,7 +48,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       db_post ->
         db_post.uuid
         |> DBStorage.list_versions()
-        |> Enum.find(&(&1.status == "published"))
+        |> Enum.find(&Constants.published?(&1.status))
         |> case do
           nil -> {:error, :no_published_version}
           v -> {:ok, v.version_number}
@@ -327,7 +327,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   defp archive_other_published_versions!(repo, versions, target_version_number) do
     for v <- versions,
         v.version_number != target_version_number,
-        v.status == "published" do
+        Constants.published?(v.status) do
       case DBStorage.update_version(v, %{status: "archived"}) do
         {:ok, _} -> :ok
         {:error, reason} -> repo.rollback(reason)
@@ -338,8 +338,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   defp publish_and_activate!(repo, db_post, target_version) do
     publish_attrs =
       if target_version.published_at,
-        do: %{status: "published"},
-        else: %{status: "published", published_at: UtilsDate.utc_now()}
+        do: %{status: Constants.status_published()},
+        else: %{status: Constants.status_published(), published_at: UtilsDate.utc_now()}
 
     case DBStorage.update_version(target_version, publish_attrs) do
       {:ok, published_version} ->

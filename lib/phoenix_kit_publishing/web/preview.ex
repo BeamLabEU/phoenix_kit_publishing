@@ -163,7 +163,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
         name: translation[:name] || translation.name,
         flag: translation[:flag] || "",
         url: Routes.path("/admin/publishing/#{group_slug}/#{post_uuid}/preview?#{query}"),
-        status: "published",
+        status: Constants.status_published(),
         exists: true
       }
     end)

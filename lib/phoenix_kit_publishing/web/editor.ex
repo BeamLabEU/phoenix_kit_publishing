@@ -32,6 +32,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   alias Phoenix.LiveView.JS
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -578,7 +579,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     form = Forms.post_form_with_primary_status(group_slug, post, version)
     fk = PublishingPubSub.generate_form_key(group_slug, post, :edit)
 
-    is_published = form["status"] == "published"
+    is_published = Constants.published?(form["status"])
 
     sock =
       socket
@@ -2286,9 +2287,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     statuses = assigns[:version_statuses] || %{}
     current = assigns[:current_version]
 
-    if assigns[:form]["status"] == "published" and Map.get(statuses, current) != "published" do
+    if Constants.published?(assigns[:form]["status"]) and
+         not Constants.published?(Map.get(statuses, current)) do
       statuses
-      |> Enum.find(fn {number, status} -> status == "published" and number != current end)
+      |> Enum.find(fn {number, status} -> Constants.published?(status) and number != current end)
       |> case do
         {number, _status} -> number
         nil -> nil
@@ -2550,7 +2552,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             <span class="hidden sm:inline">{gettext("Preview")}</span>
           </button>
         <% end %>
-        <%= if @form["status"] == "published" && @public_url do %>
+        <%= if Constants.published?(@form["status"]) && @public_url do %>
           <a
             href={if @has_pending_changes, do: "#", else: @public_url}
             target="_blank"
@@ -2576,7 +2578,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     </div>
 
     <%!-- Public URL (shown for published posts, mirrors the post listing) --%>
-    <%= if @form["status"] == "published" && @public_url do %>
+    <%= if Constants.published?(@form["status"]) && @public_url do %>
       <% full_public_url = (assigns[:endpoint_url] || "") <> @public_url %>
       <p class="text-xs text-base-content/50 break-all">
         <span class="font-medium text-base-content">{gettext("Public URL")}:</span>
@@ -3738,7 +3740,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       <%= if @viewing_older_version do %>
                         <option
                           value="published"
-                          selected={@form["status"] in ["draft", "published"]}
+                          selected={@form["status"] in [Constants.status_draft(), Constants.status_published()]}
                         >
                           {gettext("Published")}
                         </option>
@@ -3749,7 +3751,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         <option value="draft" selected={@form["status"] == "draft"}>
                           {gettext("Draft")}
                         </option>
-                        <option value="published" selected={@form["status"] == "published"}>
+                        <option value="published" selected={Constants.published?(@form["status"])}>
                           {gettext("Published")}
                         </option>
                         <option value="archived" selected={@form["status"] == "archived"}>
@@ -3870,7 +3872,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </span>
                   <span class={[
                     "badge badge-xs h-auto",
-                    status == "published" && "badge-success",
+                    Constants.published?(status) && "badge-success",
                     status == "draft" && "badge-warning",
                     status == "archived" && "badge-ghost"
                   ]}>

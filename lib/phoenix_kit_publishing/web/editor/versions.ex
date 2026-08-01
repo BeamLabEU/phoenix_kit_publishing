@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -47,7 +48,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   def apply_version_switch(socket, version, version_post, form_builder_fn) do
     group_slug = socket.assigns.group_slug
     form = form_builder_fn.(group_slug, version_post, version)
-    is_published = form["status"] == "published"
+    is_published = Constants.published?(form["status"])
     actual_language = version_post.language
     new_form_key = PublishingPubSub.generate_form_key(group_slug, version_post, :edit)
 

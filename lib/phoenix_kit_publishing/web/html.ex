@@ -2935,7 +2935,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         flag: translation.flag || "",
         url: translation.url,
         current: translation.current || false,
-        status: "published",
+        status: Constants.status_published(),
         exists: true
       }
     end)

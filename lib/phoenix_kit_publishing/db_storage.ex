@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   import Ecto.Query
 
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage.Mapper
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingContent
@@ -16,6 +17,11 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   alias PhoenixKit.Modules.Publishing.PublishingVersion
 
   require Logger
+
+  # Literals here rather than calls: these appear in function heads and Ecto
+  # query fragments, where only a compile-time value is allowed.
+  @status_published Constants.status_published()
+  @status_draft Constants.status_draft()
 
   @typep changeset_or_struct(struct) ::
            {:ok, struct} | {:error, Ecto.Changeset.t()}
@@ -285,7 +291,18 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     |> repo().all()
   end
 
-  defp filter_by_status(query, "published"),
+  # A post is published when it points at a live version — the same sentence
+  # the timestamp and slug listing queries each used to spell out for
+  # themselves, one of them nested a level deeper than the other.
+  defp by_publish_state(query, @status_published),
+    do: where(query, [p], not is_nil(p.active_version_uuid))
+
+  defp by_publish_state(query, @status_draft),
+    do: where(query, [p], is_nil(p.active_version_uuid))
+
+  defp by_publish_state(query, _status), do: query
+
+  defp filter_by_status(query, @status_published),
     do: where(query, [p], is_nil(p.trashed_at) and not is_nil(p.active_version_uuid))
 
   defp filter_by_status(query, "draft"),
@@ -318,7 +335,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       join: c in PublishingContent,
       on: c.version_uuid == v.uuid,
       where: g.slug == ^group_slug and is_nil(p.trashed_at),
-      where: v.status == "published",
+      where: v.status == @status_published,
       where: c.language in ^language_candidates,
       where: ilike(c.title, ^pattern) or ilike(c.content, ^pattern),
       distinct: true,
@@ -381,11 +398,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       )
 
     query =
-      case status do
-        "published" -> where(query, [p], not is_nil(p.active_version_uuid))
-        "draft" -> where(query, [p], is_nil(p.active_version_uuid))
-        _ -> query
-      end
+      by_publish_state(query, status)
 
     query =
       case Keyword.get(opts, :date) do
@@ -413,11 +426,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         preload: [group: g]
       )
 
-    case status do
-      "published" -> where(query, [p], not is_nil(p.active_version_uuid))
-      "draft" -> where(query, [p], is_nil(p.active_version_uuid))
-      _ -> query
-    end
+    by_publish_state(query, status)
     |> repo().all()
   end
 
@@ -1116,7 +1125,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     # Also find published versions that differ from latest (for status overlay)
     published_by_post =
       Map.new(all_versions_by_post, fn {post_uuid, versions} ->
-        {post_uuid, Enum.find(versions, fn v -> v.status == "published" end)}
+        {post_uuid, Enum.find(versions, &Constants.published?(&1.status))}
       end)
 
     # The post-level status must reflect what's LIVE, not the newest revision:
@@ -1129,7 +1138,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       Map.new(posts, fn post ->
         versions = Map.get(all_versions_by_post, post.uuid, [])
         active = find_active_version(versions, Map.get(post, :active_version_uuid))
-        {post.uuid, if(active != nil and active.status == "published", do: active)}
+        {post.uuid, if(active != nil and Constants.published?(active.status), do: active)}
       end)
 
     # Collect all version UUIDs we need contents for (latest + published if different)
@@ -1177,7 +1186,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   defp live_effective_opts(live, all_contents_by_version) do
     base = [
-      effective_status: "published",
+      effective_status: @status_published,
       effective_published_at: live.published_at,
       effective_live_version: live.version_number
     ]

@@ -70,9 +70,37 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   # Statuses
   # ---------------------------------------------------------------------------
 
-  @post_statuses ["draft", "published", "archived", "trashed"]
-  @content_statuses ["draft", "published", "archived"]
-  @group_statuses ["active", "trashed"]
+  @status_draft "draft"
+  @status_published "published"
+  @status_archived "archived"
+  @status_trashed "trashed"
+
+  @post_statuses [@status_draft, @status_published, @status_archived, @status_trashed]
+  @content_statuses [@status_draft, @status_published, @status_archived]
+  @group_statuses ["active", @status_trashed]
+
+  @doc ~S|The `"draft"` status.|
+  def status_draft, do: @status_draft
+
+  @doc ~S|The `"published"` status.|
+  def status_published, do: @status_published
+
+  @doc ~S|The `"archived"` status.|
+  def status_archived, do: @status_archived
+
+  @doc ~S|The `"trashed"` status.|
+  def status_trashed, do: @status_trashed
+
+  @doc """
+  True for the published status.
+
+  Note this is the *publishing* vocabulary. The comments module has its own
+  `"published"` status on a different table, and the two are unrelated — a
+  comment being published says nothing about the post it hangs off. Don't
+  reach for this when checking a comment.
+  """
+  @spec published?(String.t() | nil) :: boolean()
+  def published?(status), do: status == @status_published
 
   @doc "Valid post statuses: draft, published, archived, trashed."
   def post_statuses, do: @post_statuses

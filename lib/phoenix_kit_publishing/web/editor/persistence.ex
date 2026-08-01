@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.ListingCache
@@ -462,8 +463,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
 
   # All languages are equal — status is version-level, no per-language enforcement needed
   defp should_publish_version?(new_status, current_status, current_version) do
-    new_status == "published" and
-      current_status != "published" and
+    Constants.published?(new_status) and
+      not Constants.published?(current_status) and
       current_version != nil
   end
 
@@ -562,7 +563,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
 
     form = Forms.post_form_with_primary_status(group_slug, refreshed_post, current_version)
 
-    is_published = form["status"] == "published"
+    is_published = Constants.published?(form["status"])
 
     # Update saved_status to reflect the newly saved status
     new_saved_status = form["status"]

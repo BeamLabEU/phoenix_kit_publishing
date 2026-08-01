@@ -561,7 +561,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   """
   def filter_published(posts) do
     Enum.filter(posts, fn post ->
-      post[:metadata] && post.metadata.status == "published" &&
+      post[:metadata] && Constants.published?(post.metadata.status) &&
         not Constants.scheduled_ahead?(post)
     end)
   end

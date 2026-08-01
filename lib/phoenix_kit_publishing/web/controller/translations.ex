@@ -73,7 +73,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
   defp has_published_content_for_language?(posts, language) do
     Enum.any?(posts, fn post ->
       language in (post.available_languages || []) and
-        Map.get(post.language_statuses, language) == "published" and
+        Constants.published?(Map.get(post.language_statuses, language)) and
         has_content?(post, language)
     end)
   end

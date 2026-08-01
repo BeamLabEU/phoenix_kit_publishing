@@ -134,7 +134,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   Builds the public URL for a post.
   """
   def build_public_url(post, language) do
-    if Map.get(post.metadata, :status) == "published" do
+    if Constants.published?(Map.get(post.metadata, :status)) do
       build_url_for_mode(post, language)
     else
       nil

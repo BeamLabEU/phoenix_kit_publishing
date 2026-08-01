@@ -15,7 +15,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
-
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
@@ -23,6 +22,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   alias PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution
   alias PhoenixKit.Modules.Publishing.Web.Controller.Translations
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
+
+  @status_published Constants.status_published()
+  @public_version_statuses [Constants.status_published(), Constants.status_archived()]
 
   # Suppress dialyzer false positive for defensive fallback pattern
   @dialyzer {:nowarn_function, render_post_content: 2}
@@ -56,7 +58,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def render_resolved_post(conn, group_slug, identifier, language) do
     case PostFetching.fetch_post(group_slug, identifier, language) do
       {:ok, post} ->
-        if post.metadata.status == "published" and not Constants.scheduled_ahead?(post) do
+        if Constants.published?(post.metadata.status) and not Constants.scheduled_ahead?(post) do
           render_published_post(conn, group_slug, post, language)
         else
           log_404(conn, group_slug, identifier, language, :unpublished)
@@ -165,7 +167,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   # Published now, or archived after having been published at some point.
   defp historically_published?(%{metadata: metadata}) do
     case Map.get(metadata, :status) do
-      "published" -> true
+      @status_published -> true
       "archived" -> Map.get(metadata, :published_at) not in [nil, ""]
       _ -> false
     end
@@ -291,7 +293,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
       # active version, which is the one you're already reading.
       published_versions =
         version_statuses
-        |> Enum.filter(fn {_v, status} -> status in ["published", "archived"] end)
+        |> Enum.filter(fn {_v, status} -> status in @public_version_statuses end)
         |> Enum.map(fn {v, _status} -> v end)
         |> Enum.sort(:desc)
 

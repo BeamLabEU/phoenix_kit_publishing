@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   require Logger
 
   alias Phoenix.HTML.Safe
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.PageBuilder
   alias PhoenixKit.Modules.Publishing.Shared
@@ -386,7 +387,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   """
   @spec render_post(map(), keyword()) :: {:ok, String.t()} | {:error, any()}
   def render_post(post, opts \\ []) do
-    if post.metadata.status == "published" and render_cache_enabled?(post.group) do
+    if Constants.published?(post.metadata.status) and render_cache_enabled?(post.group) do
       cache_key = build_cache_key(post, opts)
 
       case get_cached(cache_key) do

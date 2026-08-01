@@ -17,6 +17,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
 
+  @status_published Constants.status_published()
+
   @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Hashtags
@@ -54,7 +56,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     date = if is_binary(date), do: Date.from_iso8601!(date), else: date
 
     group_slug
-    |> DBStorage.list_posts_timestamp_mode("published", date: date)
+    |> DBStorage.list_posts_timestamp_mode(Constants.status_published(), date: date)
     |> Enum.map(&(Time.to_string(&1.post_time) |> String.slice(0, 5)))
     |> Enum.uniq()
     |> Enum.sort()
@@ -1111,7 +1113,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   @default_title Constants.default_title()
 
-  defp validate_title_for_publish(language, "published", title)
+  defp validate_title_for_publish(language, @status_published, title)
        when title in ["", @default_title] do
     primary_language = LanguageHelpers.get_primary_language()
 
@@ -1416,7 +1418,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # Drop a "published" status so it is never written outside publish_version/4's
   # atomic transaction (see update_version_defaults/4). draft/archived/nil pass
   # through unchanged.
-  defp deferred_publish_status("published"), do: nil
+  defp deferred_publish_status(@status_published), do: nil
   defp deferred_publish_status(status), do: status
 
   # The same reservation, in the other direction.
