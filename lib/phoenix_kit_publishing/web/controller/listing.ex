@@ -264,13 +264,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     case fetch_group(group_slug) do
       {:ok, group} ->
         if Map.get(group, "search_enabled", false) do
-          do_render_search(group, group_slug, language, query)
+          search_with_canonical_check(conn, group, group_slug, language, query)
         else
           render_group_listing(conn, group_slug, language, params)
         end
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  # Same canonical-prefix 301 the plain listing enforces — search results
+  # are indexable HTML with their own og:url, so serving them 200 at a
+  # non-canonical prefix is a duplicate-content hole. The consumer's
+  # redirect_301 preserves ?q= via with_query_string.
+  defp search_with_canonical_check(conn, group, group_slug, language, query) do
+    canonical_language = Language.get_canonical_url_language(language)
+    canonical_url = PublishingHTML.group_listing_path(canonical_language, group_slug)
+
+    if canonical_redirect?(conn, language, canonical_language, canonical_url) do
+      {:redirect_301, canonical_url}
+    else
+      do_render_search(group, group_slug, language, query)
     end
   end
 
@@ -432,10 +447,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   map (`%{type:, label:, count:}`) for the heading. Single results page,
   newest first, capped like search.
   """
-  def render_term_archive(_conn, group_slug, language, term) do
-    with {:ok, group} <- fetch_group(group_slug),
-         canonical_language = Language.get_canonical_url_language(language),
-         {:ok, posts, label} <- scoped_chronological_posts(group_slug, canonical_language, term) do
+  def render_term_archive(conn, group_slug, language, term) do
+    case fetch_group(group_slug) do
+      {:ok, group} ->
+        # Canonical-prefix parity with the plain listing (archives are
+        # indexable HTML); the consumer preserves the query string. Group
+        # existence is checked FIRST so a garbage group 404s without a hop.
+        canonical_language = Language.get_canonical_url_language(language)
+        canonical_url = PublishingHTML.term_archive_path(canonical_language, group_slug, term)
+
+        if canonical_redirect?(conn, language, canonical_language, canonical_url) do
+          {:redirect_301, canonical_url}
+        else
+          do_render_term_archive(group, group_slug, canonical_language, term)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp do_render_term_archive(group, group_slug, canonical_language, term) do
+    with {:ok, posts, label} <- scoped_chronological_posts(group_slug, canonical_language, term) do
       display_name = Publishing.translated_group_name(group, canonical_language) || group_slug
       {type, raw} = term
       term_label = label || raw

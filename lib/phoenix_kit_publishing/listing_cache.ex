@@ -431,12 +431,33 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   @doc """
   Invalidates (clears) the cache for a group.
 
-  Clears the :persistent_term entries. The next read will trigger
-  a regeneration from the database.
+  Clears the :persistent_term entries locally AND broadcasts
+  `{:cache_invalidated, slug}` so every node's `CacheSync` erases its own
+  copy — `:persistent_term` is process-less, so a peer node's warm cache
+  never misses on its own and kept serving pre-mutation listings (rename/
+  trash/delete, category changes) until an unrelated local mutation. The
+  broadcast means ERASE, not regenerate (`:cache_changed`'s meaning): a
+  renamed-away slug can't be regenerated at all — its group lookup fails —
+  only erased. The next read on each node rebuilds lazily. PubSub is
+  at-most-once: a partitioned node misses the purge until its next local
+  mutation or restart — the listing cache is eventually consistent.
   """
   @spec invalidate(String.t()) :: :ok
   def invalidate(group_slug) do
-    # Clear :persistent_term entries
+    erase_local(group_slug)
+    PublishingPubSub.broadcast_cache_invalidated(group_slug)
+    Logger.debug("[ListingCache] Invalidated cache for #{group_slug}")
+    :ok
+  end
+
+  @doc """
+  Erases this node's :persistent_term entries for a group — no broadcast.
+
+  `CacheSync` calls this on `{:cache_invalidated, _}` receipt; calling
+  `invalidate/1` there would re-broadcast and storm the cluster.
+  """
+  @spec erase_local(String.t()) :: :ok
+  def erase_local(group_slug) do
     term_key = persistent_term_key(group_slug)
 
     try do
@@ -451,7 +472,6 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
       ArgumentError -> :ok
     end
 
-    Logger.debug("[ListingCache] Invalidated cache for #{group_slug}")
     :ok
   end
 

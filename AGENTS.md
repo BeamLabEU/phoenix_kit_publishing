@@ -231,7 +231,7 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 
 Publishing uses the **route module** pattern via `Publishing.Routes`. Both `admin_locale_routes/0` and `admin_routes/0` declare every admin LiveView path (the localized variant gets `:locale` segment + `_localized` `:as` aliases). Tabs in `admin_tabs/0` carry only the parent-level Publishing entry; per-page routes come from the route module so we can express the full Listing/Editor/Preview/PostShow tree (including dynamic `:group` / `:post_uuid` segments) without enumerating each as a `Tab` struct.
 
-Public routes (the Controller's `show/2`, `index/2`, `all_groups/2`) historically lived in `Publishing.Routes.public_routes/1`. **As of the routing-strategy change** that function returns an empty AST — public dispatch now routes through `PhoenixKitPublishing.RouterDispatch` (see "Public dispatch" below).
+Public routes (the Controller's `show/2`, `index/2`) historically lived in `Publishing.Routes.public_routes/1`. (The all-groups overview template was deleted 2026-08 — it had been unrouted dead code; an overview would come back as an opt-in reserved route, not a resurrection.) **As of the routing-strategy change** that function returns an empty AST — public dispatch now routes through `PhoenixKitPublishing.RouterDispatch` (see "Public dispatch" below).
 
 > Phoenix.Router has **no per-segment regex constraint mechanism** — `constraints: %{...}` on a route is silently ignored. Don't add one expecting it to filter. Locale-vs-group disambiguation is done in the controller by `Web.Controller.Language.detect_language_or_group/2`, which rewrites `conn.params` so the smart-fallback below reads the corrected interpretation.
 
@@ -333,7 +333,7 @@ Current auto-events:
 | action | when | resource_type |
 |--------|------|---------------|
 | `publishing.content.language_normalized` | Legacy base-code content (e.g. `"en"`) rewritten to the enabled dialect (`"en-US"`) by `StaleFixer` | `publishing_content` |
-| `publishing.content.merged` | Legacy and dialect rows for the same version merged by `StaleFixer` | `publishing_content` |
+| `publishing.content.merged` | Legacy and dialect rows for the same version merged by `StaleFixer`. Metadata includes `discarded_body` — true when a divergent non-blank legacy body lost to the target's; its text is stashed in the merged row's `data["_stale_fixer"]["discarded"]` (whitelisted in Posts' content-data preservation, so edits keep it) | `publishing_content` |
 | `publishing.content.promoted` | Legacy base-code row promoted in place when the admin adds the corresponding dialect translation | `publishing_content` |
 | `publishing.content.metadata_promoted` | Legacy V1 content.data keys (`description`, `featured_image_uuid`, `seo_title`, `excerpt`) promoted to `version.data` on first edit so the V2 whitelist (`previous_url_slugs`, `updated_by_uuid`, `custom_css`) can wipe content.data without losing the value. Metadata: `language`, `version_uuid`, `promoted_keys`. Self-healing — runs at most once per legacy row | `publishing_content` |
 
@@ -409,7 +409,7 @@ Add new error atoms by extending `@type error_atom`, the doctest example, and ad
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group override for the render cache |
 | `publishing_show_language_switcher` | `true` | Render the in-page language switcher on listing + post pages. Disable when the host layout already provides one (see "Language switcher integration" below) |
 | `publishing_render_og_tags` | `true` | Render OpenGraph + Twitter Card meta tags **in-page** (inside the public body) so social previews work even when the host root layout doesn't render the forwarded `:og` assign in `<head>`. Disable when the host renders `:og` in `<head>` itself, to avoid duplicate tags (see "OpenGraph metadata" below) |
-| `publishing_feeds_enabled` | `true` | Serve an RSS 2.0 feed per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the requested language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → feed URLs 404 (never the smart fallback — a feed URL must not redirect to HTML) |
+| `publishing_feeds_enabled` | `true` | Serve an RSS 2.0 feed per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the requested language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → feed URLs 404 (never the smart fallback — a feed URL must not redirect to HTML). Canonical-prefix 301s ARE emitted feed-to-feed (a redundantly-prefixed default-language feed URL 301s to its prefixless twin), matching the `rel="self"` link |
 | `publishing_render_jsonld` | `true` | Emit a schema.org `Article` JSON-LD script in-page on post pages (same body-placement rationale as the OG tags; built from the same refined `:og` map). `escape: :html_safe` on the encode so no value can close the script tag early |
 
 ### Per-group display settings (group `data` JSONB)
@@ -583,7 +583,7 @@ Per-translation URLs are exposed regardless of `publishing_show_language_switche
 Today's forwarding chain:
 
 1. Controller sets `conn.assigns[:phoenix_kit_publishing_translations]` (in `Web.Controller`).
-2. Publishing's three public render branches (`all_groups/1`, `index/1`, `show/1` in `Web.HTML`) pass it via the module-agnostic `module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations]}}` to `<PhoenixKitWeb.Components.LayoutWrapper.app_layout>`.
+2. Publishing's public render branches (`index/1`, `show/1` in `Web.HTML`) pass it via the module-agnostic `module_assigns={%{phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations]}}` to `<PhoenixKitWeb.Components.LayoutWrapper.app_layout>`.
 3. `LayoutWrapper.app_layout` (in phoenix_kit core) declares the generic `:module_assigns` map attr and merges its keys into the top-level assigns before invoking the host's `Layouts.app/1`.
 
 Why the generic `:module_assigns` map instead of a specific attr per module: function-component attrs must be declared in advance, and we don't want phoenix_kit core to carry a hard-coded list of every external module's host-consumable keys. The single map attribute lets each module thread its own keys through without core touching the API.
@@ -597,7 +597,7 @@ Publishing assigns a `:og` map on every public response for host root layouts to
 - **Listing pages** — `%{title, url, locale, type: "website"}` (4 fields).
 - **Post pages** — `%{title, description, image, url, locale, type: "article"}`, plus up to three `og:image:*` hint fields (`image_width`, `image_height`, `image_type`) added by `maybe_put` when the resolved image has known variant dimensions/mime — so 6–9 fields. `description` and `image` may be `nil` when the post has no SEO metadata or featured image.
 
-`:og` lands on `conn.assigns` AND is forwarded through `LayoutWrapper.app_layout`'s `:module_assigns` map, so hosts can consume it from either `root.html.heex` (the conn assign) OR `Layouts.app/1` (the forwarded `@og` assign). The forwarding happens in publishing's three public render branches (`all_groups/1`, `index/1`, `show/1` in `Web.HTML`) the same way `:phoenix_kit_publishing_translations` does — see the function-component-layout callout above for the boundary mechanism.
+`:og` lands on `conn.assigns` AND is forwarded through `LayoutWrapper.app_layout`'s `:module_assigns` map, so hosts can consume it from either `root.html.heex` (the conn assign) OR `Layouts.app/1` (the forwarded `@og` assign). The forwarding happens in publishing's public render branches (`index/1`, `show/1` in `Web.HTML`) the same way `:phoenix_kit_publishing_translations` does — see the function-component-layout callout above for the boundary mechanism.
 
 ### Automatic in-page rendering (default on)
 

@@ -508,6 +508,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp handle_feed(conn, group_slug, language, scope) do
     with true <- PublishingHTML.feeds_enabled?(),
          {:ok, group} <- Publishing.get_group(group_slug),
+         :render <- feed_canonical_redirect(conn, group_slug, language, scope),
          {:ok, all_posts, term_label} <-
            Listing.scoped_chronological_posts(group_slug, language, scope) do
       # date_counts over the group's WHOLE published set (all languages, all
@@ -532,11 +533,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       |> put_resp_content_type("application/rss+xml")
       |> send_resp(200, IO.iodata_to_binary(xml))
     else
+      {:redirect_301, url} ->
+        redirect_301(conn, url)
+
       _ ->
         conn
         |> put_status(:not_found)
         |> put_view(html: PhoenixKitWeb.ErrorHTML)
         |> render(:"404")
+    end
+  end
+
+  # Canonical-prefix parity for feeds — strictly feed-to-feed (the target is
+  # feed_path/3 by construction, never the HTML smart fallback the moduledoc
+  # above forbids). Readers follow permanent redirects, and without this the
+  # channel's rel="self" link (built canonical) disagreed with the URL that
+  # served it.
+  defp feed_canonical_redirect(conn, group_slug, language, scope) do
+    canonical_language = Language.get_canonical_url_language(language)
+    canonical_url = PublishingHTML.feed_path(canonical_language, group_slug, scope)
+
+    if Language.prefixed_default_language_request?(conn, canonical_language) and
+         not Language.request_matches_canonical_url?(conn, canonical_url) do
+      {:redirect_301, canonical_url}
+    else
+      :render
     end
   end
 
@@ -582,6 +603,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           type: "website"
         })
         |> render(:index)
+
+      {:redirect_301, url} ->
+        redirect_301(conn, url)
 
       {:error, reason} ->
         handle_not_found(conn, reason)

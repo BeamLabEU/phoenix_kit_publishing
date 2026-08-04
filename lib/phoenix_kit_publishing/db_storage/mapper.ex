@@ -204,7 +204,12 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   defp build_metadata(post, version, content, status, published_at) do
     %{
       title: content.title,
-      description: PublishingVersion.get_description(version),
+      # Version wins (a stored "" is an explicit cleared value); only an
+      # ABSENT version key falls back to the row's V1-legacy per-language
+      # value — see legacy_content_fallback/2.
+      description:
+        PublishingVersion.get_description(version) ||
+          legacy_content_fallback(content, "description"),
       status: status,
       slug: post.slug,
       version: version.version_number,
@@ -212,7 +217,9 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       url_slug: content.url_slug,
       previous_url_slugs: PublishingContent.get_previous_url_slugs(content),
       published_at: format_datetime(published_at),
-      featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
+      featured_image_uuid:
+        PublishingVersion.get_featured_image_uuid(version) ||
+          legacy_content_fallback(content, "featured_image_uuid"),
       featured: PublishingVersion.get_featured(version),
       tags: PublishingVersion.get_tags(version),
       category_uuids: PublishingVersion.get_category_uuids(version),
@@ -257,13 +264,17 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   defp build_listing_metadata(post, version, content, status, published_at) do
     %{
       title: content.title,
-      description: PublishingVersion.get_description(version),
+      description:
+        PublishingVersion.get_description(version) ||
+          legacy_content_fallback(content, "description"),
       status: status,
       slug: post.slug,
       # Must mirror build_metadata/5 — see the clause above.
       allow_version_access: PublishingVersion.get_allow_version_access(version),
       published_at: format_datetime(published_at),
-      featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
+      featured_image_uuid:
+        PublishingVersion.get_featured_image_uuid(version) ||
+          legacy_content_fallback(content, "featured_image_uuid"),
       featured: PublishingVersion.get_featured(version),
       tags: PublishingVersion.get_tags(version),
       category_uuids: PublishingVersion.get_category_uuids(version),
@@ -282,6 +293,24 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       {c.language, PublishingContent.get_previous_url_slugs(c)}
     end)
   end
+
+  # V1 stored description/featured_image_uuid per-language on content.data;
+  # V2's home is version.data, migrated by promotion-on-first-edit
+  # (Posts.collect_legacy_content_promotions/2). A never-edited V1 post lost
+  # its featured image and explicit description on every public surface
+  # until someone happened to edit it — this read-side fallback restores
+  # them, per-language-faithfully (the rendered language's own value), and
+  # goes dead for a row the moment promotion runs (the version key then
+  # exists, and a stored "" is an explicit cleared value that wins). Same
+  # pattern extract_excerpt/1 below has always used for card excerpts.
+  defp legacy_content_fallback(%PublishingContent{data: data}, key) when is_map(data) do
+    case Map.get(data, key) do
+      value when is_binary(value) and value != "" -> value
+      _ -> nil
+    end
+  end
+
+  defp legacy_content_fallback(_content, _key), do: nil
 
   defp extract_excerpt(%PublishingContent{} = content) do
     case PublishingContent.get_excerpt(content) do

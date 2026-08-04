@@ -440,6 +440,36 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
     Manager.broadcast(cache_topic(group_slug), {:cache_changed, group_slug})
   end
 
+  @doc """
+  Global (non-per-group) topic for cache invalidations. Node-level
+  subscribers (`ListingCache.CacheSync`) listen here — a per-group topic
+  can't work for them because a node subscriber can't enumerate every group
+  in advance.
+  """
+  @spec cache_invalidation_topic() :: String.t()
+  def cache_invalidation_topic do
+    "#{@topic_prefix}:cache_invalidations"
+  end
+
+  @doc """
+  Subscribes the current process to `{:cache_invalidated, group_slug}`
+  messages — an instruction to ERASE the local cached listing (never to
+  regenerate; see `ListingCache.invalidate/1`).
+  """
+  @spec subscribe_to_cache_invalidations() :: subscription_result
+  def subscribe_to_cache_invalidations do
+    Manager.subscribe(cache_invalidation_topic())
+  end
+
+  @doc """
+  Broadcasts that a group's listing cache was invalidated (rename/trash/
+  delete, category changes) so every node erases its local copy.
+  """
+  @spec broadcast_cache_invalidated(String.t()) :: broadcast_result
+  def broadcast_cache_invalidated(group_slug) do
+    Manager.broadcast(cache_invalidation_topic(), {:cache_invalidated, group_slug})
+  end
+
   # ============================================================================
   # AI Translation Progress
   # ============================================================================

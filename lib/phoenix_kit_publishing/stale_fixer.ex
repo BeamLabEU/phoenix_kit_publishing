@@ -693,7 +693,12 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
             "merged_from_uuid" => legacy.uuid,
             "from_language" => legacy.language,
             "to_language" => target.language,
-            "version_uuid" => target.version_uuid
+            "version_uuid" => target.version_uuid,
+            # True when a divergent non-blank legacy body lost to the target's
+            # — its text is stashed in the merged row's data["_stale_fixer"].
+            "discarded_body" =>
+              not blank_string?(target.content) and not blank_string?(legacy.content) and
+                target.content != legacy.content
           }
         })
 
@@ -717,9 +722,16 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
+  # A discarded body is capped so a huge markdown blob doesn't bloat every
+  # merged row's JSONB — the stash is recovery insurance, not a mirror.
+  @discarded_body_cap 100_000
+
   defp build_duplicate_content_merge_attrs(target, legacy) do
     merged_data =
-      merge_content_data(target.data || %{}, legacy.data || %{}, target.url_slug, legacy.url_slug)
+      target.data
+      |> Kernel.||(%{})
+      |> merge_content_data(legacy.data || %{}, target.url_slug, legacy.url_slug)
+      |> maybe_stash_discarded_body(target, legacy)
 
     %{}
     |> maybe_take_legacy_title(target, legacy)
@@ -727,6 +739,29 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     |> maybe_take_legacy_url_slug(target, legacy)
     |> maybe_take_legacy_status(target, legacy)
     |> maybe_put_merged_data(target.data || %{}, merged_data)
+  end
+
+  # Target-wins is the right convergence rule (the target is the canonical
+  # dialect row), but silently DELETING a divergent non-blank legacy body is
+  # unrecoverable — there is no UI path back and the activity row carries
+  # uuids, not text. Stash it under a reserved key the mappers never read,
+  # so support can recover it. Public rendering is unaffected. The key is in
+  # Posts' @content_only_data_keys whitelist so an edit can't wipe it, and
+  # the stash is a LIST so a second heal can't overwrite the first.
+  defp maybe_stash_discarded_body(merged_data, target, legacy) do
+    if not blank_string?(target.content) and not blank_string?(legacy.content) and
+         target.content != legacy.content do
+      entry = %{
+        "discarded_content" => String.slice(legacy.content, 0, @discarded_body_cap),
+        "from_uuid" => legacy.uuid,
+        "from_language" => legacy.language
+      }
+
+      existing = get_in(merged_data, ["_stale_fixer", "discarded"]) || []
+      Map.put(merged_data, "_stale_fixer", %{"discarded" => [entry | existing]})
+    else
+      merged_data
+    end
   end
 
   defp maybe_take_legacy_title(attrs, target, legacy) do

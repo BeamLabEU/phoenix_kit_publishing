@@ -1188,7 +1188,10 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  @content_only_data_keys ~w(previous_url_slugs updated_by_uuid custom_css og)
+  # `_stale_fixer` is the merge-conflict recovery stash (StaleFixer's
+  # discarded-body snapshots) — without it in the whitelist, the first edit
+  # after a heal wiped the only copy of the discarded text.
+  @content_only_data_keys ~w(previous_url_slugs updated_by_uuid custom_css og _stale_fixer)
   @og_override_form_keys ~w(og_title og_description og_image_uuid)
   @legacy_promotable_keys ~w(description featured_image_uuid seo_title excerpt)
 
