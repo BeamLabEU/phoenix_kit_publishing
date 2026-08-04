@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.6 - 2026-08-04
+
+### Fixed
+- **The `leaf` requirement no longer locks hosts out of the release.** 0.4.5
+  declared `{:leaf, "~> 0.4.1"}`, which was written meaning "0.4.1 or later" but
+  reads as `>= 0.4.1 and < 0.5.0`. phoenix_kit core declares `~> 0.3`, so a host
+  resolving both got leaf 0.5.1 — and with 0.5.x excluded here, the resolver
+  quietly settled on publishing **0.4.4**, silently withholding the entire 0.4.5
+  wave. `mix deps.update` could not break the tie; the only escape was pinning
+  leaf back to 0.4.x in the host's `mix.exs`, i.e. downgrading the editor.
+
+  The requirement is now `~> 0.4.1 or ~> 0.5`. The 0.4.1 floor still stands (it
+  is where inline suggestions and `:flush` arrived); only the accidental ceiling
+  is gone. leaf 0.5 removed nothing this package calls — its attr set is a strict
+  superset of 0.4.1's, and the message contract only gained `{:leaf_flushed, …}`.
+
+  Hosts loading leaf's JS the documented way
+  (`import "../../../deps/leaf/priv/static/assets/leaf.js"`) move to the 0.5
+  bundle automatically. A **CDN pin or a vendored copy of `leaf.js` must be
+  updated by hand** — 0.5 is a server↔client contract change, and a bundle left
+  behind fails silently. leaf 0.5.1 logs a console warning when it detects this.
+
 ## 0.4.5 - 2026-08-01
 
 PR #37 — the publishing wave (Leaf editor, per-version categories,

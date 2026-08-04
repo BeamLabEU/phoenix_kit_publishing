@@ -1,7 +1,7 @@
 defmodule PhoenixKitPublishing.MixProject do
   use Mix.Project
 
-  @version "0.4.5"
+  @version "0.4.6"
   @source_url "https://github.com/BeamLabEU/phoenix_kit_publishing"
 
   def project do
@@ -106,7 +106,14 @@ defmodule PhoenixKitPublishing.MixProject do
       # command and the caret popup that `#hashtag` autocomplete rides on —
       # arrived in 0.4.0, and `:flush` lets a save collect the last keystrokes
       # instead of whatever the debounce had settled.
-      {:leaf, "~> 0.4.1"},
+      #
+      # The range is a FLOOR plus a major-ish ceiling, not `~> 0.4.1` — that
+      # reads as `>= 0.4.1 and < 0.5.0`, which locked publishing out of leaf
+      # 0.5 entirely. phoenix_kit core declares `~> 0.3`, so a host resolving
+      # both got leaf 0.5.1 + publishing 0.4.4 and silently stayed a release
+      # behind. 0.5 removed nothing publishing calls (its attr set is a strict
+      # superset of 0.4.1's; the message contract only gained `:leaf_flushed`).
+      {:leaf, "~> 0.4.1 or ~> 0.5"},
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},
