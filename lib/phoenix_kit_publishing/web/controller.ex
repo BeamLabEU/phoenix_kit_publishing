@@ -686,6 +686,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> render(:show)
 
+      # The canonical-language redirect a versioned URL can now return
+      # (respond_with_browsable_version) — without this clause it crashed
+      # with a FunctionClauseError instead of redirecting.
+      {:redirect_301, url} ->
+        redirect_301(conn, url)
+
       {:error, reason} ->
         handle_not_found(conn, reason)
     end

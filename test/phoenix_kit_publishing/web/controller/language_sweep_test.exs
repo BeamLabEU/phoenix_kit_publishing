@@ -310,6 +310,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSweepTest do
     end
   end
 
+  describe "versioned URLs honor the canonical-language redirect" do
+    test "a wrong-language /v/N URL 301s instead of crashing or serving the fallback", %{
+      conn: conn
+    } do
+      enable_languages(["en-US", "de-DE"], "en-US")
+      {:ok, group} = Groups.add_group(unique_name("vlang"), mode: "slug")
+      slug = group["slug"]
+
+      {:ok, post} =
+        Posts.create_post(slug, %{title: "Versioned", slug: "versioned", content: "Body."})
+
+      {:ok, read} = Posts.read_post_by_uuid(post.uuid, "en-US", 1)
+      {:ok, _} = Posts.update_post(slug, read, %{"allow_version_access" => "true"}, %{})
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+
+      conn = get(conn, "/de/#{slug}/versioned/v/1")
+
+      # No German content: the versioned view must canonical-redirect to the
+      # content's language, never 500 (missing consumer clause) and never
+      # serve the English body at 200 under the German URL.
+      assert conn.status == 301
+      assert redirected_to(conn, 301) =~ "/en/#{slug}/versioned"
+    end
+  end
+
   defp set_post_datetime(post_uuid, date, time) do
     {:ok, _} =
       post_uuid
