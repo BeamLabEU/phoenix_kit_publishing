@@ -98,10 +98,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
     ]
   end
 
-  # The description prefers the post's explicit description; the resolved
-  # per-language excerpt (Listing puts it in :content) is the fallback.
+  # The resolved per-language excerpt (Listing puts it in :content) — the same
+  # source the listing cards preview. The version-level metadata description is
+  # deliberately not consulted: it carries no language, so it put one language's
+  # text in every localized feed (see post_card_excerpt/1 in Web.HTML).
   defp item_description(post) do
-    text = get_in(post, [:metadata, :description]) || excerpt_fallback(post)
+    text = excerpt_fallback(post)
 
     case text do
       t when is_binary(t) and t != "" ->

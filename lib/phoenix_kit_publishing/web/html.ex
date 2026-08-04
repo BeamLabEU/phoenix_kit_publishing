@@ -2025,13 +2025,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     """
   end
 
-  # An explicit description wins; otherwise derive an excerpt from the content.
+  # The preview always derives from the per-language content that
+  # Controller.Listing's resolve step put in :content (content.data excerpt/
+  # description where a legacy row still carries one, else the first paragraph
+  # or the part before <!-- more -->). The version-level data["description"]
+  # is deliberately NOT consulted: it has no editor UI and carries no language
+  # (legacy V1 promotion / API writes fill it), so on multi-language groups it
+  # showed one language's text under every language's title. Its remaining
+  # job is the og:description default on post pages (build_og_data/4).
   defp post_card_excerpt(post) do
-    if desc = Map.get(post.metadata, :description) do
-      desc
-    else
-      extract_excerpt(post.content)
-    end
+    extract_excerpt(post.content)
   end
 
   # The date the timeline rail bins a card under — MUST match the effective
