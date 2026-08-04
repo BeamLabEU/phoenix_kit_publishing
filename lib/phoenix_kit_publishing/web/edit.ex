@@ -146,6 +146,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          socket
          |> put_flash(:error, gettext("Group not found"))
          |> push_navigate(to: Routes.path("/admin/publishing"))}
+
+      # DBStorage changeset errors pass through Groups.update_group — the
+      # reachable ones are the slug unique-constraint (renaming onto another
+      # group's slug) and the 255-char name length. Without this clause the
+      # save crashed with CaseClauseError and the whole form was lost.
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, group_changeset_message(changeset))
+         |> assign(:form, Component.to_form(params, as: :group))}
     end
   rescue
     # Narrow to the realistic failure classes (DB errors, optimistic-lock
@@ -184,6 +194,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   defp find_group(slug) do
     Publishing.list_groups()
     |> Enum.find(&(&1["slug"] == slug))
+  end
+
+  defp group_changeset_message(changeset) do
+    if Keyword.has_key?(changeset.errors, :slug) do
+      gettext("That slug is already used by another group.")
+    else
+      gettext("Couldn't save the group — please check the values and try again.")
+    end
   end
 
   defp group_form_params(group) do

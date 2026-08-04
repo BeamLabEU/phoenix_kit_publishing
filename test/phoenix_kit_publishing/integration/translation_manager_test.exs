@@ -101,11 +101,11 @@ defmodule PhoenixKit.Integration.Publishing.TranslationManagerTest do
                TranslationManager.clear_translation(group["slug"], post[:uuid], "fr-FR")
     end
 
-    test "refuses to delete the last remaining language", %{group: group, post: post} do
-      # Seed post has only its primary-language content row. Clearing it
-      # would leave the version with zero content rows; the validator
-      # rejects this so the post never becomes unreachable.
-      assert {:error, :last_language} =
+    test "refuses to delete the primary language's row", %{group: group, post: post} do
+      # The primary row anchors the post (publish validation, url_slug
+      # identity, the public primary URL) — the guard fires before the
+      # last-language check even gets a say.
+      assert {:error, :cannot_delete_primary_language} =
                TranslationManager.clear_translation(group["slug"], post[:uuid], "en-US")
     end
   end
@@ -209,15 +209,13 @@ defmodule PhoenixKit.Integration.Publishing.TranslationManagerTest do
                TranslationManager.delete_language(group["slug"], post[:uuid], "fr-FR")
     end
 
-    test "refuses to archive the last remaining ACTIVE language",
+    test "refuses to delete the primary language's row",
          %{group: group, post: post} do
-      # Single en-US content row → archiving it would leave zero
-      # non-archived rows. Refused.
-      assert {:error, :last_language} =
+      assert {:error, :cannot_delete_primary_language} =
                TranslationManager.delete_language(group["slug"], post[:uuid], "en-US")
     end
 
-    test "archives (not hard-deletes) the content row when there are >1 languages",
+    test "hard-deletes the content row when there are >1 languages",
          %{group: group, post: post} do
       assert {:ok, _} =
                TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de-DE")
@@ -233,13 +231,13 @@ defmodule PhoenixKit.Integration.Publishing.TranslationManagerTest do
                  actor_uuid: @actor_uuid
                )
 
-      # Sibling distinction from `clear_translation`: the row STAYS in
-      # the DB with `status="archived"`, it isn't deleted.
+      # 2026-08: hard-delete, same as clear_translation — the old archive
+      # semantics were reader-dead (nothing filtered archived rows, so a
+      # "deleted" translation kept serving publicly and create_version_from
+      # resurrected it in every new version).
       contents = DBStorage.list_contents(version.uuid)
-      assert length(contents) == 2
-
-      archived = Enum.find(contents, &(&1.language == "de-DE"))
-      assert archived.status == "archived"
+      assert length(contents) == 1
+      refute Enum.any?(contents, &(&1.language == "de-DE"))
 
       assert_activity_logged("publishing.translation.deleted",
         actor_uuid: @actor_uuid,

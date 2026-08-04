@@ -224,7 +224,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         url =
           Helpers.build_edit_url(group_slug, %{uuid: uuid},
             lang: lang_code,
-            version: live_version_for(socket, uuid)
+            version: version_holding_language(socket, uuid, lang_code)
           )
 
         {:noreply, push_navigate(socket, to: url)}
@@ -707,6 +707,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     Enum.find_value(socket.assigns[:posts] || [], fn post ->
       if post[:uuid] == uuid, do: post[:live_version]
     end)
+  end
+
+  # The version an existing-language pill must open: the pills' state comes
+  # from the LATEST version's language maps, while the card's title link
+  # deliberately pins the LIVE version. Reusing the live pin for pills sent
+  # a draft-only language to a version where it doesn't exist — a blank
+  # "new translation" editor whose save would add the language straight onto
+  # the PUBLISHED version. Published language → live pin (unchanged); draft
+  # language → the latest revision (where it actually lives).
+  defp version_holding_language(socket, uuid, lang_code) do
+    case Enum.find(socket.assigns[:posts] || [], &(&1[:uuid] == uuid)) do
+      nil ->
+        nil
+
+      post ->
+        if Constants.published?(get_in(post, [:language_statuses, lang_code])) do
+          post[:live_version]
+        else
+          post[:version]
+        end
+    end
   end
 
   # Batched all-time view totals for the loaded posts — %{} when the group

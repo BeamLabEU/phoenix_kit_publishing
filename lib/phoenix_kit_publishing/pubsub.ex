@@ -304,10 +304,13 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   Broadcasts that a translation was deleted from a post.
   """
   @spec broadcast_translation_deleted(String.t(), String.t(), String.t()) :: broadcast_result
-  def broadcast_translation_deleted(group_slug, post_slug, language) do
+  def broadcast_translation_deleted(group_slug, post_slug, language, version \\ nil) do
+    # Version-scoped like :translation_created — versionless, every editor
+    # tab of the post dropped the language pill even when it was viewing an
+    # untouched version.
     Manager.broadcast(
       post_translations_topic(group_slug, post_slug),
-      {:translation_deleted, group_slug, post_slug, language}
+      {:translation_deleted, group_slug, post_slug, language, version}
     )
   end
 
@@ -321,11 +324,29 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   The `source` is the socket.id of the saver, so they don't reload their own save.
   """
   @spec broadcast_editor_saved(String.t(), String.t() | nil) :: broadcast_result
-  def broadcast_editor_saved(form_key, source) do
-    Manager.broadcast(
-      editor_form_topic(form_key),
-      {:editor_saved, form_key, source}
-    )
+  def broadcast_editor_saved(form_key, source, post_scope \\ nil) do
+    result =
+      Manager.broadcast(
+        editor_form_topic(form_key),
+        {:editor_saved, form_key, source}
+      )
+
+    # Mirror onto the post's translations topic so SIBLING-language editors
+    # (subscribed there, not to this form key's topic) learn a save touched
+    # the SHARED version-level fields and can reload — see the editor's
+    # same_post_and_version? handling.
+    case post_scope do
+      {group_slug, post_uuid} when is_binary(group_slug) and is_binary(post_uuid) ->
+        Manager.broadcast(
+          post_translations_topic(group_slug, post_uuid),
+          {:editor_saved, form_key, source}
+        )
+
+      _ ->
+        :ok
+    end
+
+    result
   end
 
   # ============================================================================
@@ -615,10 +636,18 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   @spec generate_form_key(String.t(), map(), :edit | :new) :: String.t()
   def generate_form_key(group_slug, post, mode \\ :edit)
 
-  # UUID-based form key (preferred for DB posts)
-  def generate_form_key(group_slug, %{uuid: uuid, language: lang}, :edit)
+  # UUID-based form key (preferred for DB posts). The VERSION is part of the
+  # key: without it, editors on v1 and v2 of the same language shared one
+  # lock/sync channel — the v2 opener became the v1 owner's spectator,
+  # received v1's buffer over its v2 state, and on owner-departure promotion
+  # autosaved v1's content into v2's row. Versions are independent branches;
+  # they must lock independently.
+  def generate_form_key(group_slug, %{uuid: uuid, language: lang} = post, :edit)
       when is_binary(uuid) and is_binary(lang) do
-    "#{group_slug}:#{uuid}:#{lang}"
+    case Map.get(post, :version) do
+      v when is_integer(v) -> "#{group_slug}:#{uuid}:v#{v}:#{lang}"
+      _ -> "#{group_slug}:#{uuid}:#{lang}"
+    end
   end
 
   # Path already includes language (e.g., "blog/my-post/v1/en")

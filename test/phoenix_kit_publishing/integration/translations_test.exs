@@ -122,13 +122,17 @@ defmodule PhoenixKit.Integration.Publishing.TranslationsTest do
       assert result == {:error, :last_language} or match?({:error, _}, result)
     end
 
-    test "can delete primary if other languages exist" do
+    test "cannot delete the primary even when other languages exist" do
       {group, post} = create_group_and_post()
       {:ok, _} = TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de", nil)
 
-      # With 2 languages, deleting one should work
+      # 2026-08 guard: the primary row anchors the post; deleting it let
+      # the public primary URL silently serve another language and made the
+      # post unpublishable. The NON-primary sibling stays deletable.
       result = TranslationManager.delete_language(group["slug"], post[:uuid], "en", nil)
-      assert result == :ok or match?({:ok, _}, result)
+      assert result == {:error, :cannot_delete_primary_language}
+
+      assert :ok = TranslationManager.delete_language(group["slug"], post[:uuid], "de", nil)
     end
   end
 

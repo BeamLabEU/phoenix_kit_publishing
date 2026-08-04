@@ -45,15 +45,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       )
 
     # Subscribe to PubSub for live updates when connected
-    if connected?(socket) do
-      # Subscribe to all groups' post updates
-      Enum.each(groups, fn group ->
-        PublishingPubSub.subscribe_to_posts(group["slug"])
-      end)
+    subscribed_slugs =
+      if connected?(socket) do
+        # Subscribe to all groups' post updates
+        Enum.each(groups, fn group ->
+          PublishingPubSub.subscribe_to_posts(group["slug"])
+        end)
 
-      # Subscribe to global groups topic (for group creation/deletion)
-      PublishingPubSub.subscribe_to_groups()
-    end
+        # Subscribe to global groups topic (for group creation/deletion)
+        PublishingPubSub.subscribe_to_groups()
+        MapSet.new(groups, & &1["slug"])
+      else
+        MapSet.new()
+      end
+
+    socket = assign(socket, :subscribed_group_slugs, subscribed_slugs)
 
     socket =
       socket
@@ -246,10 +252,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
     trashed_count = length(Publishing.list_groups("trashed"))
 
-    # Resubscribe to any new groups that may have been created
-    Enum.each(groups, fn group ->
-      PublishingPubSub.subscribe_to_posts(group["slug"])
-    end)
+    # Subscribe to groups we haven't seen yet. Phoenix.PubSub.subscribe is
+    # not idempotent — re-subscribing on every debounced refresh delivered
+    # each post event N times and grew the subscription list without bound
+    # on a long-lived dashboard.
+    subscribed = socket.assigns[:subscribed_group_slugs] || MapSet.new()
+
+    new_slugs =
+      groups
+      |> Enum.map(& &1["slug"])
+      |> Enum.reject(&MapSet.member?(subscribed, &1))
+
+    Enum.each(new_slugs, &PublishingPubSub.subscribe_to_posts/1)
+
+    socket =
+      assign(
+        socket,
+        :subscribed_group_slugs,
+        Enum.reduce(new_slugs, subscribed, &MapSet.put(&2, &1))
+      )
 
     assign(socket,
       groups: groups,

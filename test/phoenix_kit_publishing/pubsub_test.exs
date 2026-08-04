@@ -242,8 +242,8 @@ defmodule PhoenixKit.Modules.Publishing.PubSubTest do
       # Explicit version rides the payload so editors can filter by it.
       :ok = PublishingPubSub.broadcast_translation_created(group, slug, "de", "2")
       assert_receive {:translation_created, ^group, ^slug, "de", "2"}, 500
-      :ok = PublishingPubSub.broadcast_translation_deleted(group, slug, "fr")
-      assert_receive {:translation_deleted, ^group, ^slug, "fr"}, 500
+      :ok = PublishingPubSub.broadcast_translation_deleted(group, slug, "fr", 2)
+      assert_receive {:translation_deleted, ^group, ^slug, "fr", 2}, 500
       PublishingPubSub.unsubscribe_from_post_translations(group, slug)
     end
 

@@ -242,21 +242,28 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
         ) :: :ok | {:error, term()}
   def clear_translation(group_slug, post_uuid, language_code, version \\ nil, opts \\ [])
       when is_nil(version) or is_integer(version) do
+    repo = PhoenixKit.RepoHelper.repo()
+
     with db_post when not is_nil(db_post) <-
            DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]),
          db_version when not is_nil(db_version) <- Shared.resolve_db_version(db_post, version),
          content when not is_nil(content) <-
            DBStorage.get_content(db_version.uuid, language_code),
-         :ok <- validate_not_last_content(db_version, language_code),
-         repo = PhoenixKit.RepoHelper.repo(),
-         {:ok, _} <- repo.delete(content) do
+         :ok <- validate_not_primary_language(language_code),
+         {:ok, :ok} <- delete_content_row_locked(repo, db_post, db_version, content) do
       ListingCache.regenerate(group_slug)
-      PublishingPubSub.broadcast_translation_deleted(group_slug, db_post.uuid, language_code)
+
+      PublishingPubSub.broadcast_translation_deleted(
+        group_slug,
+        db_post.uuid,
+        language_code,
+        db_version.version_number
+      )
 
       # Match `delete_language/5`'s audit pattern so the destructive
       # branch is auditable. Distinct `action` ("cleared" vs "deleted")
-      # keeps the activity feed from collapsing the two — `delete_language`
-      # archives the content row, `clear_translation` hard-deletes it.
+      # keeps the two entry points tellable apart in the activity feed —
+      # both hard-delete the row since 2026-08 (archiving was reader-dead).
       ActivityLog.log_manual(
         "publishing.translation.cleared",
         ActivityLog.actor_uuid(opts),
@@ -277,6 +284,24 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
     end
   end
 
+  # Post lock + fresh re-check inside one transaction: two concurrent
+  # deletions of the two remaining languages both passed the lockless count
+  # and left the version with ZERO content rows (public :not_found, then
+  # auto-trashed as "empty"). The lock serializes them; the loser re-counts
+  # and refuses. Shared by clear_translation/5 and delete_language/5.
+  defp delete_content_row_locked(repo, db_post, db_version, content) do
+    repo.transaction(fn ->
+      DBStorage.lock_post_row!(repo, db_post.uuid)
+
+      with :ok <- validate_not_last_content(db_version, content.language),
+           {:ok, _} <- repo.delete(content) do
+        :ok
+      else
+        {:error, reason} -> repo.rollback(reason)
+      end
+    end)
+  end
+
   defp validate_not_last_content(db_version, language_code) do
     remaining =
       DBStorage.list_contents(db_version.uuid)
@@ -285,11 +310,41 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
     if remaining == [], do: {:error, :last_language}, else: :ok
   end
 
+  # The primary-language row anchors the post: publish requires its title
+  # (validate_primary_title!), its url_slug carries the post's public
+  # identity + 301 history, and the public primary URL would silently serve
+  # another language's body through the fallback chain. Deleting it is never
+  # the right tool — edit the content instead. A legacy BASE-code row ("en"
+  # while primary is "en-US") counts as the primary; an enabled sibling
+  # dialect ("en-GB") does not.
+  defp validate_not_primary_language(language_code) do
+    primary = LanguageHelpers.get_primary_language()
+    down = String.downcase(language_code)
+
+    primary_base =
+      String.downcase(LanguageHelpers.url_language_code(primary) || primary)
+
+    if down == String.downcase(primary) or down == primary_base do
+      {:error, :cannot_delete_primary_language}
+    else
+      :ok
+    end
+  end
+
   @doc """
   Deletes a specific language translation from a post.
 
   For versioned posts, specify the version. For unversioned posts, version is ignored.
-  Refuses to delete the last remaining language content.
+  Refuses to delete the last remaining language content or the primary
+  language's row.
+
+  Hard-deletes the content row (same as `clear_translation/5`). The old
+  behavior set `status: "archived"` — but NO read path anywhere filtered
+  archived content rows, so a "deleted" translation kept serving publicly,
+  kept its url_slug claimed, stayed in `available_languages`, and
+  `create_version_from` resurrected it as a draft in every new version.
+  Dead semantics; the delete now does what its name, log line, and
+  broadcast have always claimed.
 
   Returns :ok on success or {:error, reason} on failure.
   """
@@ -297,15 +352,23 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
           :ok | {:error, term()}
   def delete_language(group_slug, post_uuid, language_code, version \\ nil, opts \\ [])
       when is_nil(version) or is_integer(version) do
+    repo = PhoenixKit.RepoHelper.repo()
+
     with db_post when not is_nil(db_post) <-
            DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]),
          db_version when not is_nil(db_version) <- Shared.resolve_db_version(db_post, version),
          content when not is_nil(content) <-
            DBStorage.get_content(db_version.uuid, language_code),
-         :ok <- validate_not_last_language(db_version),
-         {:ok, _} <- DBStorage.update_content(content, %{status: "archived"}) do
+         :ok <- validate_not_primary_language(language_code),
+         {:ok, :ok} <- delete_content_row_locked(repo, db_post, db_version, content) do
       ListingCache.regenerate(group_slug)
-      PublishingPubSub.broadcast_translation_deleted(group_slug, db_post.uuid, language_code)
+
+      PublishingPubSub.broadcast_translation_deleted(
+        group_slug,
+        db_post.uuid,
+        language_code,
+        db_version.version_number
+      )
 
       ActivityLog.log_manual(
         "publishing.translation.deleted",
@@ -325,14 +388,6 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       nil -> {:error, :not_found}
       {:error, _} = err -> err
     end
-  end
-
-  defp validate_not_last_language(db_version) do
-    active =
-      DBStorage.list_contents(db_version.uuid)
-      |> Enum.reject(&(&1.status == "archived"))
-
-    if length(active) <= 1, do: {:error, :last_language}, else: :ok
   end
 
   @doc """

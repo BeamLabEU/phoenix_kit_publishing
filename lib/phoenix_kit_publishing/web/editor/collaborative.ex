@@ -127,7 +127,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     subscribe_to_post_translations(socket)
     subscribe_to_post_versions(socket)
 
+    # Same up-front clear as the context-switch path above: a leftover
+    # synced-from-owner marker from a previous form key would make the next
+    # promotion adopt a buffer that belonged to different content.
     socket
+    |> clear_synced_from_owner()
     |> assign_editing_role(form_key)
     |> maybe_broadcast_editor_joined()
     |> maybe_load_spectator_state(form_key)

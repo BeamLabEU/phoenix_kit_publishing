@@ -130,6 +130,24 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     :ok
   end
 
+  defp cas_clear_pointer(post, active_uuid, version) do
+    case DBStorage.clear_active_version_if(post.uuid, active_uuid) do
+      1 ->
+        Logger.info(
+          "[Publishing] Clearing stale active_version_uuid for post #{post.uuid}: " <>
+            "version #{inspect(active_uuid)} is #{if version, do: version.status, else: "missing"}"
+        )
+
+        mark_listing_dirty()
+
+      _ ->
+        Logger.debug(
+          "[Publishing] Skipped stale-pointer clear for #{post.uuid} — " <>
+            "the pointer moved (concurrent publish)"
+        )
+    end
+  end
+
   defp invalidate_group_listing(%PublishingPost{} = post) do
     case post.group do
       %PublishingGroup{slug: slug} when is_binary(slug) ->
@@ -167,6 +185,13 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       post
     else
       post = apply_stale_fix(post, build_post_fixes(post, ctx), &DBStorage.update_post/2)
+
+      # Pointer heal is a discrete CAS step (not part of build_post_fixes):
+      # it re-reads the post afterwards so the orphan demotion below never
+      # runs off a stale pointer — the exact combination that could revert a
+      # concurrent publish (clear the fresh pointer, then draft the freshly
+      # published version).
+      post = fix_active_pointer_cas(post, ctx)
 
       # Fix version/content-level issues
       demote_orphaned_published_versions(post, ctx)
@@ -248,7 +273,6 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     |> maybe_fix_post_mode(post)
     |> maybe_fix_post_slug(post, ctx)
     |> maybe_fix_post_timestamp(post)
-    |> maybe_fix_active_version(post, ctx)
   end
 
   defp maybe_fix_post_mode(attrs, post) do
@@ -389,21 +413,25 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   defp maybe_set_time(attrs, _time, _now), do: attrs
 
   # If active_version_uuid points to a non-existent or non-published version, clear it
-  defp maybe_fix_active_version(attrs, %{active_version_uuid: nil}, _ctx), do: attrs
+  defp fix_active_pointer_cas(%{active_version_uuid: nil} = post, _ctx), do: post
 
-  defp maybe_fix_active_version(attrs, post, ctx) do
+  defp fix_active_pointer_cas(post, ctx) do
     active_uuid = post.active_version_uuid
     version = Enum.find(ctx.versions, &(&1.uuid == active_uuid))
 
     if is_nil(version) or not Constants.published?(version.status) do
-      Logger.info(
-        "[Publishing] Clearing stale active_version_uuid for post #{post.uuid}: " <>
-          "version #{inspect(active_uuid)} is #{if version, do: version.status, else: "missing"}"
-      )
+      # Compare-and-swap: clear only while the row STILL points at the
+      # version this snapshot judged stale. The fixer runs lockless on the
+      # read path — a publish committing between our post read and here
+      # moved the pointer to a fresh version, and an unconditional write
+      # reverted that publish.
+      cas_clear_pointer(post, active_uuid, version)
 
-      Map.put(attrs, :active_version_uuid, nil)
+      # Fresh re-read so downstream fixers (orphan demotion) never decide
+      # off the stale pointer.
+      DBStorage.get_post_by_uuid(post.uuid, [:group]) || post
     else
-      attrs
+      post
     end
   end
 
@@ -749,18 +777,31 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   # Posts' @content_only_data_keys whitelist so an edit can't wipe it, and
   # the stash is a LIST so a second heal can't overwrite the first.
   defp maybe_stash_discarded_body(merged_data, target, legacy) do
-    if not blank_string?(target.content) and not blank_string?(legacy.content) and
-         target.content != legacy.content do
-      entry = %{
-        "discarded_content" => String.slice(legacy.content, 0, @discarded_body_cap),
-        "from_uuid" => legacy.uuid,
-        "from_language" => legacy.language
-      }
+    # Union BOTH rows' prior stash lists — merge_content_data lets the
+    # target's data win wholesale, which silently dropped a previously
+    # healed legacy row's own discarded-body list with the deleted row.
+    target_prior = get_in(merged_data, ["_stale_fixer", "discarded"]) || []
+    legacy_prior = get_in(legacy.data || %{}, ["_stale_fixer", "discarded"]) || []
+    prior = target_prior ++ (legacy_prior -- target_prior)
 
-      existing = get_in(merged_data, ["_stale_fixer", "discarded"]) || []
-      Map.put(merged_data, "_stale_fixer", %{"discarded" => [entry | existing]})
-    else
+    entries =
+      if not blank_string?(target.content) and not blank_string?(legacy.content) and
+           target.content != legacy.content do
+        entry = %{
+          "discarded_content" => String.slice(legacy.content, 0, @discarded_body_cap),
+          "from_uuid" => legacy.uuid,
+          "from_language" => legacy.language
+        }
+
+        [entry | prior]
+      else
+        prior
+      end
+
+    if entries == [] do
       merged_data
+    else
+      Map.put(merged_data, "_stale_fixer", %{"discarded" => entries})
     end
   end
 

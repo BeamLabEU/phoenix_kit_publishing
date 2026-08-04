@@ -172,10 +172,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Handles base codes by finding a matching dialect in available languages.
   """
   def resolve_language_for_post(language, available_languages) do
+    ci_exact =
+      Enum.find(available_languages, fn code ->
+        String.downcase(code) == String.downcase(language)
+      end)
+
     cond do
       # Direct match - language exactly matches an available language
       language in available_languages ->
         language
+
+      # Case-insensitive exact — lowercase sibling-dialect URL codes
+      # ("en-gb") must resolve to the stored row ("en-GB"), never fall
+      # through to a base match that picks the OTHER sibling.
+      ci_exact != nil ->
+        ci_exact
 
       # Base code - try to find a dialect that matches
       base_code?(language) ->

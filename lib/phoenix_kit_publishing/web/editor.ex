@@ -31,6 +31,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   @compile {:no_warn_undefined, PhoenixKitOG}
 
   alias Phoenix.LiveView.JS
+  alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Errors
@@ -262,7 +263,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   def handle_params(_params, _uri, socket) do
-    {:noreply, socket}
+    # Nothing above matched AND no post is loaded (a bare /:group/edit URL,
+    # or a stale preview-token link) — the render dereferences @post, so
+    # falling through with nil crashed the LV. Bounce to the group listing.
+    if socket.assigns[:post] || socket.assigns[:is_new_post] do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> put_flash(:error, gettext("Post not found"))
+       |> push_navigate(to: Routes.path("/admin/publishing/#{socket.assigns.group_slug}"))}
+    end
   end
 
   # Clear the in-flight translation spinner when (re)loading a post scope. A
@@ -450,7 +461,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     virtual_post = Helpers.build_virtual_post(group_slug, group_mode, primary_language, now)
 
     form = Forms.post_form(virtual_post)
-    form_key = PublishingPubSub.generate_form_key(group_slug, virtual_post, :new)
+
+    # Socket-scoped: two admins composing NEW posts are two unrelated
+    # drafts, but the shared "group:new:lang" key made the second a
+    # read-only spectator of the first's unsaved buffer. A new post has no
+    # shared identity until it's saved — nothing to collaborate on.
+    form_key =
+      PublishingPubSub.generate_form_key(group_slug, virtual_post, :new) <> ":" <> socket.id
 
     old_form_key = socket.assigns[:form_key]
     old_post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
@@ -504,8 +521,42 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # form for adding a new translation. A bare base code that matches one of
   # the post's enabled dialects (e.g. ?lang=en against ["en-GB", "ru"]) is
   # treated as editing the existing dialect, not as a new-translation request.
+  defp same_post_and_version?(key_a, key_b) do
+    case {String.split(key_a, ":"), String.split(key_b, ":")} do
+      {[group, uuid, "v" <> _ = version, _lang_a], [group, uuid, version, _lang_b]} -> true
+      _ -> false
+    end
+  end
+
   defp new_translation_request?(language, %{available_languages: available}) do
-    ControllerLanguage.resolve_language_for_post(language, available) not in available
+    resolved = ControllerLanguage.resolve_language_for_post(language, available)
+    down = String.downcase(language)
+
+    cond do
+      # Nothing resolvable — definitely new.
+      resolved not in available ->
+        true
+
+      # Resolved to the exact row (case-insensitively) — existing.
+      String.downcase(resolved) == down ->
+        false
+
+      # Resolved to the legacy BASE row ("en" for ?lang=en-US) — existing;
+      # opening it drives the promote-in-place flow (AGENTS Issue #11).
+      resolved == DialectMapper.extract_base(language) ->
+        false
+
+      # Resolved to a SIBLING dialect. If the requested code is itself an
+      # ENABLED dialect, this is a new-translation request — the old silent
+      # bounce made adding the second enabled dialect (en-GB on an
+      # en-US-only post) impossible: the blank form self-destructed into
+      # the sibling on the very next handle_params pass.
+      Enum.any?(LanguageHelpers.enabled_language_codes(), &(String.downcase(&1) == down)) ->
+        true
+
+      true ->
+        false
+    end
   end
 
   defp handle_new_translation_params(
@@ -1027,12 +1078,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply, assign(socket, :new_version_source, nil)}
   end
 
-  def handle_event("set_new_version_source", %{"source" => version_str}, socket) do
+  def handle_event("set_new_version_source", %{"source" => version_str}, socket)
+      when is_binary(version_str) do
     case Integer.parse(version_str) do
       {version, _} -> {:noreply, assign(socket, :new_version_source, version)}
       :error -> {:noreply, socket}
     end
   end
+
+  # Crafted payloads (non-binary source) must not crash the LV.
+  def handle_event("set_new_version_source", _params, socket), do: {:noreply, socket}
 
   def handle_event("create_version_from_source", _params, socket)
       when socket.assigns.readonly? == true do
@@ -1058,7 +1113,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # Handle Events - Language Switching
   # ============================================================================
 
-  def handle_event("switch_language", %{"language" => new_language}, socket) do
+  def handle_event("switch_language", %{"language" => new_language}, socket)
+      when is_binary(new_language) do
     if socket.assigns[:is_new_post] do
       {:noreply,
        put_flash(socket, :warning, gettext("Save the post to enable language switching"))}
@@ -1076,6 +1132,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # ============================================================================
   # Handle Events - Navigation
   # ============================================================================
+
+  # Crafted payloads (non-binary language) must not crash the LV.
+  def handle_event("switch_language", _params, socket), do: {:noreply, socket}
 
   def handle_event("preview", _params, socket) do
     # Save first if there are pending changes (autosave is 500ms but user might click fast).
@@ -1140,7 +1199,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     case result do
       :ok ->
         primary_lang = LanguageHelpers.get_primary_language()
-        url = Helpers.build_edit_url(group_slug, post, lang: primary_lang)
+        # Keep the VERSION pin — clearing a translation while on draft v2
+        # used to navigate without ?v= and silently land back on the live
+        # version, abandoning the draft context.
+        url = Helpers.build_edit_url(group_slug, post, lang: primary_lang, version: version)
 
         {:noreply,
          socket
@@ -1530,14 +1592,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       socket.assigns.form_key == nil ->
         {:noreply, socket}
 
-      form_key != socket.assigns.form_key ->
-        {:noreply, socket}
-
       source == socket.id ->
         {:noreply, socket}
 
+      form_key == socket.assigns.form_key ->
+        {:noreply, Persistence.reload_post(socket)}
+
+      # A SIBLING language of the same post+version saved. The version-level
+      # fields (categories/featured/published_at/audio/…) are SHARED across
+      # languages and written wholesale on every save — without this reload,
+      # this tab's stale copies silently reverted the sibling editor's
+      # changes on its next autosave (categories dropped, published_at — and
+      # so a timestamp post's public URL — snapped back). reload_post is
+      # pending-work-safe: it keeps local edits and warns instead of
+      # clobbering.
+      same_post_and_version?(form_key, socket.assigns.form_key) ->
+        {:noreply, Persistence.reload_post(socket)}
+
       true ->
-        socket = Persistence.reload_post(socket)
         {:noreply, socket}
     end
   end
@@ -1679,8 +1751,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
-  def handle_info({:translation_deleted, group_slug, post_identifier, language}, socket) do
-    if socket.assigns[:group_slug] == group_slug && post_matches?(socket, post_identifier) do
+  def handle_info({:translation_deleted, group_slug, post_identifier, language, version}, socket) do
+    if socket.assigns[:group_slug] == group_slug && post_matches?(socket, post_identifier) &&
+         (is_nil(version) or version == current_version_scope(socket)) do
       available = socket.assigns[:available_languages] || []
       updated_available = List.delete(available, language)
 

@@ -50,6 +50,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
 
   @impl true
   def handle_event("update_new_group", %{"group" => params}, socket) do
+    # Input-level phx-change (the Custom content-type box carries its own)
+    # serializes ONLY that input — normalizing the partial map used to
+    # rebuild every other field from defaults: typing in the custom-type box
+    # wiped name + slug and silently flipped the mode radio back to
+    # Timestamp, which locks in at creation. Merge over the last-known
+    # params so a payload only changes the keys it actually carries.
+    params = Map.merge(socket.assigns[:form_params] || %{}, params)
+
     {normalized_params, auto_slug?, last_generated_slug, auto_item_names?} =
       normalize_form_params(
         params,

@@ -228,7 +228,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   Updates a publishing group's display name and slug.
   """
   @spec update_group(String.t(), map() | keyword(), keyword() | map()) ::
-          {:ok, group()} | {:error, atom()}
+          {:ok, group()} | {:error, atom() | Ecto.Changeset.t()}
   def update_group(slug, params, opts \\ []) when is_binary(slug) do
     case DBStorage.get_group_by_slug(slug) do
       nil ->
@@ -347,28 +347,41 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   defp merge_group_config(existing_data, _params), do: existing_data
 
   # Per-language display-name overrides arrive as a `%{lang => name}` map (form
-  # inputs named `group[name_i18n][<lang>]`). Store the non-blank set wholesale;
-  # an all-blank submission clears the key. Only touched when submitted, so
-  # callers that don't edit the name (or keyword-list callers) leave it intact.
-  # Entries with a non-binary value (e.g. a nested map from crafted params or a
-  # programmatic caller) are dropped rather than raising, and each override is
-  # capped to the same max length the primary `name` column enforces.
+  # inputs named `group[name_i18n][<lang>]`). Per-key merge over the stored
+  # map: a submitted non-blank value sets its key, a submitted BLANK deletes
+  # it, and a key the form didn't submit at all is kept — the edit form only
+  # renders tabs for ENABLED languages, so a wholesale replace silently wiped
+  # the override of any language disabled after it was translated (re-enable
+  # and the name was gone). Only touched when submitted, so callers that
+  # don't edit the name (or keyword-list callers) leave it intact. Entries
+  # with a non-binary value (e.g. a nested map from crafted params) are
+  # ignored rather than raising, and each override is capped to the same max
+  # length the primary `name` column enforces.
   defp merge_name_i18n(data, params) do
     case Map.fetch(params, "name_i18n") do
       {:ok, translations} when is_map(translations) ->
-        cleaned =
-          translations
-          |> Enum.flat_map(&clean_name_i18n_entry/1)
-          |> Map.new()
+        merged = Enum.reduce(translations, data["name_i18n"] || %{}, &apply_name_i18n_entry/2)
 
-        if cleaned == %{},
+        if merged == %{},
           do: Map.delete(data, "name_i18n"),
-          else: Map.put(data, "name_i18n", cleaned)
+          else: Map.put(data, "name_i18n", merged)
 
       _ ->
         data
     end
   end
+
+  defp apply_name_i18n_entry({lang, value}, acc)
+       when (is_binary(lang) or is_atom(lang)) and is_binary(value) do
+    key = to_string(lang)
+
+    case clean_name_i18n_entry({lang, value}) do
+      [{^key, cleaned}] -> Map.put(acc, key, cleaned)
+      [] -> Map.delete(acc, key)
+    end
+  end
+
+  defp apply_name_i18n_entry(_entry, acc), do: acc
 
   defp clean_name_i18n_entry({lang, value})
        when (is_binary(lang) or is_atom(lang)) and is_binary(value) do

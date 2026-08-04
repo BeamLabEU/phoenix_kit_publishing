@@ -56,7 +56,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
     group_slug = socket.assigns.group_slug
 
     case Publishing.read_post_by_uuid(post_uuid) do
-      {:ok, post} ->
+      # Group-membership check (the editor does the same): without it any
+      # group's post rendered under any other group's URL with that group's
+      # breadcrumbs.
+      {:ok, %{group: ^group_slug} = post} ->
         socket =
           socket
           |> assign(:post, post)
@@ -65,7 +68,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
 
         {:noreply, socket}
 
-      {:error, _} ->
+      _other ->
         {:noreply,
          socket
          |> put_flash(:error, gettext("Post not found"))
@@ -88,13 +91,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
     :ok
   end
 
-  # PubSub handlers for live updates
+  # PubSub handlers for live updates. The broadcast payload is
+  # {:post_updated, %{uuid:, slug:}} — the old 3-tuple head never matched,
+  # so the page never live-updated.
   @impl true
-  def handle_info({:post_updated, _group_slug, _post_slug}, socket) do
-    # Reload post data
-    case Publishing.read_post_by_uuid(socket.assigns.post_uuid) do
-      {:ok, post} -> {:noreply, assign(socket, :post, post)}
-      {:error, _} -> {:noreply, socket}
+  def handle_info({:post_updated, payload}, socket) when is_map(payload) do
+    if payload[:uuid] == socket.assigns[:post_uuid] do
+      case Publishing.read_post_by_uuid(socket.assigns.post_uuid) do
+        {:ok, post} -> {:noreply, assign(socket, :post, post)}
+        {:error, _} -> {:noreply, socket}
+      end
+    else
+      {:noreply, socket}
     end
   end
 

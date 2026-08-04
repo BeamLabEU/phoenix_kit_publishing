@@ -594,12 +594,29 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       fresh_post && fresh_post.active_version_uuid == fresh_version.uuid ->
         repo.rollback(:cannot_delete_live)
 
+      # Fresh last-version re-check UNDER the lock — the pre-lock count in
+      # validate_version_deletable is a courtesy fast-fail; two concurrent
+      # deletes of the two remaining non-archived versions both passed it
+      # and left the post with zero live-able versions.
+      last_nonarchived_version?(fresh_post, fresh_version) ->
+        repo.rollback(:last_version)
+
       true ->
         case DBStorage.update_version(fresh_version, %{status: "archived"}) do
           {:ok, updated} -> updated
           {:error, reason} -> repo.rollback(reason)
         end
     end
+  end
+
+  defp last_nonarchived_version?(fresh_post, fresh_version) do
+    post_uuid = (fresh_post && fresh_post.uuid) || fresh_version.post_uuid
+
+    post_uuid
+    |> DBStorage.list_versions()
+    |> Enum.reject(&(&1.status == "archived"))
+    |> length()
+    |> Kernel.<=(1)
   end
 
   defp validate_version_deletable(db_post, db_version) do
@@ -697,7 +714,17 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
 
   defp validate_primary_title!(repo, target_version) do
     primary_language = LanguageHelpers.get_primary_language()
-    content = DBStorage.get_content(target_version.uuid, primary_language)
+
+    # A never-edited V1 post carries its primary content under the legacy
+    # BASE code ("en" while primary is "en-US"); editor flows heal that on
+    # read, but a programmatic publish reached here directly and failed
+    # with a misleading :title_required despite a titled row.
+    content =
+      DBStorage.get_content(target_version.uuid, primary_language) ||
+        DBStorage.get_content(
+          target_version.uuid,
+          LanguageHelpers.url_language_code(primary_language) || primary_language
+        )
 
     if is_nil(content) or content.title in ["", nil, Constants.default_title()] do
       repo.rollback(:title_required)

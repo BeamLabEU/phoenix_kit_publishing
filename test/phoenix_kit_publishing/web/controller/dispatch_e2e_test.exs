@@ -33,6 +33,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
   import Plug.Conn, only: [get_resp_header: 2]
 
   alias Ecto.Adapters.SQL.Sandbox
+  alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
@@ -163,8 +164,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
     {:ok, post} =
       Posts.create_post(gb_slug, %{title: "Color", slug: "color", content: "US body."})
 
-    {:ok, _} = PhoenixKit.Modules.Publishing.add_language_to_post(gb_slug, post.uuid, "en-GB", 1)
-    {:ok, gb_read} = PhoenixKit.Modules.Publishing.read_post_by_uuid(post.uuid, "en-GB", 1)
+    {:ok, _} = Publishing.add_language_to_post(gb_slug, post.uuid, "en-GB", 1)
+    {:ok, gb_read} = Publishing.read_post_by_uuid(post.uuid, "en-GB", 1)
 
     {:ok, _} =
       Posts.update_post(gb_slug, gb_read, %{"title" => "Colour", "content" => "UK body."}, %{})

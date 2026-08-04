@@ -1051,6 +1051,66 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     end
   end
 
+  @doc """
+  Row-locks a post (`FOR UPDATE`) inside the caller's transaction — the
+  same lock `Versions.publish_version/unpublish/delete` take, so any writer
+  that acquires it serializes with the publish machinery. Returns the fresh
+  post row (or nil).
+  """
+  @spec lock_post_row!(module(), String.t()) :: PublishingPost.t() | nil
+  def lock_post_row!(repo, post_uuid) do
+    from(p in PublishingPost, where: p.uuid == ^post_uuid, lock: "FOR UPDATE")
+    |> repo.one()
+  end
+
+  @doc "Fetches a version by its uuid."
+  @spec get_version_by_uuid(String.t()) :: PublishingVersion.t() | nil
+  def get_version_by_uuid(version_uuid) do
+    repo().get(PublishingVersion, version_uuid)
+  end
+
+  @doc """
+  Clears a post's `active_version_uuid` ONLY when it still equals
+  `expected_uuid` — the compare-and-swap StaleFixer's pointer heal needs.
+  A plain write raced concurrent publishes: the fixer judged the pointer
+  stale from an earlier read, a publish moved it to a fresh version in
+  between, and the unconditional clear reverted the publish. Returns the
+  number of rows updated (0 = the pointer moved; do nothing).
+  """
+  @spec clear_active_version_if(String.t(), String.t()) :: non_neg_integer()
+  def clear_active_version_if(post_uuid, expected_uuid) do
+    {count, _} =
+      from(p in PublishingPost,
+        where: p.uuid == ^post_uuid and p.active_version_uuid == ^expected_uuid
+      )
+      |> repo().update_all(set: [active_version_uuid: nil, updated_at: DateTime.utc_now()])
+
+    count
+  end
+
+  @doc """
+  Demotes a published version to draft ONLY while its post's
+  `active_version_uuid` is still NULL — the orphan-demotion StaleFixer runs
+  from a possibly-stale snapshot, and an unconditional demote could draft a
+  version a concurrent publish just made live. One atomic statement; returns
+  the number of rows updated.
+  """
+  @spec demote_version_if_orphaned(String.t(), String.t()) :: non_neg_integer()
+  def demote_version_if_orphaned(version_uuid, post_uuid) do
+    orphaned_post =
+      from(p in PublishingPost, where: p.uuid == ^post_uuid and is_nil(p.active_version_uuid))
+
+    {count, _} =
+      from(v in PublishingVersion,
+        where:
+          v.uuid == ^version_uuid and v.status == ^Constants.status_published() and
+            exists(orphaned_post)
+      )
+      |> repo().update_all(set: [status: "draft", updated_at: DateTime.utc_now()])
+
+    count
+  end
+
   # Mirrors the editor flow's Posts.record_previous_url_slug/3: displaced
   # slug prepended to data["previous_url_slugs"], deduped, never containing
   # the row's own new slug (a history entry equal to the current slug would
