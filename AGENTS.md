@@ -76,7 +76,9 @@ This is a **library** (not a standalone Phoenix app) that provides publishing/CM
 
 - **`Publishing.DBStorage`** (`lib/phoenix_kit_publishing/db_storage.ex`) — Raw Ecto CRUD layer. Uses `PhoenixKit.RepoHelper.repo()` for multi-tenant support.
 
-- **`Publishing.ListingCache`** (`lib/phoenix_kit_publishing/listing_cache.ex`) — `:persistent_term` cache (~0.1us reads) for post metadata. Invalidated on mutations.
+- **`Publishing.ListingCache`** (`lib/phoenix_kit_publishing/listing_cache.ex`) — `:persistent_term` cache (~0.1us reads) for post metadata. Invalidated on mutations. `invalidate/1` erases locally AND broadcasts `{:cache_invalidated, slug}`; `erase_local/1` is the no-broadcast variant `ListingCache.CacheSync` calls on receipt (calling `invalidate/1` there would storm the cluster).
+
+- **`Publishing.ListingCache.CacheSync`** (`listing_cache/cache_sync.ex`) — supervised node-local subscriber that erases this node's cached terms when another node invalidates a group. `:persistent_term` is process-less, so a peer node's warm cache never misses on its own and kept serving pre-mutation listings until an unrelated LOCAL mutation. **Erase-only** — the next read rebuilds lazily, so an invalidation can never start a cluster-wide regeneration storm. Delivery is PubSub at-most-once: a partitioned node misses the purge until its next local mutation or restart. The listing cache is eventually consistent, not strongly.
 
 - **`Publishing.Renderer`** (`lib/phoenix_kit_publishing/renderer.ex`) — Markdown→HTML via MDEx (comrak) with ETS caching (6hr TTL). Detects and renders inline PHK components.
 
@@ -188,7 +190,12 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **Content format**: Markdown with inline PHK XML components (Image, Hero, CTA, Video, Headline, Subheadline, EntityForm)
 - **Admin routing** — plugin LiveView routes are auto-discovered by PhoenixKit and compiled into `live_session :phoenix_kit_admin`. Never hand-register them in a parent app's `router.ex`; use `live_view:` on a tab or a route module. See `phoenix_kit/guides/custom-admin-pages.md` for the authoritative reference
 - **Public templates must forward `phoenix_kit_current_scope`** — every `<PhoenixKitWeb.Components.LayoutWrapper.app_layout>` call in `Web.HTML` needs `phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}` so the parent app's header sees the authenticated user. Omitting it renders the page as logged-out even when the controller knows otherwise (see Issue #8)
-- **Public URL building** — always go through `PublishingHTML.group_listing_path/3` / `build_post_url/4` / `build_public_path_with_time/4`; never hand-roll prefix logic in admin templates (see Issue #7)
+- **Public URL building** — always go through `PublishingHTML.group_listing_path/3` / `build_post_url/4` / `build_public_path_with_time/4` / `feed_path/3` / `term_archive_path/3`; never hand-roll prefix logic in admin templates (see Issue #7)
+- **Language segment ≠ language identity** — every public URL builder resolves its path segment through `LanguageHelpers.public_url_segment/1`, but keeps the ORIGINAL code for the per-language slug lookup and the `use_language_prefix?/1` decision. When several enabled dialects share a base, the base's OWNER (primary-preferred, then first-declared) keeps the historical base segment (`/en/…`) and a NON-owner sibling gets its full lowercase code (`/en-gb/…`) — the only shape that can address it at all. Enabling a sibling therefore never changes an existing URL. Lowercase dialect segments are normalized back to the stored BCP-47 case (`en-gb` → `en-GB`) in `RouterDispatch.enabled_dialect_case_insensitive?/2`, `Web.Controller.Language.detect_language_or_group/2`, `Posts.resolve_language_to_dialect/1` and `Listing.find_matching_language/2` — a new match site must be case-insensitive too or it will miss every sibling URL
+- **Only the PRIMARY language may go prefixless** under `publishing_default_language_no_prefix`. Both `LanguageHelpers.use_language_prefix?/1` and `Language.prefixed_default_language_request?/2` compare the resolved FULL code, not the base — a base comparison also claims the primary's siblings, and `/en-GB/…` would 301 to the prefixless URL that serves `en-US`
+- **Collaborative form keys are version-scoped**: `"<group>:<uuid>:v<N>:<lang>"` from `PubSub.generate_form_key/3` when the post map carries an integer `:version` (older 2/3-segment shapes remain for path/slug posts). New-post keys additionally carry `socket.id` — two admins composing drafts have nothing to collaborate on. Anything comparing form keys by string must handle every shape; see `same_post_and_version?/2` in `web/editor.ex`
+- **Version scopes ride PubSub as STRINGS.** `:translation_created` / `:translation_deleted` carry `to_string(version_number)` because the editor filters them against `to_string(socket.assigns.current_version)`. A raw integer compares unequal and the event is silently dropped — that exact bug shipped in PR #38 and was caught post-merge
+- **Deleting a translation is a hard delete, and the primary language's row can't be deleted at all.** Both `TranslationManager.clear_translation/5` and `delete_language/5` `repo.delete` the content row (the old `status: "archived"` was reader-dead — nothing filtered archived rows, so a "deleted" translation kept serving publicly and `create_version_from` resurrected it) and both refuse the primary row with `:cannot_delete_primary_language`. A legacy base-code row (`"en"` while primary is `"en-US"`) counts as primary; an enabled sibling (`"en-GB"`) does not. Versions remain the only undo
 - **Language normalization on read** — `Posts.read_post/4` and the slug finders retry through the legacy base language on `:not_found` and fix stale content in place via `StaleFixer`. Don't pre-check for staleness on the hot path — the retry-on-miss pattern keeps healthy reads at one query
 - **Base→enabled-dialect resolution** — `Posts.resolve_language_to_dialect/1` (private, used by every `read_post*` entry point) maps a base code (`"en"`) to whichever enabled dialect actually exists. When several dialects share the base, prefers `LanguageHelpers.get_primary_language/0`, otherwise the first match in `enabled_language_codes/0` declaration order; falls back to `DialectMapper.base_to_dialect/1` only when no enabled dialect matches the base. The Listing builds `?lang=<primary_base>` for the editor's default click-through, so this resolver is on the hot path for every "click a post title" navigation. **The Editor's UUID-mode and path-mode `handle_params` clauses must run `Web.Controller.Language.resolve_language_for_post/2` (via the local `new_translation_request?/2` helper) against `post.available_languages` before deciding new-vs-existing translation.** A naive `language not in post.available_languages` check on the raw URL param routes `?lang=en` against `["en-GB", "ru"]` into `handle_new_translation_params/6` — which empties the form (see Issue #11).
 
@@ -335,13 +342,16 @@ Current auto-events:
 | `publishing.content.language_normalized` | Legacy base-code content (e.g. `"en"`) rewritten to the enabled dialect (`"en-US"`) by `StaleFixer` | `publishing_content` |
 | `publishing.content.merged` | Legacy and dialect rows for the same version merged by `StaleFixer`. Metadata includes `discarded_body` — true when a divergent non-blank legacy body lost to the target's; its text is stashed in the merged row's `data["_stale_fixer"]["discarded"]` (whitelisted in Posts' content-data preservation, so edits keep it) | `publishing_content` |
 | `publishing.content.promoted` | Legacy base-code row promoted in place when the admin adds the corresponding dialect translation | `publishing_content` |
-| `publishing.content.metadata_promoted` | Legacy V1 content.data keys (`description`, `featured_image_uuid`, `seo_title`, `excerpt`) promoted to `version.data` on first edit so the V2 whitelist (`previous_url_slugs`, `updated_by_uuid`, `custom_css`) can wipe content.data without losing the value. Metadata: `language`, `version_uuid`, `promoted_keys`. Self-healing — runs at most once per legacy row | `publishing_content` |
+| `publishing.content.metadata_promoted` | Legacy V1 content.data keys (`description`, `featured_image_uuid`, `seo_title`, `excerpt`) promoted to `version.data` on first edit so the V2 whitelist (`previous_url_slugs`, `updated_by_uuid`, `custom_css`, `og`, `_stale_fixer`) can wipe content.data without losing the value. Metadata: `language`, `version_uuid`, `promoted_keys`. Self-healing — runs at most once per legacy row | `publishing_content` |
+| `publishing.post.auto_trashed` | An empty post (no content in any version) past the grace period, trashed by `StaleFixer` | `publishing_post` |
 
-All four run with `mode: "auto"` and no `actor_uuid` — they're system-triggered, not user-initiated. Metadata includes `from_language`/`to_language`/`version_uuid`.
+All five run with `mode: "auto"` and no `actor_uuid` — they're system-triggered, not user-initiated. Metadata includes `from_language`/`to_language`/`version_uuid`.
+
+`StaleFixer` runs on the public READ path, so it tracks whether any fixer actually wrote (a process-local dirty flag set by `mark_listing_dirty/0`) and invalidates the group's listing cache exactly once, only when something changed — invalidating unconditionally would nuke the cache on every post read.
 
 ### User-driven CRUD events
 
-Every mutating context function in Posts / Groups / Versions / TranslationManager logs a corresponding `mode: "manual"` row via `ActivityLog.log_manual/5`. The full list:
+Every mutating context function in Posts / Groups / Versions / TranslationManager / Categories / Comments logs a corresponding `mode: "manual"` row via `ActivityLog.log_manual/5`. The full list:
 
 | action | resource_type |
 |--------|---------------|
@@ -350,6 +360,7 @@ Every mutating context function in Posts / Groups / Versions / TranslationManage
 | `publishing.post.trashed` | `publishing_post` |
 | `publishing.post.restored` | `publishing_post` |
 | `publishing.post.unpublished` | `publishing_post` |
+| `publishing.post.categorized` | `publishing_post` |
 | `publishing.group.created` | `publishing_group` |
 | `publishing.group.updated` | `publishing_group` |
 | `publishing.group.trashed` | `publishing_group` |
@@ -359,9 +370,36 @@ Every mutating context function in Posts / Groups / Versions / TranslationManage
 | `publishing.version.published` | `publishing_version` |
 | `publishing.version.deleted` | `publishing_version` |
 | `publishing.translation.added` | `publishing_content` |
+| `publishing.translation.cleared` | `publishing_content` |
 | `publishing.translation.deleted` | `publishing_content` |
+| `publishing.category.created` | `publishing_category` |
+| `publishing.category.updated` | `publishing_category` |
+| `publishing.category.deleted` | `publishing_category` |
+| `publishing.category.reordered` | `publishing_group` (failure rows say `publishing_category` — see below) |
+| `publishing.comment.created` | `publishing_post` |
+| `publishing.comment.replied` | `publishing_post` |
 | `publishing.module.enabled` | `publishing_module` |
 | `publishing.module.disabled` | `publishing_module` |
+
+`cleared` vs `deleted` on translations distinguishes the two entry points
+(`clear_translation/5` vs `delete_language/5`) in the feed — both hard-delete
+the row since 2026-08.
+
+**Failure side.** Every user-driven mutation also leaves a `db_pending` row
+via `ActivityLog.log_failed_mutation/5` when it fails, so a vanished admin
+action is still auditable. Categories and translations funnel their error
+branches through single chokepoints (`log_category_failure/5`,
+`log_translation_failure/6`) rather than logging at each site. Reasons go
+through `ActivityLog.reason_string/1`, which collapses an `%Ecto.Changeset{}`
+to `"changeset_error"` — changesets carry the submitted params (names, free
+text) and must never reach metadata.
+
+> **Known drift:** `reorder_categories/3` logs success against
+> `"publishing_group"` (the reorder is a group-scoped operation) but its
+> failure rows go through the shared `log_category_failure/5` chokepoint,
+> which hardcodes `"publishing_category"`. Filtering an activity feed by
+> `resource_type` therefore splits reorder successes from failures. Harmless
+> today; fix by passing the resource type into the chokepoint.
 
 Mutating context fns accept `opts \\ []` (or already accept it) and pull `actor_uuid` out via `ActivityLog.actor_uuid/1`. `update_post/4` additionally falls back to the audit-metadata path's `:updated_by_uuid` when no explicit `actor_uuid` opt is present, so legacy LV callers that only thread `:scope` continue to attribute correctly.
 
@@ -383,7 +421,7 @@ Module enable/disable runs without an actor (`actor_uuid: nil`) since it can be 
 
 ## Errors module
 
-`PhoenixKit.Modules.Publishing.Errors` is the central atom→user-facing-string dispatcher. Every public-API error tuple in the module either returns one of the documented atoms (`@type error_atom` lists 36 of them) or one of four tagged tuples (`{:ai_translation_failed, _}`, `{:ai_extract_failed, _}`, `{:ai_request_failed, _}`, `{:source_post_read_failed, _}`). UI flash messages call `Errors.message/1` to translate via `gettext/1` from this module's own `PhoenixKitPublishing.Gettext` backend (`priv/gettext/`) — keep the API layer locale-agnostic; let the UI decide presentation.
+`PhoenixKit.Modules.Publishing.Errors` is the central atom→user-facing-string dispatcher. Every public-API error tuple in the module either returns one of the documented atoms (`@type error_atom` lists 44 of them) or one of four tagged tuples (`{:ai_translation_failed, _}`, `{:ai_extract_failed, _}`, `{:ai_request_failed, _}`, `{:source_post_read_failed, _}`). UI flash messages call `Errors.message/1` to translate via `gettext/1` from this module's own `PhoenixKitPublishing.Gettext` backend (`priv/gettext/`) — keep the API layer locale-agnostic; let the UI decide presentation.
 
 `Errors.truncate_for_log/2` is the canonical way to render an opaque error reason inside `Logger.*` calls that target external HTTP responses or large AI payloads. Default budget 500 chars; appends `(truncated, N bytes)` so the log line is still grep-able.
 
@@ -660,38 +698,53 @@ This module implements `css_sources/0` returning `[:phoenix_kit_publishing]` so 
 
 ### Tagging & GitHub releases
 
-Tags use a **`v` prefix** (`git ls-remote --tags` is the source of truth —
-`v0.1.6` through `v0.2.3` all use it; only the earliest releases, `0.1.1`/
-`0.1.3`, predate the switch to bare numbers):
+Tags use a **`v` prefix** (`git tag --sort=v:refname` is the source of
+truth — every tag from `v0.1.6` on uses it; only the two earliest,
+`0.1.1`/`0.1.3`, predate the switch from bare numbers):
 
 ```bash
 git tag -a v0.1.0 -m "Release 0.1.0"
 git push origin v0.1.0
 ```
 
-GitHub releases have lapsed since `v0.1.7` (2026-05-05) — `0.2.0`–`0.2.3`
-were tagged and published to Hex but have no corresponding `gh release`.
-When creating one, use `gh release create` with the tag as the release
-name, title `<version> - <date>`, and body from the corresponding
-`CHANGELOG.md` section:
+GitHub releases lapsed between `v0.1.7` (2026-05-05) and `v0.4.4`, and
+`0.4.5`/`0.4.6` were backfilled on 2026-08-04 — so **`v0.4.4` onward all
+have a `gh release`; `v0.1.8`–`v0.4.3` do not.** Keep the streak going.
+Use the tag as the release name, title `<version> - <date>` (the release
+date from `CHANGELOG.md`, not today's), and the body copied from that
+version's `CHANGELOG.md` section:
 
 ```bash
-gh release create v0.1.0 \
-  --title "0.1.0 - 2026-03-25" \
-  --notes "$(changelog body for this version)"
+# Extract the section, then create the release from it.
+awk '/^## 0\.4\.7 /{f=1;next} /^## 0\.4\.6 /{f=0} f' CHANGELOG.md > /tmp/notes.md
+gh release create v0.4.7 --title "0.4.7 - 2026-08-04" --notes-file /tmp/notes.md
 ```
+
+Pass `--latest=false` when **backfilling an older version** — `gh` otherwise
+marks the newest-created release as Latest, which would demote the current
+one.
 
 ### Full release checklist
 
-1. Update version in `mix.exs`, `lib/phoenix_kit_publishing/publishing.ex` (`version/0`), and the version test
-2. Add changelog entry in `CHANGELOG.md`
-3. Run `mix precommit` — ensure zero warnings/errors before proceeding
-4. Commit all changes: `"Bump version to x.y.z"`
-5. Push to main and **verify the push succeeded** before tagging
-6. Create and push git tag: `git tag -a vx.y.z -m "Release x.y.z" && git push origin vx.y.z`
-7. Create GitHub release (optional — see note above; skipped for the last several releases): `gh release create vx.y.z --title "x.y.z - YYYY-MM-DD" --notes "..."`
+Two version sources must move together — `mix.exs`'s `@version` and
+`Publishing.version/0` in `lib/phoenix_kit_publishing/publishing.ex`.
+Nothing pins them to each other (`facade_callbacks_test.exs` only asserts
+`is_binary`), so a missed one goes unnoticed: `version/0` sat at `0.4.5`
+through the entire `0.4.6` release. **Grep both before committing.**
 
-**IMPORTANT:** Never tag or create a release before all changes are committed and pushed. Tags are immutable pointers — tagging before pushing means the release points to the wrong commit.
+1. Update the version in `mix.exs` (`@version`) AND `Publishing.version/0`
+2. Add a changelog entry in `CHANGELOG.md`
+3. Run `mix precommit` — ensure zero warnings/errors before proceeding
+4. Commit all changes: `"Update version to x.y.z"`
+5. Push to main and **verify the push succeeded**
+6. Publish to Hex: `mix hex.publish --yes`
+7. Create and push the git tag: `git tag -a vx.y.z -m "Release x.y.z" && git push origin vx.y.z`
+8. Create the GitHub release (see the command above)
+
+**IMPORTANT:** The order is commit → push → **publish → then tag**. Never
+tag before a successful `mix hex.publish`: tags are immutable pointers, and
+tagging first leaves a tag for a release that may never exist. Equally,
+never tag before pushing — the tag would point at the wrong commit.
 
 ## Pull Requests
 
@@ -711,10 +764,19 @@ PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` direct
   `PhoenixKitAI.{Translations,TranslateWorker,Translation}`, and the `AITranslate` modal UI. The
   per-language Oban fan-out + the LLM call (`PhoenixKitAI.ask_with_prompt/4`, OpenRouter) are owned
   by this plugin; publishing only contributes the adapter + editor wiring.
+- **Leaf** (`~> 0.4.1 or ~> 0.5`) — the post editor. The 0.4.1 floor is
+  load-bearing (inline suggestions + `:flush`); the range is deliberately
+  **not** `~> 0.4.1`, which reads as `< 0.5.0` and silently held hosts a
+  release behind because phoenix_kit core declares `~> 0.3` and resolves to
+  leaf 0.5.x. Don't re-tighten it — see the 0.4.6 changelog entry
 - **Phoenix LiveView** (`~> 1.0`) — Admin LiveViews
 - **MDEx** (`~> 0.13`) — Markdown rendering (comrak, GFM)
 - **Saxy** (`~> 1.5`) — XML parsing for PHK page builder components
 - **Oban** (`~> 2.18`) — Background translation and migration workers
+- **Gettext** (`~> 1.0`) — this module's own `PhoenixKitPublishing.Gettext`
+  backend + `priv/gettext` catalogues (en, et, fr, it, ru)
+- **PhoenixKitComments** (`~> 0.2`, `only: :test`) — exercises the OPTIONAL
+  comments seam. Production installs opt in by adding it themselves
 - **Req** (via PhoenixKit) — HTTP client for AI translation
 - **Jason** (via PhoenixKit) — JSON encoding/decoding
 
