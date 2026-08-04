@@ -144,8 +144,10 @@ exclude = if repo_available, do: [], else: [:integration]
 #
 #     PHOENIX_KIT_PATH=../phoenix_kit mix test --include needs_unreleased_core
 #
-# Currently: the media selector's `lock_file_type` (audio-only picker).
-# Delete the tag from the tests and this line once core ships it.
+# Currently: sibling-dialect locale acceptance (core #679, the paired half
+# of this module's sibling-dialect URLs) and the media selector's
+# `lock_file_type` (shipped in core 1.7.226 — lifts once the lock resolves
+# past it). Delete each from the tests and this line as the pin catches up.
 exclude = exclude ++ [:needs_unreleased_core]
 
 ExUnit.start(exclude: exclude)
