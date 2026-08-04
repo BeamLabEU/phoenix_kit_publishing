@@ -32,11 +32,6 @@ defmodule PhoenixKit.Modules.Publishing.PubSubTest do
       assert topic == "publishing:editor_forms:blog:hello-world:en"
     end
 
-    test "editor_presence_topic includes form key" do
-      topic = PublishingPubSub.editor_presence_topic("blog:hello-world:en")
-      assert topic == "publishing:presence:editor:blog:hello-world:en"
-    end
-
     test "cache_topic includes blog slug" do
       assert PublishingPubSub.cache_topic("blog") == "publishing:blog:cache"
     end

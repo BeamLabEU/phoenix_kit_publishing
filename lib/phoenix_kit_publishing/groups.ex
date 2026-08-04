@@ -245,12 +245,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       db_group ->
         with {:ok, name} <- extract_and_validate_name(db_group, params),
              {:ok, sanitized_slug} <- extract_and_validate_slug(db_group, params, name),
-             {:ok, updated} <-
-               DBStorage.update_group(db_group, %{
-                 name: name,
-                 slug: sanitized_slug,
-                 data: merge_group_config(db_group.data, params)
-               }) do
+             {:ok, updated} <- write_group_update_locked(db_group, name, sanitized_slug, params) do
           # A slug rename orphans the old slug's listing cache entry — it leaks in
           # :persistent_term and keeps serving stale data under the old key (L6).
           if db_group.slug != updated.slug, do: ListingCache.invalidate(db_group.slug)
@@ -347,6 +342,33 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   defp merge_group_config(existing_data, _params), do: existing_data
 
   # Per-language display-name overrides arrive as a `%{lang => name}` map (form
+  # The config merge is read-modify-write over the whole data JSONB — the
+  # same shape the post save locks for (`lock_post_row!`). Without the
+  # group-row lock, two concurrent group-edit saves read the same snapshot
+  # and the second silently reverted the first's setting keys. The merge
+  # re-runs against the FRESH data under the lock.
+  defp write_group_update_locked(db_group, name, sanitized_slug, params) do
+    repo = PhoenixKit.RepoHelper.repo()
+
+    repo.transaction(fn ->
+      fresh = DBStorage.lock_group_row!(repo, db_group.uuid) || db_group
+      apply_group_update!(repo, fresh, name, sanitized_slug, params)
+    end)
+  end
+
+  # Runs inside `write_group_update_locked/4`'s transaction — `rollback/1`
+  # throws, so returning the updated struct is the only success path.
+  defp apply_group_update!(repo, fresh, name, sanitized_slug, params) do
+    case DBStorage.update_group(fresh, %{
+           name: name,
+           slug: sanitized_slug,
+           data: merge_group_config(fresh.data, params)
+         }) do
+      {:ok, updated} -> updated
+      {:error, reason} -> repo.rollback(reason)
+    end
+  end
+
   # inputs named `group[name_i18n][<lang>]`). Per-key merge over the stored
   # map: a submitted non-blank value sets its key, a submitted BLANK deletes
   # it, and a key the form didn't submit at all is kept — the edit form only

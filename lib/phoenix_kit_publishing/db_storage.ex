@@ -1070,6 +1070,16 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc """
+  Row-locks a group (`FOR UPDATE`) inside the caller's transaction and
+  returns the fresh row — the group-save equivalent of `lock_post_row!/2`.
+  """
+  @spec lock_group_row!(module(), String.t()) :: PublishingGroup.t() | nil
+  def lock_group_row!(repo, group_uuid) do
+    from(g in PublishingGroup, where: g.uuid == ^group_uuid, lock: "FOR UPDATE")
+    |> repo.one()
+  end
+
+  @doc """
   Clears a post's `active_version_uuid` ONLY when it still equals
   `expected_uuid` — the compare-and-swap StaleFixer's pointer heal needs.
   A plain write raced concurrent publishes: the fixer judged the pointer

@@ -164,8 +164,8 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
           |> @comments_mod.create_comment(post_uuid, user_uuid, Map.put(attrs, :content, content))
           |> log_created(post_uuid, user_uuid, attrs)
 
-        {:error, reason} ->
-          {:error, reason}
+        {:error, _reason} = err ->
+          log_created(err, post_uuid, user_uuid, %{})
       end
     else
       {:error, :comments_unavailable}
@@ -193,6 +193,28 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
       # been saved. Audit trouble must stay audit trouble.
       Logger.warning("[Publishing] comment activity log failed: #{Exception.message(error)}")
       result
+  end
+
+  # The failed branch still leaves an audit row (db_pending) — a visitor's
+  # comment vanishing without trace is exactly the mutation an admin will
+  # be asked about. Content never goes in the metadata (free text); the
+  # action/resource shape mirrors the success row in do_log_created/4.
+  defp log_created({:error, reason} = err, post_uuid, user_uuid, attrs) do
+    reply? = is_binary(Map.get(attrs, :parent_uuid))
+
+    ActivityLog.log_failed_mutation(
+      if(reply?, do: "publishing.comment.replied", else: "publishing.comment.created"),
+      user_uuid,
+      "publishing_post",
+      post_uuid,
+      %{"reason" => ActivityLog.reason_string(reason)}
+    )
+
+    err
+  rescue
+    error ->
+      Logger.warning("[Publishing] comment activity log failed: #{Exception.message(error)}")
+      err
   end
 
   defp log_created(other, _post_uuid, _user_uuid, _attrs), do: other

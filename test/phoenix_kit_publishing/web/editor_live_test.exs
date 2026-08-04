@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
+  alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   setup do
     {:ok, _} = Settings.update_boolean_setting("languages_enabled", true)
@@ -444,9 +445,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
 
     test "save event persists changes through the Persistence submodule",
          %{conn: conn, group: group, post: post} do
+      # The save stamps updated_by_uuid, so the scope's user must actually
+      # exist — with fake_scope()'s made-up uuid the write dies on the
+      # fk_publishing_posts_updated_by foreign key (which the previous
+      # `assert is_binary(html)` version of this test silently accepted).
+      saver_uuid = "019cce93-0000-7000-8000-00000000ee01"
+
+      TestRepo.query!(
+        """
+        INSERT INTO phoenix_kit_users (uuid, email, hashed_password, inserted_at, updated_at)
+        VALUES ($1::uuid, 'editor-saver@example.com', 'x', now(), now())
+        ON CONFLICT (email) DO NOTHING
+        """,
+        [Ecto.UUID.dump!(saver_uuid)]
+      )
+
       {:ok, view, _html} =
         conn
-        |> put_test_scope(fake_scope())
+        |> put_test_scope(fake_scope(user_uuid: saver_uuid))
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
       # update_meta takes flat params (not %{"post" => ...}) — keys go
@@ -461,8 +477,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
 
       _ = render(view)
 
-      html = render_click(view, "save", %{})
-      assert is_binary(html)
+      _ = render_click(view, "save", %{})
+
+      # Read the post back — the moduledoc claims this test pins that save
+      # PERSISTS; a render that silently dropped the write used to pass.
+      assert {:ok, saved} = Posts.read_post(group["slug"], post[:uuid])
+      assert saved[:metadata][:title] == "Saved Title"
+      assert saved[:content] =~ "## Body content"
     end
 
     test "saving a url_slug owned by another post shows the conflict modal (M13)",

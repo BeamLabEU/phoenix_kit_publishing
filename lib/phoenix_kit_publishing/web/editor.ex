@@ -64,6 +64,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   require Logger
 
+  # Save quickly — DB writes are ~5ms, no reason to delay
+  @autosave_debounce_ms 500
+
   # ============================================================================
   # Template Helper Delegations
   # ============================================================================
@@ -133,7 +136,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     socket =
       socket
       |> assign(:project_title, Settings.get_project_title())
-      |> assign(:page_title, "Publishing Editor")
+      |> assign(:page_title, gettext("Publishing Editor"))
       |> assign(:group_slug, group_slug)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign(:show_media_selector, false)
@@ -2217,8 +2220,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       Process.cancel_timer(socket.assigns.autosave_timer)
     end
 
-    # Save quickly — DB writes are ~5ms, no reason to delay
-    timer_ref = Process.send_after(self(), :autosave, 500)
+    timer_ref = Process.send_after(self(), :autosave, @autosave_debounce_ms)
     assign(socket, :autosave_timer, timer_ref)
   end
 
@@ -3627,6 +3629,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       }
                       type="button"
                       phx-click="clear_audio"
+                      phx-disable-with={gettext("Removing…")}
                       disabled={edit_disabled? or @viewing_older_version}
                       class="btn btn-ghost btn-sm shrink-0"
                       title={gettext("Remove the audio version")}

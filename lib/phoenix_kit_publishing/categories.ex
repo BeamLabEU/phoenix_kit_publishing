@@ -150,32 +150,37 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   `"position"`, `"name_i18n"`.
   """
   def create_category(group_slug, attrs, opts \\ []) do
-    with {:ok, group_uuid} <- group_uuid(group_slug),
-         attrs = ensure_slug(attrs),
-         :ok <- validate_parent(attrs["parent_uuid"] || attrs[:parent_uuid], group_uuid, nil) do
-      %PublishingCategory{}
-      |> PublishingCategory.create_changeset(
-        attrs
-        |> stringify_keys()
-        |> Map.put("group_uuid", group_uuid)
-      )
-      |> repo().insert()
-      |> case do
-        {:ok, category} ->
-          ActivityLog.log_manual(
-            "publishing.category.created",
-            ActivityLog.actor_uuid(opts),
-            "publishing_category",
-            category.uuid,
-            %{"group" => group_slug, "slug" => category.slug}
-          )
+    result =
+      with {:ok, group_uuid} <- group_uuid(group_slug),
+           attrs = ensure_slug(attrs),
+           :ok <- validate_parent(attrs["parent_uuid"] || attrs[:parent_uuid], group_uuid, nil) do
+        %PublishingCategory{}
+        |> PublishingCategory.create_changeset(
+          attrs
+          |> stringify_keys()
+          |> Map.put("group_uuid", group_uuid)
+        )
+        |> repo().insert()
+        |> case do
+          {:ok, category} ->
+            ActivityLog.log_manual(
+              "publishing.category.created",
+              ActivityLog.actor_uuid(opts),
+              "publishing_category",
+              category.uuid,
+              %{"group" => group_slug, "slug" => category.slug}
+            )
 
-          {:ok, category}
+            {:ok, category}
 
-        {:error, changeset} ->
-          {:error, changeset}
+          {:error, changeset} ->
+            {:error, changeset}
+        end
       end
-    end
+
+    log_category_failure(result, "publishing.category.created", opts, nil, %{
+      "group" => group_slug
+    })
   end
 
   @doc """
@@ -200,6 +205,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         {:error, reason} -> repo().rollback(reason)
       end
     end)
+    |> log_category_failure("publishing.category.updated", opts, uuid, %{})
   end
 
   # Runs inside `update_category/3`'s transaction — `rollback/1` throws, so
@@ -249,26 +255,29 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   (`ON DELETE SET NULL`) and cascades the post assignments.
   """
   def delete_category(uuid, opts \\ []) do
-    with {:ok, category} <- get_category(uuid) do
-      case repo().delete(category) do
-        {:ok, deleted} ->
-          unfile_deleted_category(deleted)
+    result =
+      with {:ok, category} <- get_category(uuid) do
+        case repo().delete(category) do
+          {:ok, deleted} ->
+            unfile_deleted_category(deleted)
 
-          ActivityLog.log_manual(
-            "publishing.category.deleted",
-            ActivityLog.actor_uuid(opts),
-            "publishing_category",
-            deleted.uuid,
-            %{"slug" => deleted.slug}
-          )
+            ActivityLog.log_manual(
+              "publishing.category.deleted",
+              ActivityLog.actor_uuid(opts),
+              "publishing_category",
+              deleted.uuid,
+              %{"slug" => deleted.slug}
+            )
 
-          invalidate_group_cache(deleted.group_uuid)
-          {:ok, deleted}
+            invalidate_group_cache(deleted.group_uuid)
+            {:ok, deleted}
 
-        {:error, changeset} ->
-          {:error, changeset}
+          {:error, changeset} ->
+            {:error, changeset}
+        end
       end
-    end
+
+    log_category_failure(result, "publishing.category.deleted", opts, uuid, %{})
   end
 
   # Assignments live in `version.data`, which no foreign key can reach, so
@@ -369,9 +378,20 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
 
       changed
     end)
+    |> log_category_failure("publishing.category.reordered", opts, nil, %{
+      "group" => group_slug
+    })
   end
 
-  def reorder_categories(_group_slug, _ordered_uuids, _opts), do: {:error, :invalid_order}
+  def reorder_categories(group_slug, _ordered_uuids, opts) do
+    log_category_failure(
+      {:error, :invalid_order},
+      "publishing.category.reordered",
+      opts,
+      nil,
+      %{"group" => group_slug}
+    )
+  end
 
   @doc """
   Re-parents a category, appending it at the END of the new sibling group
@@ -543,6 +563,26 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   """
   def replace_post_categories(post_uuid, category_uuids, opts \\ [])
       when is_list(category_uuids) and length(category_uuids) <= 100 do
+    result = do_replace_post_categories(post_uuid, category_uuids, opts)
+
+    case result do
+      {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.post.categorized",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post_uuid,
+          %{"reason" => ActivityLog.reason_string(reason)}
+        )
+
+        result
+
+      _ ->
+        result
+    end
+  end
+
+  defp do_replace_post_categories(post_uuid, category_uuids, opts) do
     with {:ok, post} <- get_post(post_uuid),
          {:ok, version} <- target_version(post) do
       # Non-UUID strings must be dropped BEFORE the query — Ecto raises a
@@ -844,4 +884,21 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   rescue
     _ -> :ok
   end
+
+  # Failure chokepoint — the success row is written at each mutation site;
+  # this records the error branch (db_pending) so a failed admin action
+  # still leaves an audit trail, matching groups/posts/versions.
+  defp log_category_failure({:error, reason} = err, action, opts, resource_uuid, metadata) do
+    ActivityLog.log_failed_mutation(
+      action,
+      ActivityLog.actor_uuid(opts),
+      "publishing_category",
+      resource_uuid,
+      Map.put(metadata, "reason", ActivityLog.reason_string(reason))
+    )
+
+    err
+  end
+
+  defp log_category_failure(result, _action, _opts, _resource_uuid, _metadata), do: result
 end

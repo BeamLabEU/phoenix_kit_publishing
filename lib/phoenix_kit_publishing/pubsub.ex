@@ -366,14 +366,6 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   end
 
   @doc """
-  Returns the presence topic for tracking editors of a post.
-  """
-  @spec editor_presence_topic(String.t()) :: String.t()
-  def editor_presence_topic(form_key) do
-    "publishing:presence:editor:#{form_key}"
-  end
-
-  @doc """
   Subscribes to collaborative events for a specific editor form.
   """
   @spec subscribe_to_editor_form(String.t()) :: subscription_result

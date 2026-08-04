@@ -20,6 +20,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   alias PhoenixKit.Utils.Date, as: UtilsDate
 
   @doc "Lists version numbers for a post."
+  @spec list_versions(String.t(), String.t()) :: [integer()]
   def list_versions(group_slug, post_slug) do
     case DBStorage.get_post(group_slug, post_slug) do
       nil ->
@@ -40,6 +41,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   end
 
   @doc "Gets the published version number for a post."
+  @spec get_published_version(String.t(), String.t()) ::
+          {:ok, integer()} | {:error, :not_found | :no_published_version}
   def get_published_version(group_slug, post_slug) do
     case DBStorage.get_post(group_slug, post_slug) do
       nil ->
@@ -64,6 +67,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   end
 
   @doc "Gets the status of a specific version/language."
+  @spec get_version_status(String.t(), String.t(), integer(), String.t()) :: String.t()
   def get_version_status(group_slug, post_slug, version_number, _language) do
     with db_post when not is_nil(db_post) <- DBStorage.get_post(group_slug, post_slug),
          db_version when not is_nil(db_version) <-
@@ -649,6 +653,31 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   # Private helpers
   # ===========================================================================
 
+  # Failure chokepoint — success is logged inside do_create_version, so this
+  # wrapper only records the error branches (the "New version" click has to
+  # leave an audit row either way, matching publish/unpublish/delete).
+  defp create_version_in_db(group_slug, post_uuid, source_version, params, opts) do
+    case run_create_version(group_slug, post_uuid, source_version, params, opts) do
+      {:ok, _} = ok ->
+        ok
+
+      {:error, reason} = err ->
+        ActivityLog.log_failed_mutation(
+          "publishing.version.created",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post_uuid,
+          %{
+            "group_slug" => group_slug,
+            "source_version" => source_version,
+            "reason" => ActivityLog.reason_string(reason)
+          }
+        )
+
+        err
+    end
+  end
+
   # Both public entry points have always taken a `params` map, documented as
   # "content and metadata updates are applied to the new version", and neither
   # ever applied it — the argument reached here and was dropped. Every caller
@@ -656,11 +685,11 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   # trusted the docs would have watched a version get cloned over the edit it
   # thought it was saving, and been handed a success tuple saying otherwise.
   # Say no out loud instead: branch, then save through the normal update path.
-  defp create_version_in_db(_group_slug, _post_uuid, _source_version, params, _opts)
+  defp run_create_version(_group_slug, _post_uuid, _source_version, params, _opts)
        when params not in [nil, %{}],
        do: {:error, :params_not_applied}
 
-  defp create_version_in_db(group_slug, post_uuid, source_version, _params, opts) do
+  defp run_create_version(group_slug, post_uuid, source_version, _params, opts) do
     case DBStorage.get_group_post_by_uuid(group_slug, post_uuid, [:group]) do
       nil -> {:error, :post_not_found}
       db_post -> do_create_version(group_slug, post_uuid, db_post, source_version, opts)

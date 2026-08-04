@@ -183,9 +183,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
 
   test "trash_post event soft-deletes a post and flashes success",
        %{conn: conn, group: group, post: post} do
+    # Non-default uuid so an actor falling back to a fixture default
+    # can't fake the activity-row assertion below.
+    actor = "019cce93-dddd-7000-8000-000000000077"
+
     {:ok, view, _html} =
       conn
-      |> put_test_scope(fake_scope())
+      |> put_test_scope(fake_scope(user_uuid: actor))
       |> live("/admin/publishing/#{group["slug"]}")
 
     html = render_click(view, "trash_post", %{"uuid" => post[:uuid]})
@@ -197,6 +201,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     # `:not_found` result is the soft-delete success signal.
     assert html =~ "Post moved to trash"
     assert Posts.read_post(group["slug"], post[:slug]) == {:error, :not_found}
+
+    # And the audit row carries the click's actor — a dropped
+    # `actor_uuid:` opt in the LV's context call lands nil here.
+    assert_activity_logged("publishing.post.trashed",
+      actor_uuid: actor,
+      resource_uuid: post[:uuid]
+    )
   end
 
   test "restore_post event un-trashes a post and flashes success",
@@ -217,6 +228,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     # restore worked end-to-end, not just rendered something.
     assert html =~ "Post restored as draft"
     assert {:ok, _reloaded} = Posts.read_post(group["slug"], post[:slug])
+
+    assert_activity_logged("publishing.post.restored", resource_uuid: post[:uuid])
   end
 
   test "handle_info {:post_updated, post} schedules debounced refresh", %{

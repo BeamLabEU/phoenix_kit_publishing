@@ -39,6 +39,50 @@ shape) + group-membership check; malformed uuid/params no longer crash
 LVs; index dashboard subscription dedup; presence sync marker cleared on
 new-presence setup; unpublish-via-status-select explains itself.
 
+## C12 re-validation round (same day, pre-PR)
+
+Three fresh triage agents (playbook C12: security/error-handling,
+translations/activity/tests, pubsub/cleanliness) re-swept the tree after
+the rebase onto upstream 0.4.6. Fixed from their findings:
+
+- **Group-settings save now locks the group row** (`lock_group_row!` +
+  in-transaction re-merge) — two concurrent group-edit saves used to
+  read the same `data` snapshot and the second silently reverted the
+  first's setting keys (same class as the post-save lock).
+- **Presence metas no longer replicate the full `%User{}` struct**
+  (hashed_password included — `redact` only affects Inspect) —
+  trimmed to `%{uuid, email}`, the only fields consumers read.
+- **Failure-side activity logging** for categories (create/update/
+  delete/reorder/file), translation add/clear/delete, version create,
+  and public comment create — every user-driven mutation now leaves a
+  `db_pending` audit row when it fails, matching the groups/posts/
+  versions convention. Shared `ActivityLog.reason_string/1` keeps
+  changesets (user free text) out of metadata.
+- **Tautology tests made real**: the index-LV trash/restore/delete
+  tests now pin DB state + the activity row's actor (non-default
+  actor uuid); the editor save test reads the post back — doing so
+  immediately exposed that the save had been failing all along
+  (fake_scope's made-up uuid violates `fk_publishing_posts_updated_by`;
+  the test now inserts a real user row). Listing trash/restore pin
+  actor threading; `:cannot_delete_primary_language` string pinned.
+- **Missed i18n**: `page_title` in listing ("Publishing") and editor
+  ("Publishing Editor") gettext-wrapped; "Publishing Editor" filled in
+  all five catalogues (the ten msgids agent 2 flagged were already
+  extracted + filled earlier the same day; its scan predated that
+  commit).
+- Dashboard LV subscribes to the global groups topic BEFORE the first
+  read (no lost group events in the mount window); dead
+  `build_summary/2` + `:dashboard_summary` assign and dead
+  `editor_presence_topic/1` removed; silent `handle_info` catch-alls
+  now `Logger.debug`; category schemas got `@type t` and the
+  `parent_uuid` FK constraint (no 500 on a raced parent delete);
+  autosave debounce named (`@autosave_debounce_ms`); `@spec`s added to
+  the three spec-less version reads.
+
+Gates after the round: full suite 1563 tests green on the published pin
+AND local core (`--include needs_unreleased_core`, plus a seed-0 run);
+`mix precommit` clean (credo no issues, dialyzer 0 new).
+
 ## Open
 
 None blocking. The items below are surfaced for Max's call — none are data
@@ -80,3 +124,32 @@ corruption, all were verified real:
     dead create-version-on-edit path would error if its flag were ever
     enabled; the editor still renders the Clear button for the primary
     language (server guard refuses; hiding it is cosmetic).
+
+Added by the C12 re-validation round (all LOW/INFO, verified real):
+
+13. **Broad `rescue` on read paths is systemic** — the documented
+    graceful-degradation convention (survive the release-gated
+    missing-table window), but most sites catch *every* exception, so a
+    code bug degrades to `[]`/`nil`/`"draft"` with only a warning. The
+    narrowed pattern already exists in-repo
+    (`e in [Ecto.QueryError, DBConnection.ConnectionError, Postgrex.Error]`).
+    Sweep the read paths onto it?
+14. **`remove_group` has-posts guard is check-then-act** (count, then
+    delete, no transaction) — a post created in the window is
+    cascade-deleted despite `force: false`. Admin UI always passes
+    `force: true`, so programmatic-API only.
+15. **Concurrent add of the same language isn't idempotent** — the loser
+    gets a unique-constraint changeset error instead of
+    `{:ok, existing}`. Constraint prevents corruption; UX-only.
+16. **`module enable/disable` + settings-LV toggles log success only /
+    nothing** — enable/disable's actor is genuinely unavailable from the
+    core module manager, and core convention audits only module
+    enable/disable, not settings writes. Leave as-is, or thread actors
+    through core?
+17. Cleanups: `Errors.message/1` has no clause for
+    `{:error, {:has_posts, n}}` (the one non-uniform group-API error
+    shape, currently unreachable from UI); `Shared.audit_metadata(_,
+    :create)` has zero internal callers (public facade only);
+    `web/listing.ex`'s per-post loop re-evaluates
+    `Constants.published?/1` up to 6× per row instead of hoisting it
+    like `group_slug`/`public_url`.

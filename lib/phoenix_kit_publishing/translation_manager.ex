@@ -134,6 +134,25 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       )
     end
 
+    case result do
+      {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.translation.added",
+          ActivityLog.actor_uuid(opts),
+          "publishing_content",
+          nil,
+          %{
+            "group_slug" => group_slug,
+            "post_uuid" => post_uuid,
+            "language" => language_code,
+            "reason" => ActivityLog.reason_string(reason)
+          }
+        )
+
+      _ ->
+        :ok
+    end
+
     result
   end
 
@@ -279,8 +298,25 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
 
       :ok
     else
-      nil -> {:error, :not_found}
-      {:error, _} = err -> err
+      nil ->
+        log_translation_failure(
+          {:error, :not_found},
+          "publishing.translation.cleared",
+          opts,
+          group_slug,
+          post_uuid,
+          language_code
+        )
+
+      {:error, _} = err ->
+        log_translation_failure(
+          err,
+          "publishing.translation.cleared",
+          opts,
+          group_slug,
+          post_uuid,
+          language_code
+        )
     end
   end
 
@@ -385,9 +421,46 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
 
       :ok
     else
-      nil -> {:error, :not_found}
-      {:error, _} = err -> err
+      nil ->
+        log_translation_failure(
+          {:error, :not_found},
+          "publishing.translation.deleted",
+          opts,
+          group_slug,
+          post_uuid,
+          language_code
+        )
+
+      {:error, _} = err ->
+        log_translation_failure(
+          err,
+          "publishing.translation.deleted",
+          opts,
+          group_slug,
+          post_uuid,
+          language_code
+        )
     end
+  end
+
+  # Failure chokepoint for the destructive translation paths — a failed
+  # user-driven clear/delete still leaves an audit row (db_pending),
+  # matching the groups/posts/versions convention.
+  defp log_translation_failure({:error, reason} = err, action, opts, group_slug, post_uuid, lang) do
+    ActivityLog.log_failed_mutation(
+      action,
+      ActivityLog.actor_uuid(opts),
+      "publishing_content",
+      nil,
+      %{
+        "group_slug" => group_slug,
+        "post_uuid" => post_uuid,
+        "language" => lang,
+        "reason" => ActivityLog.reason_string(reason)
+      }
+    )
+
+    err
   end
 
   @doc """

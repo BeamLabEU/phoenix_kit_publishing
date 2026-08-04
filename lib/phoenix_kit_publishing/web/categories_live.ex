@@ -502,6 +502,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
                       <.table_row_menu_button
                         phx-click="delete"
                         phx-value-uuid={category.uuid}
+                        phx-disable-with={gettext("Deleting…")}
                         icon="hero-trash"
                         label={gettext("Delete")}
                         variant="error"
@@ -550,7 +551,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
             <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
               {gettext("Cancel")}
             </button>
-            <button type="submit" class="btn btn-primary btn-sm">
+            <button
+              type="submit"
+              class="btn btn-primary btn-sm"
+              phx-disable-with={gettext("Saving…")}
+            >
               <%= if @editing do %>
                 {gettext("Save")}
               <% else %>
@@ -578,7 +583,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
             <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_move">
               {gettext("Cancel")}
             </button>
-            <button type="submit" class="btn btn-primary btn-sm">
+            <button
+              type="submit"
+              class="btn btn-primary btn-sm"
+              phx-disable-with={gettext("Moving…")}
+            >
               {gettext("Move")}
             </button>
           </div>

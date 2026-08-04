@@ -37,14 +37,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
         }
       )
 
-    {groups, insights, summary} =
+    # Subscribe to the global groups topic BEFORE the first read, so a
+    # group created/deleted between the snapshot and the subscription
+    # still reaches this LV (per-group post topics follow the read — a
+    # group arriving via the global topic gets its topic in refresh).
+    if connected?(socket) do
+      PublishingPubSub.subscribe_to_groups()
+    end
+
+    {groups, insights} =
       dashboard_snapshot(
         socket.assigns.current_locale_base,
         socket.assigns[:phoenix_kit_current_user],
         date_time_settings
       )
 
-    # Subscribe to PubSub for live updates when connected
     subscribed_slugs =
       if connected?(socket) do
         # Subscribe to all groups' post updates
@@ -52,8 +59,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
           PublishingPubSub.subscribe_to_posts(group["slug"])
         end)
 
-        # Subscribe to global groups topic (for group creation/deletion)
-        PublishingPubSub.subscribe_to_groups()
         MapSet.new(groups, & &1["slug"])
       else
         MapSet.new()
@@ -71,7 +76,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       )
       |> assign(:groups, groups)
       |> assign(:dashboard_insights, insights)
-      |> assign(:dashboard_summary, summary)
       |> assign(:empty_state?, groups == [])
       |> assign(:enabled_languages, Publishing.enabled_language_codes())
       |> assign(:default_url_language, Publishing.get_primary_language_base())
@@ -153,7 +157,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     do: {:noreply, socket |> assign(:dashboard_refresh_timer, nil) |> refresh_dashboard()}
 
   # Catch-all for other PubSub messages (translation progress, cache changes, etc.)
-  def handle_info(_msg, socket), do: {:noreply, socket}
+  def handle_info(msg, socket) do
+    Logger.debug("Publishing dashboard ignoring message: #{inspect(msg)}")
+    {:noreply, socket}
+  end
 
   @impl true
   def handle_event("switch_view", %{"mode" => mode}, socket) when mode in @group_statuses do
@@ -242,7 +249,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   defp refresh_dashboard(socket) do
     view_mode = socket.assigns[:view_mode] || "active"
 
-    {groups, insights, summary} =
+    {groups, insights} =
       dashboard_snapshot(
         socket.assigns.current_locale_base,
         socket.assigns[:phoenix_kit_current_user],
@@ -275,7 +282,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     assign(socket,
       groups: groups,
       dashboard_insights: insights,
-      dashboard_summary: summary,
       empty_state?: groups == [] and view_mode == "active",
       trashed_count: trashed_count
     )
@@ -290,9 +296,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     insights =
       Enum.map(db_groups, &build_group_insight(&1, current_user, date_time_settings))
 
-    summary = build_summary(groups, insights)
-
-    {groups, insights, summary}
+    {groups, insights}
   end
 
   defp build_group_insight(db_group, current_user, date_time_settings) do
@@ -347,28 +351,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
   defp compare_and_select_latest(datetime, current) do
     if DateTime.compare(datetime, current) == :gt, do: datetime, else: current
-  end
-
-  defp build_summary(groups, insights) do
-    Enum.reduce(
-      insights,
-      %{
-        total_groups: length(groups),
-        total_posts: 0,
-        published_posts: 0,
-        draft_posts: 0,
-        archived_posts: 0
-      },
-      fn insight, acc ->
-        %{
-          acc
-          | total_posts: acc.total_posts + insight.posts_count,
-            published_posts: acc.published_posts + insight.published_count,
-            draft_posts: acc.draft_posts + insight.draft_count,
-            archived_posts: acc.archived_posts + insight.archived_count
-        }
-      end
-    )
   end
 
   defp parse_datetime(nil), do: :error

@@ -29,10 +29,14 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
   def track_editing_session(form_key, socket, user) do
     topic = editing_topic(form_key)
 
+    # Minimal payload — presence metas replicate cluster-wide and land in
+    # every subscriber. The full %User{} struct (hashed_password included;
+    # redact: only affects Inspect) has no business there: consumers read
+    # only uuid + email, so :user carries exactly that shape.
     Presence.track(self(), topic, socket.id, %{
       user_uuid: user.uuid,
       user_email: user.email,
-      user: user,
+      user: %{uuid: user.uuid, email: user.email},
       joined_at: System.system_time(:millisecond),
       phx_ref: socket.id,
       pid: self(),

@@ -104,4 +104,14 @@ defmodule PhoenixKit.Modules.Publishing.ActivityLog do
       metadata: Map.put(metadata, "db_pending", true)
     })
   end
+
+  @doc """
+  Compresses a mutation-failure reason into a PII-safe string for failure
+  metadata. Changesets carry the submitted params (free text, names), so
+  they collapse to `"changeset_error"` rather than being inspected.
+  """
+  @spec reason_string(term()) :: String.t()
+  def reason_string(reason) when is_atom(reason), do: Atom.to_string(reason)
+  def reason_string(%Ecto.Changeset{}), do: "changeset_error"
+  def reason_string(reason), do: inspect(reason)
 end

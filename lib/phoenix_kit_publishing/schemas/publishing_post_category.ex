@@ -12,6 +12,12 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPostCategory do
   @primary_key false
   @foreign_key_type UUIDv7
 
+  @type t :: %__MODULE__{
+          post_uuid: Ecto.UUID.t() | nil,
+          category_uuid: Ecto.UUID.t() | nil,
+          inserted_at: DateTime.t() | nil
+        }
+
   schema "phoenix_kit_publishing_post_categories" do
     belongs_to :post, PhoenixKit.Modules.Publishing.PublishingPost,
       foreign_key: :post_uuid,
