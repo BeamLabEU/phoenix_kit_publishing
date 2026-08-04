@@ -237,9 +237,31 @@ defmodule PhoenixKit.Modules.Publishing.PubSubTest do
       # Explicit version rides the payload so editors can filter by it.
       :ok = PublishingPubSub.broadcast_translation_created(group, slug, "de", "2")
       assert_receive {:translation_created, ^group, ^slug, "de", "2"}, 500
-      :ok = PublishingPubSub.broadcast_translation_deleted(group, slug, "fr", 2)
-      assert_receive {:translation_deleted, ^group, ^slug, "fr", 2}, 500
+      # Same STRING scope shape as :translation_created — the editor filters
+      # both against `to_string(current_version)`, so an integer here would
+      # never compare equal and the pill would never drop.
+      :ok = PublishingPubSub.broadcast_translation_deleted(group, slug, "fr", "2")
+      assert_receive {:translation_deleted, ^group, ^slug, "fr", "2"}, 500
       PublishingPubSub.unsubscribe_from_post_translations(group, slug)
+    end
+
+    test "broadcast_editor_saved mirrors to the post topic under a distinct tag" do
+      group = "tg-#{System.unique_integer([:positive])}"
+      uuid = "019cce93-1111-7000-8000-000000000001"
+      form_key = "#{group}:#{uuid}:v1:en-US"
+
+      :ok = PublishingPubSub.subscribe_to_editor_form(form_key)
+      :ok = PublishingPubSub.subscribe_to_post_translations(group, uuid)
+
+      PublishingPubSub.broadcast_editor_saved(form_key, "phx-source", {group, uuid})
+
+      # Own form-key topic keeps :editor_saved; the post-wide mirror uses
+      # :sibling_editor_saved so a subscriber of BOTH doesn't reload twice.
+      assert_receive {:editor_saved, ^form_key, "phx-source"}, 500
+      assert_receive {:sibling_editor_saved, ^form_key, "phx-source"}, 500
+      refute_receive {:editor_saved, ^form_key, "phx-source"}, 100
+
+      PublishingPubSub.unsubscribe_from_post_translations(group, uuid)
     end
 
     test "broadcast_cache_changed delivers cache event" do

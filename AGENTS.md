@@ -530,9 +530,11 @@ Every public surface that shows a group name resolves through it: the listing
 h1 / page title / OG title / breadcrumb, the post page's breadcrumb + "Back
 to …" footer (via `PostRendering.fetch_group/1` + `resolve_group_name/3` — the
 same fetched group map also feeds the controller's
-`assign_group_display_config/2`, one fetch per request), and the all-groups
-overview cards. Admin surfaces intentionally show the canonical primary-language
-name. `display_settings_render_test.exs` pins the reach.
+`assign_group_display_config/2`, one fetch per request), and the feed channel
+title. (The all-groups overview cards were deleted with the template in
+2026-08 — see the Routing section.) Admin surfaces intentionally show the
+canonical primary-language name. `display_settings_render_test.exs` pins the
+reach.
 
 ## Comments (optional seam)
 

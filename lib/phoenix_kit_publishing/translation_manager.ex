@@ -276,7 +276,7 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
         group_slug,
         db_post.uuid,
         language_code,
-        db_version.version_number
+        version_row_scope(db_version)
       )
 
       # Match `delete_language/5`'s audit pattern so the destructive
@@ -403,7 +403,7 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
         group_slug,
         db_post.uuid,
         language_code,
-        db_version.version_number
+        version_row_scope(db_version)
       )
 
       ActivityLog.log_manual(
@@ -575,6 +575,14 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       version -> to_string(version)
     end
   end
+
+  # Same scope convention, from a DB version row. The editor compares the
+  # broadcast version against `to_string(socket.assigns.current_version)`, so a
+  # raw integer never matches and the event is silently dropped.
+  defp version_row_scope(%{version_number: number}) when not is_nil(number),
+    do: to_string(number)
+
+  defp version_row_scope(_version), do: nil
 
   # The post's active version number as a string, matching the editor's scope
   # convention. nil (→ active via fetch/3) when there's no active version or the

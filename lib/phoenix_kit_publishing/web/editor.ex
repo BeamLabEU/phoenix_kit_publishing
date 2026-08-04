@@ -519,18 +519,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   defp parse_version_param(_), do: nil
 
+  # True when two collaborative form keys address the same post AND the same
+  # version, differing only in language — the pair that shares version-level
+  # fields and therefore has to reload on each other's saves.
+  defp same_post_and_version?(key_a, key_b) do
+    case {String.split(key_a, ":"), String.split(key_b, ":")} do
+      {[group, uuid, version, _lang_a], [group, uuid, version, _lang_b]} ->
+        # Only the version-scoped edit key shape ("<group>:<uuid>:v<N>:<lang>").
+        # A bare `"v" <> _` prefix test also accepts a language code in that
+        # slot ("vi"), which other 4-segment key shapes can carry.
+        version_segment?(version)
+
+      _ ->
+        false
+    end
+  end
+
+  defp version_segment?("v" <> number), do: number != "" and String.match?(number, ~r/^\d+$/)
+  defp version_segment?(_), do: false
+
   # Returns true when the requested ?lang= parameter does not resolve to any
   # existing content row on the post — i.e. the editor should open a blank
   # form for adding a new translation. A bare base code that matches one of
   # the post's enabled dialects (e.g. ?lang=en against ["en-GB", "ru"]) is
   # treated as editing the existing dialect, not as a new-translation request.
-  defp same_post_and_version?(key_a, key_b) do
-    case {String.split(key_a, ":"), String.split(key_b, ":")} do
-      {[group, uuid, "v" <> _ = version, _lang_a], [group, uuid, version, _lang_b]} -> true
-      _ -> false
-    end
-  end
-
   defp new_translation_request?(language, %{available_languages: available}) do
     resolved = ControllerLanguage.resolve_language_for_post(language, available)
     down = String.downcase(language)
@@ -1601,19 +1613,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       form_key == socket.assigns.form_key ->
         {:noreply, Persistence.reload_post(socket)}
 
-      # A SIBLING language of the same post+version saved. The version-level
-      # fields (categories/featured/published_at/audio/…) are SHARED across
-      # languages and written wholesale on every save — without this reload,
-      # this tab's stale copies silently reverted the sibling editor's
-      # changes on its next autosave (categories dropped, published_at — and
-      # so a timestamp post's public URL — snapped back). reload_post is
-      # pending-work-safe: it keeps local edits and warns instead of
-      # clobbering.
-      same_post_and_version?(form_key, socket.assigns.form_key) ->
-        {:noreply, Persistence.reload_post(socket)}
-
       true ->
         {:noreply, socket}
+    end
+  end
+
+  # A SIBLING language of the same post+version saved (mirrored onto the post's
+  # translations topic). The version-level fields (categories/featured/
+  # published_at/audio/…) are SHARED across languages and written wholesale on
+  # every save — without this reload, this tab's stale copies silently reverted
+  # the sibling editor's changes on its next autosave (categories dropped,
+  # published_at — and so a timestamp post's public URL — snapped back).
+  # reload_post is pending-work-safe: it keeps local edits and warns instead of
+  # clobbering.
+  def handle_info({:sibling_editor_saved, form_key, source}, socket) do
+    if socket.assigns[:form_key] != nil and source != socket.id and
+         form_key != socket.assigns.form_key and
+         same_post_and_version?(form_key, socket.assigns.form_key) do
+      {:noreply, Persistence.reload_post(socket)}
+    else
+      {:noreply, socket}
     end
   end
 

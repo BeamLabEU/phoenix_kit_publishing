@@ -302,8 +302,13 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
 
   @doc """
   Broadcasts that a translation was deleted from a post.
+
+  `version` is the version number as a STRING, matching
+  `:translation_created` and the editor's `current_version` scope — an
+  integer here never compares equal and the event is silently dropped.
   """
-  @spec broadcast_translation_deleted(String.t(), String.t(), String.t()) :: broadcast_result
+  @spec broadcast_translation_deleted(String.t(), String.t(), String.t(), String.t() | nil) ::
+          broadcast_result
   def broadcast_translation_deleted(group_slug, post_slug, language, version \\ nil) do
     # Version-scoped like :translation_created — versionless, every editor
     # tab of the post dropped the language pill even when it was viewing an
@@ -323,7 +328,8 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
 
   The `source` is the socket.id of the saver, so they don't reload their own save.
   """
-  @spec broadcast_editor_saved(String.t(), String.t() | nil) :: broadcast_result
+  @spec broadcast_editor_saved(String.t(), String.t() | nil, {String.t(), String.t()} | nil) ::
+          broadcast_result
   def broadcast_editor_saved(form_key, source, post_scope \\ nil) do
     result =
       Manager.broadcast(
@@ -334,12 +340,14 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
     # Mirror onto the post's translations topic so SIBLING-language editors
     # (subscribed there, not to this form key's topic) learn a save touched
     # the SHARED version-level fields and can reload — see the editor's
-    # same_post_and_version? handling.
+    # same_post_and_version? handling. A DISTINCT tag, because an editor on
+    # the saver's own form key is subscribed to BOTH topics: reusing
+    # :editor_saved made it reload twice per remote save.
     case post_scope do
       {group_slug, post_uuid} when is_binary(group_slug) and is_binary(post_uuid) ->
         Manager.broadcast(
           post_translations_topic(group_slug, post_uuid),
-          {:editor_saved, form_key, source}
+          {:sibling_editor_saved, form_key, source}
         )
 
       _ ->
