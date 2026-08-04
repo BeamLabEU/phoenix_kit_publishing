@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.Renderer
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
 
@@ -807,12 +808,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
       <%!-- Feed autodiscovery — body placement for the same reason as the OG
         tags (the host owns <head>); feed readers scan the whole document. --%>
+      <%!-- On a category/tag archive the advertised feed is the ARCHIVE's
+        feed, not the group's — a reader subscribing from /blog/category/x
+        expects that category's items. --%>
       <link
         :if={feeds_enabled?() && assigns[:group]}
         rel="alternate"
         type="application/rss+xml"
         title={Publishing.translated_group_name(@group, @current_language)}
-        href={feed_path(@current_language, @group["slug"])}
+        href={
+          feed_path(
+            @current_language,
+            @group["slug"],
+            assigns[:term_filter] && {@term_filter.type, @term_filter.value}
+          )
+        }
       />
       <.scrollbar_style_tag style={(assigns[:group] && @group["scrollbar_style"]) || "default"} />
       <.scroll_timeline
@@ -2032,7 +2042,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   # is deliberately NOT consulted: it has no editor UI and carries no language
   # (legacy V1 promotion / API writes fill it), so on multi-language groups it
   # showed one language's text under every language's title. Its remaining
-  # job is the og:description default on post pages (build_og_data/4).
+  # job is the LAST-RESORT og:description default on post pages
+  # (build_og_data/4 — per-language override and derived excerpt both outrank
+  # it there too).
   defp post_card_excerpt(post) do
     extract_excerpt(post.content)
   end
@@ -2213,7 +2225,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                       >
                         <span>v{v.version}</span>
                         <%= if v.is_live do %>
-                          <span class="badge badge-success badge-xs h-auto">live</span>
+                          <span class="badge badge-success badge-xs h-auto">{gettext("live")}</span>
                         <% end %>
                       </.link>
                     </li>
@@ -2738,21 +2750,41 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         |> String.trim()
       end
 
-    # Render markdown to HTML
-    html = Renderer.render_markdown(excerpt_markdown)
+    # PHK components must not reach the preview: rendering a <Note> here
+    # would bake its body text AND the notes-section CSS into the excerpt,
+    # and a truncated component tag survives tag-stripping as escaped junk.
+    html = excerpt_markdown |> Shared.strip_components() |> Renderer.render_markdown()
 
     # Strip HTML tags to get plain text
     html
     |> Phoenix.HTML.raw()
     |> Phoenix.HTML.safe_to_string()
     |> strip_html_tags()
+    |> decode_basic_entities()
     |> String.trim()
   end
 
   def extract_excerpt(_), do: ""
 
+  # The renderer HTML-escapes text; after tag-stripping the excerpt is plain
+  # text that HEEx will escape AGAIN, so "Fish & chips" read "Fish &amp;
+  # chips" on every card. Decode the standard named entities back — `&amp;`
+  # LAST, or a double-encoded `&amp;lt;` would decode twice.
+  defp decode_basic_entities(text) do
+    text
+    |> String.replace("&nbsp;", " ")
+    |> String.replace("&quot;", "\"")
+    |> String.replace("&#39;", "'")
+    |> String.replace("&lt;", "<")
+    |> String.replace("&gt;", ">")
+    |> String.replace("&amp;", "&")
+  end
+
   defp strip_html_tags(html) when is_binary(html) do
     html
+    # style/script CONTENT is not prose — removing only the tags used to
+    # leave a wall of CSS text in excerpts and inflate reading-time counts.
+    |> String.replace(~r/<(style|script)\b[^>]*>.*?<\/\1>/is, " ")
     |> String.replace(~r/<[^>]*>/, " ")
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
@@ -2930,7 +2962,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Converts the @translations assign to the format expected by the component.
   """
   def build_public_translations(translations, _current_language) do
-    Enum.map(translations, fn translation ->
+    translations
+    # A disabled/legacy language is not publicly routable — RouterDispatch
+    # only rewrites ENABLED locales, so these entries' URLs 404 at the host.
+    # The post-page translation list deliberately includes them (admin
+    # context); the public switcher must not render dead links. The current
+    # entry survives regardless so the switcher never loses its anchor;
+    # entries without the flag (listing translations) are enabled-only by
+    # construction.
+    |> Enum.reject(fn t -> Map.get(t, :enabled) == false and not (t.current || false) end)
+    |> Enum.map(fn translation ->
       %{
         code: translation.code,
         display_code: translation.display_code || translation.code,

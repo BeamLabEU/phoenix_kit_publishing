@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PublishingPost
@@ -96,11 +97,58 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   Deletes empty posts (no content in any version) that are past the grace period.
   """
   @spec fix_stale_post(PublishingPost.t()) :: PublishingPost.t()
+  # Tracks whether any fixer wrote during this fix_stale_post call, so the
+  # group's listing cache is invalidated exactly when a self-heal changed
+  # something. The fixers run on the public READ path: without this, a
+  # relabelled/merged language row kept serving the cached pre-heal
+  # language_titles/slugs/available_languages indefinitely on a quiet site —
+  # and invalidating unconditionally would nuke the cache on EVERY post read
+  # (read_post_by_uuid runs the fixer each time). Process-local: the whole
+  # fix runs synchronously in the calling process, and mark_listing_dirty/0
+  # no-ops when the flag isn't armed (standalone fix_stale_content/version
+  # calls behave as before).
+  @dirty_flag {__MODULE__, :listing_cache_dirty}
+
   def fix_stale_post(%PublishingPost{} = post) do
-    # Pre-fetch all versions and contents once to avoid redundant queries
-    ctx = build_post_context(post)
-    do_fix_stale_post(post, ctx)
+    Process.put(@dirty_flag, false)
+
+    try do
+      # Pre-fetch all versions and contents once to avoid redundant queries
+      ctx = build_post_context(post)
+      result = do_fix_stale_post(post, ctx)
+
+      if Process.get(@dirty_flag) == true, do: invalidate_group_listing(result)
+
+      result
+    after
+      Process.delete(@dirty_flag)
+    end
   end
+
+  defp mark_listing_dirty do
+    if Process.get(@dirty_flag) == false, do: Process.put(@dirty_flag, true)
+    :ok
+  end
+
+  defp invalidate_group_listing(%PublishingPost{} = post) do
+    case post.group do
+      %PublishingGroup{slug: slug} when is_binary(slug) ->
+        ListingCache.invalidate(slug)
+
+      _ ->
+        case DBStorage.get_post_by_uuid(post.uuid, [:group]) do
+          %PublishingPost{group: %PublishingGroup{slug: slug}} when is_binary(slug) ->
+            ListingCache.invalidate(slug)
+
+          _ ->
+            :ok
+        end
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp invalidate_group_listing(_), do: :ok
 
   defp build_post_context(post) do
     versions = DBStorage.list_versions(post.uuid)
@@ -142,6 +190,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
     case DBStorage.update_post(post, %{trashed_at: DateTime.utc_now()}) do
       {:ok, _} ->
+        mark_listing_dirty()
+
         ActivityLog.log_manual(
           "publishing.post.auto_trashed",
           nil,
@@ -373,11 +423,13 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
     case update_fn.(record, attrs) do
       {:ok, updated} ->
+        mark_listing_dirty()
         updated
 
       {:error, %Ecto.Changeset{} = cs} ->
         case retry_on_slug_conflict(record, attrs, cs, update_fn) do
           {:ok, updated} ->
+            mark_listing_dirty()
             updated
 
           {:error, reason} ->
@@ -477,7 +529,14 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
         "[Publishing] Fixing stale version #{version.uuid}: status #{inspect(version.status)} → \"draft\""
       )
 
-      DBStorage.update_version(version, %{status: "draft"})
+      case DBStorage.update_version(version, %{status: "draft"}) do
+        {:ok, _} = ok ->
+          mark_listing_dirty()
+          ok
+
+        other ->
+          other
+      end
     end
   end
 
@@ -505,7 +564,14 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
         "[Publishing] Fixing stale content #{content.uuid} (#{content.language}): #{inspect(attrs)}"
       )
 
-      DBStorage.update_content(content, attrs)
+      case DBStorage.update_content(content, attrs) do
+        {:ok, _} = ok ->
+          mark_listing_dirty()
+          ok
+
+        other ->
+          other
+      end
     end
   end
 
@@ -544,6 +610,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
         case DBStorage.update_content(content, %{language: target_language}) do
           {:ok, updated} ->
+            mark_listing_dirty()
+
             ActivityLog.log(%{
               action: "publishing.content.language_normalized",
               mode: "auto",
@@ -610,6 +678,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
     case result do
       {:ok, :ok} ->
+        mark_listing_dirty()
+
         Logger.info(
           "[Publishing] Merged duplicate legacy content #{legacy.uuid} into #{target.uuid}"
         )
@@ -755,6 +825,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
       DBStorage.update_version(v, %{status: "draft"})
       DBStorage.update_content_status(v.uuid, "draft")
+      mark_listing_dirty()
     end
   end
 
@@ -776,6 +847,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       for v <- demote do
         DBStorage.update_version(v, %{status: "archived"})
         DBStorage.update_content_status(v.uuid, "archived")
+        mark_listing_dirty()
       end
     end
   end
@@ -807,6 +879,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       )
 
       DBStorage.update_post(post, %{active_version_uuid: nil})
+      mark_listing_dirty()
     end
   end
 
@@ -823,6 +896,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       for v <- published_versions do
         DBStorage.update_version(v, %{status: "archived"})
         demote_published_content(v.uuid)
+        mark_listing_dirty()
       end
     end
   end
@@ -848,6 +922,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
       for content <- published do
         DBStorage.update_content(content, %{status: "draft"})
+        mark_listing_dirty()
       end
     end
   end

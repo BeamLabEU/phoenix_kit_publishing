@@ -924,7 +924,12 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
     case find_free_suffix(base_slug, group_slug, content.language, content.uuid, start_n) do
       {:ok, new_slug} ->
-        case update_content(content, %{url_slug: new_slug}) do
+        # The displaced slug joins previous_url_slugs so the established
+        # public URL 301s to the renamed one instead of dying — the editor's
+        # normal slug-change flow records history; this self-heal must too.
+        data = record_displaced_slug(content.data || %{}, base_slug, new_slug)
+
+        case update_content(content, %{url_slug: new_slug, data: data}) do
           {:ok, _updated} ->
             Logger.warning(
               "[Publishing] Auto-resolved url_slug collision: content #{content.uuid} renamed " <>
@@ -1029,19 +1034,36 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         contents =
           from(c in PublishingContent,
             join: v in assoc(c, :version),
-            where: v.post_uuid == ^db_post.uuid and c.url_slug == ^url_slug_to_clear,
-            select: {c, c.language}
+            where: v.post_uuid == ^db_post.uuid and c.url_slug == ^url_slug_to_clear
           )
           |> repo().all()
 
-        from(c in PublishingContent,
-          join: v in assoc(c, :version),
-          where: v.post_uuid == ^db_post.uuid and c.url_slug == ^url_slug_to_clear
-        )
-        |> repo().update_all(set: [url_slug: nil, updated_at: DateTime.utc_now()])
+        # Per-row (not update_all): the cleared slug must join each row's
+        # previous_url_slugs so the established public URL keeps 301ing to
+        # this post — clearing without history silently handed the URL to
+        # whichever post triggered the collision.
+        Enum.each(contents, fn content ->
+          data = record_displaced_slug(content.data || %{}, url_slug_to_clear, nil)
+          update_content(content, %{url_slug: nil, data: data})
+        end)
 
-        Enum.map(contents, fn {_content, lang} -> lang end) |> Enum.uniq()
+        Enum.map(contents, & &1.language) |> Enum.uniq()
     end
+  end
+
+  # Mirrors the editor flow's Posts.record_previous_url_slug/3: displaced
+  # slug prepended to data["previous_url_slugs"], deduped, never containing
+  # the row's own new slug (a history entry equal to the current slug would
+  # 301-loop).
+  defp record_displaced_slug(data, old_slug, new_slug) do
+    previous = data["previous_url_slugs"] || []
+
+    updated =
+      [old_slug | previous]
+      |> Enum.reject(&(&1 in [nil, "", new_slug]))
+      |> Enum.uniq()
+
+    Map.put(data, "previous_url_slugs", updated)
   end
 
   @doc "Upserts content by version_id + language using ON CONFLICT."

@@ -58,17 +58,52 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def render_resolved_post(conn, group_slug, identifier, language) do
     case PostFetching.fetch_post(group_slug, identifier, language) do
       {:ok, post} ->
-        if Constants.published?(post.metadata.status) and not Constants.scheduled_ahead?(post) do
-          render_published_post(conn, group_slug, post, language)
-        else
-          log_404(conn, group_slug, identifier, language, :unpublished)
-          {:error, :unpublished}
+        cond do
+          not Constants.published?(post.metadata.status) or Constants.scheduled_ahead?(post) ->
+            log_404(conn, group_slug, identifier, language, :unpublished)
+            {:error, :unpublished}
+
+          # The editor's "Add language" writes {title: "Untitled", content: ""}
+          # onto the ACTIVE version — instantly public. An untranslated stub
+          # must read as a MISSING translation, not an empty published page:
+          # :not_found sends it through the smart fallback (other language →
+          # group listing). The primary language can't hit this — publishing
+          # requires a real primary title.
+          stub_translation?(post) ->
+            log_404(conn, group_slug, identifier, language, :not_found)
+            {:error, :not_found}
+
+          true ->
+            render_published_post(conn, group_slug, post, language)
         end
 
       {:error, reason} ->
         log_404(conn, group_slug, identifier, language, reason)
         {:error, reason}
     end
+  end
+
+  # Same canonical-language check the live path runs: without it,
+  # /de/.../v/1 for a version with no German content silently served the
+  # fallback language's body at 200 under the German URL.
+  defp respond_with_browsable_version(conn, group_slug, post, version, language) do
+    canonical_language = Language.get_canonical_url_language_for_post(post.language)
+    canonical_url = build_version_url(group_slug, post, canonical_language, version)
+
+    if canonical_redirect?(conn, language, canonical_language, canonical_url) do
+      {:redirect_301, canonical_url}
+    else
+      build_versioned_post_response(group_slug, post, version)
+    end
+  end
+
+  # An untranslated stub row: default/blank title AND a blank body.
+  defp stub_translation?(post) do
+    title = get_in(post, [:metadata, :title])
+    body = post[:content]
+
+    (title in [nil, ""] or title == Constants.default_title()) and
+      (not is_binary(body) or String.trim(body) == "")
   end
 
   defp render_published_post(conn, group_slug, post, language) do
@@ -124,7 +159,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
         # A version that never shipped (plain draft, no published_at) stays
         # private.
         if publicly_browsable_version?(group_slug, post, version) do
-          build_versioned_post_response(group_slug, post, version)
+          respond_with_browsable_version(conn, group_slug, post, version, language)
         else
           log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
           {:error, :unpublished}

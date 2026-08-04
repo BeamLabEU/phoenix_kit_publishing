@@ -29,8 +29,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
     # Get enabled languages - these are the ONLY languages that should show
     enabled_languages = Language.get_enabled_languages()
 
-    # Get the primary/default language
-    primary_language = List.first(enabled_languages) || "en"
+    # The SITE primary — not List.first(enabled), which is declaration order
+    # and diverged from the post-page switcher's ordering whenever the
+    # primary wasn't positioned first in the languages config.
+    primary_language = LanguageHelpers.get_primary_language()
 
     # For each enabled language, check if there's published content for it
     # Only show languages that are explicitly enabled (not just base code matches)
@@ -69,13 +71,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
   end
 
   # Check if a specific enabled language has published content in the group.
-  # Requires the language to exist, be published, and have actual content (non-empty title).
+  # Requires the language to exist, be published, and have actual content
+  # (non-empty title). Base-tolerant on the CONTENT key: a legacy row keyed
+  # "en" must still light up the enabled "en-US" switcher entry — the listing
+  # itself serves it (filter_by_exact_language base-matches), and the
+  # post-page switcher includes it, so an exact-key check here made the two
+  # surfaces disagree until the stale-fixer happened to relabel the row.
   defp has_published_content_for_language?(posts, language) do
     Enum.any?(posts, fn post ->
-      language in (post.available_languages || []) and
-        Constants.published?(Map.get(post.language_statuses, language)) and
-        has_content?(post, language)
+      case content_key_for(post, language) do
+        nil ->
+          false
+
+        key ->
+          Constants.published?(Map.get(post.language_statuses, key)) and
+            has_content?(post, key)
+      end
     end)
+  end
+
+  defp content_key_for(post, language) do
+    available = post.available_languages || []
+
+    if language in available do
+      language
+    else
+      base = LanguageHelpers.url_language_code(language) || language
+      Enum.find(available, fn code -> LanguageHelpers.url_language_code(code) == base end)
+    end
   end
 
   defp has_content?(post, language) do
@@ -220,15 +243,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
   end
 
   # Fetches language_slugs map from cache for per-language URL slugs
-  # Returns a map of language -> url_slug for each available language
+  # Returns a map of language -> url_slug for each available language.
+  # On a cache miss (cold cache, cache disabled via the admin setting, or a
+  # post outside the cache's 5,000-row window) the post map's OWN
+  # :language_slugs is the fallback — to_post_map always carries it, and
+  # falling straight to post.slug emitted internal slugs for every localized
+  # entry, costing a canonical-redirect hop per click (permanently, when the
+  # cache is disabled).
   defp fetch_language_slugs_from_cache(group_slug, post) do
     case ListingCache.find_post_by_mode(group_slug, post) do
       {:ok, cached_post} ->
         cached_post.language_slugs || %{}
 
       {:error, _} ->
-        # Cache miss - return empty map (will fall back to post.slug)
-        %{}
+        Map.get(post, :language_slugs) || %{}
     end
   end
 

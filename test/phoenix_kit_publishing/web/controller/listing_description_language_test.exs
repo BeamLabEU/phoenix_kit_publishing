@@ -124,13 +124,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ListingDescriptionLanguag
     refute de_feed =~ @description
   end
 
-  test "the description keeps its one job: the og:description default on post pages", %{
+  test "og:description derives from the page's own language", %{
     conn: conn,
     group_slug: slug
   } do
-    body = conn |> get("/en/#{slug}/hello") |> follow_to_body()
+    en = conn |> get("/en/#{slug}/hello") |> follow_to_body()
+    assert en =~ ~s(<meta property="og:description" content="#{@en_paragraph}")
+    refute en =~ ~s(content="#{@description}")
 
-    assert body =~ ~s(<meta property="og:description" content="#{@description}")
+    de = build_conn() |> get("/de/#{slug}/hello") |> follow_to_body()
+    assert de =~ ~s(<meta property="og:description" content="#{@de_paragraph}")
+    refute de =~ ~s(content="#{@description}")
+  end
+
+  test "og:description falls back to the version description only when the language has no body",
+       %{conn: conn, group_slug: slug} do
+    {:ok, bodyless} =
+      Posts.create_post(slug, %{title: "Empty Body", slug: "empty-body", content: ""})
+
+    {:ok, read} = Publishing.read_post_by_uuid(bodyless.uuid, "en-US", 1)
+    {:ok, _} = Posts.update_post(slug, read, %{"description" => "Last-resort description"}, %{})
+    :ok = Versions.publish_version(slug, bodyless.uuid, 1)
+
+    body = conn |> get("/en/#{slug}/empty-body") |> follow_to_body()
+    assert body =~ ~s(<meta property="og:description" content="Last-resort description")
   end
 
   # The listing may 301 to its canonical language form (prefix handling);

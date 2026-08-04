@@ -46,8 +46,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
 
     title =
       case scope do
-        {_type, value} -> "#{Publishing.translated_group_name(group, language)} · #{value}"
-        nil -> Publishing.translated_group_name(group, language)
+        # scope_label is the translated term name (category names translate;
+        # tags are their own identifier) — the raw scope value is the SLUG,
+        # which made a German category feed title show "Blog · news" while
+        # the HTML archive heading said "Blog · Nachrichten".
+        {_type, value} ->
+          label = Keyword.get(opts, :scope_label) || value
+          "#{Publishing.translated_group_name(group, language)} · #{label}"
+
+        nil ->
+          Publishing.translated_group_name(group, language)
       end
 
     description = feed_description(group, title)

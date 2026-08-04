@@ -27,19 +27,19 @@ msgstr "\\\"Tõlgi puuduvad\\\" loob tõlked ainult keeltele, millel tõlget vee
 msgid "\"Translate to All\" will create or overwrite translations for all enabled languages."
 msgstr "\\\"Tõlgi kõikidesse\\\" loob või kirjutab üle tõlked kõigi lubatud keelte jaoks."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2581
-#: lib/phoenix_kit_publishing/web/html.ex:2589
-#: lib/phoenix_kit_publishing/web/html.ex:2603
-#: lib/phoenix_kit_publishing/web/html.ex:2611
-#: lib/phoenix_kit_publishing/web/html.ex:2808
-#: lib/phoenix_kit_publishing/web/html.ex:2812
+#: lib/phoenix_kit_publishing/web/html.ex:2596
+#: lib/phoenix_kit_publishing/web/html.ex:2604
+#: lib/phoenix_kit_publishing/web/html.ex:2618
+#: lib/phoenix_kit_publishing/web/html.ex:2626
+#: lib/phoenix_kit_publishing/web/html.ex:2843
+#: lib/phoenix_kit_publishing/web/html.ex:2847
 #, elixir-autogen, elixir-format
 msgid "%B %d, %Y"
 msgstr "%B %d, %Y"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:1491
-#: lib/phoenix_kit_publishing/web/html.ex:752
-#: lib/phoenix_kit_publishing/web/html.ex:922
+#: lib/phoenix_kit_publishing/web/html.ex:753
+#: lib/phoenix_kit_publishing/web/html.ex:932
 #, elixir-autogen, elixir-format
 msgid "%{count} post"
 msgid_plural "%{count} posts"
@@ -53,9 +53,9 @@ msgid_plural "%{count} versions"
 msgstr[0] "%{count} versioon"
 msgstr[1] "%{count} versiooni"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2605
-#: lib/phoenix_kit_publishing/web/html.ex:2613
-#: lib/phoenix_kit_publishing/web/html.ex:2825
+#: lib/phoenix_kit_publishing/web/html.ex:2620
+#: lib/phoenix_kit_publishing/web/html.ex:2628
+#: lib/phoenix_kit_publishing/web/html.ex:2860
 #, elixir-autogen, elixir-format
 msgid "%{date} at %{time}"
 msgstr "%{date} kell %{time}"
@@ -87,7 +87,7 @@ msgid_plural "%{count} others viewing"
 msgstr[0] "1 kasutaja vaatab"
 msgstr[1] "%{count} kasutajat vaatab"
 
-#: lib/phoenix_kit_publishing/web/html.ex:850
+#: lib/phoenix_kit_publishing/web/html.ex:860
 #, elixir-autogen, elixir-format
 msgid "1 post"
 msgid_plural "%{count} posts"
@@ -190,12 +190,12 @@ msgstr "Teine kasutaja redigeerib hetkel seda postitust. Saate seda vaadata, kui
 msgid "Applies to all languages in this version."
 msgstr "Kehtib kõigi selle versiooni keelte kohta."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2990
+#: lib/phoenix_kit_publishing/web/html.ex:3034
 #, elixir-autogen, elixir-format
 msgid "Apr"
 msgstr "Apr"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2973
+#: lib/phoenix_kit_publishing/web/html.ex:3017
 #, elixir-autogen, elixir-format
 msgid "April"
 msgstr "Aprill"
@@ -211,12 +211,12 @@ msgstr "Aprill"
 msgid "Archived"
 msgstr "Arhiveeritud"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2994
+#: lib/phoenix_kit_publishing/web/html.ex:3038
 #, elixir-autogen, elixir-format
 msgid "Aug"
 msgstr "Aug"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2977
+#: lib/phoenix_kit_publishing/web/html.ex:3021
 #, elixir-autogen, elixir-format
 msgid "August"
 msgstr "August"
@@ -232,8 +232,8 @@ msgid "Autosave failed — click Save to retry"
 msgstr "Automaatne salvestamine ebaõnnestus — uuesti proovimiseks klõpsake nuppu Salvesta"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2535
-#: lib/phoenix_kit_publishing/web/html.ex:2092
-#: lib/phoenix_kit_publishing/web/html.ex:2376
+#: lib/phoenix_kit_publishing/web/html.ex:2107
+#: lib/phoenix_kit_publishing/web/html.ex:2391
 #: lib/phoenix_kit_publishing/web/preview.ex:343
 #, elixir-autogen, elixir-format
 msgid "Back to %{group}"
@@ -623,12 +623,12 @@ msgstr "Andmebaasi uuendamine ebaõnnestus"
 msgid "Date"
 msgstr "Kuupäev"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2998
+#: lib/phoenix_kit_publishing/web/html.ex:3042
 #, elixir-autogen, elixir-format
 msgid "Dec"
 msgstr "Dets"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2981
+#: lib/phoenix_kit_publishing/web/html.ex:3025
 #, elixir-autogen, elixir-format
 msgid "December"
 msgstr "Detsember"
@@ -752,7 +752,7 @@ msgstr "Järjekorda lisamine…"
 msgid "Entries Cached"
 msgstr "Vahemällu salvestatud kirjed"
 
-#: lib/phoenix_kit_publishing/renderer.ex:764
+#: lib/phoenix_kit_publishing/renderer.ex:769
 #, elixir-autogen, elixir-format
 msgid "Error rendering markdown"
 msgstr "Viga markdown'i renderdamisel"
@@ -788,12 +788,12 @@ msgid "Featured Image"
 msgstr "Esiletõstetud pilt"
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3304
-#: lib/phoenix_kit_publishing/web/html.ex:1177
-#: lib/phoenix_kit_publishing/web/html.ex:1188
-#: lib/phoenix_kit_publishing/web/html.ex:1339
-#: lib/phoenix_kit_publishing/web/html.ex:1350
-#: lib/phoenix_kit_publishing/web/html.ex:1641
-#: lib/phoenix_kit_publishing/web/html.ex:1652
+#: lib/phoenix_kit_publishing/web/html.ex:1187
+#: lib/phoenix_kit_publishing/web/html.ex:1198
+#: lib/phoenix_kit_publishing/web/html.ex:1349
+#: lib/phoenix_kit_publishing/web/html.ex:1360
+#: lib/phoenix_kit_publishing/web/html.ex:1651
+#: lib/phoenix_kit_publishing/web/html.ex:1662
 #, elixir-autogen, elixir-format
 msgid "Featured image"
 msgstr "Esiletõstetud pilt"
@@ -808,12 +808,12 @@ msgstr "Esiletõstetud pilt tühjendatud"
 msgid "Featured image selected"
 msgstr "Esiletõstetud pilt valitud"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2988
+#: lib/phoenix_kit_publishing/web/html.ex:3032
 #, elixir-autogen, elixir-format
 msgid "Feb"
 msgstr "Veebr"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2971
+#: lib/phoenix_kit_publishing/web/html.ex:3015
 #, elixir-autogen, elixir-format
 msgid "February"
 msgstr "Veebruar"
@@ -1018,32 +1018,32 @@ msgstr "Üksuste nimetamine"
 msgid "Items called \"%{plural}\"."
 msgstr "Üksuste nimetus: \\\"%{plural}\\\"."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2987
+#: lib/phoenix_kit_publishing/web/html.ex:3031
 #, elixir-autogen, elixir-format
 msgid "Jan"
 msgstr "Jaan"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2970
+#: lib/phoenix_kit_publishing/web/html.ex:3014
 #, elixir-autogen, elixir-format
 msgid "January"
 msgstr "Jaanuar"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2993
+#: lib/phoenix_kit_publishing/web/html.ex:3037
 #, elixir-autogen, elixir-format
 msgid "Jul"
 msgstr "Juuli"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2976
+#: lib/phoenix_kit_publishing/web/html.ex:3020
 #, elixir-autogen, elixir-format
 msgid "July"
 msgstr "Juuli"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2992
+#: lib/phoenix_kit_publishing/web/html.ex:3036
 #, elixir-autogen, elixir-format
 msgid "Jun"
 msgstr "Juuni"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2975
+#: lib/phoenix_kit_publishing/web/html.ex:3019
 #, elixir-autogen, elixir-format
 msgid "June"
 msgstr "Juuni"
@@ -1113,18 +1113,18 @@ msgstr "Halda juhiseid"
 msgid "Manage caching and performance settings for the publishing module."
 msgstr "Halda avaldamismooduli vahemälu ja jõudluse seadeid."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2989
+#: lib/phoenix_kit_publishing/web/html.ex:3033
 #, elixir-autogen, elixir-format
 msgid "Mar"
 msgstr "Märts"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2972
+#: lib/phoenix_kit_publishing/web/html.ex:3016
 #, elixir-autogen, elixir-format
 msgid "March"
 msgstr "Märts"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2974
-#: lib/phoenix_kit_publishing/web/html.ex:2991
+#: lib/phoenix_kit_publishing/web/html.ex:3018
+#: lib/phoenix_kit_publishing/web/html.ex:3035
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr "Mai"
@@ -1199,7 +1199,7 @@ msgstr "OG-pilti pole määratud."
 msgid "No UUID"
 msgstr "UUID puudub"
 
-#: lib/phoenix_kit_publishing/web/html.ex:785
+#: lib/phoenix_kit_publishing/web/html.ex:786
 #, elixir-autogen, elixir-format
 msgid "No groups configured yet."
 msgstr "Rühmi pole veel seadistatud."
@@ -1229,7 +1229,7 @@ msgstr "Postitusi ei leitud"
 msgid "No published posts yet"
 msgstr "Avaldatud postitusi pole veel"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1081
+#: lib/phoenix_kit_publishing/web/html.ex:1091
 #, elixir-autogen, elixir-format
 msgid "No published posts yet."
 msgstr "Avaldatud postitusi pole veel."
@@ -1259,12 +1259,12 @@ msgstr "Ei leitud"
 msgid "Not published"
 msgstr "Avaldamata"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2997
+#: lib/phoenix_kit_publishing/web/html.ex:3041
 #, elixir-autogen, elixir-format
 msgid "Nov"
 msgstr "Nov"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2980
+#: lib/phoenix_kit_publishing/web/html.ex:3024
 #, elixir-autogen, elixir-format
 msgid "November"
 msgstr "November"
@@ -1314,12 +1314,12 @@ msgstr "OK"
 msgid "ON — primary language URLs are prefixless (e.g. /blog/post). Managed on the Languages page."
 msgstr "SEES — peamise keele URL-id on ilma prefiksita (nt /blog/post). Hallatav lehel Keeled."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2996
+#: lib/phoenix_kit_publishing/web/html.ex:3040
 #, elixir-autogen, elixir-format
 msgid "Oct"
 msgstr "Okt"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2979
+#: lib/phoenix_kit_publishing/web/html.ex:3023
 #, elixir-autogen, elixir-format
 msgid "October"
 msgstr "Oktoober"
@@ -1534,7 +1534,7 @@ msgstr "Avaldatud"
 msgid "Published (Live)"
 msgstr "Avaldatud (aktiivne)"
 
-#: lib/phoenix_kit_publishing/web/html.ex:731
+#: lib/phoenix_kit_publishing/web/html.ex:732
 #: lib/phoenix_kit_publishing/web/index.ex:61
 #: lib/phoenix_kit_publishing/web/index.ex:415
 #: lib/phoenix_kit_publishing/web/post_show.ex:150
@@ -1553,10 +1553,10 @@ msgstr "Avaldamise seaded"
 msgid "Publishing group \"%{name}\" created"
 msgstr "Avaldamisrühm \\\"%{name}\\\" loodud"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1231
-#: lib/phoenix_kit_publishing/web/html.ex:1373
-#: lib/phoenix_kit_publishing/web/html.ex:1552
-#: lib/phoenix_kit_publishing/web/html.ex:1703
+#: lib/phoenix_kit_publishing/web/html.ex:1241
+#: lib/phoenix_kit_publishing/web/html.ex:1383
+#: lib/phoenix_kit_publishing/web/html.ex:1562
+#: lib/phoenix_kit_publishing/web/html.ex:1713
 #, elixir-autogen, elixir-format
 msgid "Read More →"
 msgstr "Loe edasi →"
@@ -1739,12 +1739,12 @@ msgstr "Vali otspunkt..."
 msgid "Semantic URLs ideal for evergreen content."
 msgstr "Semantilised URL-id sobivad ajatu sisu jaoks."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2995
+#: lib/phoenix_kit_publishing/web/html.ex:3039
 #, elixir-autogen, elixir-format
 msgid "Sep"
 msgstr "Sept"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2978
+#: lib/phoenix_kit_publishing/web/html.ex:3022
 #, elixir-autogen, elixir-format
 msgid "September"
 msgstr "September"
@@ -2302,7 +2302,7 @@ msgstr "Versioon:"
 msgid "Versions"
 msgstr "Versioonid"
 
-#: lib/phoenix_kit_publishing/web/html.ex:762
+#: lib/phoenix_kit_publishing/web/html.ex:763
 #, elixir-autogen, elixir-format
 msgid "View Posts"
 msgstr "Vaata postitusi"
@@ -2410,7 +2410,7 @@ msgstr "kuvatakse"
 msgid "your-group"
 msgstr "sinu-ryhm"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2778
+#: lib/phoenix_kit_publishing/web/html.ex:2813
 #, elixir-autogen, elixir-format
 msgid "%{count} min read"
 msgid_plural "%{count} min read"
@@ -2497,7 +2497,7 @@ msgstr "Sisu laius"
 msgid "Default — the browser's native scrollbar"
 msgstr "Vaikimisi — brauseri enda kerimisriba"
 
-#: lib/phoenix_kit_publishing/web/html.ex:733
+#: lib/phoenix_kit_publishing/web/html.ex:734
 #, elixir-autogen, elixir-format
 msgid "Explore our published content"
 msgstr "Tutvuge meie avaldatud sisuga"
@@ -2507,9 +2507,9 @@ msgstr "Tutvuge meie avaldatud sisuga"
 msgid "Feature this post"
 msgstr "Tõsta see postitus esile"
 
-#: lib/phoenix_kit_publishing/web/html.ex:948
-#: lib/phoenix_kit_publishing/web/html.ex:1197
-#: lib/phoenix_kit_publishing/web/html.ex:1677
+#: lib/phoenix_kit_publishing/web/html.ex:958
+#: lib/phoenix_kit_publishing/web/html.ex:1207
+#: lib/phoenix_kit_publishing/web/html.ex:1687
 #, elixir-autogen, elixir-format
 msgid "Featured"
 msgstr "Esiletõstetud"
@@ -2544,7 +2544,7 @@ msgstr "Too esiletõstetud postitused esile"
 msgid "Highlighted card — a larger card within the grid"
 msgstr "Esiletõstetud kaart — suurem kaart ruudustikus"
 
-#: lib/phoenix_kit_publishing/web/html.ex:517
+#: lib/phoenix_kit_publishing/web/html.ex:518
 #, elixir-autogen, elixir-format
 msgid "Jump to date"
 msgstr "Hüppa kuupäevale"
@@ -2579,7 +2579,7 @@ msgstr "Tavaline"
 msgid "Oldest first (by publish date)"
 msgstr "Vanimad eespool (avaldamiskuupäeva järgi)"
 
-#: lib/phoenix_kit_publishing/web/html.ex:256
+#: lib/phoenix_kit_publishing/web/html.ex:257
 #, elixir-autogen, elixir-format
 msgid "On this page"
 msgstr "Sellel lehel"
@@ -2709,9 +2709,9 @@ msgstr "Klõpsatavad kaardipildid"
 msgid "Highlight the latest post"
 msgstr "Too uusim postitus esile"
 
-#: lib/phoenix_kit_publishing/web/html.ex:976
-#: lib/phoenix_kit_publishing/web/html.ex:1200
-#: lib/phoenix_kit_publishing/web/html.ex:1680
+#: lib/phoenix_kit_publishing/web/html.ex:986
+#: lib/phoenix_kit_publishing/web/html.ex:1210
+#: lib/phoenix_kit_publishing/web/html.ex:1690
 #, elixir-autogen, elixir-format
 msgid "Latest"
 msgstr "Uusim"
@@ -2787,7 +2787,7 @@ msgstr "Kaartide hover-animatsioonid"
 msgid "Cards lift slightly on hover as a click cue."
 msgstr "Kaardid kerkivad hiirega üleminekul veidi, andes märku klõpsatavusest."
 
-#: lib/phoenix_kit_publishing/web/html.ex:899
+#: lib/phoenix_kit_publishing/web/html.ex:909
 #, elixir-autogen, elixir-format
 msgid "%{count} result for “%{query}”"
 msgid_plural "%{count} results for “%{query}”"
@@ -2799,7 +2799,7 @@ msgstr[1] "%{count} tulemust päringule „%{query}“"
 msgid "A category can't be moved under one of its own subcategories."
 msgstr "Kategooriat ei saa liigutada omaenda alamkategooria alla."
 
-#: lib/phoenix_kit_publishing/web/html.ex:929
+#: lib/phoenix_kit_publishing/web/html.ex:939
 #, elixir-autogen, elixir-format
 msgid "All posts"
 msgstr "Kõik postitused"
@@ -2833,7 +2833,7 @@ msgstr "Kategooriat ei leitud"
 msgid "Category updated"
 msgstr "Kategooria uuendatud"
 
-#: lib/phoenix_kit_publishing/web/html.ex:917
+#: lib/phoenix_kit_publishing/web/html.ex:927
 #, elixir-autogen, elixir-format
 msgid "Category: %{name}"
 msgstr "Kategooria: %{name}"
@@ -2843,7 +2843,7 @@ msgstr "Kategooria: %{name}"
 msgid "Chronological newer/older post links at the bottom of the post page."
 msgstr "Kronoloogilised uuema/vanema postituse lingid postituse lehe allosas."
 
-#: lib/phoenix_kit_publishing/web/html.ex:910
+#: lib/phoenix_kit_publishing/web/html.ex:920
 #, elixir-autogen, elixir-format
 msgid "Clear search"
 msgstr "Tühjenda otsing"
@@ -2933,7 +2933,7 @@ msgstr "Loendi paigutus"
 msgid "Minimal — date and title only, no images"
 msgstr "Minimaalne — ainult kuupäev ja pealkiri, piltideta"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2291
+#: lib/phoenix_kit_publishing/web/html.ex:2306
 #, elixir-autogen, elixir-format
 msgid "More posts"
 msgstr "Rohkem postitusi"
@@ -2952,7 +2952,7 @@ msgstr "Nimi"
 msgid "New category"
 msgstr "Uus kategooria"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2299
+#: lib/phoenix_kit_publishing/web/html.ex:2314
 #, elixir-autogen, elixir-format
 msgid "Newer"
 msgstr "Uuemad"
@@ -2962,7 +2962,7 @@ msgstr "Uuemad"
 msgid "No posts match your filter"
 msgstr "Ükski postitus ei vasta filtrile"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1079
+#: lib/phoenix_kit_publishing/web/html.ex:1089
 #, elixir-autogen, elixir-format
 msgid "No posts match your search."
 msgstr "Ükski postitus ei vasta otsingule."
@@ -2973,7 +2973,7 @@ msgstr "Ükski postitus ei vasta otsingule."
 msgid "None (top level)"
 msgstr "Puudub (ülemine tase)"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2309
+#: lib/phoenix_kit_publishing/web/html.ex:2324
 #, elixir-autogen, elixir-format
 msgid "Older"
 msgstr "Vanemad"
@@ -3008,12 +3008,12 @@ msgstr "RSS-voog sisse lülitatud — iga rühm pakub /<group>/feed.xml"
 msgid "Readers can search this group's published posts by title and text."
 msgstr "Lugejad saavad otsida selle rühma avaldatud postitusi pealkirja ja teksti järgi."
 
-#: lib/phoenix_kit_publishing/web/html.ex:892
+#: lib/phoenix_kit_publishing/web/html.ex:902
 #, elixir-autogen, elixir-format
 msgid "Search"
 msgstr "Otsi"
 
-#: lib/phoenix_kit_publishing/web/html.ex:887
+#: lib/phoenix_kit_publishing/web/html.ex:897
 #, elixir-autogen, elixir-format
 msgid "Search posts…"
 msgstr "Otsi postitusi…"
@@ -3038,7 +3038,7 @@ msgstr "Näita kategooriasilte"
 msgid "Show previous/next navigation"
 msgstr "Näita eelmise/järgmise navigatsiooni"
 
-#: lib/phoenix_kit_publishing/web/html.ex:919
+#: lib/phoenix_kit_publishing/web/html.ex:929
 #, elixir-autogen, elixir-format
 msgid "Tag: %{name}"
 msgstr "Silt: %{name}"
@@ -3058,7 +3058,7 @@ msgstr "Ülemkategooria peab kuuluma samasse rühma."
 msgid "auto from the name"
 msgstr "automaatselt nimest"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2152
+#: lib/phoenix_kit_publishing/web/html.ex:2167
 #, elixir-autogen, elixir-format
 msgid "%{count} view"
 msgid_plural "%{count} views"
@@ -3085,7 +3085,7 @@ msgstr "Vaatamiste arv päevas; robotid filtreeritud ja sessioonid dubleerimata,
 msgid "Show view counts"
 msgstr "Näita vaatamiste arvu"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2327
+#: lib/phoenix_kit_publishing/web/html.ex:2342
 #, elixir-autogen, elixir-format
 msgid "%{count} comment"
 msgid_plural "%{count} comments"
@@ -3102,12 +3102,12 @@ msgstr "Kommentaaride lõim iga postituse all. Nõuab Kommentaaride moodulit; ko
 msgid "Audio version"
 msgstr "Heliversioon"
 
-#: lib/phoenix_kit_publishing/web/controller.ex:275
+#: lib/phoenix_kit_publishing/web/controller.ex:280
 #, elixir-autogen, elixir-format
 msgid "Comment posted."
 msgstr "Kommentaar lisatud."
 
-#: lib/phoenix_kit_publishing/web/controller.ex:296
+#: lib/phoenix_kit_publishing/web/controller.ex:301
 #, elixir-autogen, elixir-format
 msgid "Couldn't post your comment — please try again."
 msgstr "Kommentaari lisamine ebaõnnestus — proovige uuesti."
@@ -3117,70 +3117,70 @@ msgstr "Kommentaari lisamine ebaõnnestus — proovige uuesti."
 msgid "Enable comments"
 msgstr "Luba kommentaarid"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2235
+#: lib/phoenix_kit_publishing/web/html.ex:2250
 #, elixir-autogen, elixir-format
 msgid "Listen to this post"
 msgstr "Kuula seda postitust"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2001
-#: lib/phoenix_kit_publishing/web/html.ex:2351
+#: lib/phoenix_kit_publishing/web/html.ex:2011
+#: lib/phoenix_kit_publishing/web/html.ex:2366
 #, elixir-autogen, elixir-format
 msgid "Log in"
 msgstr "Logi sisse"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2330
+#: lib/phoenix_kit_publishing/web/html.ex:2345
 #, elixir-autogen, elixir-format
 msgid "No comments yet — be the first."
 msgstr "Kommentaare veel pole — olge esimene."
 
-#: lib/phoenix_kit_publishing/web/controller.ex:208
+#: lib/phoenix_kit_publishing/web/controller.ex:213
 #, elixir-autogen, elixir-format
 msgid "Please log in to comment."
 msgstr "Kommenteerimiseks logige sisse."
 
-#: lib/phoenix_kit_publishing/web/html.ex:1896
+#: lib/phoenix_kit_publishing/web/html.ex:1906
 #, elixir-autogen, elixir-format
 msgid "Post comment"
 msgstr "Lisa kommentaar"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1719
-#: lib/phoenix_kit_publishing/web/html.ex:1723
+#: lib/phoenix_kit_publishing/web/html.ex:1729
+#: lib/phoenix_kit_publishing/web/html.ex:1733
 #, elixir-autogen, elixir-format
 msgid "Reader"
 msgstr "Lugeja"
 
-#: lib/phoenix_kit_publishing/web/controller.ex:288
+#: lib/phoenix_kit_publishing/web/controller.ex:293
 #, elixir-autogen, elixir-format
 msgid "That comment is too long."
 msgstr "See kommentaar on liiga pikk."
 
-#: lib/phoenix_kit_publishing/web/controller.ex:196
+#: lib/phoenix_kit_publishing/web/controller.ex:201
 #, elixir-autogen, elixir-format
 msgid "That post is no longer available."
 msgstr "See postitus ei ole enam saadaval."
 
-#: lib/phoenix_kit_publishing/web/controller.ex:287
+#: lib/phoenix_kit_publishing/web/controller.ex:292
 #, elixir-autogen, elixir-format
 msgid "The comment can't be empty."
 msgstr "Kommentaar ei saa olla tühi."
 
-#: lib/phoenix_kit_publishing/web/controller.ex:205
+#: lib/phoenix_kit_publishing/web/controller.ex:210
 #, elixir-autogen, elixir-format
 msgid "The form expired — please try again."
 msgstr "Vorm aegus — proovige uuesti."
 
-#: lib/phoenix_kit_publishing/web/html.ex:1895
+#: lib/phoenix_kit_publishing/web/html.ex:1905
 #, elixir-autogen, elixir-format
 msgid "Write a comment… (Markdown supported)"
 msgstr "Kirjutage kommentaar… (Markdown on toetatud)"
 
 #: lib/phoenix_kit_publishing/page_builder/components/audio.ex:38
-#: lib/phoenix_kit_publishing/web/html.ex:2232
+#: lib/phoenix_kit_publishing/web/html.ex:2247
 #, elixir-autogen, elixir-format
 msgid "Your browser does not support the audio element."
 msgstr "Teie brauser ei toeta heli-elementi."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2353
+#: lib/phoenix_kit_publishing/web/html.ex:2368
 #, elixir-autogen, elixir-format
 msgid "to join the conversation."
 msgstr "vestlusega liitumiseks."
@@ -3231,14 +3231,14 @@ msgstr "Uus alamkategooria"
 msgid "No categories yet — create the first one."
 msgstr "Kategooriaid veel pole — looge esimene."
 
-#: lib/phoenix_kit_publishing/web/html.ex:1972
+#: lib/phoenix_kit_publishing/web/html.ex:1982
 #, elixir-autogen, elixir-format
 msgid "%{count} comment on this note"
 msgid_plural "%{count} comments on this note"
 msgstr[0] "%{count} kommentaar sellele märkusele"
 msgstr[1] "%{count} kommentaari sellele märkusele"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1936
+#: lib/phoenix_kit_publishing/web/html.ex:1946
 #, elixir-autogen, elixir-format
 msgid "Author notes"
 msgstr "Autori märkused"
@@ -3248,13 +3248,13 @@ msgstr "Autori märkused"
 msgid "Author notes style"
 msgstr "Autori märkuste stiil"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1948
-#: lib/phoenix_kit_publishing/web/html.ex:1964
+#: lib/phoenix_kit_publishing/web/html.ex:1958
+#: lib/phoenix_kit_publishing/web/html.ex:1974
 #, elixir-autogen, elixir-format
 msgid "Close note"
 msgstr "Sulge märkus"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1996
+#: lib/phoenix_kit_publishing/web/html.ex:2006
 #, elixir-autogen, elixir-format
 msgid "Comment on this note…"
 msgstr "Kommenteerige seda märkust…"
@@ -3264,22 +3264,22 @@ msgstr "Kommenteerige seda märkust…"
 msgid "Footnotes — numbered refs, notes collected at the bottom"
 msgstr "Allmärkused — nummerdatud viited, märkused kogutud allossa"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1959
+#: lib/phoenix_kit_publishing/web/html.ex:1969
 #, elixir-autogen, elixir-format
 msgid "Note"
 msgstr "Märkus"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1952
+#: lib/phoenix_kit_publishing/web/html.ex:1962
 #, elixir-autogen, elixir-format
 msgid "Note %{number}"
 msgstr "Märkus %{number}"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1864
+#: lib/phoenix_kit_publishing/web/html.ex:1874
 #, elixir-autogen, elixir-format
 msgid "Post reply"
 msgstr "Saada vastus"
 
-#: lib/phoenix_kit_publishing/web/html.ex:1847
+#: lib/phoenix_kit_publishing/web/html.ex:1857
 #, elixir-autogen, elixir-format
 msgid "Reply"
 msgstr "Vasta"
@@ -3289,22 +3289,22 @@ msgstr "Vasta"
 msgid "Slide-out panel — click the phrase, note opens on the right"
 msgstr "Väljalibisev paneel — klõpsake fraasil, märkus avaneb paremal"
 
-#: lib/phoenix_kit_publishing/web/controller.ex:291
+#: lib/phoenix_kit_publishing/web/controller.ex:296
 #, elixir-autogen, elixir-format
 msgid "The comment you replied to is no longer available."
 msgstr "Kommentaar, millele vastasite, ei ole enam saadaval."
 
-#: lib/phoenix_kit_publishing/web/controller.ex:294
+#: lib/phoenix_kit_publishing/web/controller.ex:299
 #, elixir-autogen, elixir-format
 msgid "This thread is too deep to reply to."
 msgstr "See lõim on vastamiseks liiga sügav."
 
-#: lib/phoenix_kit_publishing/web/html.ex:1863
+#: lib/phoenix_kit_publishing/web/html.ex:1873
 #, elixir-autogen, elixir-format
 msgid "Write a reply…"
 msgstr "Kirjutage vastus…"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2003
+#: lib/phoenix_kit_publishing/web/html.ex:2013
 #, elixir-autogen, elixir-format
 msgid "to comment on this note."
 msgstr "selle märkuse kommenteerimiseks."
@@ -3339,7 +3339,7 @@ msgstr "Heliversioon eemaldatud"
 msgid "Order unchanged — use “Move to…” to change a parent."
 msgstr "Järjekord ei muutunud — ülemkategooria muutmiseks kasutage „Liiguta…“."
 
-#: lib/phoenix_kit_publishing/web/controller.ex:277
+#: lib/phoenix_kit_publishing/web/controller.ex:282
 #, elixir-autogen, elixir-format
 msgid "Thanks — your comment is awaiting review."
 msgstr "Aitäh — teie kommentaar ootab ülevaatamist."
@@ -3568,3 +3568,23 @@ msgstr "Seade uuendatud"
 #, elixir-autogen, elixir-format
 msgid "This post was saved somewhere else. Your unsaved changes are still here — saving will overwrite that copy."
 msgstr "See postitus salvestati mujal. Teie salvestamata muudatused on alles — salvestamine kirjutab selle koopia üle."
+
+#: lib/phoenix_kit_publishing/renderer.ex:674
+#, elixir-autogen, elixir-format
+msgid "Back to text"
+msgstr "Tagasi teksti juurde"
+
+#: lib/phoenix_kit_publishing/web/controller/listing.ex:109
+#, elixir-autogen, elixir-format
+msgid "No posts in this language yet. Showing closest match."
+msgstr "Selles keeles pole veel postitusi. Näitame lähimat vastet."
+
+#: lib/phoenix_kit_publishing/renderer.ex:687
+#, elixir-autogen, elixir-format
+msgid "Notes"
+msgstr "Märkused"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2228
+#, elixir-autogen, elixir-format
+msgid "live"
+msgstr "aktiivne"

@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.PublishingVersion
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Utils.Values
 
   @doc """
@@ -302,12 +303,18 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
 
   defp extract_first_paragraph(content) when is_binary(content) do
     content
+    # Components first: a body opening with <Gallery>/<Showcase> would
+    # otherwise become the "first paragraph", and the 300-char slice below
+    # could cut MID-TAG — the broken tag then survives downstream
+    # tag-stripping as escaped junk in the card preview.
+    |> Shared.strip_components()
     |> String.split(~r/\n\n+/)
-    |> Enum.reject(&String.starts_with?(&1, "#"))
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#")))
     |> List.first()
     |> case do
       nil -> ""
-      text -> text |> String.trim() |> String.slice(0, 300)
+      text -> String.slice(text, 0, 300)
     end
   end
 

@@ -232,7 +232,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   def prefixed_default_language_request?(conn, language) do
     Map.has_key?(conn.params, "language") and
       LanguageHelpers.default_language_no_prefix?() and
-      LanguageHelpers.url_language_code(language) == LanguageHelpers.get_primary_language_base()
+      denotes_default_language?(language)
+  end
+
+  # The prefix is redundant only when it denotes the DEFAULT language itself.
+  # This used to compare BASE codes, which also claimed sibling dialects:
+  # with en-US default and en-GB enabled too, /en-GB/... read as "redundantly
+  # prefixed default", 301'd to the unprefixed URL, and the unprefixed route
+  # then served en-US — a silent language switch. Resolve the prefix to a
+  # dialect and compare the FULL code instead.
+  defp denotes_default_language?(language) do
+    resolved =
+      if base_code?(language) do
+        find_dialect_for_base(language, get_enabled_languages()) || language
+      else
+        language
+      end
+
+    resolved == LanguageHelpers.get_primary_language()
   end
 
   # ============================================================================
@@ -260,14 +277,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Find a dialect in enabled languages that matches the given base code.
 
-  First-match tie-break: when multiple candidates match the base, returns
-  the first in `enabled_languages` declaration order. For primary-language
-  preference, call `LanguageHelpers.resolve_dialect_for_base/3` with
-  `prefer: LanguageHelpers.get_primary_language()` directly.
+  Primary-then-declaration tie-break: when multiple candidates match the
+  base, prefers `LanguageHelpers.get_primary_language/0`, then the first in
+  `enabled_languages` declaration order — the SAME rule the post read path
+  (`Posts.resolve_language_to_dialect/1`) applies. The two layers used to
+  disagree (this one was first-match only), so `/en/blog` could list one
+  dialect's titles while clicking a card served the other dialect's body
+  whenever the primary wasn't first in declaration order.
   """
   @spec find_dialect_for_base(String.t(), [String.t()]) :: String.t() | nil
   def find_dialect_for_base(base_code, enabled_languages) do
-    LanguageHelpers.resolve_dialect_for_base(base_code, enabled_languages)
+    LanguageHelpers.resolve_dialect_for_base(base_code, enabled_languages,
+      prefer: LanguageHelpers.get_primary_language()
+    )
   end
 
   @doc """

@@ -314,7 +314,14 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
   codes as keys (e.g., `"en-US"`), but the display/canonical language may be
   a base code (e.g., `"en"`) when only one dialect is enabled.
 
-  Tries exact match first, then falls back to base code matching.
+  Tries exact match first, then base-code matching with the same tie-break
+  the read path uses: the primary language, then enabled dialects in
+  declaration order, then any remaining key sorted. The map may carry
+  legacy/disabled dialect rows (`"en-GB"` alongside enabled `"en-US"`), and
+  the old first-base-match rule picked whichever key the map happened to
+  enumerate first — so a listing card could show a disabled dialect's title
+  and link its slug, which slug resolution (enabled-aware) then failed to
+  find.
   """
   @spec resolve_language_key(String.t(), [String.t()]) :: String.t()
   def resolve_language_key(language, available_keys) do
@@ -322,7 +329,17 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
       language
     else
       base = DialectMapper.extract_base(language)
-      Enum.find(available_keys, language, fn key -> DialectMapper.extract_base(key) == base end)
+      base_matches = Enum.filter(available_keys, &(DialectMapper.extract_base(&1) == base))
+
+      primary = get_primary_language()
+      enabled_match = Enum.find(enabled_language_codes(), &(&1 in base_matches))
+
+      cond do
+        base_matches == [] -> language
+        primary in base_matches -> primary
+        enabled_match != nil -> enabled_match
+        true -> base_matches |> Enum.sort() |> List.first()
+      end
     end
   end
 

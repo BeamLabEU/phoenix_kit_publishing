@@ -8,6 +8,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   - Translation link building for listings
   """
 
+  use Gettext, backend: PhoenixKitPublishing.Gettext
+
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Categories
@@ -100,7 +102,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
             ctx.pagination_params
           )
 
-        {:redirect_301, fallback_url}
+        # 302 + flash, mirroring the post page's smart fallback — NOT a 301:
+        # "this language has no posts" is a content state, and a cached 301
+        # would keep bouncing readers after the first translation is added.
+        {:redirect_with_flash, fallback_url,
+         gettext("No posts in this language yet. Showing closest match.")}
 
       :not_found ->
         # Group exists but no published posts — render empty listing instead of 404
@@ -114,13 +120,45 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     {:exact, exact_posts}
   end
 
-  defp resolve_language_posts([], published_posts, group_slug, language) do
-    fallback_posts = filter_by_exact_language(published_posts, group_slug, language)
+  defp resolve_language_posts([], published_posts, _group_slug, language) do
+    # Nothing in the requested language (exact or base-dialect). If OTHER
+    # languages have published posts, redirect to one of those listings
+    # instead of rendering an empty page — the listing twin of the post
+    # page's smart fallback. (This branch was dead for a long time: the
+    # second filter used to re-run the caller's identical filter, so it
+    # always came back empty and every miss rendered the empty listing.)
+    case fallback_language_with_content(published_posts, language) do
+      nil -> :not_found
+      fallback_language -> {:fallback, fallback_language}
+    end
+  end
 
-    if fallback_posts != [] do
-      {:fallback, get_fallback_language(language, fallback_posts)}
-    else
-      :not_found
+  # Picks the language whose listing the fallback redirect targets: the
+  # primary language when it has content, else the alphabetically first
+  # available language (deterministic — the old first-post rule flipped with
+  # sort order). Returns nil when the target's LISTING URL would equal the
+  # requested one (`group_listing_path` strips dialects to base codes, so a
+  # same-base sibling would 301 to the URL being served — a redirect loop);
+  # rendering the empty listing is the safe degenerate answer there.
+  defp fallback_language_with_content(published_posts, requested_language) do
+    available =
+      published_posts
+      |> Enum.flat_map(&(&1[:available_languages] || []))
+      |> Enum.uniq()
+
+    primary = LanguageHelpers.get_primary_language()
+
+    preferred =
+      if primary in available do
+        primary
+      else
+        available |> Enum.sort() |> List.first()
+      end
+
+    requested_base = LanguageHelpers.url_language_code(requested_language)
+
+    if preferred && LanguageHelpers.url_language_code(preferred) != requested_base do
+      preferred
     end
   end
 
@@ -194,10 +232,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
        newest_layout: Map.get(ctx.group, "newest_layout", "hero"),
        newest_style: Map.get(ctx.group, "newest_style", "classic"),
        # Group-wide, not page-visible: URL disambiguation (date-only vs
-       # date+time) must count same-day posts across every page AND the pinned
-       # featured/newest bands — a page-2 render otherwise undercounts a date
-       # shared with a pinned or other-page post and emits an ambiguous URL.
-       date_counts: PublishingHTML.build_date_counts(all_posts),
+       # date+time) must count same-day posts across every page, the pinned
+       # featured/newest bands, AND every language — URL resolution
+       # (Posts.list_times_on_date/2) is language-agnostic, so a
+       # language-filtered count emits a date-only URL for a date whose
+       # same-day sibling merely lacks this translation, and that URL then
+       # 302s to the FIRST time on the date: a different post, possibly in a
+       # different language.
+       date_counts: PublishingHTML.build_date_counts(ctx.published_posts),
        current_language: ctx.canonical_language,
        translations: translations,
        page: page,
@@ -301,7 +343,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
       |> Enum.filter(&MapSet.member?(uuids, &1[:uuid]))
       |> Enum.take(@search_limit)
 
-    {matches, PublishingHTML.build_date_counts(all)}
+    {matches, group_date_counts(group_slug)}
+  end
+
+  @doc """
+  The date→count map that decides the date-only vs date+time URL form for
+  timestamp posts, computed over the group's published set across ALL
+  languages — the same basis URL resolution (`Posts.list_times_on_date/2`)
+  uses. Never build these counts from a language-filtered list: the card
+  would emit a date-only URL whenever the same-day sibling merely lacks the
+  viewer's translation, and that URL resolves to a different post.
+  """
+  def group_date_counts(group_slug) do
+    group_slug
+    |> PostFetching.fetch_posts_with_cache()
+    |> filter_published()
+    |> PublishingHTML.build_date_counts()
   end
 
   # Content-language candidates for the DB search. A full-dialect request
@@ -401,10 +458,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
          newest_posts: [],
          newest_layout: Map.get(group, "newest_layout", "hero"),
          newest_style: Map.get(group, "newest_style", "classic"),
-         # Full-group counts — a same-day sibling outside this archive must
-         # still force the time-segment URL form for timestamp posts.
-         date_counts:
-           PublishingHTML.build_date_counts(chronological_posts(group_slug, canonical_language)),
+         # Full-group, all-language counts — a same-day sibling outside this
+         # archive (or without this translation) must still force the
+         # time-segment URL form for timestamp posts.
+         date_counts: group_date_counts(group_slug),
          current_language: canonical_language,
          translations: translations,
          page: 1,
@@ -412,7 +469,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
          total_count: length(posts),
          total_pages: if(posts == [], do: 0, else: 1),
          breadcrumbs: [%{label: display_name, url: nil}],
-         term_filter: %{type: type, label: term_label, count: length(posts)}
+         # `value` is the raw slug/tag (URL identity — feeds, autodiscovery);
+         # `label` is the translated display name.
+         term_filter: %{type: type, value: raw, label: term_label, count: length(posts)}
        }}
     end
   end
@@ -448,7 +507,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   """
   def neighbor_posts(group_slug, language, post_uuid) do
     posts = chronological_posts(group_slug, language)
-    date_counts = PublishingHTML.build_date_counts(posts)
+    date_counts = group_date_counts(group_slug)
 
     {newer, older} =
       case Enum.find_index(posts, &(&1[:uuid] == post_uuid)) do
@@ -573,13 +632,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Filter posts to only include those that have matching language content.
   Handles both exact matches and base code matches (e.g., "en" matches "en-US").
-  Translation visibility is based on existence only — status comes from the post level.
+  Status comes from the post level; the matched language's CONTENT must also
+  be real — the editor's "Add language" creates `{title: "Untitled",
+  content: ""}` on the post's active version, which is public the instant it
+  commits, so existence-only visibility rendered an Untitled card with an
+  empty preview on that language's listing. Real = a non-default title OR a
+  non-empty excerpt (a title-only translation still lists).
   """
   def filter_by_exact_language(posts, _group_slug, language) do
     Enum.filter(posts, fn post ->
       available = post[:available_languages] || []
-      find_matching_language(language, available) != nil
+
+      case find_matching_language(language, available) do
+        nil -> false
+        matched_key -> matched_content_real?(post, matched_key)
+      end
     end)
+  end
+
+  defp matched_content_real?(post, key) do
+    case post[:language_titles] do
+      %{} = titles when is_map_key(titles, key) ->
+        title = Map.get(titles, key)
+        excerpt = get_in(post, [:language_excerpts, key])
+
+        (title not in [nil, ""] and title != Constants.default_title()) or
+          (is_binary(excerpt) and excerpt != "")
+
+      # Maps without per-language titles (minimal fixtures, legacy shapes)
+      # keep existence-only semantics.
+      _ ->
+        true
+    end
   end
 
   @doc """
@@ -610,22 +694,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
       true ->
         base = DialectMapper.extract_base(language)
         Language.find_dialect_for_base_in_languages(base, available_languages)
-    end
-  end
-
-  @doc """
-  Get the actual language that the fallback matched.
-  Used to redirect to the correct URL when requested language has no content.
-  """
-  def get_fallback_language(requested_language, posts) do
-    # Look at the first post to find what language actually matched
-    case posts do
-      [first_post | _] ->
-        find_matching_language(requested_language, first_post.available_languages) ||
-          requested_language
-
-      [] ->
-        requested_language
     end
   end
 

@@ -673,19 +673,24 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   defp notes_section([]), do: ""
 
+  # The "Notes"/"Back to text" chrome is gettext'd at RENDER time — safe with
+  # the render cache because the cache key includes the content language and
+  # the request locale matches it when the cache fills.
   defp notes_section(notes) do
+    back_label = escape_html(gettext("Back to text"))
+
     items =
       notes
       |> Enum.with_index(1)
       |> Enum.map_join(fn {body, number} ->
         ~s(<li id="pk-note-#{number}">) <>
           escape_html(body) <>
-          ~s( <a href="#pk-note-ref-#{number}" aria-label="Back to text">↩</a></li>)
+          ~s( <a href="#pk-note-ref-#{number}" aria-label="#{back_label}">↩</a></li>)
       end)
 
     """
     <section class="pk-notes mt-10 border-t border-base-200 pt-4 text-sm text-base-content/70">
-    <h2 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">Notes</h2>
+    <h2 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">#{escape_html(gettext("Notes"))}</h2>
     <ol class="list-decimal space-y-1 pl-5">#{items}</ol>
     </section>
     <style>
