@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.Renderer
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
 
@@ -710,86 +711,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     """
   end
 
-  def all_groups(assigns) do
-    ~H"""
-    <PhoenixKitWeb.Components.LayoutWrapper.app_layout
-      flash={@flash}
-      page_title={@page_title}
-      current_path={@conn.request_path}
-      phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
-      module_assigns={
-        %{
-          phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations],
-          og: assigns[:og]
-        }
-      }
-    >
-      <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
-      <div class="groups-overview-container max-w-6xl mx-auto px-6 py-8">
-        <%!-- Page Header --%>
-        <header class="mb-8">
-          <h1 class="text-2xl sm:text-4xl font-bold mb-2">{gettext("Publishing")}</h1>
-          <p class="text-base sm:text-lg text-base-content/70">
-            {gettext("Explore our published content")}
-          </p>
-        </header>
-        <%!-- Group Cards --%>
-        <%= if length(@groups) > 0 do %>
-          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <%= for group <- @groups do %>
-              <article class="card bg-base-200 shadow-md hover:shadow-lg transition-shadow">
-                <div class="card-body">
-                  <h2 class="card-title text-2xl">
-                    <.link
-                      navigate={group_listing_path(@current_language, group["slug"])}
-                      class="hover:text-primary"
-                    >
-                      {Publishing.translated_group_name(group, @current_language)}
-                    </.link>
-                  </h2>
-
-                  <div class="text-sm text-base-content/70 mt-2">
-                    <span>{ngettext("%{count} post", "%{count} posts", group["post_count"],
-                      count: group["post_count"]
-                    )}</span>
-                  </div>
-
-                  <div class="card-actions justify-end mt-auto pt-4">
-                    <.link
-                      navigate={group_listing_path(@current_language, group["slug"])}
-                      class="btn btn-sm btn-primary"
-                    >
-                      {gettext("View Posts")} →
-                    </.link>
-                  </div>
-                </div>
-              </article>
-            <% end %>
-          </div>
-        <% else %>
-          <div class="alert alert-info">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              class="stroke-current shrink-0 w-6 h-6"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              >
-              </path>
-            </svg>
-            <span>{gettext("No groups configured yet.")}</span>
-          </div>
-        <% end %>
-      </div>
-    </PhoenixKitWeb.Components.LayoutWrapper.app_layout>
-    """
-  end
-
   def index(assigns) do
     ~H"""
     <PhoenixKitWeb.Components.LayoutWrapper.app_layout
@@ -807,12 +728,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
       <%!-- Feed autodiscovery — body placement for the same reason as the OG
         tags (the host owns <head>); feed readers scan the whole document. --%>
+      <%!-- On a category/tag archive the advertised feed is the ARCHIVE's
+        feed, not the group's — a reader subscribing from /blog/category/x
+        expects that category's items. --%>
       <link
         :if={feeds_enabled?() && assigns[:group]}
         rel="alternate"
         type="application/rss+xml"
         title={Publishing.translated_group_name(@group, @current_language)}
-        href={feed_path(@current_language, @group["slug"])}
+        href={
+          feed_path(
+            @current_language,
+            @group["slug"],
+            assigns[:term_filter] && {@term_filter.type, @term_filter.value}
+          )
+        }
       />
       <.scrollbar_style_tag style={(assigns[:group] && @group["scrollbar_style"]) || "default"} />
       <.scroll_timeline
@@ -2025,13 +1955,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     """
   end
 
-  # An explicit description wins; otherwise derive an excerpt from the content.
+  # The preview always derives from the per-language content that
+  # Controller.Listing's resolve step put in :content (content.data excerpt/
+  # description where a legacy row still carries one, else the first paragraph
+  # or the part before <!-- more -->). The version-level data["description"]
+  # is deliberately NOT consulted: it has no editor UI and carries no language
+  # (legacy V1 promotion / API writes fill it), so on multi-language groups it
+  # showed one language's text under every language's title. Its remaining
+  # job is the LAST-RESORT og:description default on post pages
+  # (build_og_data/4 — per-language override and derived excerpt both outrank
+  # it there too).
   defp post_card_excerpt(post) do
-    if desc = Map.get(post.metadata, :description) do
-      desc
-    else
-      extract_excerpt(post.content)
-    end
+    extract_excerpt(post.content)
   end
 
   # The date the timeline rail bins a card under — MUST match the effective
@@ -2210,7 +2145,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                       >
                         <span>v{v.version}</span>
                         <%= if v.is_live do %>
-                          <span class="badge badge-success badge-xs h-auto">live</span>
+                          <span class="badge badge-success badge-xs h-auto">{gettext("live")}</span>
                         <% end %>
                       </.link>
                     </li>
@@ -2389,12 +2324,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Can also omit the default-language prefix when that setting is enabled.
   """
   def group_listing_path(language, group_slug, params \\ []) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    # Segment ≠ identity: a non-owner sibling dialect renders as its full
+    # lowercase code ("en-gb"); everything else keeps the base code. The
+    # prefix decision uses the ORIGINAL language (only the primary itself
+    # may go prefixless).
+    segment = LanguageHelpers.public_url_segment(language)
 
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug],
+        do: [segment, group_slug],
         else: [group_slug]
 
     base_path = build_public_path(segments)
@@ -2416,8 +2354,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   with the same locale-prefix rules as `group_listing_path/3`.
   """
   def feed_path(language, group_slug, scope \\ nil) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    segment = LanguageHelpers.public_url_segment(language)
 
     tail =
       case scope do
@@ -2428,7 +2365,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug | tail],
+        do: [segment, group_slug | tail],
         else: [group_slug | tail]
 
     build_public_path(segments)
@@ -2439,14 +2376,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   archive (`…/<group>/tag/<tag>`).
   """
   def term_archive_path(language, group_slug, {type, value}) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    segment = LanguageHelpers.public_url_segment(language)
 
     tail = [to_string(type), value]
 
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug | tail],
+        do: [segment, group_slug | tail],
         else: [group_slug | tail]
 
     build_public_path(segments)
@@ -2465,8 +2401,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   - If multiple posts exist on the date, includes time (e.g., /group/2025-12-09/16:26)
   """
   def build_post_url(group_slug, post, language, date_counts \\ nil) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    # The ORIGINAL language keeps its identity for the per-language slug
+    # lookup (an "en-GB" caller must get the en-GB slug) and for the prefix
+    # decision; only the rendered path segment goes through
+    # public_url_segment (sibling dialects → lowercase full code).
+    language = language || LanguageHelpers.get_primary_language()
+    segment = LanguageHelpers.public_url_segment(language)
 
     case post.mode do
       mode when mode in @slug_modes ->
@@ -2475,7 +2415,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
         segments =
           if LanguageHelpers.use_language_prefix?(language),
-            do: [language, group_slug, url_slug],
+            do: [segment, group_slug, url_slug],
             else: [group_slug, url_slug]
 
         build_public_path(segments)
@@ -2484,7 +2424,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         date = get_timestamp_date(post)
         post_count = lookup_date_count(date_counts, group_slug, date)
 
-        segments = timestamp_url_segments(language, group_slug, date, post_count > 1, post)
+        segments =
+          timestamp_url_segments({language, segment}, group_slug, date, post_count > 1, post)
 
         build_public_path(segments)
 
@@ -2494,24 +2435,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
         segments =
           if LanguageHelpers.use_language_prefix?(language),
-            do: [language, group_slug, url_slug],
+            do: [segment, group_slug, url_slug],
             else: [group_slug, url_slug]
 
         build_public_path(segments)
     end
   end
 
-  defp timestamp_url_segments(language, group_slug, date, true = _include_time, post) do
+  defp timestamp_url_segments({language, segment}, group_slug, date, true = _include_time, post) do
     time = get_timestamp_time(post)
 
     if LanguageHelpers.use_language_prefix?(language),
-      do: [language, group_slug, date, time],
+      do: [segment, group_slug, date, time],
       else: [group_slug, date, time]
   end
 
-  defp timestamp_url_segments(language, group_slug, date, false = _include_time, _post) do
+  defp timestamp_url_segments({language, segment}, group_slug, date, false = _include_time, _post) do
     if LanguageHelpers.use_language_prefix?(language),
-      do: [language, group_slug, date],
+      do: [segment, group_slug, date],
       else: [group_slug, date]
   end
 
@@ -2561,12 +2502,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Used when redirecting from date-only URLs to full timestamp URLs.
   """
   def build_public_path_with_time(language, group_slug, date, time) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    segment = LanguageHelpers.public_url_segment(language)
 
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug, date, time],
+        do: [segment, group_slug, date, time],
         else: [group_slug, date, time]
 
     build_public_path(segments)
@@ -2735,21 +2675,41 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         |> String.trim()
       end
 
-    # Render markdown to HTML
-    html = Renderer.render_markdown(excerpt_markdown)
+    # PHK components must not reach the preview: rendering a <Note> here
+    # would bake its body text AND the notes-section CSS into the excerpt,
+    # and a truncated component tag survives tag-stripping as escaped junk.
+    html = excerpt_markdown |> Shared.strip_components() |> Renderer.render_markdown()
 
     # Strip HTML tags to get plain text
     html
     |> Phoenix.HTML.raw()
     |> Phoenix.HTML.safe_to_string()
     |> strip_html_tags()
+    |> decode_basic_entities()
     |> String.trim()
   end
 
   def extract_excerpt(_), do: ""
 
+  # The renderer HTML-escapes text; after tag-stripping the excerpt is plain
+  # text that HEEx will escape AGAIN, so "Fish & chips" read "Fish &amp;
+  # chips" on every card. Decode the standard named entities back — `&amp;`
+  # LAST, or a double-encoded `&amp;lt;` would decode twice.
+  defp decode_basic_entities(text) do
+    text
+    |> String.replace("&nbsp;", " ")
+    |> String.replace("&quot;", "\"")
+    |> String.replace("&#39;", "'")
+    |> String.replace("&lt;", "<")
+    |> String.replace("&gt;", ">")
+    |> String.replace("&amp;", "&")
+  end
+
   defp strip_html_tags(html) when is_binary(html) do
     html
+    # style/script CONTENT is not prose — removing only the tags used to
+    # leave a wall of CSS text in excerpts and inflate reading-time counts.
+    |> String.replace(~r/<(style|script)\b[^>]*>.*?<\/\1>/is, " ")
     |> String.replace(~r/<[^>]*>/, " ")
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
@@ -2927,7 +2887,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Converts the @translations assign to the format expected by the component.
   """
   def build_public_translations(translations, _current_language) do
-    Enum.map(translations, fn translation ->
+    translations
+    # A disabled/legacy language is not publicly routable — RouterDispatch
+    # only rewrites ENABLED locales, so these entries' URLs 404 at the host.
+    # The post-page translation list deliberately includes them (admin
+    # context); the public switcher must not render dead links. The current
+    # entry survives regardless so the switcher never loses its anchor;
+    # entries without the flag (listing translations) are enabled-only by
+    # construction.
+    |> Enum.reject(fn t -> Map.get(t, :enabled) == false and not (t.current || false) end)
+    |> Enum.map(fn translation ->
       %{
         code: translation.code,
         display_code: translation.display_code || translation.code,

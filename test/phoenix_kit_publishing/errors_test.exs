@@ -36,6 +36,10 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
       assert Errors.message(:invalid_status) == "Invalid status"
       assert Errors.message(:invalid_type) == "Invalid type"
       assert Errors.message(:invalid_version) == "Invalid version"
+
+      assert Errors.message(:cannot_delete_primary_language) ==
+               "The primary language's content anchors the post and can't be deleted — edit it instead"
+
       assert Errors.message(:last_language) == "Cannot delete the last language"
       assert Errors.message(:last_version) == "Cannot delete the last version"
       assert Errors.message(:no_post) == "No post"

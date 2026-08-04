@@ -32,11 +32,6 @@ defmodule PhoenixKit.Modules.Publishing.PubSubTest do
       assert topic == "publishing:editor_forms:blog:hello-world:en"
     end
 
-    test "editor_presence_topic includes form key" do
-      topic = PublishingPubSub.editor_presence_topic("blog:hello-world:en")
-      assert topic == "publishing:presence:editor:blog:hello-world:en"
-    end
-
     test "cache_topic includes blog slug" do
       assert PublishingPubSub.cache_topic("blog") == "publishing:blog:cache"
     end
@@ -242,8 +237,8 @@ defmodule PhoenixKit.Modules.Publishing.PubSubTest do
       # Explicit version rides the payload so editors can filter by it.
       :ok = PublishingPubSub.broadcast_translation_created(group, slug, "de", "2")
       assert_receive {:translation_created, ^group, ^slug, "de", "2"}, 500
-      :ok = PublishingPubSub.broadcast_translation_deleted(group, slug, "fr")
-      assert_receive {:translation_deleted, ^group, ^slug, "fr"}, 500
+      :ok = PublishingPubSub.broadcast_translation_deleted(group, slug, "fr", 2)
+      assert_receive {:translation_deleted, ^group, ^slug, "fr", 2}, 500
       PublishingPubSub.unsubscribe_from_post_translations(group, slug)
     end
 

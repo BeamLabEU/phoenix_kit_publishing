@@ -236,19 +236,4 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ListingTest do
       assert Listing.find_matching_language("en", []) == nil
     end
   end
-
-  # ============================================================================
-  # get_fallback_language/2
-  # ============================================================================
-
-  describe "get_fallback_language/2" do
-    test "returns matching language from first post" do
-      posts = [build_post(%{available_languages: ["en", "fr"]})]
-      assert Listing.get_fallback_language("en", posts) == "en"
-    end
-
-    test "returns requested language when no posts" do
-      assert Listing.get_fallback_language("de", []) == "de"
-    end
-  end
 end

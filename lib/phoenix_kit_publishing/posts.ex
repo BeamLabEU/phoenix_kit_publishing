@@ -224,6 +224,18 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   @spec read_post_by_uuid(String.t(), String.t() | nil, integer() | nil) ::
           {:ok, map()} | {:error, any()}
   def read_post_by_uuid(post_uuid, language \\ nil, version \\ nil) do
+    # A malformed uuid raises Ecto.Query.CastError out of repo.get — the
+    # admin PostShow/Preview LVs and public version paths reach here with
+    # user-controlled identifiers, and the crash took the whole LV down
+    # instead of flashing "Post not found". (The trash/restore path casts
+    # first; the update path already whitelists CastError.)
+    case Ecto.UUID.cast(post_uuid) do
+      {:ok, _} -> do_read_post_by_uuid(post_uuid, language, version)
+      :error -> {:error, :not_found}
+    end
+  end
+
+  defp do_read_post_by_uuid(post_uuid, language, version) do
     case DBStorage.get_post_by_uuid(post_uuid, [:group]) do
       nil ->
         {:error, :not_found}
@@ -892,9 +904,19 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   defp resolve_language_to_dialect(language) do
     enabled = LanguageHelpers.enabled_language_codes()
 
+    ci_exact =
+      Enum.find(enabled, fn code -> String.downcase(code) == String.downcase(language) end)
+
     cond do
       language in enabled ->
         language
+
+      # Lowercase sibling-dialect URL codes ("en-gb") resolve to the stored
+      # enabled code ("en-GB") — without this, the read fell through to the
+      # as-is branch, missed the content row, and the fallback chain served
+      # (or let the editor EDIT) the primary language under the en-gb name.
+      ci_exact != nil ->
+        ci_exact
 
       DialectMapper.extract_base(language) == language ->
         LanguageHelpers.resolve_dialect_for_base(language, enabled,
@@ -1085,6 +1107,17 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     repo = PhoenixKit.RepoHelper.repo()
 
     repo.transaction(fn ->
+      # Serialize with publish/unpublish/delete (they take this same FOR
+      # UPDATE lock). Without it, save_writable_status's check raced a
+      # concurrent publish (archiving the version it had just made live),
+      # and the version.data merge below read-modify-wrote a
+      # pre-transaction snapshot — parallel AI translation jobs lost each
+      # other's tags and legacy promotions.
+      DBStorage.lock_post_row!(repo, ctx.db_post.uuid)
+
+      # Fresh read under the lock — the caller's struct predates it.
+      version = DBStorage.get_version_by_uuid(version.uuid) || version
+
       with {:ok, final_slug} <- resolve_slug_in_tx(ctx),
            :ok <-
              upsert_post_content(
@@ -1188,7 +1221,10 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  @content_only_data_keys ~w(previous_url_slugs updated_by_uuid custom_css og)
+  # `_stale_fixer` is the merge-conflict recovery stash (StaleFixer's
+  # discarded-body snapshots) — without it in the whitelist, the first edit
+  # after a heal wiped the only copy of the discarded text.
+  @content_only_data_keys ~w(previous_url_slugs updated_by_uuid custom_css og _stale_fixer)
   @og_override_form_keys ~w(og_title og_description og_image_uuid)
   @legacy_promotable_keys ~w(description featured_image_uuid seo_title excerpt)
 

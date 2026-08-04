@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
 
   use PhoenixKitPublishing.LiveCase
 
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Settings
 
@@ -70,17 +71,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
              ~s|phx-value-mode="trashed" class="px-3 py-1 text-xs font-medium border-b-2 transition-colors cursor-pointer border-error|
   end
 
+  # The three destructive-group tests pin the DB outcome AND the activity
+  # row's actor_uuid (the C4 threading this module's moduledoc claims) —
+  # `is_binary(html)` accepted any render, including one where the mutation
+  # silently failed or the LV dropped `actor_uuid:` from the context call.
+  # The scope carries a NON-default user_uuid so an actor that falls back
+  # to a default fixture value can't fake the assertion.
+  @click_actor "019cce93-cccc-7000-8000-000000000042"
+
   test "trash_group event soft-deletes the group", %{conn: conn} do
     {:ok, group} =
       Groups.add_group("Index Trash Click #{System.unique_integer([:positive])}", mode: "slug")
 
     {:ok, view, _html} =
       conn
-      |> put_test_scope(fake_scope())
+      |> put_test_scope(fake_scope(user_uuid: @click_actor))
       |> live("/admin/publishing")
 
     html = render_click(view, "trash_group", %{"slug" => group["slug"]})
-    assert is_binary(html)
+    assert html =~ "moved to trash"
+
+    assert %{status: "trashed"} = DBStorage.get_group_by_slug(group["slug"])
+
+    assert_activity_logged("publishing.group.trashed",
+      actor_uuid: @click_actor,
+      metadata_has: %{"slug" => group["slug"]}
+    )
   end
 
   test "restore_group event un-trashes the group", %{conn: conn} do
@@ -91,12 +107,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
 
     {:ok, view, _html} =
       conn
-      |> put_test_scope(fake_scope())
+      |> put_test_scope(fake_scope(user_uuid: @click_actor))
       |> live("/admin/publishing")
 
     _ = render_click(view, "switch_view", %{"mode" => "trashed"})
     html = render_click(view, "restore_group", %{"slug" => group["slug"]})
-    assert is_binary(html)
+    assert html =~ "restored"
+
+    assert %{status: "active"} = DBStorage.get_group_by_slug(group["slug"])
+
+    assert_activity_logged("publishing.group.restored",
+      actor_uuid: @click_actor,
+      metadata_has: %{"slug" => group["slug"]}
+    )
   end
 
   test "delete_group event hard-deletes (group with no posts)",
@@ -108,12 +131,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
 
     {:ok, view, _html} =
       conn
-      |> put_test_scope(fake_scope())
+      |> put_test_scope(fake_scope(user_uuid: @click_actor))
       |> live("/admin/publishing")
 
     _ = render_click(view, "switch_view", %{"mode" => "trashed"})
     html = render_click(view, "delete_group", %{"slug" => group["slug"]})
     assert is_binary(html)
+
+    assert DBStorage.get_group_by_slug(group["slug"]) == nil
+
+    assert_activity_logged("publishing.group.deleted",
+      actor_uuid: @click_actor,
+      metadata_has: %{"slug" => group["slug"]}
+    )
   end
 
   test "handle_info catch-all swallows unknown messages", %{conn: conn} do

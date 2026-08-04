@@ -33,6 +33,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
   import Plug.Conn, only: [get_resp_header: 2]
 
   alias Ecto.Adapters.SQL.Sandbox
+  alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
@@ -130,4 +131,64 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
   # router_dispatch_test.exs — in this harness core's full route surface
   # catches such paths itself, so the host-wins semantics can't be observed
   # here without declaring host routes inside the macro's scope.)
+
+  # Sibling-dialect URLs traverse core's locale plug inside the dispatch
+  # pipeline, and the RELEASED core still 301s every hyphenated segment to
+  # its base — the acceptance branch ships in the paired core change. Until
+  # that release:  PHOENIX_KIT_PATH=../phoenix_kit mix test --include needs_unreleased_core
+  @tag :needs_unreleased_core
+  test "a sibling-dialect URL survives the full dispatch + locale pipeline", %{slug: slug} do
+    {:ok, _} =
+      Settings.update_json_setting("languages_config", %{
+        "languages" => [
+          %{
+            "code" => "en-US",
+            "name" => "English (US)",
+            "is_default" => true,
+            "is_enabled" => true,
+            "position" => 0
+          },
+          %{
+            "code" => "en-GB",
+            "name" => "English (UK)",
+            "is_default" => false,
+            "is_enabled" => true,
+            "position" => 1
+          }
+        ]
+      })
+
+    {:ok, gb_group} = Groups.add_group(unique_name(), mode: "slug")
+    gb_slug = gb_group["slug"]
+
+    {:ok, post} =
+      Posts.create_post(gb_slug, %{title: "Color", slug: "color", content: "US body."})
+
+    {:ok, _} = Publishing.add_language_to_post(gb_slug, post.uuid, "en-GB", 1)
+    {:ok, gb_read} = Publishing.read_post_by_uuid(post.uuid, "en-GB", 1)
+
+    {:ok, _} =
+      Posts.update_post(gb_slug, gb_read, %{"title" => "Colour", "content" => "UK body."}, %{})
+
+    :ok = Versions.publish_version(gb_slug, post.uuid, 1)
+
+    conn = build_conn() |> get("#{@prefix}/en-gb/#{gb_slug}")
+
+    # The old core plug 301'd /en-gb/... to /en/... before publishing ran;
+    # with the paired core change the sibling listing renders directly.
+    assert conn.status == 200
+    body = html_response(conn, 200)
+    assert body =~ "Colour"
+    refute body =~ "US body."
+    assert_no_internal_leak(conn)
+
+    # The primary's base URL still routes through the same pipeline. (This
+    # harness pins runtime URL building to "/" while routes live under
+    # @prefix, so canonical redirects can fire — per-response assertions
+    # only, like the rest of this file.)
+    en_conn = build_conn() |> get("#{@prefix}/en/#{gb_slug}")
+    assert_no_internal_leak(en_conn)
+
+    _ = slug
+  end
 end

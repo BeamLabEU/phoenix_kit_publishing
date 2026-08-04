@@ -607,6 +607,10 @@ defmodule PhoenixKit.Modules.Publishing do
       # Owns the ListingCache regeneration-lock ETS table so it outlives the
       # transient request processes that would otherwise create (and destroy) it.
       PhoenixKit.Modules.Publishing.ListingCache.LockTableOwner,
+      # Erases this node's cached listings when another node invalidates a
+      # group — without it, multi-node deploys served stale listings on peer
+      # nodes after a rename/trash/delete until an unrelated local mutation.
+      PhoenixKit.Modules.Publishing.ListingCache.CacheSync,
       # Per-post render cache (Renderer.render_post_cached/1). Without this the
       # cache GenServer never starts, so every published view re-renders markdown
       # and logs a per-request warning. max_size bounds growth — the cache key

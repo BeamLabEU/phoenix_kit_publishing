@@ -91,6 +91,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       ])
       |> Map.put("content", socket.assigns.content)
 
+    params = restore_default_url_slug(params, socket.assigns.post)
+
     params =
       case {socket.assigns.group_mode, Map.get(params, "slug")} do
         {"slug", slug} when is_binary(slug) and slug != "" ->
@@ -135,6 +137,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         {:noreply, Phoenix.LiveView.put_flash(socket, :error, error_message)}
     end
   end
+
+  # The UI promises "leave empty to restore the default slug", but the
+  # domain layer deliberately reads a blank url_slug as "leave it alone"
+  # (protecting programmatic partial maps — see upsert_post_content).
+  # Translate the promise here: an erased field becomes an EXPLICIT write of
+  # the post's default slug, which also files the old custom slug as a 301.
+  # Timestamp posts have no slug to restore — leave blank alone.
+  defp restore_default_url_slug(%{"url_slug" => ""} = params, %{slug: default_slug})
+       when is_binary(default_slug) and default_slug != "" do
+    Map.put(params, "url_slug", default_slug)
+  end
+
+  defp restore_default_url_slug(params, _post), do: params
 
   defp validate_url_slug_for_save(socket, params) do
     url_slug = Map.get(params, "url_slug", "")
@@ -479,7 +494,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
          _post,
          _version
        ) do
-    handle_post_save_success(socket, updated_post)
+    requested_status = socket.assigns.form["status"]
+    saved_status = get_in(updated_post, [:metadata, :status])
+
+    {:noreply, socket} = handle_post_save_success(socket, updated_post)
+
+    # The domain deliberately drops a draft/archived status on the LIVE
+    # version (unpublishing is unpublish_post's job) — but the editor
+    # offered the select, saved, flashed success, and snapped the select
+    # back with no explanation. Say what actually happened.
+    socket =
+      if requested_status != saved_status and Constants.published?(saved_status) do
+        Phoenix.LiveView.put_flash(
+          socket,
+          :info,
+          gettext(
+            "The live version stays published — to take it offline, use Unpublish on the group page."
+          )
+        )
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   defp handle_successful_update(
@@ -503,13 +540,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         handle_post_save_success(socket, updated_post)
 
       {:error, reason} ->
+        # The content DID save (update_post committed before this publish
+        # attempt) — mark the buffer clean so language/version switches
+        # aren't blocked by flush_before_switch endlessly re-hitting the
+        # same publish failure. And name the actual reason: the old
+        # unconditional "archiving the other versions failed" wording sent
+        # a blank-primary-title user (:title_required) hunting a phantom
+        # archiving problem.
+        message =
+          case reason do
+            :title_required ->
+              gettext(
+                "Post saved as a draft, but it can't be published: the primary language needs a title."
+              )
+
+            _ ->
+              gettext("Post saved, but publishing failed.") <> " " <> Errors.message(reason)
+          end
+
         {:noreply,
-         Phoenix.LiveView.put_flash(
-           socket,
-           :warning,
-           gettext("Post saved, but archiving the other versions failed.") <>
-             " " <> Errors.message(reason)
-         )}
+         socket
+         |> Helpers.mark_clean()
+         |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
+         |> Phoenix.LiveView.put_flash(:warning, message)}
     end
   end
 
@@ -525,7 +578,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           "form_key=#{inspect(socket.assigns.form_key)}, source=#{inspect(socket.id)}"
       )
 
-      PublishingPubSub.broadcast_editor_saved(socket.assigns.form_key, socket.id)
+      PublishingPubSub.broadcast_editor_saved(
+        socket.assigns.form_key,
+        socket.id,
+        {socket.assigns.group_slug, get_in(socket.assigns, [:post, :uuid])}
+      )
     end
 
     # A save that WORKS must retract a previous failure. update_meta now
@@ -634,7 +691,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
               "form_key=#{inspect(socket.assigns.form_key)}, source=#{inspect(socket.id)}"
           )
 
-          PublishingPubSub.broadcast_editor_saved(socket.assigns.form_key, socket.id)
+          PublishingPubSub.broadcast_editor_saved(
+            socket.assigns.form_key,
+            socket.id,
+            {socket.assigns.group_slug, get_in(socket.assigns, [:post, :uuid])}
+          )
         end
 
         flash_message =

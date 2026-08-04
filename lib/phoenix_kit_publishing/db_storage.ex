@@ -924,7 +924,12 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
     case find_free_suffix(base_slug, group_slug, content.language, content.uuid, start_n) do
       {:ok, new_slug} ->
-        case update_content(content, %{url_slug: new_slug}) do
+        # The displaced slug joins previous_url_slugs so the established
+        # public URL 301s to the renamed one instead of dying — the editor's
+        # normal slug-change flow records history; this self-heal must too.
+        data = record_displaced_slug(content.data || %{}, base_slug, new_slug)
+
+        case update_content(content, %{url_slug: new_slug, data: data}) do
           {:ok, _updated} ->
             Logger.warning(
               "[Publishing] Auto-resolved url_slug collision: content #{content.uuid} renamed " <>
@@ -1029,19 +1034,106 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         contents =
           from(c in PublishingContent,
             join: v in assoc(c, :version),
-            where: v.post_uuid == ^db_post.uuid and c.url_slug == ^url_slug_to_clear,
-            select: {c, c.language}
+            where: v.post_uuid == ^db_post.uuid and c.url_slug == ^url_slug_to_clear
           )
           |> repo().all()
 
-        from(c in PublishingContent,
-          join: v in assoc(c, :version),
-          where: v.post_uuid == ^db_post.uuid and c.url_slug == ^url_slug_to_clear
-        )
-        |> repo().update_all(set: [url_slug: nil, updated_at: DateTime.utc_now()])
+        # Per-row (not update_all): the cleared slug must join each row's
+        # previous_url_slugs so the established public URL keeps 301ing to
+        # this post — clearing without history silently handed the URL to
+        # whichever post triggered the collision.
+        Enum.each(contents, fn content ->
+          data = record_displaced_slug(content.data || %{}, url_slug_to_clear, nil)
+          update_content(content, %{url_slug: nil, data: data})
+        end)
 
-        Enum.map(contents, fn {_content, lang} -> lang end) |> Enum.uniq()
+        Enum.map(contents, & &1.language) |> Enum.uniq()
     end
+  end
+
+  @doc """
+  Row-locks a post (`FOR UPDATE`) inside the caller's transaction — the
+  same lock `Versions.publish_version/unpublish/delete` take, so any writer
+  that acquires it serializes with the publish machinery. Returns the fresh
+  post row (or nil).
+  """
+  @spec lock_post_row!(module(), String.t()) :: PublishingPost.t() | nil
+  def lock_post_row!(repo, post_uuid) do
+    from(p in PublishingPost, where: p.uuid == ^post_uuid, lock: "FOR UPDATE")
+    |> repo.one()
+  end
+
+  @doc "Fetches a version by its uuid."
+  @spec get_version_by_uuid(String.t()) :: PublishingVersion.t() | nil
+  def get_version_by_uuid(version_uuid) do
+    repo().get(PublishingVersion, version_uuid)
+  end
+
+  @doc """
+  Row-locks a group (`FOR UPDATE`) inside the caller's transaction and
+  returns the fresh row — the group-save equivalent of `lock_post_row!/2`.
+  """
+  @spec lock_group_row!(module(), String.t()) :: PublishingGroup.t() | nil
+  def lock_group_row!(repo, group_uuid) do
+    from(g in PublishingGroup, where: g.uuid == ^group_uuid, lock: "FOR UPDATE")
+    |> repo.one()
+  end
+
+  @doc """
+  Clears a post's `active_version_uuid` ONLY when it still equals
+  `expected_uuid` — the compare-and-swap StaleFixer's pointer heal needs.
+  A plain write raced concurrent publishes: the fixer judged the pointer
+  stale from an earlier read, a publish moved it to a fresh version in
+  between, and the unconditional clear reverted the publish. Returns the
+  number of rows updated (0 = the pointer moved; do nothing).
+  """
+  @spec clear_active_version_if(String.t(), String.t()) :: non_neg_integer()
+  def clear_active_version_if(post_uuid, expected_uuid) do
+    {count, _} =
+      from(p in PublishingPost,
+        where: p.uuid == ^post_uuid and p.active_version_uuid == ^expected_uuid
+      )
+      |> repo().update_all(set: [active_version_uuid: nil, updated_at: DateTime.utc_now()])
+
+    count
+  end
+
+  @doc """
+  Demotes a published version to draft ONLY while its post's
+  `active_version_uuid` is still NULL — the orphan-demotion StaleFixer runs
+  from a possibly-stale snapshot, and an unconditional demote could draft a
+  version a concurrent publish just made live. One atomic statement; returns
+  the number of rows updated.
+  """
+  @spec demote_version_if_orphaned(String.t(), String.t()) :: non_neg_integer()
+  def demote_version_if_orphaned(version_uuid, post_uuid) do
+    orphaned_post =
+      from(p in PublishingPost, where: p.uuid == ^post_uuid and is_nil(p.active_version_uuid))
+
+    {count, _} =
+      from(v in PublishingVersion,
+        where:
+          v.uuid == ^version_uuid and v.status == ^Constants.status_published() and
+            exists(orphaned_post)
+      )
+      |> repo().update_all(set: [status: "draft", updated_at: DateTime.utc_now()])
+
+    count
+  end
+
+  # Mirrors the editor flow's Posts.record_previous_url_slug/3: displaced
+  # slug prepended to data["previous_url_slugs"], deduped, never containing
+  # the row's own new slug (a history entry equal to the current slug would
+  # 301-loop).
+  defp record_displaced_slug(data, old_slug, new_slug) do
+    previous = data["previous_url_slugs"] || []
+
+    updated =
+      [old_slug | previous]
+      |> Enum.reject(&(&1 in [nil, "", new_slug]))
+      |> Enum.uniq()
+
+    Map.put(data, "previous_url_slugs", updated)
   end
 
   @doc "Upserts content by version_id + language using ON CONFLICT."

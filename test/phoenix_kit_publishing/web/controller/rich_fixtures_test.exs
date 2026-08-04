@@ -107,20 +107,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RichFixturesTest do
       {:ok, _} =
         TranslationManager.add_language_to_post(group["slug"], post.uuid, "de-DE", nil)
 
-      # Give the German content its own custom URL slug, then publish (which
-      # regenerates the listing cache with both languages' slugs).
-      [version] = DBStorage.list_versions(post.uuid)
-
-      de_content =
-        version.uuid
-        |> DBStorage.list_contents()
-        |> Enum.find(&(&1.language == "de-DE"))
+      # A REAL German translation (title + body) with its own custom URL
+      # slug, then publish (which regenerates the listing cache with both
+      # languages' slugs). The row must not stay an "Untitled"/empty stub:
+      # untranslated stubs are deliberately invisible on the public surface.
+      {:ok, de_read} = Posts.read_post_by_uuid(post.uuid, "de-DE", 1)
 
       {:ok, _} =
-        DBStorage.update_content(de_content, %{
-          url_slug: "hallo-welt"
-        })
+        Posts.update_post(
+          group["slug"],
+          de_read,
+          %{
+            "title" => "Hallo Welt",
+            "content" => "Hallo Welt Inhalt.",
+            "url_slug" => "hallo-welt"
+          },
+          %{}
+        )
 
+      [version] = DBStorage.list_versions(post.uuid)
       :ok = Versions.publish_version(group["slug"], post.uuid, version.version_number)
 
       %{group_slug: group["slug"], post: post}
@@ -145,8 +150,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RichFixturesTest do
       if conn.status in [301, 302] do
         assert redirected_to(conn, conn.status) =~ "hallo-welt"
       else
-        # The DE translation's content is blank in this fixture — assert the
-        # rendered page's canonical URL keeps the custom slug instead.
+        # Rendered directly — the page's canonical URL keeps the custom slug.
         assert html_response(conn, 200) =~ "/de/#{group_slug}/hallo-welt"
       end
     end

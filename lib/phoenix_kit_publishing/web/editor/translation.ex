@@ -480,6 +480,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
     end
   end
 
+  # Drops this version's scope from :translations_in_flight and unlocks the
+  # editor UI when the queue is verifiably empty. Only called from the
+  # restore path after Oban reported no active jobs for the scope.
+  defp release_stale_translation_marker(socket, _post) do
+    scope = version_scope(socket)
+    in_flight = socket.assigns[:translations_in_flight] || MapSet.new()
+
+    if scope && MapSet.member?(in_flight, scope) do
+      socket
+      |> Phoenix.Component.assign(:translations_in_flight, MapSet.delete(in_flight, scope))
+      |> Phoenix.Component.assign(:ai_translation_status, nil)
+      |> Phoenix.Component.assign(:translation_locked?, false)
+    else
+      socket
+    end
+  end
+
   defp check_source_language_editor(socket, warnings) do
     post = socket.assigns.post
     group_slug = socket.assigns.group_slug
@@ -687,7 +704,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
     if post && post[:uuid] do
       case in_flight_translation_languages(post.uuid, version_scope(socket)) do
         [] ->
-          socket
+          # Oban shows NO active jobs for this post+version — also RELEASE
+          # any stale in-flight marker. Switching versions mid-translation
+          # made the completion events miss their scope, so the marker never
+          # cleared and switching back re-locked the editor forever ("
+          # Translation in progress" until a full remount).
+          release_stale_translation_marker(socket, post)
 
         target_languages ->
           current_lang = socket.assigns[:current_language]

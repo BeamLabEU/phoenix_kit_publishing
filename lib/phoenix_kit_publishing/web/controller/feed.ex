@@ -46,8 +46,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
 
     title =
       case scope do
-        {_type, value} -> "#{Publishing.translated_group_name(group, language)} · #{value}"
-        nil -> Publishing.translated_group_name(group, language)
+        # scope_label is the translated term name (category names translate;
+        # tags are their own identifier) — the raw scope value is the SLUG,
+        # which made a German category feed title show "Blog · news" while
+        # the HTML archive heading said "Blog · Nachrichten".
+        {_type, value} ->
+          label = Keyword.get(opts, :scope_label) || value
+          "#{Publishing.translated_group_name(group, language)} · #{label}"
+
+        nil ->
+          Publishing.translated_group_name(group, language)
       end
 
     description = feed_description(group, title)
@@ -98,10 +106,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
     ]
   end
 
-  # The description prefers the post's explicit description; the resolved
-  # per-language excerpt (Listing puts it in :content) is the fallback.
+  # The resolved per-language excerpt (Listing puts it in :content) — the same
+  # source the listing cards preview. The version-level metadata description is
+  # deliberately not consulted: it carries no language, so it put one language's
+  # text in every localized feed (see post_card_excerpt/1 in Web.HTML).
   defp item_description(post) do
-    text = get_in(post, [:metadata, :description]) || excerpt_fallback(post)
+    text = excerpt_fallback(post)
 
     case text do
       t when is_binary(t) and t != "" ->

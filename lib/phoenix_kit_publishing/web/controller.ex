@@ -29,6 +29,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Modules.Publishing.Web.Controller.Fallback
@@ -176,6 +177,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp handle_comment_submission(conn, group, params) do
     group_slug = group["slug"]
     language = params["language"] || Language.get_default_language()
+    # The flash strings below are gettext'd; without this the POST renders
+    # them in the default (or a recycled worker's residual) locale while
+    # redirecting back to the reader's localized page.
+    set_gettext_locale(language)
     post_uuid = params["post_uuid"]
 
     post =
@@ -479,6 +484,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       {:redirect_301, url} ->
         redirect_301(conn, url)
 
+      # The listing's language fallback (requested language has no posts,
+      # another language does) — 302 + flash like the post page's smart
+      # fallback, never a cacheable 301.
+      {:redirect_with_flash, path, message} ->
+        conn
+        |> put_flash(:info, message)
+        |> redirect(to: path)
+
       {:error, reason} ->
         handle_not_found(conn, reason)
     end
@@ -495,30 +508,56 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp handle_feed(conn, group_slug, language, scope) do
     with true <- PublishingHTML.feeds_enabled?(),
          {:ok, group} <- Publishing.get_group(group_slug),
-         {:ok, all_posts, _term_label} <-
+         :render <- feed_canonical_redirect(conn, group_slug, language, scope),
+         {:ok, all_posts, term_label} <-
            Listing.scoped_chronological_posts(group_slug, language, scope) do
-      # date_counts over the WHOLE scoped set, not the 50-item window —
-      # a same-day sibling outside the window must still force the
-      # time-segment URL form for timestamp items.
+      # date_counts over the group's WHOLE published set (all languages, all
+      # terms) — never the windowed/scoped list: a same-day sibling outside
+      # the window, outside the term, or without this translation must still
+      # force the time-segment URL form for timestamp items, because date-URL
+      # resolution is group-wide.
       posts = Enum.take(all_posts, feed_item_limit())
 
       xml =
         Feed.render_rss(group, posts,
           base_url: base_url(conn),
           language: language,
-          date_counts: PublishingHTML.build_date_counts(all_posts),
-          scope: scope
+          date_counts: Listing.group_date_counts(group_slug),
+          scope: scope,
+          # The translated term name — the HTML archive heading shows it;
+          # without it the feed's channel title interpolated the raw slug.
+          scope_label: term_label
         )
 
       conn
       |> put_resp_content_type("application/rss+xml")
       |> send_resp(200, IO.iodata_to_binary(xml))
     else
+      {:redirect_301, url} ->
+        redirect_301(conn, url)
+
       _ ->
         conn
         |> put_status(:not_found)
         |> put_view(html: PhoenixKitWeb.ErrorHTML)
         |> render(:"404")
+    end
+  end
+
+  # Canonical-prefix parity for feeds — strictly feed-to-feed (the target is
+  # feed_path/3 by construction, never the HTML smart fallback the moduledoc
+  # above forbids). Readers follow permanent redirects, and without this the
+  # channel's rel="self" link (built canonical) disagreed with the URL that
+  # served it.
+  defp feed_canonical_redirect(conn, group_slug, language, scope) do
+    canonical_language = Language.get_canonical_url_language(language)
+    canonical_url = PublishingHTML.feed_path(canonical_language, group_slug, scope)
+
+    if Language.prefixed_default_language_request?(conn, canonical_language) and
+         not Language.request_matches_canonical_url?(conn, canonical_url) do
+      {:redirect_301, canonical_url}
+    else
+      :render
     end
   end
 
@@ -529,7 +568,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp handle_term_archive(conn, group_slug, language, term) do
     case Listing.render_term_archive(conn, group_slug, language, term) do
       {:ok, assigns} ->
-        listing_url = PublishingHTML.group_listing_path(assigns.current_language, group_slug)
+        # og:url must be THIS archive's URL, not the group listing — the
+        # archive is its own canonical page; advertising the listing marked
+        # every category/tag archive as a duplicate of the group root.
+        listing_url =
+          PublishingHTML.term_archive_path(assigns.current_language, group_slug, term)
+
         base_url = base_url(conn)
 
         conn
@@ -559,6 +603,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           type: "website"
         })
         |> render(:index)
+
+      {:redirect_301, url} ->
+        redirect_301(conn, url)
 
       {:error, reason} ->
         handle_not_found(conn, reason)
@@ -663,6 +710,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> render(:show)
 
+      # The canonical-language redirect a versioned URL can now return
+      # (respond_with_browsable_version) — without this clause it crashed
+      # with a FunctionClauseError instead of redirecting.
+      {:redirect_301, url} ->
+        redirect_301(conn, url)
+
       {:error, reason} ->
         handle_not_found(conn, reason)
     end
@@ -744,8 +797,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     # Sets both: core's backend for host-rendered chrome (error pages, root
     # layout) and this module's own backend for publishing's own strings
     # (e.g. the "%{count} post(s)" counts in HTML.ex).
-    Gettext.put_locale(PhoenixKitWeb.Gettext, language)
-    Gettext.put_locale(PhoenixKitPublishing.Gettext, language)
+    #
+    # Normalized to the BASE code: catalogue directories are base-coded
+    # (priv/gettext/{en,et,fr,it,ru}) and gettext has no dialect fallback, so
+    # put_locale("fr-FR") matches nothing and every public string silently
+    # renders in English. Full codes reach here on unprefixed default-language
+    # requests (language = content_language, e.g. "et-EE") and on
+    # multi-dialect canonical languages ("en-GB") — invisible on
+    # English-default sites because the msgid fallback IS English.
+    locale = LanguageHelpers.url_language_code(language) || language
+    Gettext.put_locale(PhoenixKitWeb.Gettext, locale)
+    Gettext.put_locale(PhoenixKitPublishing.Gettext, locale)
   end
 
   # Issue the canonical 301 while preserving the request's query string — a
@@ -803,7 +865,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     og =
       %{
         title: og_override["title"] || post.metadata.title,
-        description: og_override["description"] || Map.get(post.metadata, :description),
+        # Same rule as the listing previews (fa50732): right-language derived
+        # text beats the version-level data["description"], which carries no
+        # language — otherwise a translated page shares one language's text
+        # with every social scraper and the JSON-LD. The version field stays
+        # as the last resort when this language has no body to derive from.
+        description:
+          og_override["description"] || derived_og_description(post) ||
+            Map.get(post.metadata, :description),
         image: absolute_url(base_url, image_meta[:url]),
         url: absolute_url(base_url, canonical_url),
         locale: og_locale(language),
@@ -814,6 +883,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       |> maybe_put(:image_type, image_meta[:mime_type])
 
     maybe_refine_og_with_module(og, conn, post, language)
+  end
+
+  # The per-language og:description default: a plain-text excerpt of the
+  # language's own body. nil (not "") when there is nothing to derive, so the
+  # caller's `||` chain can fall through to the version-level description.
+  defp derived_og_description(post) do
+    case PublishingHTML.extract_excerpt(post.content) do
+      text when is_binary(text) and text != "" -> String.slice(text, 0, 300)
+      _ -> nil
+    end
   end
 
   # Resolves the effective featured image (override UUID > post's own
@@ -1105,7 +1184,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # violated, let it crash so the regression surfaces.
   defp assign_publishing_translations(conn, translations) when is_list(translations) do
     normalized =
-      Enum.map(translations, fn t ->
+      translations
+      # Same rule as the in-page switcher (HTML.build_public_translations):
+      # a disabled/legacy language is not publicly routable (RouterDispatch
+      # only rewrites enabled locales), so handing its URL to the host's
+      # switcher publishes a dead link. Current entry survives as the anchor.
+      |> Enum.reject(fn t -> Map.get(t, :enabled) == false and not (t.current || false) end)
+      |> Enum.map(fn t ->
         %{
           code: t.code,
           name: t.name,

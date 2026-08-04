@@ -25,6 +25,19 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
   @primary_key {:uuid, UUIDv7, autogenerate: true}
   @foreign_key_type UUIDv7
 
+  @type t :: %__MODULE__{
+          uuid: Ecto.UUID.t() | nil,
+          name: String.t() | nil,
+          slug: String.t() | nil,
+          name_i18n: map(),
+          description: String.t() | nil,
+          position: integer(),
+          group_uuid: Ecto.UUID.t() | nil,
+          parent_uuid: Ecto.UUID.t() | nil,
+          inserted_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil
+        }
+
   schema "phoenix_kit_publishing_categories" do
     field :name, :string
     field :slug, :string
@@ -63,6 +76,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
     |> normalize_name_i18n()
     |> unique_constraint([:group_uuid, :slug],
       name: :phoenix_kit_publishing_categories_group_slug_uniq
+    )
+    |> foreign_key_constraint(:parent_uuid,
+      message: "parent category no longer exists"
     )
   end
 

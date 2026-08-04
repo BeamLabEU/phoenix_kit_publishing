@@ -33,6 +33,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
     group_slug = params["group"]
 
     cond do
+      # A dialect URL segment matching an ENABLED code — normalized to the
+      # stored BCP-47 case ("en-gb" → "en-GB") so every downstream match
+      # (content rows, canonical comparisons, switcher identity) sees the
+      # exact enabled code. Must run before valid_language?, which doesn't
+      # recognize lowercase dialect forms and would shift them into the
+      # group position.
+      normalized = normalize_enabled_dialect(language_param) ->
+        {normalized, params}
+
       # Known/predefined language - use as-is
       valid_language?(language_param) ->
         {language_param, params}
@@ -47,6 +56,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
         {get_default_language(), shift_language_to_group(language_param, params)}
     end
   end
+
+  defp normalize_enabled_dialect(param) when is_binary(param) do
+    if String.contains?(param, "-") do
+      down = String.downcase(param)
+      Enum.find(get_enabled_languages(), &(String.downcase(&1) == down))
+    end
+  end
+
+  defp normalize_enabled_dialect(_), do: nil
 
   defp shift_language_to_group(language_param, %{"group" => first_segment, "path" => rest})
        when is_list(rest) do
@@ -154,10 +172,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Handles base codes by finding a matching dialect in available languages.
   """
   def resolve_language_for_post(language, available_languages) do
+    ci_exact =
+      Enum.find(available_languages, fn code ->
+        String.downcase(code) == String.downcase(language)
+      end)
+
     cond do
       # Direct match - language exactly matches an available language
       language in available_languages ->
         language
+
+      # Case-insensitive exact — lowercase sibling-dialect URL codes
+      # ("en-gb") must resolve to the stored row ("en-GB"), never fall
+      # through to a base match that picks the OTHER sibling.
+      ci_exact != nil ->
+        ci_exact
 
       # Base code - try to find a dialect that matches
       base_code?(language) ->
@@ -232,7 +261,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   def prefixed_default_language_request?(conn, language) do
     Map.has_key?(conn.params, "language") and
       LanguageHelpers.default_language_no_prefix?() and
-      LanguageHelpers.url_language_code(language) == LanguageHelpers.get_primary_language_base()
+      denotes_default_language?(language)
+  end
+
+  # The prefix is redundant only when it denotes the DEFAULT language itself.
+  # This used to compare BASE codes, which also claimed sibling dialects:
+  # with en-US default and en-GB enabled too, /en-GB/... read as "redundantly
+  # prefixed default", 301'd to the unprefixed URL, and the unprefixed route
+  # then served en-US — a silent language switch. Resolve the prefix to a
+  # dialect and compare the FULL code instead.
+  defp denotes_default_language?(language) do
+    resolved =
+      if base_code?(language) do
+        find_dialect_for_base(language, get_enabled_languages()) || language
+      else
+        language
+      end
+
+    resolved == LanguageHelpers.get_primary_language()
   end
 
   # ============================================================================
@@ -260,14 +306,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Find a dialect in enabled languages that matches the given base code.
 
-  First-match tie-break: when multiple candidates match the base, returns
-  the first in `enabled_languages` declaration order. For primary-language
-  preference, call `LanguageHelpers.resolve_dialect_for_base/3` with
-  `prefer: LanguageHelpers.get_primary_language()` directly.
+  Primary-then-declaration tie-break: when multiple candidates match the
+  base, prefers `LanguageHelpers.get_primary_language/0`, then the first in
+  `enabled_languages` declaration order — the SAME rule the post read path
+  (`Posts.resolve_language_to_dialect/1`) applies. The two layers used to
+  disagree (this one was first-match only), so `/en/blog` could list one
+  dialect's titles while clicking a card served the other dialect's body
+  whenever the primary wasn't first in declaration order.
   """
   @spec find_dialect_for_base(String.t(), [String.t()]) :: String.t() | nil
   def find_dialect_for_base(base_code, enabled_languages) do
-    LanguageHelpers.resolve_dialect_for_base(base_code, enabled_languages)
+    LanguageHelpers.resolve_dialect_for_base(base_code, enabled_languages,
+      prefer: LanguageHelpers.get_primary_language()
+    )
   end
 
   @doc """

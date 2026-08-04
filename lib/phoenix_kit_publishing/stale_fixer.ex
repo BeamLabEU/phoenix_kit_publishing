@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PublishingPost
@@ -96,11 +97,76 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   Deletes empty posts (no content in any version) that are past the grace period.
   """
   @spec fix_stale_post(PublishingPost.t()) :: PublishingPost.t()
+  # Tracks whether any fixer wrote during this fix_stale_post call, so the
+  # group's listing cache is invalidated exactly when a self-heal changed
+  # something. The fixers run on the public READ path: without this, a
+  # relabelled/merged language row kept serving the cached pre-heal
+  # language_titles/slugs/available_languages indefinitely on a quiet site —
+  # and invalidating unconditionally would nuke the cache on EVERY post read
+  # (read_post_by_uuid runs the fixer each time). Process-local: the whole
+  # fix runs synchronously in the calling process, and mark_listing_dirty/0
+  # no-ops when the flag isn't armed (standalone fix_stale_content/version
+  # calls behave as before).
+  @dirty_flag {__MODULE__, :listing_cache_dirty}
+
   def fix_stale_post(%PublishingPost{} = post) do
-    # Pre-fetch all versions and contents once to avoid redundant queries
-    ctx = build_post_context(post)
-    do_fix_stale_post(post, ctx)
+    Process.put(@dirty_flag, false)
+
+    try do
+      # Pre-fetch all versions and contents once to avoid redundant queries
+      ctx = build_post_context(post)
+      result = do_fix_stale_post(post, ctx)
+
+      if Process.get(@dirty_flag) == true, do: invalidate_group_listing(result)
+
+      result
+    after
+      Process.delete(@dirty_flag)
+    end
   end
+
+  defp mark_listing_dirty do
+    if Process.get(@dirty_flag) == false, do: Process.put(@dirty_flag, true)
+    :ok
+  end
+
+  defp cas_clear_pointer(post, active_uuid, version) do
+    case DBStorage.clear_active_version_if(post.uuid, active_uuid) do
+      1 ->
+        Logger.info(
+          "[Publishing] Clearing stale active_version_uuid for post #{post.uuid}: " <>
+            "version #{inspect(active_uuid)} is #{if version, do: version.status, else: "missing"}"
+        )
+
+        mark_listing_dirty()
+
+      _ ->
+        Logger.debug(
+          "[Publishing] Skipped stale-pointer clear for #{post.uuid} — " <>
+            "the pointer moved (concurrent publish)"
+        )
+    end
+  end
+
+  defp invalidate_group_listing(%PublishingPost{} = post) do
+    case post.group do
+      %PublishingGroup{slug: slug} when is_binary(slug) ->
+        ListingCache.invalidate(slug)
+
+      _ ->
+        case DBStorage.get_post_by_uuid(post.uuid, [:group]) do
+          %PublishingPost{group: %PublishingGroup{slug: slug}} when is_binary(slug) ->
+            ListingCache.invalidate(slug)
+
+          _ ->
+            :ok
+        end
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp invalidate_group_listing(_), do: :ok
 
   defp build_post_context(post) do
     versions = DBStorage.list_versions(post.uuid)
@@ -119,6 +185,13 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       post
     else
       post = apply_stale_fix(post, build_post_fixes(post, ctx), &DBStorage.update_post/2)
+
+      # Pointer heal is a discrete CAS step (not part of build_post_fixes):
+      # it re-reads the post afterwards so the orphan demotion below never
+      # runs off a stale pointer — the exact combination that could revert a
+      # concurrent publish (clear the fresh pointer, then draft the freshly
+      # published version).
+      post = fix_active_pointer_cas(post, ctx)
 
       # Fix version/content-level issues
       demote_orphaned_published_versions(post, ctx)
@@ -142,6 +215,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
     case DBStorage.update_post(post, %{trashed_at: DateTime.utc_now()}) do
       {:ok, _} ->
+        mark_listing_dirty()
+
         ActivityLog.log_manual(
           "publishing.post.auto_trashed",
           nil,
@@ -198,7 +273,6 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     |> maybe_fix_post_mode(post)
     |> maybe_fix_post_slug(post, ctx)
     |> maybe_fix_post_timestamp(post)
-    |> maybe_fix_active_version(post, ctx)
   end
 
   defp maybe_fix_post_mode(attrs, post) do
@@ -339,21 +413,25 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   defp maybe_set_time(attrs, _time, _now), do: attrs
 
   # If active_version_uuid points to a non-existent or non-published version, clear it
-  defp maybe_fix_active_version(attrs, %{active_version_uuid: nil}, _ctx), do: attrs
+  defp fix_active_pointer_cas(%{active_version_uuid: nil} = post, _ctx), do: post
 
-  defp maybe_fix_active_version(attrs, post, ctx) do
+  defp fix_active_pointer_cas(post, ctx) do
     active_uuid = post.active_version_uuid
     version = Enum.find(ctx.versions, &(&1.uuid == active_uuid))
 
     if is_nil(version) or not Constants.published?(version.status) do
-      Logger.info(
-        "[Publishing] Clearing stale active_version_uuid for post #{post.uuid}: " <>
-          "version #{inspect(active_uuid)} is #{if version, do: version.status, else: "missing"}"
-      )
+      # Compare-and-swap: clear only while the row STILL points at the
+      # version this snapshot judged stale. The fixer runs lockless on the
+      # read path — a publish committing between our post read and here
+      # moved the pointer to a fresh version, and an unconditional write
+      # reverted that publish.
+      cas_clear_pointer(post, active_uuid, version)
 
-      Map.put(attrs, :active_version_uuid, nil)
+      # Fresh re-read so downstream fixers (orphan demotion) never decide
+      # off the stale pointer.
+      DBStorage.get_post_by_uuid(post.uuid, [:group]) || post
     else
-      attrs
+      post
     end
   end
 
@@ -373,11 +451,13 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
     case update_fn.(record, attrs) do
       {:ok, updated} ->
+        mark_listing_dirty()
         updated
 
       {:error, %Ecto.Changeset{} = cs} ->
         case retry_on_slug_conflict(record, attrs, cs, update_fn) do
           {:ok, updated} ->
+            mark_listing_dirty()
             updated
 
           {:error, reason} ->
@@ -477,7 +557,14 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
         "[Publishing] Fixing stale version #{version.uuid}: status #{inspect(version.status)} → \"draft\""
       )
 
-      DBStorage.update_version(version, %{status: "draft"})
+      case DBStorage.update_version(version, %{status: "draft"}) do
+        {:ok, _} = ok ->
+          mark_listing_dirty()
+          ok
+
+        other ->
+          other
+      end
     end
   end
 
@@ -505,7 +592,14 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
         "[Publishing] Fixing stale content #{content.uuid} (#{content.language}): #{inspect(attrs)}"
       )
 
-      DBStorage.update_content(content, attrs)
+      case DBStorage.update_content(content, attrs) do
+        {:ok, _} = ok ->
+          mark_listing_dirty()
+          ok
+
+        other ->
+          other
+      end
     end
   end
 
@@ -544,6 +638,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
         case DBStorage.update_content(content, %{language: target_language}) do
           {:ok, updated} ->
+            mark_listing_dirty()
+
             ActivityLog.log(%{
               action: "publishing.content.language_normalized",
               mode: "auto",
@@ -610,6 +706,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
     case result do
       {:ok, :ok} ->
+        mark_listing_dirty()
+
         Logger.info(
           "[Publishing] Merged duplicate legacy content #{legacy.uuid} into #{target.uuid}"
         )
@@ -623,7 +721,12 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
             "merged_from_uuid" => legacy.uuid,
             "from_language" => legacy.language,
             "to_language" => target.language,
-            "version_uuid" => target.version_uuid
+            "version_uuid" => target.version_uuid,
+            # True when a divergent non-blank legacy body lost to the target's
+            # — its text is stashed in the merged row's data["_stale_fixer"].
+            "discarded_body" =>
+              not blank_string?(target.content) and not blank_string?(legacy.content) and
+                target.content != legacy.content
           }
         })
 
@@ -647,9 +750,16 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
+  # A discarded body is capped so a huge markdown blob doesn't bloat every
+  # merged row's JSONB — the stash is recovery insurance, not a mirror.
+  @discarded_body_cap 100_000
+
   defp build_duplicate_content_merge_attrs(target, legacy) do
     merged_data =
-      merge_content_data(target.data || %{}, legacy.data || %{}, target.url_slug, legacy.url_slug)
+      target.data
+      |> Kernel.||(%{})
+      |> merge_content_data(legacy.data || %{}, target.url_slug, legacy.url_slug)
+      |> maybe_stash_discarded_body(target, legacy)
 
     %{}
     |> maybe_take_legacy_title(target, legacy)
@@ -657,6 +767,42 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     |> maybe_take_legacy_url_slug(target, legacy)
     |> maybe_take_legacy_status(target, legacy)
     |> maybe_put_merged_data(target.data || %{}, merged_data)
+  end
+
+  # Target-wins is the right convergence rule (the target is the canonical
+  # dialect row), but silently DELETING a divergent non-blank legacy body is
+  # unrecoverable — there is no UI path back and the activity row carries
+  # uuids, not text. Stash it under a reserved key the mappers never read,
+  # so support can recover it. Public rendering is unaffected. The key is in
+  # Posts' @content_only_data_keys whitelist so an edit can't wipe it, and
+  # the stash is a LIST so a second heal can't overwrite the first.
+  defp maybe_stash_discarded_body(merged_data, target, legacy) do
+    # Union BOTH rows' prior stash lists — merge_content_data lets the
+    # target's data win wholesale, which silently dropped a previously
+    # healed legacy row's own discarded-body list with the deleted row.
+    target_prior = get_in(merged_data, ["_stale_fixer", "discarded"]) || []
+    legacy_prior = get_in(legacy.data || %{}, ["_stale_fixer", "discarded"]) || []
+    prior = target_prior ++ (legacy_prior -- target_prior)
+
+    entries =
+      if not blank_string?(target.content) and not blank_string?(legacy.content) and
+           target.content != legacy.content do
+        entry = %{
+          "discarded_content" => String.slice(legacy.content, 0, @discarded_body_cap),
+          "from_uuid" => legacy.uuid,
+          "from_language" => legacy.language
+        }
+
+        [entry | prior]
+      else
+        prior
+      end
+
+    if entries == [] do
+      merged_data
+    else
+      Map.put(merged_data, "_stale_fixer", %{"discarded" => entries})
+    end
   end
 
   defp maybe_take_legacy_title(attrs, target, legacy) do
@@ -755,6 +901,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
       DBStorage.update_version(v, %{status: "draft"})
       DBStorage.update_content_status(v.uuid, "draft")
+      mark_listing_dirty()
     end
   end
 
@@ -776,6 +923,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       for v <- demote do
         DBStorage.update_version(v, %{status: "archived"})
         DBStorage.update_content_status(v.uuid, "archived")
+        mark_listing_dirty()
       end
     end
   end
@@ -807,6 +955,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       )
 
       DBStorage.update_post(post, %{active_version_uuid: nil})
+      mark_listing_dirty()
     end
   end
 
@@ -823,6 +972,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       for v <- published_versions do
         DBStorage.update_version(v, %{status: "archived"})
         demote_published_content(v.uuid)
+        mark_listing_dirty()
       end
     end
   end
@@ -848,6 +998,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
       for content <- published do
         DBStorage.update_content(content, %{status: "draft"})
+        mark_listing_dirty()
       end
     end
   end

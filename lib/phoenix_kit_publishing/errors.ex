@@ -64,6 +64,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | :invalid_status
           | :invalid_type
           | :invalid_version
+          | :cannot_delete_primary_language
           | :last_language
           | :last_version
           | :no_post
@@ -123,6 +124,13 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:invalid_status), do: gettext("Invalid status")
   def message(:invalid_type), do: gettext("Invalid type")
   def message(:invalid_version), do: gettext("Invalid version")
+
+  def message(:cannot_delete_primary_language),
+    do:
+      gettext(
+        "The primary language's content anchors the post and can't be deleted — edit it instead"
+      )
+
   def message(:last_language), do: gettext("Cannot delete the last language")
   def message(:last_version), do: gettext("Cannot delete the last version")
   def message(:no_post), do: gettext("No post")

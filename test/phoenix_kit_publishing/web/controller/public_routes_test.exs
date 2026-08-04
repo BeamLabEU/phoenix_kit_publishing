@@ -113,10 +113,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PublicRoutesTest do
     end
   end
 
-  describe "all_groups index" do
-    test "renders 200 for /(no group) when configured" do
-      # The index path may or may not be live in this configuration —
-      # we just verify a request to root doesn't crash.
+  describe "root path" do
+    test "a bare / never crashes (it belongs to the host, not publishing)" do
+      # There is deliberately no all-groups overview route — the catch-all
+      # must pass the root through to the host. (The dormant all_groups/1
+      # template was deleted 2026-08; an overview would be a new opt-in
+      # reserved route, not a resurrection.)
       conn = build_conn() |> get("/")
       assert conn.status in [200, 301, 302, 404]
     end

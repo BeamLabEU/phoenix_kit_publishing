@@ -5,6 +5,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   use PhoenixKitWeb, :live_view
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  require Logger
+
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.ListingCache
@@ -342,7 +344,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     {:noreply, refresh_groups(socket)}
   end
 
-  def handle_info(_msg, socket), do: {:noreply, socket}
+  def handle_info(msg, socket) do
+    Logger.debug("Publishing settings ignoring message: #{inspect(msg)}")
+    {:noreply, socket}
+  end
 
   defp assign_numbers(socket) do
     Enum.reduce(@number_settings, socket, fn {key, {_min, _max, default}}, acc ->

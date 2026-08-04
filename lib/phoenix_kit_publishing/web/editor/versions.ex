@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
   # ============================================================================
@@ -119,9 +120,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
           |> Phoenix.Component.assign(:new_version_source, nil)
           |> Phoenix.LiveView.put_flash(:info, flash_msg)
           |> Phoenix.LiveView.push_navigate(
+            # Carry the language too — branching a version while editing a
+            # non-primary translation used to land on the primary.
             to:
               Helpers.build_edit_url(group_slug, new_version_post,
-                version: new_version_post.version
+                version: new_version_post.version,
+                lang: socket.assigns[:current_language]
               )
           )
 
@@ -212,13 +216,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
          updated_versions,
          surviving_version
        ) do
+    # Full transition, mirroring apply_version_switch/4: the old shape
+    # swapped :post/:content/:current_version but left the FORM and the
+    # Leaf editor's client content showing the deleted version's text — the
+    # first keystroke then diffed that stale text against the survivor and
+    # autosaved the deleted version's body over it. The form key must also
+    # move (it is version-scoped), and the URL must stop claiming ?v=<gone>.
+    form = Forms.post_form_with_primary_status(group_slug, fresh_post, surviving_version)
+    new_form_key = PublishingPubSub.generate_form_key(group_slug, fresh_post, :edit)
+
     socket
     |> Phoenix.Component.assign(:post, %{fresh_post | group: group_slug})
+    |> Phoenix.Component.assign(:form, form)
+    |> Phoenix.Component.assign(:form_key, new_form_key)
     |> Phoenix.Component.assign(:available_versions, updated_versions)
     |> Phoenix.Component.assign(:current_version, surviving_version)
     |> Phoenix.Component.assign(:content, fresh_post.content)
+    |> Phoenix.Component.assign(:saved_status, form["status"])
+    |> Phoenix.Component.assign(:editing_published_version, Constants.published?(form["status"]))
     |> Helpers.mark_clean()
     |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
+    |> Phoenix.LiveView.push_event("set-content", %{content: fresh_post.content})
+    |> Phoenix.LiveView.push_patch(
+      to:
+        Helpers.build_edit_url(group_slug, fresh_post,
+          lang: fresh_post.language,
+          version: surviving_version
+        )
+    )
     |> Phoenix.LiveView.put_flash(
       :warning,
       gettext("The version you were editing was deleted. Switched to version %{version}.",

@@ -12,6 +12,31 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   alias PhoenixKit.Users.Auth.Scope
 
   # ============================================================================
+  # Excerpt Sanitisation
+  # ============================================================================
+
+  @doc """
+  Strips PHK component markup from a markdown chunk so excerpt derivation
+  sees prose only.
+
+  `<Note note="...">phrase</Note>` keeps its inner phrase (the note BODY must
+  never reach a card preview); every other `<Component ...>` block — paired,
+  self-closing, or an unterminated opening tag left by upstream truncation —
+  is dropped. Only capitalised tags are touched: lowercase admin-authored
+  HTML passes through for the renderer to handle.
+  """
+  @spec strip_components(String.t() | term()) :: String.t() | term()
+  def strip_components(markdown) when is_binary(markdown) do
+    markdown
+    |> String.replace(~r/<Note\b[^>]*>(.*?)<\/Note>/s, "\\1")
+    |> String.replace(~r/<([A-Z][A-Za-z]*)\b[^>]*>.*?<\/\1>/s, " ")
+    |> String.replace(~r/<[A-Z][A-Za-z]*\b[^>]*\/?>/, " ")
+    |> String.replace(~r/<[A-Z][A-Za-z]*\b[^>]*\z/s, " ")
+  end
+
+  def strip_components(other), do: other
+
+  # ============================================================================
   # UUID Validation
   # ============================================================================
 

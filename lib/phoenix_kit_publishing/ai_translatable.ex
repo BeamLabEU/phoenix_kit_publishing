@@ -110,22 +110,41 @@ defmodule PhoenixKitPublishing.AITranslatable do
   @impl true
   def source_fields(%__MODULE__{} = resource, source_lang) do
     case Publishing.read_post_by_uuid(resource.post_uuid, source_lang, resource.version) do
+      {:ok, %{language: resolved} = post}
+      when resolved != source_lang and not is_nil(resolved) ->
+        # Fail closed on a language mismatch: the read falls back to another
+        # language when the requested row is missing, and translating THAT
+        # text labeled as `source_lang` sends (say) German to the model as
+        # English — wrong output fanned out to every target. Exception: a
+        # base/dialect family match ("en" row for "en-US") is the legacy
+        # promote-in-place shape and is genuinely the same language.
+        if LanguageHelpers.url_language_code(resolved) ==
+             LanguageHelpers.url_language_code(source_lang) do
+          build_source_fields(post)
+        else
+          %{}
+        end
+
       {:ok, post} ->
-        # Lowercase keys ("title"/"content") match the prompt's {{title}}/
-        # {{content}} placeholders — the same convention as the catalogue and
-        # projects adapters. Core's prompt substitution is case-SENSITIVE
-        # (PhoenixKitAI.Prompt.get_variable_value) and these keys also drive
-        # response parsing (markers are upcased either way), so they must line
-        # up with the prompt placeholders or the model gets a literal {{title}}
-        # and hallucinates. editor_translation_test.exs pins the default
-        # prompt's placeholders against these keys.
-        %{}
-        |> put_nonempty("title", extract_title(post))
-        |> put_nonempty("content", post.content || "")
+        build_source_fields(post)
 
       _ ->
         %{}
     end
+  end
+
+  # Lowercase keys ("title"/"content") match the prompt's {{title}}/
+  # {{content}} placeholders — the same convention as the catalogue and
+  # projects adapters. Core's prompt substitution is case-SENSITIVE
+  # (PhoenixKitAI.Prompt.get_variable_value) and these keys also drive
+  # response parsing (markers are upcased either way), so they must line
+  # up with the prompt placeholders or the model gets a literal {{title}}
+  # and hallucinates. editor_translation_test.exs pins the default
+  # prompt's placeholders against these keys.
+  defp build_source_fields(post) do
+    %{}
+    |> put_nonempty("title", extract_title(post))
+    |> put_nonempty("content", post.content || "")
   end
 
   @impl true
