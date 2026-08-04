@@ -2324,12 +2324,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Can also omit the default-language prefix when that setting is enabled.
   """
   def group_listing_path(language, group_slug, params \\ []) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    # Segment ≠ identity: a non-owner sibling dialect renders as its full
+    # lowercase code ("en-gb"); everything else keeps the base code. The
+    # prefix decision uses the ORIGINAL language (only the primary itself
+    # may go prefixless).
+    segment = LanguageHelpers.public_url_segment(language)
 
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug],
+        do: [segment, group_slug],
         else: [group_slug]
 
     base_path = build_public_path(segments)
@@ -2351,8 +2354,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   with the same locale-prefix rules as `group_listing_path/3`.
   """
   def feed_path(language, group_slug, scope \\ nil) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    segment = LanguageHelpers.public_url_segment(language)
 
     tail =
       case scope do
@@ -2363,7 +2365,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug | tail],
+        do: [segment, group_slug | tail],
         else: [group_slug | tail]
 
     build_public_path(segments)
@@ -2374,14 +2376,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   archive (`…/<group>/tag/<tag>`).
   """
   def term_archive_path(language, group_slug, {type, value}) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    segment = LanguageHelpers.public_url_segment(language)
 
     tail = [to_string(type), value]
 
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug | tail],
+        do: [segment, group_slug | tail],
         else: [group_slug | tail]
 
     build_public_path(segments)
@@ -2400,8 +2401,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   - If multiple posts exist on the date, includes time (e.g., /group/2025-12-09/16:26)
   """
   def build_post_url(group_slug, post, language, date_counts \\ nil) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    # The ORIGINAL language keeps its identity for the per-language slug
+    # lookup (an "en-GB" caller must get the en-GB slug) and for the prefix
+    # decision; only the rendered path segment goes through
+    # public_url_segment (sibling dialects → lowercase full code).
+    language = language || LanguageHelpers.get_primary_language()
+    segment = LanguageHelpers.public_url_segment(language)
 
     case post.mode do
       mode when mode in @slug_modes ->
@@ -2410,7 +2415,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
         segments =
           if LanguageHelpers.use_language_prefix?(language),
-            do: [language, group_slug, url_slug],
+            do: [segment, group_slug, url_slug],
             else: [group_slug, url_slug]
 
         build_public_path(segments)
@@ -2419,7 +2424,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         date = get_timestamp_date(post)
         post_count = lookup_date_count(date_counts, group_slug, date)
 
-        segments = timestamp_url_segments(language, group_slug, date, post_count > 1, post)
+        segments =
+          timestamp_url_segments({language, segment}, group_slug, date, post_count > 1, post)
 
         build_public_path(segments)
 
@@ -2429,24 +2435,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
         segments =
           if LanguageHelpers.use_language_prefix?(language),
-            do: [language, group_slug, url_slug],
+            do: [segment, group_slug, url_slug],
             else: [group_slug, url_slug]
 
         build_public_path(segments)
     end
   end
 
-  defp timestamp_url_segments(language, group_slug, date, true = _include_time, post) do
+  defp timestamp_url_segments({language, segment}, group_slug, date, true = _include_time, post) do
     time = get_timestamp_time(post)
 
     if LanguageHelpers.use_language_prefix?(language),
-      do: [language, group_slug, date, time],
+      do: [segment, group_slug, date, time],
       else: [group_slug, date, time]
   end
 
-  defp timestamp_url_segments(language, group_slug, date, false = _include_time, _post) do
+  defp timestamp_url_segments({language, segment}, group_slug, date, false = _include_time, _post) do
     if LanguageHelpers.use_language_prefix?(language),
-      do: [language, group_slug, date],
+      do: [segment, group_slug, date],
       else: [group_slug, date]
   end
 
@@ -2496,12 +2502,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Used when redirecting from date-only URLs to full timestamp URLs.
   """
   def build_public_path_with_time(language, group_slug, date, time) do
-    language =
-      LanguageHelpers.url_language_code(language) || LanguageHelpers.get_primary_language_base()
+    segment = LanguageHelpers.public_url_segment(language)
 
     segments =
       if LanguageHelpers.use_language_prefix?(language),
-        do: [language, group_slug, date, time],
+        do: [segment, group_slug, date, time],
         else: [group_slug, date, time]
 
     build_public_path(segments)

@@ -162,7 +162,17 @@ defmodule PhoenixKitPublishing.RouterDispatch do
     enabled = Language.get_enabled_languages()
 
     seg in enabled or
+      enabled_dialect_case_insensitive?(seg, enabled) or
       (Language.base_code?(seg) and Language.find_dialect_for_base(seg, enabled) != nil)
+  end
+
+  # Sibling-dialect URLs render lowercase ("en-gb") while enabled codes are
+  # stored BCP-47 ("en-GB") — accept them case-insensitively, else the
+  # dispatch refuses the very URLs the builders emit. Hyphen-only guard keeps
+  # this from widening the base-code path.
+  defp enabled_dialect_case_insensitive?(seg, enabled) do
+    String.contains?(seg, "-") and
+      Enum.any?(enabled, &(String.downcase(&1) == String.downcase(seg)))
   rescue
     _ -> false
   end

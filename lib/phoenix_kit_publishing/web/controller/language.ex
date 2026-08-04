@@ -33,6 +33,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
     group_slug = params["group"]
 
     cond do
+      # A dialect URL segment matching an ENABLED code — normalized to the
+      # stored BCP-47 case ("en-gb" → "en-GB") so every downstream match
+      # (content rows, canonical comparisons, switcher identity) sees the
+      # exact enabled code. Must run before valid_language?, which doesn't
+      # recognize lowercase dialect forms and would shift them into the
+      # group position.
+      normalized = normalize_enabled_dialect(language_param) ->
+        {normalized, params}
+
       # Known/predefined language - use as-is
       valid_language?(language_param) ->
         {language_param, params}
@@ -47,6 +56,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
         {get_default_language(), shift_language_to_group(language_param, params)}
     end
   end
+
+  defp normalize_enabled_dialect(param) when is_binary(param) do
+    if String.contains?(param, "-") do
+      down = String.downcase(param)
+      Enum.find(get_enabled_languages(), &(String.downcase(&1) == down))
+    end
+  end
+
+  defp normalize_enabled_dialect(_), do: nil
 
   defp shift_language_to_group(language_param, %{"group" => first_segment, "path" => rest})
        when is_list(rest) do

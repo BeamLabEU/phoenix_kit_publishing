@@ -81,10 +81,55 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
   """
   @spec use_language_prefix?(String.t() | nil) :: boolean()
   def use_language_prefix?(language_code) do
-    language_code = url_language_code(language_code) || get_primary_language_base()
-
     not single_language_mode?() and
-      not (default_language_no_prefix?() and language_code == get_primary_language_base())
+      not (default_language_no_prefix?() and denotes_primary_language?(language_code))
+  end
+
+  # Only the PRIMARY language itself may go prefixless. The old base-code
+  # comparison also matched the primary's sibling dialects (en-GB when the
+  # default is en-US), which would emit the sibling's URLs at the primary's
+  # prefixless path and serve the primary's content there instead.
+  defp denotes_primary_language?(nil), do: true
+
+  defp denotes_primary_language?(code) when is_binary(code) do
+    primary = get_primary_language()
+    down = String.downcase(code)
+
+    String.downcase(primary) == down or
+      (base_language_code?(code) and DialectMapper.extract_base(primary) == down)
+  end
+
+  @doc """
+  The path segment a language uses in public URLs.
+
+  Single-dialect bases keep the historical base-code segment (`"en"`), and
+  so does the base's OWNER dialect when several are enabled — the owner is
+  the primary-preferred, then first-declared dialect (the same tie-break
+  every resolver uses), so existing primary URLs never change when a
+  sibling dialect is enabled. A NON-owner sibling gets its full code,
+  lowercased (`"en-gb"`): the only URL shape that can address it at all.
+  Accepts base codes, stored-case full codes, or lowercase URL codes;
+  unknown/disabled codes degrade to the base segment.
+  """
+  @spec public_url_segment(String.t() | nil) :: String.t()
+  def public_url_segment(nil), do: get_primary_language_base()
+
+  def public_url_segment(language) when is_binary(language) do
+    base = DialectMapper.extract_base(language)
+    enabled = enabled_language_codes()
+    siblings = Enum.filter(enabled, &(DialectMapper.extract_base(&1) == base))
+
+    case siblings do
+      [_, _ | _] ->
+        owner = resolve_dialect_for_base(base, enabled, prefer: get_primary_language())
+        down = String.downcase(language)
+        resolved = Enum.find(siblings, owner, &(String.downcase(&1) == down))
+
+        if resolved == owner, do: base, else: String.downcase(resolved)
+
+      _ ->
+        base
+    end
   end
 
   @doc """
@@ -325,8 +370,13 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
   """
   @spec resolve_language_key(String.t(), [String.t()]) :: String.t()
   def resolve_language_key(language, available_keys) do
-    if language in available_keys do
-      language
+    exact_ci =
+      Enum.find(available_keys, fn key ->
+        key == language or String.downcase(key) == String.downcase(language)
+      end)
+
+    if exact_ci do
+      exact_ci
     else
       base = DialectMapper.extract_base(language)
       base_matches = Enum.filter(available_keys, &(DialectMapper.extract_base(&1) == base))

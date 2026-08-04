@@ -712,6 +712,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Find a matching language in available languages.
   Handles exact matches and base code matching.
+
+  A full dialect that is itself ENABLED (a real sibling URL like `/en-gb/`)
+  never falls back onto a sibling dialect — only onto a literal legacy base
+  row (`"en"`). Base-code requests and non-enabled dialect requests keep the
+  historical tolerant matching.
   """
   def find_matching_language(language, available_languages) do
     cond do
@@ -723,9 +728,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
       Language.base_code?(language) ->
         Language.find_dialect_for_base_in_languages(language, available_languages)
 
-      # Full dialect not found - try base code match
+      # Full dialect not directly present
       true ->
-        base = DialectMapper.extract_base(language)
+        match_full_dialect(language, available_languages)
+    end
+  end
+
+  defp match_full_dialect(language, available_languages) do
+    down = String.downcase(language)
+    base = DialectMapper.extract_base(language)
+
+    ci_exact = Enum.find(available_languages, &(String.downcase(&1) == down))
+
+    cond do
+      ci_exact != nil ->
+        ci_exact
+
+      # An enabled sibling URL matches its own row or the legacy base row —
+      # never the OTHER sibling (that would list en-US content on /en-gb/).
+      Enum.any?(LanguageHelpers.enabled_language_codes(), &(String.downcase(&1) == down)) ->
+        if base in available_languages, do: base
+
+      true ->
         Language.find_dialect_for_base_in_languages(base, available_languages)
     end
   end
