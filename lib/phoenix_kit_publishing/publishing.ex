@@ -283,6 +283,39 @@ defmodule PhoenixKit.Modules.Publishing do
   @impl PhoenixKit.Module
   def module_name, do: "Publishing"
 
+  # Project-extension catalog entry for the `phoenix_kit_projects` hub —
+  # duck-typed contract (its Extensions.Registry discovers this function on
+  # every loaded module; no dependency on that package, no `@impl`). NOTE:
+  # unlike most modules this lives in publishing.ex (the module is
+  # PhoenixKit.Modules.Publishing, not PhoenixKitPublishing) — the registry
+  # scans modules, not file paths, so discovery works the same. The Docs
+  # tab config-links ONE publishing group per project (groups are
+  # slug-keyed everywhere in this package, so the config stores the SLUG).
+  def phoenix_kit_project_extensions do
+    [
+      %{
+        key: "publishing_docs",
+        name: "Docs",
+        description: "Link a publishing group and read its published entries in the project",
+        icon: "hero-document-text",
+        module_key: "publishing",
+        default_enabled: false,
+        tabs: [
+          %{
+            key: "docs",
+            label: "Docs",
+            icon: "hero-document-text",
+            lv: PhoenixKit.Modules.Publishing.Web.ProjectDocsLive
+          }
+        ],
+        config_schema: [
+          %{key: "group_slug", type: :string, label: "Publishing group slug"}
+        ],
+        permission_actions: [:view]
+      }
+    ]
+  end
+
   # ============================================================================
   # OG module integration — exposes per-post variables that the
   # `phoenix_kit_og` plugin can wire to a template's slots at
