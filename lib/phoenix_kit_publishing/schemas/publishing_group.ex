@@ -317,7 +317,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
         if name do
           # Core's rule, not a local copy — the pipeline here deleted every
           # non-ASCII character, so a Cyrillic group name got an EMPTY slug.
-          slug = Slug.slugify(name)
+          slug = Slug.slugify(name, transliterate: true)
 
           put_change(changeset, :slug, slug)
         else
