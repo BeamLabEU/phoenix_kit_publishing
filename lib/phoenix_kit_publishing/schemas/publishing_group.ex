@@ -87,6 +87,8 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   use PhoenixKit.SchemaPrefix
   import Ecto.Changeset
 
+  alias PhoenixKit.Utils.Slug
+
   alias PhoenixKit.Modules.Publishing
 
   @primary_key {:uuid, UUIDv7, autogenerate: true}
@@ -313,12 +315,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
         name = get_field(changeset, :name)
 
         if name do
-          slug =
-            name
-            |> String.downcase()
-            |> String.replace(~r/[^\w\s-]/, "")
-            |> String.replace(~r/\s+/, "-")
-            |> String.trim("-")
+          # Core's rule, not a local copy — the pipeline here deleted every
+          # non-ASCII character, so a Cyrillic group name got an EMPTY slug.
+          slug = Slug.slugify(name)
 
           put_change(changeset, :slug, slug)
         else
