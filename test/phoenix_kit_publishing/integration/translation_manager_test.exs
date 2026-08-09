@@ -20,6 +20,7 @@ defmodule PhoenixKit.Integration.Publishing.TranslationManagerTest do
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.TranslationManager
   alias PhoenixKit.Settings
 
@@ -248,6 +249,28 @@ defmodule PhoenixKit.Integration.Publishing.TranslationManagerTest do
           "version_uuid" => version.uuid
         }
       )
+    end
+
+    test "broadcasts the version as a STRING scope, like :translation_created",
+         %{group: group, post: post} do
+      # The editor filters both events against `to_string(current_version)`.
+      # A raw integer here never compares equal, so the language pill would
+      # stay on screen for a translation that no longer exists.
+      assert {:ok, _} =
+               TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de-DE")
+
+      [version] = DBStorage.list_versions(post[:uuid])
+      scope = to_string(version.version_number)
+      post_uuid = post[:uuid]
+      group_slug = group["slug"]
+
+      :ok = PublishingPubSub.subscribe_to_post_translations(group_slug, post_uuid)
+
+      assert :ok = TranslationManager.delete_language(group_slug, post_uuid, "de-DE")
+
+      assert_receive {:translation_deleted, ^group_slug, ^post_uuid, "de-DE", ^scope}, 500
+
+      PublishingPubSub.unsubscribe_from_post_translations(group_slug, post_uuid)
     end
   end
 end
