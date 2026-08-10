@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.5.0 - 2026-08-10
+
+### Changed
+
+- **⚠️ Requires `phoenix_kit ~> 2.0`.** The core pin moved to `~> 2.0`, so this
+  release no longer resolves against core 1.7.
+
+  Core 2.0.0 squashes the migration chain into a single `V135` baseline and makes
+  V135 the chain's floor: `mix ecto.migrate` now *refuses* on a database below it
+  rather than migrating. Check `mix phoenix_kit.status` **before** upgrading. A
+  host below V135 must install `phoenix_kit 1.7.236` — the migration bridge, the
+  last release carrying the full pre-squash chain — migrate until the reported
+  version is at least V135, and only then move to 2.0.
+
+  This package does not call migration internals, so the change is the pin
+  itself.
+
+- Sibling pins raised in step, for the same resolution reason as the core pin:
+  `phoenix_kit_ai` → `~> 0.18`, `phoenix_kit_comments` (test-only) → `~> 0.3`.
+  Each of those is the first release of its package requiring core 2.0, so the
+  old pins could only have resolved versions still requiring core 1.7.
+
+### Added
+
+- **Docs tab for the `phoenix_kit_projects` hub (PR #39).** Contributed through
+  `phoenix_kit_project_extensions/0`, the duck-typed one-way discovery contract —
+  no dependency on the projects package. Config-links one publishing group per
+  project by slug (groups are slug-keyed throughout this package).
+
+### Fixed
+
+- **Cyrillic group names produced an empty slug (PR #39).** `PublishingGroup`
+  built its slug with a local pipeline that deleted every non-ASCII character.
+  Now calls core's `Slug.slugify/2` with `transliterate: true`, which romanizes.
+
 ## 0.4.7 - 2026-08-04
 
 PR #38 — the public + admin language surfaces, sibling-dialect URLs, and a
