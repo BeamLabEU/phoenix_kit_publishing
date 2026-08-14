@@ -37,7 +37,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.AudioPickerTest do
     view.pid |> :sys.get_state() |> get_in([Access.key(:socket), Access.key(:assigns)])
   end
 
-  @tag :needs_unreleased_core
   test "opening it for audio narrows the picker to audio and locks it", %{view: view} do
     render_click(view, "open_media_selector", %{"field" => "audio_uuid"})
 

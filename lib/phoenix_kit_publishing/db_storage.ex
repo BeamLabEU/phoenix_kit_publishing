@@ -73,6 +73,20 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     |> repo().all()
   end
 
+  @doc """
+  Every group slug, regardless of status — the set a new slug has to avoid.
+
+  `idx_publishing_groups_slug` is a plain UNIQUE index with no status predicate,
+  so a TRASHED group still owns its slug. A uniqueness probe built from
+  `list_groups/1` (active only) therefore handed `create_group/1` a slug the
+  insert could not write, and the constraint error surfaced as a bare
+  "already exists" against a group the admin can no longer see.
+  """
+  @spec all_group_slugs() :: [String.t()]
+  def all_group_slugs do
+    repo().all(from(g in PublishingGroup, select: g.slug))
+  end
+
   @doc "Trashes a group by setting status to 'trashed'."
   @spec trash_group(PublishingGroup.t()) :: changeset_or_struct(PublishingGroup.t())
   def trash_group(%PublishingGroup{} = group) do

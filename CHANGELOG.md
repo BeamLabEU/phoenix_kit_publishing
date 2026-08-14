@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.6.0 - 2026-08-14
+
+### Changed
+
+- **⚠️ Requires `phoenix_kit ~> 2.4`.** `PublishingGroup.changeset/2` calls
+  `PhoenixKit.Utils.Slug.put_slug/3`, which core added in 2.4.0. The previous
+  `~> 2.0` let a host resolve a core without that function: the build succeeded
+  and then raised `UndefinedFunctionError` on every group create and update, in
+  the host's application. Nothing else about the requirement changed — it stays
+  two-segment, so every later 2.x core still resolves.
+
+### Fixed
+
+- **Creating a group whose name matched a TRASHED group failed with
+  "already exists" (PR #41 follow-up).** `idx_publishing_groups_slug` is a plain
+  UNIQUE index with no status predicate, so a trashed group still owns its slug,
+  but `add_group/2` built its uniqueness probe from the ACTIVE groups only. It
+  reported the slug free, the insert died on the constraint, and the admin saw
+  "already exists" for a group no longer visible anywhere. The probe now covers
+  every group regardless of status: the name yields `news-2`, and an explicitly
+  typed slug that a trashed group holds is refused at the context layer instead
+  of crashing into the index.
+
+- **The group slug suffix nested instead of counting.** A third group named alike
+  got `same-name-2-3` (and a fourth `same-name-2-3-4`) because the loop recursed
+  on the already-suffixed slug. It also appended the suffix without regard for
+  the length cap `validate_length(:slug, max: ...)` enforces. Now uses core's
+  `Slug.ensure_unique/3`, which counts from the base and trims it to make room —
+  the third is `same-name-3`.
+
+- **A slug DERIVED from the group name skipped `valid_slug?/1`.** Only the
+  explicitly-typed branch ran the check, so nothing validated what the generator
+  itself produced. A disallowed derived slug is now suffixed past rather than
+  rejecting an otherwise legitimate group name.
+
+### Changed (internal)
+
+- The group-create uniqueness probe is a single `select slug` query
+  (`DBStorage.all_group_slugs/0`) instead of `list_groups/0`, which ran
+  `StaleFixer.fix_stale_group/1` — a potential write — over every group.
+
+- Retired the `:needs_unreleased_core` test exclusion. The two tests behind it
+  (sibling-dialect locale acceptance, media-selector `lock_file_type`) pass
+  against the released core, so the tag was silently skipping working coverage.
+  1570 tests → 1575, none excluded.
+
 ## 0.5.1 - 2026-08-11
 
 ### Changed

@@ -1,7 +1,7 @@
 defmodule PhoenixKitPublishing.MixProject do
   use Mix.Project
 
-  @version "0.5.1"
+  @version "0.6.0"
   @source_url "https://github.com/BeamLabEU/phoenix_kit_publishing"
 
   def project do
@@ -85,11 +85,11 @@ defmodule PhoenixKitPublishing.MixProject do
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, and core infrastructure.
-      # 1.7.170 introduces PhoenixKit.Module.reserved_route_prefixes/0 +
-      # ModuleRegistry.all_reserved_route_prefixes/0, which router_dispatch.ex
-      # depends on (falls back to a runtime function_exported?/3 guard on an
-      # older core, but the floor should track what's actually required).
-      pk_dep(:phoenix_kit, "~> 2.0"),
+      # 2.4 is a hard floor, not a preference: `PublishingGroup.changeset/2` calls
+      # `PhoenixKit.Utils.Slug.put_slug/3`, which core added in 2.4.0. Under the
+      # previous `~> 2.0` a host resolving 2.0-2.3 compiled fine and then raised
+      # UndefinedFunctionError on every group create — in the host's app, not ours.
+      pk_dep(:phoenix_kit, "~> 2.4"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
       # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
       # which the group editor imports directly.

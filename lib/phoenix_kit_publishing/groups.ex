@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.StaleFixer
+  alias PhoenixKit.Utils.Slug
 
   alias PhoenixKit.Modules.Publishing.Constants
 
@@ -136,12 +137,12 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
         {:error, :invalid_type}
 
       true ->
-        groups = list_groups()
+        taken = DBStorage.all_group_slugs()
         preferred_slug = fetch_option(opts, :slug)
 
         with {:ok, requested_slug} <- derive_requested_slug(preferred_slug, trimmed),
-             :ok <- check_slug_availability(requested_slug, groups, preferred_slug) do
-          slug = ensure_unique_slug(requested_slug, groups)
+             :ok <- check_slug_availability(requested_slug, taken, preferred_slug) do
+          slug = ensure_unique_slug(requested_slug, taken)
 
           {default_singular, default_plural} = default_item_names(normalized_type)
 
@@ -808,24 +809,29 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   end
 
   # Check if explicit slug already exists (only when preferred_slug is provided)
-  defp check_slug_availability(slug, groups, preferred_slug) when not is_nil(preferred_slug) do
-    if Enum.any?(groups, &(&1["slug"] == slug)) do
-      {:error, :already_exists}
-    else
-      :ok
-    end
+  defp check_slug_availability(slug, taken, preferred_slug) when not is_nil(preferred_slug) do
+    if slug in taken, do: {:error, :already_exists}, else: :ok
   end
 
-  defp check_slug_availability(_slug, _groups, nil), do: :ok
+  defp check_slug_availability(_slug, _taken, nil), do: :ok
 
-  defp ensure_unique_slug(slug, groups), do: ensure_unique_slug(slug, groups, 2)
-
-  defp ensure_unique_slug(slug, groups, counter) do
-    if Enum.any?(groups, &(&1["slug"] == slug)) do
-      ensure_unique_slug("#{slug}-#{counter}", groups, counter + 1)
-    else
-      slug
-    end
+  # `taken` is EVERY slug, trashed groups included — see
+  # `DBStorage.all_group_slugs/0` for why filtering to active broke creates.
+  #
+  # A slug DERIVED from the name also clears `valid_slug?/1`: only the explicit
+  # branch of `derive_requested_slug/2` ran it, so nothing checked what the
+  # generator produced. Rejecting a legitimate group name over its derived slug
+  # would be the wrong answer, so a disallowed slug is treated like a taken one
+  # and the loop suffixes past it.
+  #
+  # Core's `ensure_unique/3` rather than a local loop: the previous one recursed
+  # on the SUFFIXED slug, so a third "Same Name" got `same-name-2-3` instead of
+  # `same-name-3`. It also respects the length ceiling, trimming the base to make
+  # room for the suffix instead of overflowing `validate_length(:slug, ...)`.
+  defp ensure_unique_slug(slug, taken) do
+    Slug.ensure_unique(slug, &(&1 in taken or not Publishing.valid_slug?(&1)),
+      max_length: Constants.max_group_slug_length()
+    )
   end
 
   defp normalize_mode(mode) when is_binary(mode) do

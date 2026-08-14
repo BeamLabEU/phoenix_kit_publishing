@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.GroupSlugTest do
   use PhoenixKitPublishing.DataCase, async: true
 
   alias Ecto.Changeset
+  alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.PublishingGroup
 
   defp changeset(attrs, group \\ %PublishingGroup{}) do
@@ -61,6 +62,44 @@ defmodule PhoenixKit.Modules.Publishing.GroupSlugTest do
         %{name: "Same Name", mode: "timestamp"} |> changeset() |> Repo.insert()
 
       assert second.slug == "same-name-2"
+    end
+  end
+
+  # The tests above drive `PublishingGroup.changeset/2` directly. Nothing in the
+  # app does: `Groups.add_group/2` — what the New Group LiveView calls — derives
+  # and uniquifies the slug itself and always hands the changeset an explicit
+  # one, so `put_slug/3` no-ops on every production create. These pin the
+  # context's own generator, which is the one that actually runs.
+  describe "Groups.add_group/2 — the path the admin UI takes" do
+    test "a trashed group still owns its slug" do
+      {:ok, first} = Groups.add_group("News")
+      assert first["slug"] == "news"
+      {:ok, "news"} = Groups.trash_group("news")
+
+      # idx_publishing_groups_slug has no status predicate, so "news" is still
+      # taken. Probing only the ACTIVE groups reported it free and the insert
+      # died on the constraint, surfacing as {:error, :already_exists} for a
+      # group the admin can no longer see anywhere.
+      assert {:ok, second} = Groups.add_group("News")
+      assert second["slug"] == "news-2"
+    end
+
+    test "an explicit slug taken by a trashed group is refused, not crashed into" do
+      {:ok, _} = Groups.add_group("News")
+      {:ok, "news"} = Groups.trash_group("news")
+
+      assert {:error, :already_exists} = Groups.add_group("Bulletin", slug: "news")
+    end
+
+    test "the suffix counts up from the base rather than nesting" do
+      {:ok, _} = Groups.add_group("Same Name")
+      {:ok, second} = Groups.add_group("Same Name")
+      {:ok, third} = Groups.add_group("Same Name")
+
+      assert second["slug"] == "same-name-2"
+      # The old loop recursed on the SUFFIXED slug, so the third was
+      # "same-name-2-3".
+      assert third["slug"] == "same-name-3"
     end
   end
 end

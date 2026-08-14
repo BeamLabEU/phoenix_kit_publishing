@@ -133,10 +133,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
   # here without declaring host routes inside the macro's scope.)
 
   # Sibling-dialect URLs traverse core's locale plug inside the dispatch
-  # pipeline, and the RELEASED core still 301s every hyphenated segment to
-  # its base — the acceptance branch ships in the paired core change. Until
-  # that release:  PHOENIX_KIT_PATH=../phoenix_kit mix test --include needs_unreleased_core
-  @tag :needs_unreleased_core
+  # pipeline. Core used to 301 every hyphenated segment down to its base; the
+  # acceptance branch landed in the paired core change, so this runs by default.
   test "a sibling-dialect URL survives the full dispatch + locale pipeline", %{slug: slug} do
     {:ok, _} =
       Settings.update_json_setting("languages_config", %{
