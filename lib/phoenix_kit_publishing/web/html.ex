@@ -808,7 +808,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             action={group_listing_path(@current_language, @group["slug"])}
             class="mt-4 flex max-w-md items-center gap-2"
           >
-            <label class="input input-sm input-bordered flex flex-1 items-center gap-2">
+            <label class="input input-sm flex flex-1 items-center gap-2">
               <.icon name="hero-magnifying-glass" class="w-4 h-4 opacity-50" />
               <input
                 type="search"
@@ -1844,7 +1844,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         required
         maxlength="10000"
         placeholder={@placeholder}
-        class="textarea textarea-bordered w-full"
+        class="textarea w-full"
       ></textarea>
       <button type="submit" class={["btn btn-primary", if(@compact, do: "btn-xs", else: "btn-sm")]}>
         {@submit_label}

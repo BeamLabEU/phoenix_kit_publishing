@@ -3403,9 +3403,9 @@ msgid "No matching categories"
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:201
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Remove %{name}"
-msgstr "Remove"
+msgstr ""
 
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:253
 #, elixir-autogen, elixir-format
@@ -3418,17 +3418,17 @@ msgid "Search categories…"
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:226
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Searching…"
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2484
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Someone else is editing this post — nothing was changed."
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/editor.ex:2401
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Author note"
 msgstr ""
 
@@ -3498,7 +3498,7 @@ msgid "Gallery inserted"
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/editor.ex:3868
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Saving will publish this version and archive v%{version}, which is live now."
 msgstr ""
 
@@ -3533,9 +3533,9 @@ msgid "How many posts a listing page shows before paginating."
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/settings.ex:622
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Posts per page"
-msgstr "Post page"
+msgstr ""
 
 #: lib/phoenix_kit_publishing/web/settings.ex:631
 #, elixir-autogen, elixir-format

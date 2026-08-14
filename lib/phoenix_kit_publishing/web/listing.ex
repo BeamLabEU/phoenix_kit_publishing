@@ -1198,7 +1198,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
           posts live in assigns; visible_count only truncates display), so it
           matches across every language title + slug instantly. --%>
         <form :if={not @loading} phx-change="search_posts" class="mb-3" onsubmit="return false">
-          <label class="input input-sm input-bordered flex w-full max-w-xs items-center gap-2">
+          <label class="input input-sm flex w-full max-w-xs items-center gap-2">
             <.icon name="hero-magnifying-glass" class="w-4 h-4 opacity-50" />
             <input
               type="search"

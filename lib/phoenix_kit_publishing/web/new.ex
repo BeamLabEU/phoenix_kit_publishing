@@ -476,9 +476,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
             </div>
 
             <%!-- Content Type Section --%>
-            <div class="form-control">
+            <div class="fieldset">
               <label class="label">
-                <span class="label-text text-sm font-semibold text-base-content">
+                <span class="fieldset-legend text-sm font-semibold text-base-content">
                   {gettext("Content Type")}
                 </span>
               </label>
@@ -542,7 +542,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
                         <input
                           type="text"
                           name="group[custom_type]"
-                          class="input input-bordered input-sm w-full max-w-xs"
+                          class="input input-sm w-full max-w-xs"
                           placeholder={gettext("e.g. tutorials, recipes")}
                           value={
                             if @form[:type].value not in PhoenixKit.Modules.Publishing.Constants.valid_types(),
@@ -558,7 +558,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
                 </label>
               </div>
               <label class="label">
-                <span class="label-text-alt text-xs text-base-content/60">
+                <span class="fieldset-label text-xs text-base-content/60">
                   {gettext(
                     "Content type determines default item naming and may affect how content is displayed."
                   )}
@@ -567,9 +567,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
             </div>
 
             <%!-- Item Naming Section --%>
-            <div class="form-control">
+            <div class="fieldset">
               <label class="label">
-                <span class="label-text text-sm font-semibold text-base-content">
+                <span class="fieldset-legend text-sm font-semibold text-base-content">
                   {gettext("Item Naming")}
                 </span>
               </label>
@@ -599,7 +599,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
                 </div>
               </div>
               <label class="label">
-                <span class="label-text-alt text-xs text-base-content/60">
+                <span class="fieldset-label text-xs text-base-content/60">
                   {gettext("Examples: \"Create new %{singular}\", \"View all %{plural}\"",
                     singular: @form[:item_singular].value || "item",
                     plural: @form[:item_plural].value || "items"
@@ -609,9 +609,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
             </div>
 
             <%!-- URL Mode Section --%>
-            <div class="form-control">
+            <div class="fieldset">
               <label class="label">
-                <span class="label-text text-sm font-semibold text-base-content">
+                <span class="fieldset-legend text-sm font-semibold text-base-content">
                   {gettext("URL Mode")}
                 </span>
               </label>
@@ -668,7 +668,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
                 </label>
               </div>
               <label class="label">
-                <span class="label-text-alt text-xs text-base-content/60">
+                <span class="fieldset-label text-xs text-base-content/60">
                   {gettext(
                     "The URL mode locks in after creation to keep your structure consistent."
                   )}

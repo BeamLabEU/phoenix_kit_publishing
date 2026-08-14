@@ -600,7 +600,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               </div>
             </div>
             <form id="setting-slug-style" phx-change="change_slug_style">
-              <label class="select select-bordered select-sm">
+              <label class="select select-sm">
                 <select name="slug_style">
                   <option value="transliterate" selected={@slug_style == "transliterate"}>
                     {gettext("Transliterate — privet")}
@@ -1012,7 +1012,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
           min={@min}
           max={@max}
           phx-debounce="600"
-          class="input input-bordered input-sm w-24"
+          class="input input-sm w-24"
         />
       </form>
     </div>

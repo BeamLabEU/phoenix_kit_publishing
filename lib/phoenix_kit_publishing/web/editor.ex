@@ -3223,7 +3223,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   value={@form["title"] || ""}
                   maxlength="500"
                   phx-debounce="300"
-                  class={"input input-bordered w-full text-2xl font-semibold #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                  class={"input w-full text-2xl font-semibold #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                   placeholder={gettext("Post title")}
                   readonly={edit_disabled? or @viewing_older_version}
                 />
@@ -3307,7 +3307,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     <%!-- Primary language: editable slug used in the post URL --%>
                     <div>
                       <label class="label">
-                        <span class="label-text text-sm font-semibold text-base-content">
+                        <span class="fieldset-legend text-sm font-semibold text-base-content">
                           {gettext("Slug")}
                         </span>
                       </label>
@@ -3317,7 +3317,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         id="slug-input"
                         value={@form["slug"]}
                         pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                        class={"input input-bordered w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                        class={"input w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                         placeholder={gettext("auto-generated from title")}
                         title={
                           gettext(
@@ -3351,7 +3351,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     <%!-- Translation: per-language URL slug for SEO-friendly localized URLs --%>
                     <div>
                       <label class="label">
-                        <span class="label-text text-sm font-semibold text-base-content">
+                        <span class="fieldset-legend text-sm font-semibold text-base-content">
                           {gettext("URL Slug")}
                           <span class="text-base-content/60 font-normal ml-1">
                             ({gettext("optional")})
@@ -3365,7 +3365,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         value={@form["url_slug"] || ""}
                         maxlength="200"
                         pattern={SlugHelpers.html_input_pattern()}
-                        class={"input input-bordered w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                        class={"input w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                         placeholder={@form["slug"] || ""}
                         title={
                           gettext(
@@ -3397,7 +3397,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
                 <div>
                   <label class="label">
-                    <span class="label-text text-sm font-semibold text-base-content">
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
                       {gettext("Featured Image")}
                     </span>
                   </label>
@@ -3515,7 +3515,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         type="text"
                         name="featured_image_uuid"
                         value={@form["featured_image_uuid"]}
-                        class={"input input-bordered input-sm w-full font-mono text-xs #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                        class={"input input-sm w-full font-mono text-xs #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                         placeholder="018e3c4a-9f6b-7890-abcd-ef1234567890"
                         readonly={edit_disabled? or @viewing_older_version}
                       />
@@ -3552,7 +3552,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       disabled={edit_disabled? or @viewing_older_version}
                       class="checkbox checkbox-primary checkbox-sm"
                     />
-                    <span class="label-text text-sm font-semibold text-base-content">
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
                       {gettext("Feature this post")}
                     </span>
                   </label>
@@ -3587,7 +3587,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       disabled={edit_disabled? or @viewing_older_version}
                       class="checkbox checkbox-primary checkbox-sm"
                     />
-                    <span class="label-text text-sm font-semibold text-base-content">
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
                       {gettext("Let readers browse older versions")}
                     </span>
                   </label>
@@ -3613,7 +3613,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                      when set; the RSS feed carries it as an enclosure. --%>
                 <div>
                   <label class="label py-1" for="post-audio-input">
-                    <span class="label-text text-sm font-semibold text-base-content">
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
                       {gettext("Audio version")}
                     </span>
                   </label>
@@ -3623,7 +3623,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       id="post-audio-input"
                       name="audio_uuid"
                       value={@form["audio_uuid"]}
-                      class={"input input-bordered input-sm w-full font-mono text-xs #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                      class={"input input-sm w-full font-mono text-xs #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                       placeholder="018e3c4a-9f6b-7890-abcd-ef1234567890"
                       readonly={edit_disabled? or @viewing_older_version}
                     />
@@ -3704,13 +3704,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
                     <div>
                       <label class="label py-1">
-                        <span class="label-text text-xs font-medium">{gettext("OG title")}</span>
+                        <span class="fieldset-legend text-xs font-medium">{gettext("OG title")}</span>
                       </label>
                       <input
                         type="text"
                         name="og_title"
                         value={@form["og_title"]}
-                        class={"input input-bordered input-sm w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                        class={"input input-sm w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                         placeholder={
                           Map.get(@post.metadata, :title) || gettext("Defaults to post title")
                         }
@@ -3720,14 +3720,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
                     <div>
                       <label class="label py-1">
-                        <span class="label-text text-xs font-medium">
+                        <span class="fieldset-legend text-xs font-medium">
                           {gettext("OG description")}
                         </span>
                       </label>
                       <textarea
                         name="og_description"
                         rows="2"
-                        class={"textarea textarea-bordered textarea-sm w-full #{if edit_disabled? or @viewing_older_version, do: "textarea-disabled bg-base-200"}"}
+                        class={"textarea textarea-sm w-full #{if edit_disabled? or @viewing_older_version, do: "textarea-disabled bg-base-200"}"}
                         placeholder={
                           Map.get(@post.metadata, :description) ||
                             gettext("Defaults to post description")
@@ -3738,7 +3738,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
                     <div>
                       <label class="label py-1">
-                        <span class="label-text text-xs font-medium">{gettext("OG image")}</span>
+                        <span class="fieldset-legend text-xs font-medium">{gettext("OG image")}</span>
                       </label>
                       <%!-- Hidden field carries the UUID; the picker writes it. --%>
                       <input type="hidden" name="og_image_uuid" value={@form["og_image_uuid"]} />
@@ -3839,7 +3839,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                 <%!-- Status (version-level, applies to all languages) --%>
                 <div>
                   <label class="label">
-                    <span class="label-text text-sm font-semibold text-base-content">
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
                       {gettext("Status")}
                     </span>
                   </label>
@@ -3894,7 +3894,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                 <%!-- Publication date (version-level) --%>
                 <div>
                   <label class="label">
-                    <span class="label-text text-sm font-semibold text-base-content">
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
                       {gettext("Publication Date & Time (UTC)")}
                     </span>
                   </label>
@@ -3902,7 +3902,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     type="datetime-local"
                     name="published_at"
                     value={datetime_local_value(@form["published_at"])}
-                    class={"input input-bordered w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
+                    class={"input w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                     readonly={edit_disabled? or @viewing_older_version}
                   />
                 </div>

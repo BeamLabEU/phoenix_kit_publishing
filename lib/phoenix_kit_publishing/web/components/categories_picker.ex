@@ -169,7 +169,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
       <%!-- Stateful LC rule: the root tag must be static — the no-categories
         case renders this outer div empty. --%>
       <div :if={@tree != []}>
-        <p class="label-text text-sm font-semibold text-base-content mb-1">
+        <p class="fieldset-legend text-sm font-semibold text-base-content mb-1">
           {gettext("Categories")}
         </p>
 
@@ -222,7 +222,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
           pick_event="category_pick"
           staged_event="category_staged"
           placeholder={gettext("Search categories…")}
-          class="input input-bordered input-sm w-full"
+          class="input input-sm w-full"
           searching_label={gettext("Searching…")}
           no_matches_label={gettext("No matching categories")}
         />
