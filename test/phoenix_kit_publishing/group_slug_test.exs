@@ -1,0 +1,66 @@
+defmodule PhoenixKit.Modules.Publishing.GroupSlugTest do
+  @moduledoc """
+  Group slug generation after adopting core's `Slug.put_slug/3`.
+
+  The local generator this replaces was DEAD CODE on the path it existed
+  for: `validate_required([:name, :slug, :mode])` ran six pipe steps before
+  it, so a create without an explicit slug failed "can't be blank" before
+  generation could have supplied one. Generation now runs before the
+  require, and probes for collisions, which the old code never did.
+  """
+  use PhoenixKitPublishing.DataCase, async: true
+
+  alias Ecto.Changeset
+  alias PhoenixKit.Modules.Publishing.PublishingGroup
+
+  defp changeset(attrs, group \\ %PublishingGroup{}) do
+    PublishingGroup.changeset(group, attrs)
+  end
+
+  describe "creation without an explicit slug" do
+    test "is now valid — the dead-code path this fixes" do
+      cs = changeset(%{name: "My Publication", mode: "timestamp"})
+
+      assert cs.valid?
+      assert Changeset.get_change(cs, :slug) == "my-publication"
+    end
+
+    test "a Cyrillic name romanizes rather than emptying" do
+      cs = changeset(%{name: "Новости компании", mode: "timestamp"})
+
+      assert cs.valid?
+
+      slug = Changeset.get_change(cs, :slug)
+      assert is_binary(slug) and slug != ""
+      assert slug =~ ~r/^[a-z0-9-]+$/
+    end
+  end
+
+  describe "existing behaviour preserved" do
+    test "an explicit slug wins" do
+      cs = changeset(%{name: "My Publication", slug: "chosen", mode: "timestamp"})
+
+      assert Changeset.get_change(cs, :slug) == "chosen"
+    end
+
+    test "a rename does not move an existing slug" do
+      existing = %PublishingGroup{name: "Old", slug: "old", mode: "timestamp"}
+      cs = changeset(%{name: "Renamed"}, existing)
+
+      assert Changeset.get_change(cs, :slug) == nil
+      assert Changeset.get_field(cs, :slug) == "old"
+    end
+  end
+
+  describe "collisions" do
+    test "a second group named alike suffixes -2" do
+      {:ok, _} =
+        %{name: "Same Name", mode: "timestamp"} |> changeset() |> Repo.insert()
+
+      {:ok, second} =
+        %{name: "Same Name", mode: "timestamp"} |> changeset() |> Repo.insert()
+
+      assert second.slug == "same-name-2"
+    end
+  end
+end

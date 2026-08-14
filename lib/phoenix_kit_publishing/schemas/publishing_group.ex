@@ -127,13 +127,20 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   def changeset(group, attrs) do
     group
     |> cast(attrs, [:name, :slug, :mode, :status, :position, :data])
+    # Generation must run BEFORE the require: with it at the end of the pipe,
+    # a create without an explicit slug failed `validate_required(:slug)` six
+    # steps before generation could have supplied one — the generator was dead
+    # code on exactly the path it existed for. Core's put_slug/3 carries the
+    # same semantics the local version declared (existing slug wins, no
+    # regeneration from a changed name) and adds the collision probe, suffixing
+    # -2, -3 … against idx_publishing_groups_slug instead of raw errors.
+    |> Slug.put_slug(:name, max_length: Publishing.Constants.max_group_slug_length())
     |> validate_required([:name, :slug, :mode])
     |> validate_inclusion(:mode, Publishing.Constants.valid_modes())
     |> validate_inclusion(:status, Publishing.Constants.group_statuses())
     |> validate_length(:name, max: Publishing.Constants.max_group_name_length())
     |> validate_length(:slug, max: Publishing.Constants.max_group_slug_length())
     |> unique_constraint(:slug, name: :idx_publishing_groups_slug)
-    |> maybe_generate_slug()
   end
 
   # Data JSONB accessors
@@ -303,29 +310,4 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
 
   defp non_blank(value) when is_binary(value) and value != "", do: value
   defp non_blank(_), do: nil
-
-  defp maybe_generate_slug(changeset) do
-    # Only auto-generate slug for new records (no existing slug).
-    # On updates, Ecto won't register the slug as a "change" if it's the same,
-    # and we must NOT regenerate from the (potentially changed) name.
-    existing_slug = get_field(changeset, :slug)
-
-    case get_change(changeset, :slug) do
-      nil when is_nil(existing_slug) or existing_slug == "" ->
-        name = get_field(changeset, :name)
-
-        if name do
-          # Core's rule, not a local copy — the pipeline here deleted every
-          # non-ASCII character, so a Cyrillic group name got an EMPTY slug.
-          slug = Slug.slugify(name, transliterate: true)
-
-          put_change(changeset, :slug, slug)
-        else
-          changeset
-        end
-
-      _ ->
-        changeset
-    end
-  end
 end
