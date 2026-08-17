@@ -25,6 +25,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   use PhoenixKitWeb, :controller
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  require Logger
+
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
@@ -446,7 +448,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     case result do
       {:ok, assigns} ->
         listing_url = PublishingHTML.group_listing_path(assigns.current_language, group_slug)
-        base_url = base_url(conn)
 
         conn
         |> assign(:page_title, assigns.page_title)
@@ -471,7 +472,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           # page_title is the language-resolved display name (listing.ex) — keep
           # the social preview in the same language as the visible <h1>/<title>.
           title: assigns.page_title,
-          url: base_url <> listing_url,
+          url: canonical_absolute_url(conn, assigns.current_language, listing_url),
           locale: og_locale(assigns.current_language),
           type: "website"
         })
@@ -874,7 +875,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           og_override["description"] || derived_og_description(post) ||
             Map.get(post.metadata, :description),
         image: absolute_url(base_url, image_meta[:url]),
-        url: absolute_url(base_url, canonical_url),
+        url: canonical_absolute_url(conn, language, canonical_url),
         locale: og_locale(language),
         type: "article"
       }
@@ -963,6 +964,52 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     # per-post override/default result if the module raises.
     _ -> og
   end
+
+  # Multi-domain hosts: canonical/og:url prefer the language's "home" host
+  # from the workspace-wide :canonical_host_resolver MFA
+  # (`config :phoenix_kit, :canonical_host_resolver, {Mod, :fun}` — called
+  # with the page language, returns a host or nil). On the home host the
+  # language is that domain's default, so its own locale prefix is stripped.
+  # Resolver absent/nil/raising ⇒ legacy behavior (request host).
+  defp canonical_absolute_url(conn, language, relative_url) do
+    case resolve_canonical_host(language) do
+      nil ->
+        base_url =
+          "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
+
+        absolute_url(base_url, relative_url)
+
+      host ->
+        absolute_url("https://#{host}", strip_language_prefix(relative_url, language))
+    end
+  end
+
+  defp resolve_canonical_host(language) do
+    case Application.get_env(:phoenix_kit, :canonical_host_resolver) do
+      {mod, fun} -> apply(mod, fun, [language])
+      _ -> nil
+    end
+  rescue
+    error ->
+      Logger.warning(
+        "[Publishing] canonical_host_resolver raised, falling back to request host: " <>
+          Exception.message(error)
+      )
+
+      nil
+  end
+
+  defp strip_language_prefix(url, language) when is_binary(url) and is_binary(language) do
+    base = LanguageHelpers.url_language_code(language)
+
+    case String.split(url, "/", parts: 3) do
+      ["", ^base] -> "/"
+      ["", ^base, rest] -> "/" <> rest
+      _ -> url
+    end
+  end
+
+  defp strip_language_prefix(url, _), do: url
 
   defp absolute_url(_base, nil), do: nil
   defp absolute_url(_base, ""), do: nil
@@ -1196,7 +1243,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           name: t.name,
           flag: t.flag,
           url: t.url,
-          current: t.current
+          current: t.current,
+          # Post translations can include legacy/disabled languages — keep the
+          # flag so host layouts can exclude them from hreflang. Listing
+          # translations are pre-filtered to enabled and default to true.
+          enabled: Map.get(t, :enabled, true)
         }
       end)
 

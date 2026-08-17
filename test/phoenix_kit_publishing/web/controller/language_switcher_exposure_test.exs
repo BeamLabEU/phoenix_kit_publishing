@@ -78,17 +78,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
       assert is_list(translations),
              "expected :phoenix_kit_publishing_translations to be assigned on the conn"
 
-      # Each entry has exactly the documented 5-field shape — stable contract
+      # Each entry has exactly the documented 6-field shape — stable contract
       # for external consumers (host's switcher, custom UI components).
-      # Internal-only fields (`display_code`, `enabled`, `known`) must NOT
-      # leak across the namespace boundary.
+      # `enabled` joined the contract deliberately (canonical-host-resolver
+      # work) so host layouts can exclude legacy/disabled languages from
+      # hreflang; the listing path pre-filters to enabled languages, so it
+      # defaults true here. Internal-only fields (`display_code`, `known`)
+      # must still NOT leak across the namespace boundary.
       Enum.each(translations, fn t ->
-        assert Map.keys(t) |> Enum.sort() == [:code, :current, :flag, :name, :url]
+        assert Map.keys(t) |> Enum.sort() == [:code, :current, :enabled, :flag, :name, :url]
         assert is_binary(t.code)
         assert is_binary(t.name)
         assert is_binary(t.flag)
         assert is_binary(t.url)
         assert is_boolean(t.current)
+        assert is_boolean(t.enabled)
       end)
     end
 
@@ -100,9 +104,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
       assert is_list(translations)
 
       # Post route's internal `:translations` shape carries `enabled`/`known`
-      # in addition to `display_code`; pin that none leak across the boundary.
+      # in addition to `display_code`; `enabled` is now part of the public
+      # contract (posts can list legacy/disabled languages), `known` must
+      # still not leak across the boundary.
       Enum.each(translations, fn t ->
-        assert Map.keys(t) |> Enum.sort() == [:code, :current, :flag, :name, :url]
+        assert Map.keys(t) |> Enum.sort() == [:code, :current, :enabled, :flag, :name, :url]
       end)
     end
   end
