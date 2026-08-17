@@ -1000,11 +1000,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   end
 
   defp strip_language_prefix(url, language) when is_binary(url) and is_binary(language) do
-    base = LanguageHelpers.url_language_code(language)
+    # The actual URL segment for `language` — base for the base's owner
+    # dialect, full lowercase code for a non-owner sibling (see
+    # LanguageHelpers.public_url_segment/1). Stripping the base unconditionally
+    # would leave a sibling's `/en-gb/…` prefix in place on its own home host.
+    segment = LanguageHelpers.public_url_segment(language)
 
     case String.split(url, "/", parts: 3) do
-      ["", ^base] -> "/"
-      ["", ^base, rest] -> "/" <> rest
+      ["", ^segment] -> "/"
+      ["", ^segment, rest] -> "/" <> rest
       _ -> url
     end
   end

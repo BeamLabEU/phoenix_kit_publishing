@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.7.0 - 2026-08-17
+
+### Added
+
+- **Canonical host resolver for multi-domain `og:url`/canonical (PR #42).**
+  Host apps can point a page's canonical/og:url at the language's home domain via
+  `config :phoenix_kit, :canonical_host_resolver, {mod, fun}` (called with the page
+  language; nil/absent/raising keeps the legacy request-host behavior). On the home
+  host, the language's own locale prefix is stripped — it is that domain's default.
+  A resolver crash logs a warning instead of degrading silently.
+
+  The normalized `:phoenix_kit_publishing_translations` assign now keeps the
+  `enabled` flag so host layouts can exclude legacy/disabled languages from
+  hreflang.
+
+### Fixed
+
+- **The stripped prefix was the base language code, not the actual URL segment
+  (post-merge review of PR #42).** `strip_language_prefix/2` computed the prefix
+  to remove via `DialectMapper.extract_base/1`, which is always the base code
+  (`"en"`). For two enabled dialects sharing a base — an owner (e.g. `en-US`) and a
+  non-owner sibling (e.g. `en-GB`) — the sibling's actual public URL segment is its
+  full lowercase code (`en-gb`), per `LanguageHelpers.public_url_segment/1`. A
+  sibling page landing on its own resolved home host therefore kept its `/en-gb/`
+  prefix in `og:url` instead of having it stripped. Now resolves the segment to
+  strip via `public_url_segment/1`, the same function every other public URL
+  builder in this module uses for the owner/sibling distinction.
+
+- Dependency updates: `phoenix_kit` 2.9.0 and the transitive set it pulls
+  (`beamlab_countries` 1.2.0, and others). No source changes in this package.
+
 ## 0.6.0 - 2026-08-14
 
 ### Changed
