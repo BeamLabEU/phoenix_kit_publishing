@@ -2774,8 +2774,8 @@ msgstr "Karten heben sich beim Hover leicht an, um Klickbarkeit anzudeuten."
 #, elixir-autogen, elixir-format
 msgid "%{count} result for “%{query}”"
 msgid_plural "%{count} results for “%{query}”"
-msgstr[0] "%{count} Ergebnis für \"%{query}\""
-msgstr[1] "%{count} Ergebnisse für \"%{query}\""
+msgstr[0] "%{count} Ergebnis für „%{query}“"
+msgstr[1] "%{count} Ergebnisse für „%{query}“"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:406
 #, elixir-autogen, elixir-format
@@ -2859,7 +2859,7 @@ msgstr "Löschen"
 #: lib/phoenix_kit_publishing/web/categories_live.ex:510
 #, elixir-autogen, elixir-format
 msgid "Delete “%{name}”? Its subcategories move to the top level and posts lose this category."
-msgstr "\"%{name}\" löschen? Ihre Unterkategorien werden auf die oberste Ebene verschoben, und Beiträge verlieren diese Kategorie."
+msgstr "„%{name}“ löschen? Ihre Unterkategorien werden auf die oberste Ebene verschoben, und Beiträge verlieren diese Kategorie."
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:529
 #, elixir-autogen, elixir-format
@@ -3197,7 +3197,7 @@ msgstr "Verschieben nach…"
 #: lib/phoenix_kit_publishing/web/categories_live.ex:573
 #, elixir-autogen, elixir-format
 msgid "Move “%{name}”"
-msgstr "Verschieben \"%{name}\""
+msgstr "Verschieben „%{name}“"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:579
 #, elixir-autogen, elixir-format
@@ -3320,7 +3320,7 @@ msgstr "Audioversion entfernt"
 #: lib/phoenix_kit_publishing/web/categories_live.ex:244
 #, elixir-autogen, elixir-format
 msgid "Order unchanged — use “Move to…” to change a parent."
-msgstr "Reihenfolge unverändert — verwenden Sie \"Verschieben nach…\", um die übergeordnete Kategorie zu ändern."
+msgstr "Reihenfolge unverändert — verwenden Sie „Verschieben nach…“, um die übergeordnete Kategorie zu ändern."
 
 #: lib/phoenix_kit_publishing/web/controller.ex:286
 #, elixir-autogen, elixir-format
