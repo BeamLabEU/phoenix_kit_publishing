@@ -10,6 +10,7 @@ msgid ""
 msgstr ""
 "Language: de\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:820
 #, elixir-autogen, elixir-format
@@ -191,7 +192,7 @@ msgstr "Gilt für alle Sprachen dieser Version."
 #: lib/phoenix_kit_publishing/web/html.ex:2959
 #, elixir-autogen, elixir-format
 msgid "Apr"
-msgstr "Apr"
+msgstr "Apr."
 
 #: lib/phoenix_kit_publishing/web/html.ex:2942
 #, elixir-autogen, elixir-format
@@ -212,7 +213,7 @@ msgstr "Archiviert"
 #: lib/phoenix_kit_publishing/web/html.ex:2963
 #, elixir-autogen, elixir-format
 msgid "Aug"
-msgstr "Aug"
+msgstr "Aug."
 
 #: lib/phoenix_kit_publishing/web/html.ex:2946
 #, elixir-autogen, elixir-format
@@ -624,7 +625,7 @@ msgstr "Datum"
 #: lib/phoenix_kit_publishing/web/html.ex:2967
 #, elixir-autogen, elixir-format
 msgid "Dec"
-msgstr "Dez"
+msgstr "Dez."
 
 #: lib/phoenix_kit_publishing/web/html.ex:2950
 #, elixir-autogen, elixir-format
@@ -1734,7 +1735,7 @@ msgstr "Semantische URLs, ideal für zeitlose Inhalte."
 #: lib/phoenix_kit_publishing/web/html.ex:2964
 #, elixir-autogen, elixir-format
 msgid "Sep"
-msgstr "Sep"
+msgstr "Sep."
 
 #: lib/phoenix_kit_publishing/web/html.ex:2947
 #, elixir-autogen, elixir-format
