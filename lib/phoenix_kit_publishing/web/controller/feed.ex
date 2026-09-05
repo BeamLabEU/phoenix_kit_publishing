@@ -177,9 +177,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
             _ -> ~T[00:00:00]
           end
 
-        post.date
-        |> DateTime.new!(time, "Etc/UTC")
-        |> DateTime.add(-Constants.site_offset_seconds(), :second)
+        Constants.from_site_wall(post.date, time)
 
       is_binary(get_in(post, [:metadata, :published_at])) ->
         case DateTime.from_iso8601(post.metadata.published_at) do

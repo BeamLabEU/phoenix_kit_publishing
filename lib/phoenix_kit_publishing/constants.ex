@@ -81,30 +81,64 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   end
 
   @doc """
-  Now, on the site's wall clock — `DateTime.utc_now/0` shifted by the
-  configured `time_zone` offset, which is the clock timestamp-mode posts
-  are written and displayed on.
+  Now, on the site's wall clock — the clock timestamp-mode posts are written
+  and displayed on. A UTC-tagged carrier for that wall clock, so it compares
+  against `scheduled_at/2` directly.
 
   Hoist this out of a loop; every call is a settings read.
   """
   @spec site_now() :: DateTime.t()
-  def site_now, do: DateTime.add(DateTime.utc_now(), site_offset_seconds(), :second)
+  def site_now, do: to_site_wall(DateTime.utc_now())
 
   @doc """
-  The site's `time_zone` setting as a whole-hour offset in seconds (0 when
-  unset or unparseable). The one place that reading lives, so post
-  stamping, schedule release and feed dates can't drift apart.
+  The site's `time_zone` setting — an IANA id such as `Europe/Tallinn`, or a
+  legacy fixed offset such as `"2"` on a site that never touched the picker.
+  `"0"` when settings are unreachable (no DB yet, a sandbox without an
+  owner): UTC is the documented default and a scheduling check must not crash
+  a page.
+
+  The one place that reading lives, so post stamping, schedule release and
+  feed dates cannot drift apart. It used to be parsed to whole hours with
+  `Integer.parse/1`, which read an IANA id (and a "5.5") as 0 — every
+  timestamp post stamped, released and syndicated on UTC while the editor
+  saw the site's clock.
   """
-  @spec site_offset_seconds() :: integer()
-  def site_offset_seconds do
-    case Integer.parse(PhoenixKit.Settings.get_setting("time_zone", "0")) do
-      {offset_hours, ""} -> offset_hours * 3600
-      _ -> 0
-    end
+  @spec site_tz() :: String.t()
+  def site_tz do
+    PhoenixKit.Settings.get_setting("time_zone", "0")
   rescue
-    # Settings unreachable (no DB yet, sandbox without an owner): UTC is the
-    # documented default and a scheduling check must not crash a page.
-    _ -> 0
+    _ -> "0"
+  end
+
+  @doc """
+  A UTC instant as the site's wall clock, tagged UTC as a carrier — the
+  stamp a timestamp-mode post gets at creation. Resolved for the instant
+  itself, so a named zone follows daylight saving on that date.
+  """
+  @spec to_site_wall(DateTime.t(), String.t()) :: DateTime.t()
+  def to_site_wall(%DateTime{} = utc, tz \\ site_tz()) do
+    utc
+    |> PhoenixKit.Utils.Date.shift_to_offset(tz)
+    |> DateTime.to_naive()
+    |> DateTime.from_naive!("Etc/UTC")
+  end
+
+  @doc """
+  A site wall-clock date and time back to the true UTC instant — the feed's
+  `pubDate`. The inverse of `to_site_wall/2`, resolved for the date given.
+  A wall clock that never happened (spring-forward gap) resolves to the
+  instant the clocks jump to; one that happened twice (fall-back overlap) to
+  its first occurrence — core's `parse_datetime_local/2` rules.
+  """
+  @spec from_site_wall(Date.t(), Time.t() | nil, String.t()) :: DateTime.t()
+  def from_site_wall(%Date{} = date, time, tz \\ site_tz()) do
+    time = time || ~T[00:00:00]
+    wall = "#{Date.to_iso8601(date)}T#{Calendar.strftime(time, "%H:%M:%S")}"
+
+    case PhoenixKit.Utils.Date.parse_datetime_local(wall, tz) do
+      {:ok, utc} -> utc
+      _ -> DateTime.new!(date, Time.truncate(time, :second), "Etc/UTC")
+    end
   end
 
   # ---------------------------------------------------------------------------

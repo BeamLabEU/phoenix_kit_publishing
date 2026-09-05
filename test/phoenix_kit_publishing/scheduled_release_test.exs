@@ -10,9 +10,10 @@ defmodule PhoenixKit.Modules.Publishing.ScheduledReleaseTest do
   UTC, which is the direction that matters.
 
   Pure tier on purpose: `scheduled_ahead?/2` takes `now` explicitly, so the
-  release rule is pinned without a settings row or a database. The reading
-  of the offset itself is `Constants.site_offset_seconds/0`, shared with the
-  stamping path so the two clocks cannot drift.
+  release rule is pinned without a settings row or a database. The
+  conversions themselves are `Constants.to_site_wall/2` and
+  `from_site_wall/3`, shared with the stamping and feed paths so the three
+  clocks cannot drift.
   """
 
   use ExUnit.Case, async: true
@@ -72,24 +73,57 @@ defmodule PhoenixKit.Modules.Publishing.ScheduledReleaseTest do
     end
   end
 
-  describe "site_offset_seconds/0" do
-    test "degrades to UTC rather than raising when settings are unreachable" do
-      assert is_integer(Constants.site_offset_seconds())
+  describe "to_site_wall/2 and from_site_wall/3" do
+    # Europe/Tallinn is UTC+2 in January and UTC+3 in July: each conversion
+    # must resolve the zone on the date converted. The old integer parse read
+    # an IANA id as 0 (UTC everywhere) and could not follow a season at all.
+    test "an IANA zone follows daylight saving on the date, both ways" do
+      assert Constants.to_site_wall(~U[2026-01-15 08:00:00Z], "Europe/Tallinn") ==
+               ~U[2026-01-15 10:00:00Z]
+
+      assert Constants.to_site_wall(~U[2026-07-15 08:00:00Z], "Europe/Tallinn") ==
+               ~U[2026-07-15 11:00:00Z]
+
+      assert Constants.from_site_wall(~D[2026-01-15], ~T[10:00:00], "Europe/Tallinn") ==
+               ~U[2026-01-15 08:00:00Z]
+
+      assert Constants.from_site_wall(~D[2026-07-15], ~T[10:00:00], "Europe/Tallinn") ==
+               ~U[2026-07-15 07:00:00Z]
+    end
+
+    test "a legacy offset is fixed, fractional ones included" do
+      assert Constants.to_site_wall(~U[2026-07-15 08:00:00Z], "2") == ~U[2026-07-15 10:00:00Z]
+      assert Constants.to_site_wall(~U[2026-07-15 08:00:00Z], "5.5") == ~U[2026-07-15 13:30:00Z]
+
+      assert Constants.from_site_wall(~D[2026-07-15], ~T[10:00:00], "-5") ==
+               ~U[2026-07-15 15:00:00Z]
+    end
+
+    test "no time means the day's first minute; an unresolvable zone degrades to UTC" do
+      assert Constants.from_site_wall(~D[2026-07-15], nil, "2") == ~U[2026-07-14 22:00:00Z]
+
+      assert Constants.from_site_wall(~D[2026-07-15], ~T[10:00:00], "nonsense") ==
+               ~U[2026-07-15 10:00:00Z]
+    end
+
+    test "the two are inverses across seasons" do
+      for utc <- [~U[2026-01-15 21:30:00Z], ~U[2026-07-15 21:30:00Z]],
+          tz <- ["Europe/Tallinn", "America/New_York", "5.5", "0"] do
+        wall = Constants.to_site_wall(utc, tz)
+
+        assert Constants.from_site_wall(DateTime.to_date(wall), DateTime.to_time(wall), tz) ==
+                 utc,
+               "#{tz} #{utc}"
+      end
     end
   end
 
   describe "site_now/0" do
-    test "is utc_now shifted by the site offset" do
+    test "is now on the site's wall clock, never raising" do
       before_call = DateTime.utc_now()
       now = Constants.site_now()
-      offset = Constants.site_offset_seconds()
-
-      drift =
-        now
-        |> DateTime.add(-offset, :second)
-        |> DateTime.diff(before_call, :second)
-
-      assert drift >= 0 and drift <= 5
+      expected = Constants.to_site_wall(before_call, Constants.site_tz())
+      assert DateTime.diff(now, expected, :second) in 0..5
     end
   end
 end
