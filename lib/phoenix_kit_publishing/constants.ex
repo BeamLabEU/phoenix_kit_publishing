@@ -51,33 +51,27 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   page and the fallback resolver. One predicate, so a scheduled post becomes
   public at one moment on every path that asks.
 
-  Both sides of the comparison are the SITE's wall clock, not UTC.
-  `post_date`/`post_time` are stamped and edited in the configured
-  `time_zone` offset (`Posts.maybe_add_initial_timestamp/3`) and shown
-  as-is with no display conversion, so comparing them to `utc_now/0`
-  released an embargoed post `offset` hours early on a site west of UTC —
-  and held it back that long on a site east of it.
+  `post_date`/`post_time` are the SITE's wall clock (stamped and edited in the
+  configured `time_zone`, shown as-is), so they are first read back as the
+  instant they name — `from_site_wall/3`, resolved for that date — and that
+  instant is compared with true UTC now. Comparing wall clock to wall clock
+  looked equivalent and was not: a wall clock is not monotonic across a
+  fall-back hour, so a post scheduled inside the hour that repeats went live
+  on the first pass and reverted to "scheduled" on the second, for most of
+  an hour, once a year. Comparing with `utc_now/0` DIRECTLY was the earlier
+  bug (an embargoed post released `offset` hours early west of UTC).
 
-  Pass `now` (from `site_now/0`) when testing many posts in one pass: the
-  offset comes from a settings read, and `filter_published/1` runs this
-  over the whole listing cache.
+  Pass `now` and `tz` when testing many posts in one pass — the zone is a
+  settings read, and `filter_published/1` runs this over the whole listing
+  cache.
   """
   @spec scheduled_ahead?(map()) :: boolean()
-  def scheduled_ahead?(post), do: scheduled_ahead?(post, site_now())
+  def scheduled_ahead?(post), do: scheduled_ahead?(post, DateTime.utc_now(), site_tz())
 
-  @spec scheduled_ahead?(map(), DateTime.t()) :: boolean()
-  def scheduled_ahead?(post, now) do
+  @spec scheduled_ahead?(map(), DateTime.t(), String.t()) :: boolean()
+  def scheduled_ahead?(post, %DateTime{} = now, tz) do
     timestamp_mode?(post[:mode]) and post[:date] != nil and
-      DateTime.compare(scheduled_at(post[:date], post[:time]), now) == :gt
-  end
-
-  defp scheduled_at(date, time) do
-    # No time means the whole day is fair game from its first minute — the
-    # old behaviour, kept for rows that predate a required post_time.
-    #
-    # "Etc/UTC" is a carrier for a naive wall clock here, not a claim about
-    # the zone: `now` is built the same way, so the two are comparable.
-    DateTime.new!(date, time || ~T[00:00:00], "Etc/UTC")
+      DateTime.compare(from_site_wall(post[:date], post[:time], tz), now) == :gt
   end
 
   @doc """
@@ -94,8 +88,8 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   The site's `time_zone` setting — an IANA id such as `Europe/Tallinn`, or a
   legacy fixed offset such as `"2"` on a site that never touched the picker.
   `"0"` when settings are unreachable (no DB yet, a sandbox without an
-  owner): UTC is the documented default and a scheduling check must not crash
-  a page.
+  owner — `Settings.get_setting/2` answers the default itself): UTC is the
+  documented default and a scheduling check must not crash a page.
 
   The one place that reading lives, so post stamping, schedule release and
   feed dates cannot drift apart. It used to be parsed to whole hours with
@@ -104,11 +98,7 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   saw the site's clock.
   """
   @spec site_tz() :: String.t()
-  def site_tz do
-    PhoenixKit.Settings.get_setting("time_zone", "0")
-  rescue
-    _ -> "0"
-  end
+  def site_tz, do: PhoenixKit.Settings.get_setting("time_zone", "0")
 
   @doc """
   A UTC instant as the site's wall clock, tagged UTC as a carrier — the
@@ -135,9 +125,11 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
     time = time || ~T[00:00:00]
     wall = "#{Date.to_iso8601(date)}T#{Calendar.strftime(time, "%H:%M:%S")}"
 
+    {micro, precision} = time.microsecond
+
     case PhoenixKit.Utils.Date.parse_datetime_local(wall, tz) do
-      {:ok, utc} -> utc
-      _ -> DateTime.new!(date, Time.truncate(time, :second), "Etc/UTC")
+      {:ok, utc} -> %{DateTime.add(utc, micro, :microsecond) | microsecond: {micro, precision}}
+      _ -> DateTime.new!(date, time, "Etc/UTC")
     end
   end
 
