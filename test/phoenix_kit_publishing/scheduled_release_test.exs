@@ -77,6 +77,25 @@ defmodule PhoenixKit.Modules.Publishing.ScheduledReleaseTest do
       refute Constants.scheduled_ahead?(scheduled, ~U[2026-03-29 01:00:00Z], "Europe/Warsaw")
     end
 
+    test "the date short-circuit agrees with the zone resolution at its edges" do
+      # `scheduled_ahead?/3` skips the zone resolution for posts two whole
+      # days clear of now's UTC date. The skip must never disagree with the
+      # resolution it replaces: at +14 (the largest offset there is) a post
+      # dated tomorrow is still ahead, and at -12 one dated yesterday is not.
+      for tz <- ["Europe/Tallinn", "Pacific/Kiritimati", "America/Anchorage", "14", "-12", "0"],
+          days <- -3..3,
+          hour <- [0, 12, 23] do
+        date = Date.add(DateTime.to_date(@now), days)
+        time = %Time{hour: hour, minute: 0, second: 0, microsecond: {0, 0}}
+        post = post(date, time)
+
+        resolved = DateTime.compare(Constants.from_site_wall(date, time, tz), @now) == :gt
+
+        assert Constants.scheduled_ahead?(post, @now, tz) == resolved,
+               "#{tz} #{date} #{time}"
+      end
+    end
+
     test "slug-mode posts and dateless rows are never scheduled" do
       refute Constants.scheduled_ahead?(
                %{mode: "slug", date: ~D[2027-01-01], time: nil},

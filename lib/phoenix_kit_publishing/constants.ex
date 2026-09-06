@@ -71,13 +71,27 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @spec scheduled_ahead?(map(), DateTime.t(), String.t()) :: boolean()
   def scheduled_ahead?(post, %DateTime{} = now, tz) do
     timestamp_mode?(post[:mode]) and post[:date] != nil and
-      DateTime.compare(from_site_wall(post[:date], post[:time], tz), now) == :gt
+      ahead_of?(post[:date], post[:time], now, tz)
+  end
+
+  # A wall clock runs at most 14 hours ahead of UTC and 12 behind it, so the
+  # instant a stamped date names always falls inside the day either side of
+  # that date. A post two whole days clear of today's UTC date is therefore
+  # decided without resolving the zone at all — which is the point: this runs
+  # per post over the listing cache (up to 5,000 entries) on every public
+  # request, and resolving the zone costs ~60x the date comparison.
+  defp ahead_of?(date, time, now, tz) do
+    case Date.diff(date, DateTime.to_date(now)) do
+      diff when diff <= -2 -> false
+      diff when diff >= 2 -> true
+      _ -> DateTime.compare(from_site_wall(date, time, tz), now) == :gt
+    end
   end
 
   @doc """
   Now, on the site's wall clock — the clock timestamp-mode posts are written
-  and displayed on. A UTC-tagged carrier for that wall clock, so it compares
-  against `scheduled_at/2` directly.
+  and displayed on. A UTC-tagged carrier for that wall clock, the same shape
+  `to_site_wall/2` hands the stamping path.
 
   Hoist this out of a loop; every call is a settings read.
   """

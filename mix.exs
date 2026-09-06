@@ -1,7 +1,7 @@
 defmodule PhoenixKitPublishing.MixProject do
   use Mix.Project
 
-  @version "0.7.0"
+  @version "0.8.0"
   @source_url "https://github.com/BeamLabEU/phoenix_kit_publishing"
 
   def project do
@@ -85,11 +85,21 @@ defmodule PhoenixKitPublishing.MixProject do
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, and core infrastructure.
-      # 2.4 is a hard floor, not a preference: `PublishingGroup.changeset/2` calls
-      # `PhoenixKit.Utils.Slug.put_slug/3`, which core added in 2.4.0. Under the
-      # previous `~> 2.0` a host resolving 2.0-2.3 compiled fine and then raised
-      # UndefinedFunctionError on every group create — in the host's app, not ours.
-      pk_dep(:phoenix_kit, "~> 2.4"),
+      # 2.14 is a hard floor, not a preference, for two independent reasons:
+      #
+      #   * `PublishingGroup.changeset/2` calls `PhoenixKit.Utils.Slug.put_slug/3`,
+      #     which core added in 2.4.0. Under the older `~> 2.0` a host resolving
+      #     2.0-2.3 compiled fine and then raised UndefinedFunctionError on every
+      #     group create — in the host's app, not ours.
+      #   * `Constants.to_site_wall/2` and `from_site_wall/3` reach core's
+      #     `Utils.Date.shift_to_offset/2` and `parse_datetime_local/2` to resolve
+      #     the site `time_zone`. Before 2.13.9 both parsed it with
+      #     `offset_to_seconds/1`, which reads an IANA id as 0 — so on an older
+      #     core every timestamp post is stamped, released and syndicated on UTC
+      #     while the editor shows the site's clock, silently, which is the exact
+      #     bug PR #45 fixed. The true floor is 2.13.9; rounded up to the nearest
+      #     minor to keep the ecosystem's `~> X.Y` shape.
+      pk_dep(:phoenix_kit, "~> 2.14"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
       # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
       # which the group editor imports directly.

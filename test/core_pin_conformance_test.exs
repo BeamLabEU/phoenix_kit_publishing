@@ -12,24 +12,37 @@ defmodule PhoenixKitPublishing.CorePinConformanceTest do
   outright, with no degraded mode. Nothing else in this repo's own test run
   would notice, which is why the check is a test rather than a convention.
 
-  What this does NOT forbid is raising the two-segment FLOOR. `~> 2.4` still
+  What this does NOT forbid is raising the two-segment FLOOR. `~> 2.14` still
   admits every later 2.x, and the floor has to track the oldest core that has
-  every function this module calls — `PublishingGroup.changeset/2` calls
-  `PhoenixKit.Utils.Slug.put_slug/3`, added in core 2.4.0, and core's own
-  release note tells adopters to pin `~> 2.4` for exactly that reason. A floor
-  left at 2.0 does not spare the consumer anything: it lets `mix deps.get`
-  resolve a core without the function and moves the failure to an
-  `UndefinedFunctionError` on the host's first group create. Raise this
-  alongside `mix.exs` whenever a newly-adopted core API sets a higher floor.
+  every function this module calls, BEHAVING as this module needs it to:
+
+    * `PublishingGroup.changeset/2` calls `PhoenixKit.Utils.Slug.put_slug/3`,
+      added in core 2.4.0 — the original floor, and the loud kind of gap: a
+      floor left at 2.0 lets `mix deps.get` resolve a core without the
+      function and moves the failure to an `UndefinedFunctionError` on the
+      host's first group create.
+    * `Constants.to_site_wall/2` and `from_site_wall/3` reach
+      `Utils.Date.shift_to_offset/2` and `parse_datetime_local/2`, which only
+      became IANA-aware in core 2.13.9 — the SILENT kind. Both functions exist
+      on an older core and both compile; they just read `Europe/Tallinn` as
+      offset `0`, so every timestamp post is stamped, released and syndicated
+      on UTC with no error anywhere. A present-but-wrong function is why this
+      floor is about behaviour, not just arity.
+
+  The floor rounds 2.13.9 up to `~> 2.14` to keep the ecosystem's two-segment
+  shape. Raise this alongside `mix.exs` whenever a newly-adopted core API — or
+  a newly-relied-on core BEHAVIOUR — sets a higher one.
 
   Core 1.7 is deliberately excluded: core 2.0.0 squashed the migration chain to
   a V135 floor and this module is verified only against that baseline.
   """
 
-  # Floor: core 2.4.0 (`Slug.put_slug/3`). Everything above it, forever, must
-  # stay admitted — that is the two-segment invariant this test exists for.
-  @must_admit ["2.4.0", "2.4.9", "2.5.0", "2.9.4"]
-  @must_reject ["1.7.189", "1.7.236", "1.9.4", "2.0.0", "2.3.9", "3.0.0"]
+  # Floor: core 2.14.0 (IANA-aware `Utils.Date`, 2.13.9 rounded up). Everything
+  # above it, forever, must stay admitted — that is the two-segment invariant
+  # this test exists for. 2.13.9 sits in @must_reject because the pin is the
+  # rounded floor, not the exact one; move both lists together.
+  @must_admit ["2.14.0", "2.14.9", "2.15.0", "2.99.4"]
+  @must_reject ["1.7.189", "1.7.236", "1.9.4", "2.0.0", "2.3.9", "2.13.9", "3.0.0"]
 
   test "the :phoenix_kit requirement admits every core 2.x and nothing else" do
     requirement = core_requirement()
