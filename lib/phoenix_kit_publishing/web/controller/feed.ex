@@ -60,9 +60,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
 
     description = feed_description(group, title)
 
+    # One settings read for the whole document. `site_tz/0` is an uncached DB
+    # round-trip, and the pubDate of every item plus lastBuildDate needs it —
+    # reading it per call made a 50-item feed 100 queries deep.
+    tz = Constants.site_tz()
+
     items =
       Enum.map(posts, fn post ->
-        item_xml(post, group_slug, language, date_counts, base_url)
+        item_xml(post, group_slug, language, date_counts, base_url, tz)
       end)
 
     [
@@ -74,7 +79,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
       element("description", description),
       element("language", language),
       ~s(<atom:link href="#{escape(self_url)}" rel="self" type="application/rss+xml"/>\n),
-      last_build_date(posts),
+      last_build_date(posts, tz),
       element("generator", "PhoenixKit Publishing"),
       items,
       "</channel>\n</rss>\n"
@@ -90,7 +95,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
     end
   end
 
-  defp item_xml(post, group_slug, language, date_counts, base_url) do
+  defp item_xml(post, group_slug, language, date_counts, base_url, tz) do
     url = base_url <> PublishingHTML.build_post_url(group_slug, post, language, date_counts)
     title = get_in(post, [:metadata, :title]) || Constants.default_title()
 
@@ -99,7 +104,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
       element("title", title),
       element("link", url),
       ~s(<guid isPermaLink="true">#{escape(url)}</guid>\n),
-      pub_date(post),
+      pub_date(post, tz),
       item_description(post),
       enclosure(post, base_url),
       "</item>\n"
@@ -144,16 +149,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
     end
   end
 
-  defp pub_date(post) do
-    case effective_datetime(post) do
+  defp pub_date(post, tz) do
+    case effective_datetime(post, tz) do
       nil -> []
       dt -> element("pubDate", rfc822(dt))
     end
   end
 
-  defp last_build_date(posts) do
+  defp last_build_date(posts, tz) do
     posts
-    |> Enum.map(&effective_datetime/1)
+    |> Enum.map(&effective_datetime(&1, tz))
     |> Enum.reject(&is_nil/1)
     |> case do
       [] -> []
@@ -165,10 +170,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
   # for timestamp-mode posts, the version's published_at otherwise. UTC.
   #
   # A timestamp post's date/time is the SITE's wall clock (see
-  # `Constants.site_now/0`), so it has to come back to UTC before it is
+  # `Constants.to_site_wall/2`), so it has to come back to UTC before it is
   # stamped `+0000` — otherwise every item in the feed is dated by the site's
-  # own offset, and `lastBuildDate` with it.
-  defp effective_datetime(post) do
+  # own offset, and `lastBuildDate` with it. `tz` is hoisted by the caller.
+  defp effective_datetime(post, tz) do
     cond do
       match?(%Date{}, post[:date]) ->
         time =
@@ -177,9 +182,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
             _ -> ~T[00:00:00]
           end
 
-        post.date
-        |> DateTime.new!(time, "Etc/UTC")
-        |> DateTime.add(-Constants.site_offset_seconds(), :second)
+        Constants.from_site_wall(post.date, time, tz)
 
       is_binary(get_in(post, [:metadata, :published_at])) ->
         case DateTime.from_iso8601(post.metadata.published_at) do

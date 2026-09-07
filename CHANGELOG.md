@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.8.1 - 2026-09-07
+
+### Fixed
+
+- Removed duplicate page headings across Publishing admin pages (index, Settings, Edit Group, Categories, post show, preview) — each repeated the page title already shown in the top breadcrumb bar.
+
+## 0.8.0 - 2026-09-06
+
+### Changed
+
+- **⚠️ Requires `phoenix_kit ~> 2.14`** (was `~> 2.4`). `Constants.to_site_wall/2` and
+  `from_site_wall/3` resolve the site `time_zone` through core's
+  `Utils.Date.shift_to_offset/2` and `parse_datetime_local/2`, and both of those only
+  became IANA-aware in core 2.13.9 — before that they parsed the setting with
+  `offset_to_seconds/1`, a `Float.parse/1` that reads `Europe/Tallinn` as `0`. On an
+  older core the timezone fix below is a silent no-op: every timestamp post is stamped,
+  released and syndicated on UTC while the editor shows the site's clock, with a green
+  build and no warning. The true floor is 2.13.9, rounded up to the nearest minor to
+  keep the ecosystem's `~> X.Y` shape.
+
+- **`Publishing.Constants` timezone API** (post-merge review of PR #45).
+  `site_offset_seconds/0` is gone, replaced by `site_tz/0` (the setting as core keeps
+  it) plus the conversion pair `to_site_wall/2` and `from_site_wall/3`.
+  `scheduled_ahead?/2` is replaced by `scheduled_ahead?/3`, which takes true UTC `now`
+  **and** the zone so a whole-listing pass reads settings once. No caller exists outside
+  this package in the `phoenix_kit*` ecosystem.
+
+### Fixed
+
+- **Timestamp posts ran on UTC on every site that had touched the timezone picker
+  (PR #45).** `Constants.site_offset_seconds/0` read the `time_zone` setting with
+  `Integer.parse/1` and required an empty remainder, so an IANA id — what the setting
+  holds since core 2.13.9 — and a fractional `"5.5"` both became `0`. Post stamping,
+  scheduled release and the feed's `pubDate` all ran on UTC while the editor showed the
+  site's clock: a post created at 01:00 local was filed under yesterday, one scheduled
+  for 06:00 on a UTC+3 site went live at 09:00 local, and every feed item was off by the
+  site offset. The three consumers now share `to_site_wall/2` and `from_site_wall/3`,
+  both resolving the zone on the date being converted.
+
+- **A scheduled post flickered back to "scheduled" for most of an hour, once a year
+  (PR #45).** Release compared the post's site wall clock against a wall-clock "now",
+  and a wall clock is not monotonic across a fall-back hour: a post set for 02:45 in
+  Warsaw on 2026-10-25 went out at its first 02:45 (00:45Z) and reverted at 01:00Z when
+  the clock read 02:00 again, on every public path. The post's date and time are now
+  read back as the instant they name in the site's zone and compared with true UTC now.
+
+- **The RSS feed issued one settings query per item, twice over** (post-merge review of
+  PR #45). `effective_datetime/1` called `from_site_wall/2`, whose default argument is
+  an **uncached** `Settings.get_setting/2` — and it runs once per `<item>` and again for
+  every post in `lastBuildDate`, so a 50-item feed went 100 database round-trips deep to
+  answer a question whose answer cannot change mid-document. The zone is now read once
+  per feed document and threaded through.
+
+- **The public listing paid ~30x more per post to decide whether it was scheduled**
+  (post-merge review of PR #45). `scheduled_ahead?/3` runs over the listing cache (up to
+  5,000 entries) on every public request, and resolving a zone costs ~25 ms per 5,000
+  where the `DateTime` comparison it replaced cost ~0.8 ms. A wall clock runs at most 14
+  hours ahead of UTC and 12 behind, so a post two whole days clear of now's UTC date is
+  now decided by `Date.diff/2` alone and only near-boundary posts resolve the zone. A
+  test cross-checks the shortcut against the full resolution over 126 zone/day/hour
+  combinations rather than asserting its own arithmetic.
+
+- Dependency updates: `phoenix_kit` 2.13.5 → 2.15.1 and the transitive set it pulls
+  (`phoenix` 1.8.13, `phoenix_live_view` 1.2.11, `phoenix_pubsub` 2.3.0, `oban` 2.24.1,
+  `leaf` 0.6.1, `req` 0.7.4, `mint` 1.10.0, `hammer` 7.5.0, `phoenix_kit_comments`
+  0.4.5, and others).
+
 ## 0.7.0 - 2026-08-17
 
 ### Added

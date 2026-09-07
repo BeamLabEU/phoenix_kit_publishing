@@ -654,11 +654,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   def filter_published(posts) do
     # One settings read for the whole pass — this runs over the listing cache
     # (up to 5,000 entries) on every public request.
-    now = Constants.site_now()
+    now = DateTime.utc_now()
+    tz = Constants.site_tz()
 
     Enum.filter(posts, fn post ->
       post[:metadata] && Constants.published?(post.metadata.status) &&
-        not Constants.scheduled_ahead?(post, now)
+        not Constants.scheduled_ahead?(post, now, tz)
     end)
   end
 

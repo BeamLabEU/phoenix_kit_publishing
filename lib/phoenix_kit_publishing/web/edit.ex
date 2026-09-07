@@ -47,6 +47,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          socket
          |> assign(:project_title, Settings.get_project_title())
          |> assign(:page_title, gettext("Edit Group"))
+         |> assign(:page_section, gettext("Publishing"))
+         |> assign(:page_section_path, Routes.path("/admin/publishing"))
          |> assign(
            :current_path,
            Routes.path("/admin/publishing/edit-group/#{group_slug}")
@@ -358,12 +360,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   def render(assigns) do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">
-      <%!-- Header Section --%>
-      <.admin_page_header
-        back={Routes.path("/admin/publishing")}
-        title={gettext("Edit Group")}
-      />
-
       <div class="max-w-2xl mx-auto space-y-6">
         <div class="card bg-base-100 shadow-xl border border-base-200">
           <div class="card-body space-y-6">

@@ -51,60 +51,100 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   page and the fallback resolver. One predicate, so a scheduled post becomes
   public at one moment on every path that asks.
 
-  Both sides of the comparison are the SITE's wall clock, not UTC.
-  `post_date`/`post_time` are stamped and edited in the configured
-  `time_zone` offset (`Posts.maybe_add_initial_timestamp/3`) and shown
-  as-is with no display conversion, so comparing them to `utc_now/0`
-  released an embargoed post `offset` hours early on a site west of UTC —
-  and held it back that long on a site east of it.
+  `post_date`/`post_time` are the SITE's wall clock (stamped and edited in the
+  configured `time_zone`, shown as-is), so they are first read back as the
+  instant they name — `from_site_wall/3`, resolved for that date — and that
+  instant is compared with true UTC now. Comparing wall clock to wall clock
+  looked equivalent and was not: a wall clock is not monotonic across a
+  fall-back hour, so a post scheduled inside the hour that repeats went live
+  on the first pass and reverted to "scheduled" on the second, for most of
+  an hour, once a year. Comparing with `utc_now/0` DIRECTLY was the earlier
+  bug (an embargoed post released `offset` hours early west of UTC).
 
-  Pass `now` (from `site_now/0`) when testing many posts in one pass: the
-  offset comes from a settings read, and `filter_published/1` runs this
-  over the whole listing cache.
+  Pass `now` and `tz` when testing many posts in one pass — the zone is a
+  settings read, and `filter_published/1` runs this over the whole listing
+  cache.
   """
   @spec scheduled_ahead?(map()) :: boolean()
-  def scheduled_ahead?(post), do: scheduled_ahead?(post, site_now())
+  def scheduled_ahead?(post), do: scheduled_ahead?(post, DateTime.utc_now(), site_tz())
 
-  @spec scheduled_ahead?(map(), DateTime.t()) :: boolean()
-  def scheduled_ahead?(post, now) do
+  @spec scheduled_ahead?(map(), DateTime.t(), String.t()) :: boolean()
+  def scheduled_ahead?(post, %DateTime{} = now, tz) do
     timestamp_mode?(post[:mode]) and post[:date] != nil and
-      DateTime.compare(scheduled_at(post[:date], post[:time]), now) == :gt
+      ahead_of?(post[:date], post[:time], now, tz)
   end
 
-  defp scheduled_at(date, time) do
-    # No time means the whole day is fair game from its first minute — the
-    # old behaviour, kept for rows that predate a required post_time.
-    #
-    # "Etc/UTC" is a carrier for a naive wall clock here, not a claim about
-    # the zone: `now` is built the same way, so the two are comparable.
-    DateTime.new!(date, time || ~T[00:00:00], "Etc/UTC")
+  # A wall clock runs at most 14 hours ahead of UTC and 12 behind it, so the
+  # instant a stamped date names always falls inside the day either side of
+  # that date. A post two whole days clear of today's UTC date is therefore
+  # decided without resolving the zone at all — which is the point: this runs
+  # per post over the listing cache (up to 5,000 entries) on every public
+  # request, and resolving the zone costs ~60x the date comparison.
+  defp ahead_of?(date, time, now, tz) do
+    case Date.diff(date, DateTime.to_date(now)) do
+      diff when diff <= -2 -> false
+      diff when diff >= 2 -> true
+      _ -> DateTime.compare(from_site_wall(date, time, tz), now) == :gt
+    end
   end
 
   @doc """
-  Now, on the site's wall clock — `DateTime.utc_now/0` shifted by the
-  configured `time_zone` offset, which is the clock timestamp-mode posts
-  are written and displayed on.
+  Now, on the site's wall clock — the clock timestamp-mode posts are written
+  and displayed on. A UTC-tagged carrier for that wall clock, the same shape
+  `to_site_wall/2` hands the stamping path.
 
   Hoist this out of a loop; every call is a settings read.
   """
   @spec site_now() :: DateTime.t()
-  def site_now, do: DateTime.add(DateTime.utc_now(), site_offset_seconds(), :second)
+  def site_now, do: to_site_wall(DateTime.utc_now())
 
   @doc """
-  The site's `time_zone` setting as a whole-hour offset in seconds (0 when
-  unset or unparseable). The one place that reading lives, so post
-  stamping, schedule release and feed dates can't drift apart.
+  The site's `time_zone` setting — an IANA id such as `Europe/Tallinn`, or a
+  legacy fixed offset such as `"2"` on a site that never touched the picker.
+  `"0"` when settings are unreachable (no DB yet, a sandbox without an
+  owner — `Settings.get_setting/2` answers the default itself): UTC is the
+  documented default and a scheduling check must not crash a page.
+
+  The one place that reading lives, so post stamping, schedule release and
+  feed dates cannot drift apart. It used to be parsed to whole hours with
+  `Integer.parse/1`, which read an IANA id (and a "5.5") as 0 — every
+  timestamp post stamped, released and syndicated on UTC while the editor
+  saw the site's clock.
   """
-  @spec site_offset_seconds() :: integer()
-  def site_offset_seconds do
-    case Integer.parse(PhoenixKit.Settings.get_setting("time_zone", "0")) do
-      {offset_hours, ""} -> offset_hours * 3600
-      _ -> 0
+  @spec site_tz() :: String.t()
+  def site_tz, do: PhoenixKit.Settings.get_setting("time_zone", "0")
+
+  @doc """
+  A UTC instant as the site's wall clock, tagged UTC as a carrier — the
+  stamp a timestamp-mode post gets at creation. Resolved for the instant
+  itself, so a named zone follows daylight saving on that date.
+  """
+  @spec to_site_wall(DateTime.t(), String.t()) :: DateTime.t()
+  def to_site_wall(%DateTime{} = utc, tz \\ site_tz()) do
+    utc
+    |> PhoenixKit.Utils.Date.shift_to_offset(tz)
+    |> DateTime.to_naive()
+    |> DateTime.from_naive!("Etc/UTC")
+  end
+
+  @doc """
+  A site wall-clock date and time back to the true UTC instant — the feed's
+  `pubDate`. The inverse of `to_site_wall/2`, resolved for the date given.
+  A wall clock that never happened (spring-forward gap) resolves to the
+  instant the clocks jump to; one that happened twice (fall-back overlap) to
+  its first occurrence — core's `parse_datetime_local/2` rules.
+  """
+  @spec from_site_wall(Date.t(), Time.t() | nil, String.t()) :: DateTime.t()
+  def from_site_wall(%Date{} = date, time, tz \\ site_tz()) do
+    time = time || ~T[00:00:00]
+    wall = "#{Date.to_iso8601(date)}T#{Calendar.strftime(time, "%H:%M:%S")}"
+
+    {micro, precision} = time.microsecond
+
+    case PhoenixKit.Utils.Date.parse_datetime_local(wall, tz) do
+      {:ok, utc} -> %{DateTime.add(utc, micro, :microsecond) | microsecond: {micro, precision}}
+      _ -> DateTime.new!(date, time, "Etc/UTC")
     end
-  rescue
-    # Settings unreachable (no DB yet, sandbox without an owner): UTC is the
-    # documented default and a scheduling check must not crash a page.
-    _ -> 0
   end
 
   # ---------------------------------------------------------------------------

@@ -70,6 +70,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       socket
       |> assign(:project_title, Settings.get_project_title())
       |> assign(:page_title, gettext("Publishing"))
+      |> assign(:page_action, %{
+        icon: "hero-plus",
+        label: gettext("Create Group"),
+        navigate: Routes.path("/admin/publishing/new-group")
+      })
       |> assign(
         :current_path,
         Routes.path("/admin/publishing")
@@ -412,21 +417,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   def render(assigns) do
     ~H"""
     <div class="container flex-col mx-auto px-4 py-6">
-    <%!-- Header Section --%>
-    <.admin_page_header
-      back={Routes.path("/admin")}
-      title={gettext("Publishing")}
-    >
-      <:actions>
-        <.link
-          navigate={Routes.path("/admin/publishing/new-group")}
-          class="btn btn-primary btn-sm"
-        >
-          <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Create Group")}
-        </.link>
-      </:actions>
-    </.admin_page_header>
-
     <div class="space-y-2 sm:space-y-3">
       <%= if @empty_state? do %>
         <div class="card bg-base-100 border border-dashed border-base-300 shadow-sm">

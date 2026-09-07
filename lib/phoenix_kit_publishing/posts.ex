@@ -725,16 +725,15 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   defp maybe_add_initial_timestamp(post_attrs, _mode, _now), do: post_attrs
 
-  # Shift a UTC datetime by the configured site `time_zone` (integer-hour offset,
-  # default "0"). Mirrors the offset the display/edit layers use, so create/edit/
-  # display all agree on a timestamp post's wall clock. Bad/missing setting → UTC.
+  # A UTC instant on the site's wall clock (the configured `time_zone`, an
+  # IANA id or a legacy offset). Mirrors the clock the display/edit layers
+  # use, so create/edit/display all agree on a timestamp post's wall clock.
+  # Bad/missing setting → UTC.
   #
-  # The offset itself comes from Constants, which is also what decides when a
+  # The conversion lives in Constants, which is also what decides when a
   # scheduled post goes live — a second copy of the reading here is how the
   # clock a post is STAMPED on drifts from the clock it is RELEASED on.
-  defp shift_to_site_timezone(datetime) do
-    DateTime.add(datetime, Constants.site_offset_seconds(), :second)
-  end
+  defp shift_to_site_timezone(datetime), do: Constants.to_site_wall(datetime)
 
   defp resolve_timestamp_in_transaction(post_attrs, "timestamp", group_slug) do
     {date, time} =
