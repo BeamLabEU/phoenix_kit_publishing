@@ -167,10 +167,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
       <%!-- Header with title and actions --%>
       <div class="flex items-start justify-between gap-4 mb-6">
         <div class="min-w-0">
-          <h1 class="text-2xl font-bold text-base-content truncate">
-            {@post.metadata.title || gettext("Untitled post")}
-          </h1>
-          <div class="flex items-center gap-2 mt-1">
+          <div class="flex items-center gap-2">
             <span class={"badge #{version_status_badge_class(@post.metadata[:status] || "draft")}"}>
               {status_label(@post.metadata[:status] || "draft")}
             </span>

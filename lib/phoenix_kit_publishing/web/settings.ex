@@ -39,6 +39,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     socket =
       socket
       |> assign(:page_title, gettext("Publishing Settings"))
+      |> assign(
+        :page_subtitle,
+        gettext("Manage caching and performance settings for the publishing module.")
+      )
       |> assign(:current_path, Routes.path("/admin/settings/publishing"))
 
     {:ok, socket}
@@ -458,13 +462,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   def render(assigns) do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">
-    <%!-- Header Section --%>
-    <.admin_page_header
-      back={PhoenixKit.Utils.Routes.path("/admin")}
-      title={gettext("Publishing Settings")}
-      subtitle={gettext("Manage caching and performance settings for the publishing module.")}
-    />
-
     <div class="max-w-2xl mx-auto space-y-6">
       <div class="card bg-base-100 shadow-xl border border-base-200">
         <div class="card-body space-y-4">

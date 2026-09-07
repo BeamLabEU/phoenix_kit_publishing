@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
          socket
          |> assign(:project_title, Settings.get_project_title())
          |> assign(:page_title, gettext("Categories"))
+         |> assign(:page_subtitle, group["name"])
          |> assign(:current_path, Routes.path("/admin/publishing/categories/#{group_slug}"))
          |> assign(:group, group)
          |> assign(:group_slug, group_slug)
@@ -414,11 +415,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   def render(assigns) do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">
-      <.admin_page_header
-        back={Routes.path("/admin/publishing/#{@group_slug}")}
-        title={gettext("Categories")}
-        subtitle={@group["name"]}
-      >
+      <.admin_page_header>
         <:actions>
           <button type="button" class="btn btn-primary btn-sm" phx-click="new">
             <.icon name="hero-plus" class="w-4 h-4" />

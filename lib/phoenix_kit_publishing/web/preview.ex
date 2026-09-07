@@ -312,9 +312,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
                 </div>
               <% end %>
             </div>
-            <h1 class="text-3xl font-bold mt-4">
-              {@post.metadata.title || PhoenixKit.Modules.Publishing.Constants.default_title()}
-            </h1>
           </header>
 
           <%!-- Post Content --%>
