@@ -100,3 +100,29 @@ which does not use the `Add`/`Update`/`Fix`/`Remove`/`Merge` prefix this
 repository asks for. It was not amended in place because that commit SHA is
 pinned in a downstream lockfile and rewriting it would strand that resolution
 mid-flight — worth normalising on squash-merge instead.
+
+## Merge with upstream main (2026-09-07)
+
+Upstream `main` moved past this branch with `7f97533e` ("Add tabs to
+Publishing settings page, fix missing breadcrumb section"), which touches the
+same settings page this PR's `de` catalogue covers and regenerates every
+locale's `#:` reference lines, conflicting with this branch's own reference
+churn. Merged with a merge commit, not a rebase.
+
+Resolution: `priv/gettext/default.pot` and the `en`/`et`/`fr`/`it`/`ru`
+catalogues took upstream's version outright — this PR must not touch their
+translation content, only `de`'s. `priv/gettext/de/LC_MESSAGES/default.po`
+kept this branch's version, then `mix gettext.extract` +
+`mix gettext.merge priv/gettext --no-fuzzy` picked up the one new msgid
+`7f97533e` introduced for `de` (the rest of its new tab labels —
+"Settings", "Listing Cache", "Render Cache" — already existed in the
+catalogue from other pages, so gettext linked the existing translations
+instead of creating duplicates):
+
+| msgid | msgstr (de) |
+|---|---|
+| `General` | `Allgemein` |
+
+Verified after merging: `en`/`et`/`fr`/`it`/`ru`/`.pot` are byte-identical
+to upstream `main`; `de` has zero empty `msgstr` and zero `#, fuzzy` entries
+outside the header.
