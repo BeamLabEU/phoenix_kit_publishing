@@ -603,6 +603,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           locale: og_locale(assigns.current_language),
           type: "website"
         })
+        |> maybe_assign_admin_edit(
+          Routes.path("/admin/publishing/categories/#{group_slug}"),
+          "Edit Categories"
+        )
         |> render(:index)
 
       {:redirect_301, url} ->
@@ -707,6 +711,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(
           :og,
           build_og_data(conn, assigns.post, assigns.canonical_url, assigns.current_language)
+        )
+        |> maybe_assign_admin_edit(
+          edit_post_admin_url(group_slug, assigns.post.uuid, assigns.current_language),
+          "Edit Post"
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> render(:show)
