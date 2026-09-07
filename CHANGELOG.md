@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.0 - 2026-09-07
+
+### Added
+
+- Tabs on the Publishing settings page — General / Listing Cache /
+  Render Cache — matching the tabbed treatment core applies to its own
+  Settings pages.
+
+### Fixed
+
+- Publishing settings page had no `page_section` assign at all, so its
+  breadcrumb showed bare "Publishing Settings" instead of "Settings /
+  Publishing". Page title also shortened from "Publishing Settings" to
+  "Publishing" to match the sidebar.
+
 ## 0.8.1 - 2026-09-07
 
 ### Fixed

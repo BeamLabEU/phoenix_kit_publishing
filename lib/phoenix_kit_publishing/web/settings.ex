@@ -38,11 +38,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
 
     socket =
       socket
-      |> assign(:page_title, gettext("Publishing Settings"))
+      |> assign(:page_title, gettext("Publishing"))
       |> assign(
         :page_subtitle,
         gettext("Manage caching and performance settings for the publishing module.")
       )
+      |> assign(:page_section, gettext("Settings"))
+      |> assign(:page_section_path, Routes.path("/admin/settings"))
+      |> assign(:active_tab, "general")
       |> assign(:current_path, Routes.path("/admin/settings/publishing"))
 
     {:ok, socket}
@@ -91,6 +94,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     # keeps the subscribe / unsubscribe sites paired in code review.
     PublishingPubSub.unsubscribe_from_groups()
     :ok
+  end
+
+  @impl true
+  def handle_event("switch_settings_tab", %{"tab" => tab}, socket) do
+    {:noreply, assign(socket, :active_tab, tab)}
   end
 
   @impl true
@@ -463,6 +471,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">
     <div class="max-w-2xl mx-auto space-y-6">
+      <.nav_tabs
+        active_tab={@active_tab}
+        on_change="switch_settings_tab"
+        variant={:border}
+        tabs={[
+          %{id: "general", label: gettext("General"), icon: "hero-language"},
+          %{id: "listing_cache", label: gettext("Listing Cache"), icon: "hero-bolt"},
+          %{id: "render_cache", label: gettext("Render Cache"), icon: "hero-document-text"}
+        ]}
+      />
+
+      <div class={@active_tab != "general" && "hidden"}>
       <div class="card bg-base-100 shadow-xl border border-base-200">
         <div class="card-body space-y-4">
           <div>
@@ -664,7 +684,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
           </div>
         </div>
       </div>
+      </div>
 
+      <div class={@active_tab != "listing_cache" && "hidden"}>
       <%!-- Cache Management Section --%>
       <div class="card bg-base-100 shadow-xl border border-base-200">
         <div class="card-body space-y-6">
@@ -827,7 +849,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
           <% end %>
         </div>
       </div>
+      </div>
 
+      <div class={@active_tab != "render_cache" && "hidden"}>
       <%!-- Render Cache Section --%>
       <div class="card bg-base-100 shadow-xl border border-base-200">
         <div class="card-body space-y-4">
@@ -976,6 +1000,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             </p>
           </div>
         </div>
+      </div>
       </div>
     </div>
     </div>
