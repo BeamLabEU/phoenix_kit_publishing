@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1 - 2026-09-07
+
+### Fixed
+
+- Removed duplicate page headings across Publishing admin pages (index, Settings, Edit Group, Categories, post show, preview) — each repeated the page title already shown in the top breadcrumb bar.
+
 ## 0.8.0 - 2026-09-06
 
 ### Changed
