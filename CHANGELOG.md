@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The category/tag archive and the versioned-post (`/v/N`) public views now assign an
+  admin edit link, matching the group listing and the slug/date post views. The archive
+  links to the group's admin categories page ("Edit Categories"); the versioned post
+  links to the post editor ("Edit Post"), same as the live post view.
+
 ## 0.8.1 - 2026-09-07
 
 ### Fixed
