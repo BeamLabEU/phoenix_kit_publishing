@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.9.1 - 2026-09-07
+
+### Added
+
+- The category/tag archive and the versioned-post (`/v/N`) public views now assign an
+  admin edit link, matching the group listing and the slug/date post views. The category
+  archive links to the group's admin categories page ("Edit Categories"); the versioned
+  post links to the post editor ("Edit Post"), same as the live post view. Tag archives
+  intentionally get no edit link — tags are derived from body `#hashtags` and have no
+  admin page of their own, so the category-management link would have been a dead end.
+
+### Fixed
+
+- `Publishing.version/0` had drifted to `"0.7.0"` while `mix.exs` was already at
+  `0.9.0` — nothing pins the two together (`facade_callbacks_test.exs` only asserts
+  `is_binary`), so the mismatch went unnoticed across two releases. Both now read
+  `0.9.1`.
+- `settings_live_test.exs` still asserted the old `"Publishing Settings"` `<title>`
+  text, which 0.9.0's page-title shortening (to `"Publishing"`) had already made
+  stale — `mix test` was failing on `main` before this release.
+
 ## 0.9.0 - 2026-09-07
 
 ### Added
@@ -14,15 +35,6 @@
   breadcrumb showed bare "Publishing Settings" instead of "Settings /
   Publishing". Page title also shortened from "Publishing Settings" to
   "Publishing" to match the sidebar.
-
-## Unreleased
-
-### Added
-
-- The category/tag archive and the versioned-post (`/v/N`) public views now assign an
-  admin edit link, matching the group listing and the slug/date post views. The archive
-  links to the group's admin categories page ("Edit Categories"); the versioned post
-  links to the post editor ("Edit Post"), same as the live post view.
 
 ## 0.8.1 - 2026-09-07
 

@@ -44,7 +44,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.SettingsLiveTest do
       |> put_test_scope(fake_scope())
       |> live("/admin/settings/publishing")
 
-    assert html =~ "Publishing Settings"
+    # Page title was shortened from "Publishing Settings" to "Publishing" to
+    # match the sidebar (see CHANGELOG 0.9.0) — pin the <title> tag itself
+    # rather than a loose substring so a future regression is caught.
+    assert html =~ "<title>Publishing</title>"
     assert html =~ "Listing Cache"
     assert html =~ "Render Cache"
     assert html =~ "Default Language Without Prefix"

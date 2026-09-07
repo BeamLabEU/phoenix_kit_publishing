@@ -4,7 +4,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
   branches that skipped `PhoenixKitWeb.AdminEditHelper.assign_admin_edit/3`
   (unlike the group listing and the slug/date post views, which already
   call it). Pins that an admin scope sees an "Edit Categories"/"Edit Post"
-  link on both, and an anonymous request sees neither.
+  link on both, and an anonymous request sees neither. Also pins that a
+  TAG archive never gets the "Edit Categories" link — tags have no admin
+  page of their own (they derive from body `#hashtags`), so linking there
+  would send an admin to a page that can't touch the tag at all.
   """
 
   use PhoenixKitPublishing.ConnCase, async: false
@@ -52,6 +55,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
     {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
     {:ok, _} = Posts.update_post(slug, read, %{"allow_version_access" => "true"}, %{})
 
+    {:ok, tagged_post} =
+      Posts.create_post(slug, %{
+        title: "Tagged Post",
+        slug: "tagged-post",
+        content: "Body #howto"
+      })
+
+    :ok = Versions.publish_version(slug, tagged_post.uuid, 1)
+
     %{slug: slug, category: category, post: post}
   end
 
@@ -67,6 +79,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
 
     test "an anonymous reader sees no edit link", %{conn: conn, slug: slug} do
       html = get(conn, "/#{slug}/category/guides") |> html_response(200)
+
+      refute html =~ "Edit Categories"
+      refute html =~ "/admin/publishing/categories/#{slug}"
+    end
+
+    test "an admin sees no edit link on a tag archive", %{conn: conn, slug: slug} do
+      with_scope(admin_scope())
+
+      html = get(conn, "/#{slug}/tag/howto") |> html_response(200)
 
       refute html =~ "Edit Categories"
       refute html =~ "/admin/publishing/categories/#{slug}"
