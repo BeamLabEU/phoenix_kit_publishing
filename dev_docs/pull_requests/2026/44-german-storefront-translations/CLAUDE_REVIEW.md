@@ -79,6 +79,15 @@ repository-wide gap, not something this PR introduced, and translating the
 format in German alone would make it the sole outlier. Worth addressing across
 all locales in its own change.
 
+### `IMPROVEMENT - MINOR` — inconsistent phrasing for "sub-microsecond" — fixed
+
+A second independent review found that two adjacent cache-settings strings in
+`lib/phoenix_kit_publishing/web/settings.ex` (the toggle description at line
+706 and the info footnote at line 817) both translate "sub-microsecond reads"
+but landed on different German wording: "im Sub-Mikrosekundenbereich" in one,
+"unter einer Mikrosekunde" in the other. Both are accurate; only the second
+was changed, standardising the panel on "im Sub-Mikrosekundenbereich".
+
 ## Not done here
 
 `@version` and `CHANGELOG.md` are deliberately left untouched for the

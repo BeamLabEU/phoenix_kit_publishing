@@ -1856,7 +1856,7 @@ msgstr "Status geändert zu %{status}"
 #: lib/phoenix_kit_publishing/web/settings.ex:706
 #, elixir-autogen, elixir-format
 msgid "Store in :persistent_term for sub-microsecond reads"
-msgstr "In :persistent_term speichern für Lesezugriffe unter einer Mikrosekunde"
+msgstr "In :persistent_term speichern für Lesezugriffe im Sub-Mikrosekundenbereich"
 
 #: lib/phoenix_kit_publishing/web/new.ex:178
 #, elixir-autogen, elixir-format
