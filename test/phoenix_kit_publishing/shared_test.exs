@@ -3,6 +3,16 @@ defmodule PhoenixKit.Modules.Publishing.SharedTest do
 
   alias PhoenixKit.Modules.Publishing.Shared
 
+  # `function_exported?/3` answers FALSE for a module that is merely not
+  # loaded, not only for one that lacks the function, so a bare callback
+  # assertion fails intermittently under a random seed and never when the file
+  # runs alone -- the shape that reads as flaky infrastructure and gets re-run
+  # instead of fixed. Reproduced in two sibling modules before this went in.
+  setup_all do
+    Code.ensure_loaded!(Shared)
+    :ok
+  end
+
   # ============================================================================
   # uuid_format?/1
   # ============================================================================
