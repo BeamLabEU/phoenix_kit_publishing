@@ -28,8 +28,8 @@ title: Simple Version (Original Size)
 status: draft            # draft | published | archived
 published_at: 2025-11-07T22:42:00Z
 created_at: 2025-11-07T22:42:17.231679Z
-created_by_email: max@don.ee
-updated_by_email: max@don.ee
+created_by_email: author@example.com
+updated_by_email: author@example.com
 ---
 
 # Heading 1
