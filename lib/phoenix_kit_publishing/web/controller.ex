@@ -603,6 +603,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           locale: og_locale(assigns.current_language),
           type: "website"
         })
+        |> maybe_assign_term_admin_edit(term, group_slug)
         |> render(:index)
 
       {:redirect_301, url} ->
@@ -707,6 +708,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(
           :og,
           build_og_data(conn, assigns.post, assigns.canonical_url, assigns.current_language)
+        )
+        |> maybe_assign_admin_edit(
+          edit_post_admin_url(group_slug, assigns.post.uuid, assigns.current_language),
+          "Edit Post"
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> render(:show)
@@ -1190,6 +1195,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       conn
     end
   end
+
+  # Category archives link to the categories admin page. Tags have no
+  # admin surface of their own — "Body hashtags ARE the tag system" (see
+  # Hashtags moduledoc), so an "Edit Categories" link on a tag archive
+  # would send an admin to a page that can't touch that tag at all.
+  defp maybe_assign_term_admin_edit(conn, {:category, _}, group_slug) do
+    maybe_assign_admin_edit(
+      conn,
+      Routes.path("/admin/publishing/categories/#{group_slug}"),
+      "Edit Categories"
+    )
+  end
+
+  defp maybe_assign_term_admin_edit(conn, {:tag, _}, _group_slug), do: conn
 
   # Build the admin Edit Post URL with the current public-side language
   # pinned via the `?lang=` query string. Without this, clicking "Edit
