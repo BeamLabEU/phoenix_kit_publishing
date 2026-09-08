@@ -44,7 +44,7 @@ folder.
 
 - **CHANGELOG entry** — already landed in the same `7f547b5` commit
   (CHANGELOG 0.1.6 entry for PR #12 changes). Workspace memory
-  [`feedback_phoenix_kit_releases.md`](~/.claude/projects/-Users-maxdon-Desktop-Elixir/memory/feedback_phoenix_kit_releases.md)
+  [`feedback_phoenix_kit_releases.md`]the agent memory note `feedback_phoenix_kit_releases.md`
   marks releases boss-only, but Max approved the entry in the
   follow-up commit itself; nothing further to do.
 

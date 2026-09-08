@@ -16,6 +16,9 @@ defmodule PhoenixKit.Modules.Publishing do
 
   use PhoenixKit.Module
 
+  # Single-sourced from mix.exs so a release bump cannot leave version/0 behind.
+  @version Mix.Project.config()[:version]
+
   require Logger
 
   alias PhoenixKit.Dashboard.Tab
@@ -480,7 +483,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @impl PhoenixKit.Module
-  def version, do: "0.9.1"
+  def version, do: @version
 
   @impl PhoenixKit.Module
   def get_config do

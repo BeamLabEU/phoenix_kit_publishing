@@ -21,8 +21,8 @@ defmodule PhoenixKit.Modules.Publishing.FacadeCallbacksTest do
       assert Publishing.module_name() == "Publishing"
     end
 
-    test "version returns a string" do
-      assert is_binary(Publishing.version())
+    test "version is single-sourced from mix.exs" do
+      assert Publishing.version() == Mix.Project.config()[:version]
     end
 
     test "css_sources returns the expected OTP app" do
