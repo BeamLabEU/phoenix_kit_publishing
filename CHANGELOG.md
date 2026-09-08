@@ -4,6 +4,10 @@
 
 ### Added
 
+- German (`de`) storefront translations: the public post, listing, category and feed
+  pages now render in German, alongside the existing locales. Typographic quotes follow
+  German convention („ ") and month abbreviations keep their trailing period.
+
 - Tabs on the Publishing settings page — General / Listing Cache /
   Render Cache — matching the tabbed treatment core applies to its own
   Settings pages.
