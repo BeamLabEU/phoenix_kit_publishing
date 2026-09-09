@@ -30,6 +30,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # we tell it the symbol is expected to be undefined in that case.
   @compile {:no_warn_undefined, PhoenixKitOG}
 
+  # `get_editor_mode/0` only exists in newer phoenix_kit builds, but the pin
+  # still allows older ones — `default_editor_mode/0` probes for it at runtime.
+  @compile {:no_warn_undefined, {PhoenixKit.Settings, :get_editor_mode, 0}}
+
   alias Phoenix.LiveView.JS
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
@@ -66,6 +70,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   # Save quickly — DB writes are ~5ms, no reason to delay
   @autosave_debounce_ms 500
+
+  @leaf_editor_modes [:visual, :hybrid, :markdown, :html]
+  # Fallback when the site-wide setting is unavailable (older core, no repo).
+  # Markdown, not :hybrid, to match what this editor always opened in before
+  # it honored the setting — the PHK component blocks are markdown-first.
+  @default_editor_mode :markdown
 
   # ============================================================================
   # Template Helper Delegations
@@ -119,6 +129,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     _ -> nil
   end
 
+  # Site-wide default editor mode (admin-set under Settings → Content Editor).
+  # `PhoenixKit.Settings.get_editor_mode/0` only exists in newer core builds,
+  # but the pin allows older ones — probe before calling (the
+  # `no_warn_undefined` above covers the compile side). Settings reads can
+  # also raise when no repo is configured — hence the rescue. Mirrors
+  # phoenix_kit_posts, which reads the same setting.
+  defp default_editor_mode do
+    if Code.ensure_loaded?(Settings) and function_exported?(Settings, :get_editor_mode, 0) do
+      normalize_editor_mode(Settings.get_editor_mode())
+    else
+      @default_editor_mode
+    end
+  rescue
+    _ -> @default_editor_mode
+  end
+
+  # Leaf's mode clauses have no catch-all, so a string setting value or
+  # anything unrecognised must be normalised here rather than blowing up
+  # inside Leaf.
+  defp normalize_editor_mode(mode) when mode in @leaf_editor_modes, do: mode
+
+  defp normalize_editor_mode(mode) when is_binary(mode) do
+    Enum.find(@leaf_editor_modes, @default_editor_mode, &(to_string(&1) == mode))
+  end
+
+  defp normalize_editor_mode(_mode), do: @default_editor_mode
+
   # ============================================================================
   # Mount
   # ============================================================================
@@ -141,6 +178,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign(:show_media_selector, false)
       |> assign(:autosave_blocked, nil)
+      |> assign(:editor_mode, default_editor_mode())
       |> assign(:media_selector_target, "featured_image_uuid")
       |> assign(:media_selection_mode, :single)
       |> assign(:media_selected_uuids, MapSet.new())
@@ -3238,16 +3276,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       Tags come from the group's existing ones — see
                       handle_info({:leaf_suggest, …}).
 
-                      `mode` is set deliberately, not left at Leaf's default of
-                      :hybrid. The hybrid and visual surfaces round-trip the
-                      body through HTML, which is fine for prose but makes PHK
-                      components second-class: `preserve_tags` keeps them
-                      intact, but only as opaque blocks nobody can edit without
-                      dropping to markdown anyway. Posts here are written with
-                      <Showcase>, <Note>, <Audio> and friends, so markdown is
-                      the mode that can actually edit them. The toolbar still
-                      offers the other modes — Leaf has no supported way to
-                      remove them — but nothing depends on anyone using one.
+                      `mode` follows the site-wide Content Editor setting
+                      (Settings → Content Editor), same as the posts module;
+                      when the setting is unavailable it falls back to
+                      :markdown, this editor's historical default. One caveat
+                      carries over from that default: the hybrid and visual
+                      surfaces round-trip the body through HTML, which makes
+                      PHK components second-class — `preserve_tags` keeps
+                      <Showcase>, <Note>, <Audio> and friends intact, but as
+                      opaque blocks that can only be edited by switching to
+                      markdown in the toolbar.
 
                       `protect_navigation` predates the move to Leaf and was
                       dropped in the swap — it warns before leaving with
@@ -3272,7 +3310,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   debounce={400}
                   toolbar={[:image, :video]}
                   readonly={edit_disabled? or @viewing_older_version}
-                  mode={:markdown}
+                  mode={@editor_mode}
                   preserve_tags={Renderer.component_tags()}
                   gettext_backend={PhoenixKitPublishing.Gettext}
                   protect_navigation={true}
