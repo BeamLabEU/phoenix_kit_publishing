@@ -157,7 +157,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     if url_slug != "" do
       group_slug = socket.assigns.group_slug
       language = editor_language(socket.assigns)
-      post_slug = socket.assigns.post.slug || socket.assigns.post[:uuid]
+      post_slug = persisted_post_slug(socket.assigns.post) || socket.assigns.post[:uuid]
 
       case Publishing.validate_url_slug(group_slug, url_slug, language, post_slug) do
         {:ok, _} ->
@@ -174,6 +174,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       end
     else
       {:ok, params}
+    end
+  end
+
+  # The uniqueness check excludes "this post" by its slug — but the in-memory
+  # post mirrors the FORM (update_post_from_form rewrites :slug on every
+  # keystroke), so mid-rename it carries the NEW, not-yet-saved slug. Excluding
+  # by that meant the post's own DB rows (still under the old slug) counted as
+  # "another post", and every rename died on a self-collision ("<old slug> is
+  # already in use") the writer could not resolve. Resolve the persisted slug
+  # by uuid, which is stable across renames; a post not yet in the DB has
+  # nothing to exclude.
+  defp persisted_post_slug(post) do
+    case post[:uuid] do
+      nil ->
+        post[:slug]
+
+      uuid ->
+        case DBStorage.get_post_by_uuid(uuid) do
+          %{slug: slug} -> slug
+          nil -> post[:slug]
+        end
     end
   end
 
