@@ -1294,8 +1294,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         if form_slug && form_slug != "", do: Map.put(p, :slug, form_slug), else: p
       end)
       |> Map.put(:url_slug, if(form_url_slug in [nil, ""], do: nil, else: form_url_slug))
+      |> refresh_language_slug(language, form_slug, form_url_slug)
 
     {updated_post, Helpers.build_public_url(updated_post, language)}
+  end
+
+  # `build_post_url` resolves the rendered slug through `language_slugs`
+  # FIRST, before `url_slug` — so the in-memory post must carry the form's
+  # current value there too, or the displayed public URL keeps rendering the
+  # slug from the last DB read while the writer edits the title/slug/URL.
+  # The effective per-language slug mirrors what the save will persist: the
+  # custom url_slug when one is typed, else the post slug it defaults to.
+  defp refresh_language_slug(post, language, form_slug, form_url_slug) do
+    effective = if form_url_slug in [nil, ""], do: form_slug, else: form_url_slug
+
+    if is_nil(language) or effective in [nil, ""] do
+      post
+    else
+      slugs = Map.get(post, :language_slugs) || %{}
+
+      key =
+        Enum.find(Map.keys(slugs), &(String.downcase(&1) == String.downcase(language))) ||
+          language
+
+      Map.put(post, :language_slugs, Map.put(slugs, key, effective))
+    end
   end
 
   # ============================================================================
