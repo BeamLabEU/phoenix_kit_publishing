@@ -623,6 +623,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     end
   end
 
+  # Keep the writer's live text buffers through a save's form rebuild. The
+  # client can hold keystrokes newer than what the save captured (debounce
+  # in flight); re-rendering the inputs with the save's echo made the patch
+  # overwrite the focused field and undo them — edits crawled one character
+  # per save cycle. Saving is synchronous within the LV process, so the
+  # current form IS what was just saved: keeping its values means the value
+  # attribute doesn't change across the save render and the patch leaves
+  # the input alone. Only fields with a RENDERED input in the current mode
+  # are preserved — on the primary language there is no url_slug input, and
+  # preserving that mirrored value froze it one save behind, failing the URL
+  # preview's default-tracking comparison (mirror != persisted slug); the
+  # input-less field adopts the echo, which can't fight a typist who has no
+  # input to type in. New posts and new translations adopt everything —
+  # creation may legitimately rewrite the slug (uniquification), and the
+  # writer isn't focused in these fields then.
+  defp preserve_live_buffers(form, socket) do
+    if socket.assigns[:is_new_post] || socket.assigns[:is_new_translation] do
+      form
+    else
+      preserved_keys =
+        if socket.assigns[:is_primary_language],
+          do: ["title", "slug"],
+          else: ["title", "url_slug"]
+
+      Map.merge(form, Map.take(socket.assigns.form, preserved_keys))
+    end
+  end
+
   defp handle_post_save_success(socket, post) do
     group_slug = socket.assigns.group_slug
 
@@ -675,7 +703,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           Map.put(post, :language_statuses, updated_statuses)
       end
 
-    form = Forms.post_form_with_primary_status(group_slug, refreshed_post, current_version)
+    form =
+      group_slug
+      |> Forms.post_form_with_primary_status(refreshed_post, current_version)
+      |> preserve_live_buffers(socket)
+
+    # TEMPORARY diagnostics for the one-behind URL preview — remove before PR.
+    Logger.debug(
+      "[SlugPreview:save] post_slug=#{inspect(refreshed_post[:slug])} " <>
+        "meta_url_slug=#{inspect(refreshed_post.metadata[:url_slug])} " <>
+        "form_url_slug=#{inspect(form["url_slug"])} form_slug=#{inspect(form["slug"])}"
+    )
 
     is_published = Constants.published?(form["status"])
 
@@ -685,6 +723,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     socket =
       socket
       |> Phoenix.Component.assign(:post, refreshed_post)
+      |> Phoenix.Component.assign(:db_post_slug, refreshed_post[:slug])
       |> Forms.assign_form_with_tracking(form)
       |> Phoenix.Component.assign(:content, refreshed_post.content)
       |> Helpers.mark_clean()
@@ -761,39 +800,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
             else: success_message
 
         alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
-        form = Forms.post_form(updated_post)
-
-        # Keep the writer's live text buffers through a routine save. The
-        # client can hold keystrokes newer than what this save captured
-        # (debounce in flight), and re-rendering the inputs with the save's
-        # echo made the patch overwrite the field and undo them — the writer
-        # deleted, the next autosave's render restored the char, and edits
-        # crawled one character per save cycle. Saving is synchronous within
-        # the LV process, so the current form IS what was just saved: keeping
-        # it means the value attribute doesn't change across the save render
-        # and morphdom leaves the input alone. New posts and new translations
-        # still adopt the echo — creation may legitimately rewrite the slug
-        # (uniquification), and the writer isn't focused in these fields then.
-        # Preserve exactly the fields with a RENDERED input in this mode.
-        # On the primary language there is no url_slug input — preserving
-        # its mirrored value froze it at the pre-save state, which failed
-        # the URL preview's default-tracking comparison (mirror != persisted
-        # slug), so the preview trailed the slug by one save. Adopting the
-        # echo for input-less fields keeps mirror and persisted slug in
-        # lockstep; it can't fight the typist, since there is no input.
-        preserved_keys =
-          if socket.assigns[:is_primary_language],
-            do: ["title", "slug"],
-            else: ["title", "url_slug"]
-
-        form =
-          if socket.assigns[:is_new_post] || socket.assigns[:is_new_translation] do
-            form
-          else
-            Map.merge(form, Map.take(socket.assigns.form, preserved_keys))
-          end
+        form = updated_post |> Forms.post_form() |> preserve_live_buffers(socket)
 
         public_url = Helpers.build_public_url(updated_post, updated_post.language)
+
+        # TEMPORARY diagnostics for the one-behind URL preview — remove before PR.
+        Logger.debug(
+          "[SlugPreview:save] post_slug=#{inspect(updated_post[:slug])} " <>
+            "meta_url_slug=#{inspect(updated_post.metadata[:url_slug])} " <>
+            "post_url_slug=#{inspect(updated_post[:url_slug])} " <>
+            "form_url_slug=#{inspect(form["url_slug"])} preview=#{inspect(public_url)}"
+        )
 
         socket =
           socket
