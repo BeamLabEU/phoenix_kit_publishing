@@ -445,11 +445,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # the reload — form reset, mark_clean, pending autosave defused — leaving
   # the editor silently behind what the writer typed until a full refresh.
   defp track_current_edit_url(socket, group_slug, post) do
-    assign(
-      socket,
+    socket
+    |> assign(
       :current_edit_url,
       Helpers.build_edit_url(group_slug, post, lang: post.language, version: post[:version])
     )
+    # The slug as PERSISTED, unlike @post.slug which update_post_from_form
+    # rewrites from the form on every keystroke. The URL preview needs it to
+    # tell a default-tracking url_slug (== this) from a customized one.
+    |> assign(:db_post_slug, post[:slug])
   end
 
   defp handle_path_post_params(socket, path, params) do
@@ -544,6 +548,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:is_new_post, true)
       |> assign(:public_url, nil)
       |> assign(:current_edit_url, nil)
+      |> assign(:db_post_slug, nil)
       |> assign(:form_key, form_key)
       |> assign(:current_version, 1)
       |> assign(:available_versions, [])
@@ -781,7 +786,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       language = Helpers.editor_language(socket.assigns)
 
       {updated_post, public_url} =
-        update_post_from_form(socket.assigns.post, new_form, language)
+        update_post_from_form(
+          socket.assigns.post,
+          new_form,
+          language,
+          socket.assigns[:db_post_slug]
+        )
 
       socket =
         assign_meta_updates(
@@ -1294,7 +1304,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   # Update post struct with current form values for accurate public URL and status display
-  defp update_post_from_form(post, form, language) do
+  defp update_post_from_form(post, form, language, db_post_slug) do
     # Status is version-level — all languages share the same status
     new_status = form["status"]
     available_langs = Map.get(post, :available_languages, [language])
@@ -1311,7 +1321,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         if form_slug && form_slug != "", do: Map.put(p, :slug, form_slug), else: p
       end)
       |> Map.put(:url_slug, if(form_url_slug in [nil, ""], do: nil, else: form_url_slug))
-      |> refresh_language_slug(language, form_slug, form_url_slug)
+      |> refresh_language_slug(language, form_slug, form_url_slug, db_post_slug)
 
     {updated_post, Helpers.build_public_url(updated_post, language)}
   end
@@ -1320,10 +1330,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # FIRST, before `url_slug` — so the in-memory post must carry the form's
   # current value there too, or the displayed public URL keeps rendering the
   # slug from the last DB read while the writer edits the title/slug/URL.
-  # The effective per-language slug mirrors what the save will persist: the
-  # custom url_slug when one is typed, else the post slug it defaults to.
-  defp refresh_language_slug(post, language, form_slug, form_url_slug) do
-    effective = if form_url_slug in [nil, ""], do: form_slug, else: form_url_slug
+  # The effective per-language slug mirrors what the save will persist: a
+  # url_slug that is empty OR still equals the PERSISTED post slug is only
+  # tracking the default — the save's rename-sync will carry it along — so
+  # the slug being typed drives the preview; only a url_slug the writer
+  # actually customized (differs from the persisted slug) wins over it.
+  # Comparing against @post.slug instead broke deletes: that copy mirrors
+  # the form, so the form's stale url_slug looked "customized" the moment
+  # the two fields diverged, and the preview froze until a save round-trip
+  # refreshed the form — timing the writer read as "sometimes updates".
+  defp refresh_language_slug(post, language, form_slug, form_url_slug, db_post_slug) do
+    default_tracking? = form_url_slug in [nil, ""] or form_url_slug == db_post_slug
+    effective = if default_tracking?, do: form_slug, else: form_url_slug
 
     if is_nil(language) or effective in [nil, ""] do
       post

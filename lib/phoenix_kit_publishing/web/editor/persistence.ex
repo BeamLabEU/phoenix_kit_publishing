@@ -754,6 +754,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         socket =
           socket
           |> Phoenix.Component.assign(:post, updated_post)
+          |> Phoenix.Component.assign(:db_post_slug, updated_post[:slug])
           |> Phoenix.Component.assign(:public_url, public_url)
           |> Forms.assign_form_with_tracking(form)
           |> Phoenix.Component.assign(:content, updated_post.content)
