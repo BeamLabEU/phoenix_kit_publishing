@@ -3172,10 +3172,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       </span>
                     </div>
                   <% end %>
+                  <%!-- Save-state text is deliberately quiet: it flips on every
+                        keystroke (unsaved) and every debounce settle (saved), so
+                        a filled badge here flashes constantly while typing. Only
+                        the blocked state keeps a loud badge — it carries a reason
+                        the writer must act on. --%>
                   <%= cond do %>
                     <% @is_autosaving -> %>
-                      <span class="badge badge-info badge-sm gap-1">
-                        <span class="loading loading-spinner loading-xs"></span>
+                      <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
+                        <span class="loading loading-spinner loading-2xs"></span>
                         {gettext("Saving...")}
                       </span>
                     <% @autosave_blocked -> %>
@@ -3184,14 +3189,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         {@autosave_blocked}
                       </span>
                     <% @has_pending_changes -> %>
-                      <span class="badge badge-warning badge-sm h-auto">
+                      <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
+                        <span class="w-1.5 h-1.5 rounded-full bg-warning/70"></span>
                         {gettext("Unsaved changes")}
                       </span>
                     <% @is_new_post -> %>
-                      <span class="badge badge-ghost badge-sm h-auto">{gettext("New")}</span>
+                      <span class="text-xs text-base-content/50">{gettext("New")}</span>
                     <% true -> %>
-                      <span class="badge badge-success badge-sm gap-1">
-                        <.icon name="hero-check" class="w-3 h-3" />
+                      <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
+                        <.icon name="hero-check" class="w-3 h-3 text-success/70" />
                         {gettext("Saved")}
                       </span>
                   <% end %>
