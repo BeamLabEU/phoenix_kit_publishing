@@ -708,13 +708,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       |> Forms.post_form_with_primary_status(refreshed_post, current_version)
       |> preserve_live_buffers(socket)
 
-    # TEMPORARY diagnostics for the one-behind URL preview — remove before PR.
-    Logger.debug(
-      "[SlugPreview:save] post_slug=#{inspect(refreshed_post[:slug])} " <>
-        "meta_url_slug=#{inspect(refreshed_post.metadata[:url_slug])} " <>
-        "form_url_slug=#{inspect(form["url_slug"])} form_slug=#{inspect(form["slug"])}"
-    )
-
     is_published = Constants.published?(form["status"])
 
     # Update saved_status to reflect the newly saved status
@@ -803,14 +796,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         form = updated_post |> Forms.post_form() |> preserve_live_buffers(socket)
 
         public_url = Helpers.build_public_url(updated_post, updated_post.language)
-
-        # TEMPORARY diagnostics for the one-behind URL preview — remove before PR.
-        Logger.debug(
-          "[SlugPreview:save] post_slug=#{inspect(updated_post[:slug])} " <>
-            "meta_url_slug=#{inspect(updated_post.metadata[:url_slug])} " <>
-            "post_url_slug=#{inspect(updated_post[:url_slug])} " <>
-            "form_url_slug=#{inspect(form["url_slug"])} preview=#{inspect(public_url)}"
-        )
 
         socket =
           socket

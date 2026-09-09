@@ -793,14 +793,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           socket.assigns[:db_post_slug]
         )
 
-      # TEMPORARY diagnostics for the one-behind URL preview — remove before PR.
-      Logger.debug(
-        "[SlugPreview:event] slug=#{inspect(new_form["slug"])} " <>
-          "url_slug=#{inspect(new_form["url_slug"])} " <>
-          "db_post_slug=#{inspect(socket.assigns[:db_post_slug])} " <>
-          "lang=#{inspect(language)} preview=#{inspect(public_url)}"
-      )
-
       socket =
         assign_meta_updates(
           socket_with_slug,
