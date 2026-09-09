@@ -2220,6 +2220,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # The Publication Date value formatted per the site's Date/Time Format
+  # settings (Settings → General). Accepts the shapes the form can hold: a
+  # full ISO8601 with offset, or the naive "YYYY-MM-DDTHH:MM[:SS]" a
+  # datetime-local input submits. Nil when empty or unparseable — the
+  # preview line simply doesn't render then.
+  defp published_at_preview(value) when is_binary(value) and value != "" do
+    naive =
+      case DateTime.from_iso8601(value) do
+        {:ok, dt, _} ->
+          DateTime.to_naive(dt)
+
+        _ ->
+          padded = if byte_size(value) == 16, do: value <> ":00", else: value
+
+          case NaiveDateTime.from_iso8601(padded) do
+            {:ok, naive} -> naive
+            _ -> nil
+          end
+      end
+
+    naive && UtilsDate.format_datetime_full_with_user_format(naive)
+  end
+
+  defp published_at_preview(_), do: nil
+
   defp maybe_reclaim_lock(socket) do
     if socket.assigns[:lock_released_by_timeout] do
       Collaborative.try_reclaim_lock(socket)
@@ -4009,6 +4034,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     class={"input w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                     readonly={edit_disabled? or @viewing_older_version}
                   />
+                  <%!-- A native datetime-local renders in the BROWSER locale's
+                        format, which need not match the site's Date/Time
+                        Format settings — so echo the value in the configured
+                        format, the way it will appear on the public site. --%>
+                  <% published_preview = published_at_preview(@form["published_at"]) %>
+                  <p :if={published_preview} class="text-xs text-base-content/60 mt-1">
+                    {gettext("Displays as:")} {published_preview}
+                  </p>
                 </div>
 
                 <%!-- Clear translation button (for any language with existing content) --%>
