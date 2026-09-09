@@ -3418,6 +3418,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         name="slug"
                         id="slug-input"
                         value={@form["slug"]}
+                        phx-debounce="300"
                         pattern="[a-z0-9]+(-[a-z0-9]+)*"
                         class={"input w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                         placeholder={gettext("auto-generated from title")}
@@ -3465,6 +3466,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         name="url_slug"
                         id="url-slug-input"
                         value={@form["url_slug"] || ""}
+                        phx-debounce="300"
                         maxlength="200"
                         pattern={SlugHelpers.html_input_pattern()}
                         class={"input w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
