@@ -1066,6 +1066,34 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc """
+  Carries default url_slugs along with a post-slug rename.
+
+  Content rows are stamped with the post slug at creation, so a row whose
+  `url_slug` still equals the OLD post slug is tracking the default, not a
+  custom choice — repoint it at the new slug, filing the old one as a
+  previous slug so established URLs keep 301ing. Rows with a customized
+  `url_slug` are left alone. Returns the languages updated.
+  """
+  @spec rename_default_url_slugs(String.t(), String.t(), String.t()) :: [String.t()]
+  def rename_default_url_slugs(post_uuid, old_slug, new_slug) do
+    contents =
+      from(c in PublishingContent,
+        join: v in assoc(c, :version),
+        where: v.post_uuid == ^post_uuid and c.url_slug == ^old_slug
+      )
+      |> repo().all()
+
+    # Per-row (not update_all): the old slug must join each row's
+    # previous_url_slugs — see clear_url_slug_from_post/3.
+    Enum.each(contents, fn content ->
+      data = record_displaced_slug(content.data || %{}, old_slug, new_slug)
+      update_content(content, %{url_slug: new_slug, data: data})
+    end)
+
+    Enum.map(contents, & &1.language) |> Enum.uniq()
+  end
+
+  @doc """
   Row-locks a post (`FOR UPDATE`) inside the caller's transaction — the
   same lock `Versions.publish_version/unpublish/delete` take, so any writer
   that acquires it serializes with the publish machinery. Returns the fresh
