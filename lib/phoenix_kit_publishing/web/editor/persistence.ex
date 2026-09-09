@@ -774,11 +774,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         # and morphdom leaves the input alone. New posts and new translations
         # still adopt the echo — creation may legitimately rewrite the slug
         # (uniquification), and the writer isn't focused in these fields then.
+        # Preserve exactly the fields with a RENDERED input in this mode.
+        # On the primary language there is no url_slug input — preserving
+        # its mirrored value froze it at the pre-save state, which failed
+        # the URL preview's default-tracking comparison (mirror != persisted
+        # slug), so the preview trailed the slug by one save. Adopting the
+        # echo for input-less fields keeps mirror and persisted slug in
+        # lockstep; it can't fight the typist, since there is no input.
+        preserved_keys =
+          if socket.assigns[:is_primary_language],
+            do: ["title", "slug"],
+            else: ["title", "url_slug"]
+
         form =
           if socket.assigns[:is_new_post] || socket.assigns[:is_new_translation] do
             form
           else
-            Map.merge(form, Map.take(socket.assigns.form, ["title", "slug", "url_slug"]))
+            Map.merge(form, Map.take(socket.assigns.form, preserved_keys))
           end
 
         public_url = Helpers.build_public_url(updated_post, updated_post.language)
