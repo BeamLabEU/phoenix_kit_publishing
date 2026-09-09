@@ -761,13 +761,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           |> Helpers.mark_clean()
           |> Phoenix.Component.assign(extra_assigns)
           |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-          |> Phoenix.LiveView.push_patch(
-            to:
-              Helpers.build_edit_url(socket.assigns.group_slug, updated_post,
-                lang: updated_post.language,
-                version: updated_post[:version]
-              )
-          )
+          |> maybe_patch_edit_url(updated_post)
 
         {:noreply,
          if(flash_message,
@@ -777,6 +771,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
 
       {:error, error} ->
         handle_post_update_error(socket, error)
+    end
+  end
+
+  # Patch the address bar only when the edit URL actually changed — a new
+  # post landing on its real UUID URL, or a save that moved to another
+  # version. The edit URL is UUID-based, so routine saves (slug renames
+  # included) resolve to the SAME url — and patching to it anyway re-ran
+  # handle_params, whose DB reload clobbered any keystrokes whose debounced
+  # event landed between the save and the reload: form reset from the DB,
+  # mark_clean defusing the pending autosave, editor silently behind what
+  # the writer typed until a full page refresh.
+  defp maybe_patch_edit_url(socket, updated_post) do
+    target =
+      Helpers.build_edit_url(socket.assigns.group_slug, updated_post,
+        lang: updated_post.language,
+        version: updated_post[:version]
+      )
+
+    if target == socket.assigns[:current_edit_url] do
+      socket
+    else
+      socket
+      |> Phoenix.Component.assign(:current_edit_url, target)
+      |> Phoenix.LiveView.push_patch(to: target)
     end
   end
 

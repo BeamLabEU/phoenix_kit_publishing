@@ -425,6 +425,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           )
           |> Translation.maybe_restore_translation_status()
           |> assign(:editor_loading, false)
+          |> track_current_edit_url(group_slug, post)
 
         {:noreply, socket}
 
@@ -435,6 +436,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
          |> put_flash(:error, gettext("Post not found"))
          |> push_navigate(to: Routes.path("/admin/publishing/#{group_slug}"))}
     end
+  end
+
+  # The canonical edit URL of the currently loaded post scope. The post-save
+  # path compares its patch target against this and SKIPS the push_patch when
+  # nothing changed: a same-URL patch re-runs handle_params, whose DB reload
+  # clobbers any keystrokes whose debounced event landed between the save and
+  # the reload — form reset, mark_clean, pending autosave defused — leaving
+  # the editor silently behind what the writer typed until a full refresh.
+  defp track_current_edit_url(socket, group_slug, post) do
+    assign(
+      socket,
+      :current_edit_url,
+      Helpers.build_edit_url(group_slug, post, lang: post.language, version: post[:version])
+    )
   end
 
   defp handle_path_post_params(socket, path, params) do
@@ -480,6 +495,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           )
           |> Translation.maybe_restore_translation_status()
           |> assign(:editor_loading, false)
+          |> track_current_edit_url(group_slug, post)
 
         {:noreply, socket}
 
@@ -527,6 +543,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> Helpers.mark_clean()
       |> assign(:is_new_post, true)
       |> assign(:public_url, nil)
+      |> assign(:current_edit_url, nil)
       |> assign(:form_key, form_key)
       |> assign(:current_version, 1)
       |> assign(:available_versions, [])
