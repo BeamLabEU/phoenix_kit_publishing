@@ -763,6 +763,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
         form = Forms.post_form(updated_post)
 
+        # Keep the writer's live text buffers through a routine save. The
+        # client can hold keystrokes newer than what this save captured
+        # (debounce in flight), and re-rendering the inputs with the save's
+        # echo made the patch overwrite the field and undo them — the writer
+        # deleted, the next autosave's render restored the char, and edits
+        # crawled one character per save cycle. Saving is synchronous within
+        # the LV process, so the current form IS what was just saved: keeping
+        # it means the value attribute doesn't change across the save render
+        # and morphdom leaves the input alone. New posts and new translations
+        # still adopt the echo — creation may legitimately rewrite the slug
+        # (uniquification), and the writer isn't focused in these fields then.
+        form =
+          if socket.assigns[:is_new_post] || socket.assigns[:is_new_translation] do
+            form
+          else
+            Map.merge(form, Map.take(socket.assigns.form, ["title", "slug", "url_slug"]))
+          end
+
         public_url = Helpers.build_public_url(updated_post, updated_post.language)
 
         socket =
