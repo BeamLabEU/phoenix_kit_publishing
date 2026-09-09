@@ -2634,6 +2634,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         id: "phk-cta",
         title: gettext("Call to action"),
         icon: toolbar_glyph("▭")
+      },
+      %{
+        id: "phk-embed",
+        title: gettext("Live demo (iframe)"),
+        icon: toolbar_glyph("▦")
       }
     ]
   end
@@ -2676,6 +2681,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   defp component_snippet("phk-cta", selected) do
     body = fallback(selected, gettext("What should the reader do next?"))
     ~s(<CTA>#{body}</CTA>\n\n)
+  end
+
+  defp component_snippet("phk-embed", selected) do
+    title = fallback(selected, gettext("Try it"))
+    ~s(<Embed src="" height="480" title="#{title}" />\n\n)
   end
 
   defp component_snippet(_unknown, _selected), do: nil

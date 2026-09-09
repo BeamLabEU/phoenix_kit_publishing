@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.PageBuilder
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio, as: AudioComponent
+  alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Embed, as: EmbedComponent
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Shared.Components.Image
@@ -57,7 +58,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @global_cache_key "publishing_render_cache_enabled"
   @per_group_cache_prefix "publishing_render_cache_enabled_"
 
-  @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|Audio|EntityForm)\s+([^>]*?)\/>/s
+  @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|Audio|EntityForm|Embed)\s+([^>]*?)\/>/s
   @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|Audio|EntityForm|Showcase|Gallery)\s*([^>]*)>(.*?)<\/\1>/s
 
   # Every tag this module knows how to render. The editor hands this list to
@@ -69,7 +70,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # containing `<Showcase>`, touch anything, and the autosave writes back a
   # body with the bands flattened to loose paragraphs. It is silent, it looks
   # like nothing happened, and the only copy of the original is gone.
-  @component_tags ~w(Image CTA Headline Subheadline Video Audio EntityForm Showcase Gallery Note)
+  @component_tags ~w(Image CTA Headline Subheadline Video Audio EntityForm Showcase Gallery Note Embed)
 
   @doc """
   The PHK component tags the renderer understands, for editors that must keep
@@ -849,7 +850,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       String.contains?(content, "<Audio") ||
       String.contains?(content, "<Showcase") ||
       String.contains?(content, "<Gallery") ||
-      String.contains?(content, "<EntityForm")
+      String.contains?(content, "<EntityForm") ||
+      String.contains?(content, "<Embed")
   end
 
   # Render markdown using MDEx (comrak), then inject Tailwind/daisyUI classes
@@ -1168,6 +1170,27 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     error ->
       Logger.warning("Error rendering Audio component: #{inspect(error)}")
       "<div class='error'>Error rendering audio</div>"
+  end
+
+  defp render_inline_component("Embed", attrs) do
+    attr_map = parse_xml_attributes(attrs)
+
+    assigns = %{
+      __changed__: nil,
+      attributes: attr_map,
+      variant: Map.get(attr_map, "variant", "default"),
+      content: nil,
+      children: []
+    }
+
+    EmbedComponent.render(assigns)
+    |> PageBuilder.Renderer.wrap_stretch(attr_map)
+    |> Safe.to_iodata()
+    |> IO.iodata_to_binary()
+  rescue
+    error ->
+      Logger.warning("Error rendering Embed component: #{inspect(error)}")
+      "<div class='error'>Error rendering embed</div>"
   end
 
   defp render_inline_component("EntityForm", attrs) do
