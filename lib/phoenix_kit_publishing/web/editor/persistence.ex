@@ -91,6 +91,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       ])
       |> Map.put("content", socket.assigns.content)
 
+    params =
+      params
+      |> normalize_typed_slug("slug")
+      |> normalize_typed_slug("url_slug")
+
     params = restore_default_url_slug(params, socket.assigns.post)
 
     params =
@@ -135,6 +140,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       {:error, reason} ->
         error_message = url_slug_error_message(reason)
         {:noreply, Phoenix.LiveView.put_flash(socket, :error, error_message)}
+    end
+  end
+
+  # The slug inputs save on a 500ms debounce, so a save routinely fires
+  # mid-word — "dogs-" one keystroke away from "dogs-house". validate_slug
+  # rejects a trailing hyphen (and uppercase, and doubled hyphens), which
+  # failed the WHOLE save with "lowercase letters, numbers, and hyphens only"
+  # while the writer was, in fact, typing a hyphen. Normalize the typed value
+  # through slugify — the same treatment generate_unique_slug gives a
+  # preferred slug on create — and let the input keep the raw text: the
+  # completed word saves normalized on the next pause. A value that
+  # normalizes away entirely ("-") counts as absent and falls into the
+  # existing empty-value handling below.
+  defp normalize_typed_slug(params, key) do
+    case Map.get(params, key) do
+      val when is_binary(val) and val != "" -> Map.put(params, key, Publishing.slugify(val))
+      _ -> params
     end
   end
 
