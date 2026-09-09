@@ -283,19 +283,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   Uses Renderer.render_post/2 which caches based on content hash.
   """
   def render_post_content(post, opts \\ []) do
-    case Renderer.render_post(post, opts) do
-      {:ok, html} ->
-        html
+    html =
+      case Renderer.render_post(post, opts) do
+        {:ok, html} ->
+          html
 
-      # Fallback to uncached rendering if render_post returns unexpected
-      # format. Map.get: bare maps without :group/:language must not raise —
-      # render_markdown treats a non-binary tuple element as "no tag links".
-      _ ->
-        Renderer.render_markdown(post.content,
-          tag_links: {Map.get(post, :group), Map.get(post, :language)},
-          notes_style: Keyword.get(opts, :notes_style)
-        )
-    end
+        # Fallback to uncached rendering if render_post returns unexpected
+        # format. Map.get: bare maps without :group/:language must not raise —
+        # render_markdown treats a non-binary tuple element as "no tag links".
+        _ ->
+          Renderer.render_markdown(post.content,
+            tag_links: {Map.get(post, :group), Map.get(post, :language)},
+            notes_style: Keyword.get(opts, :notes_style)
+          )
+      end
+
+    # AFTER the cache: publication links resolve to the target's current URL
+    # on every request, so a renamed target never leaves a stale href in a
+    # cached page.
+    Renderer.resolve_post_links(html, Map.get(post, :language))
   end
 
   @doc ~S(The group's author-notes display style: "footnotes" or "panel".)

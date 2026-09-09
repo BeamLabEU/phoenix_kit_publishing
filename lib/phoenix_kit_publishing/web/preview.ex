@@ -177,6 +177,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
       tag_links: {Map.get(post, :group), Map.get(post, :language)},
       notes_style: notes_style
     )
+    |> Renderer.resolve_post_links(Map.get(post, :language))
     |> then(&{:ok, &1})
   rescue
     # Narrow: the renderer can legitimately raise on PHK XML it can't parse

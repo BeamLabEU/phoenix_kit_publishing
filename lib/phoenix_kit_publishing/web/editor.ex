@@ -1681,7 +1681,66 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply, socket}
   end
 
+  # `[[` opens the publication-mention popup: pick a post and the typed
+  # `[[query` is replaced (keep_trigger: false) with `[[post:UUID|Title]]` —
+  # linked by UUID, so the target's slug and translations can change freely
+  # without breaking the mention. Cross-group on purpose: a writer linking
+  # a post remembers its title, not which group holds it.
+  def handle_info({:leaf_suggest, %{trigger: "[[", query: query, seq: seq}}, socket) do
+    results =
+      query
+      |> Publishing.search_posts_for_mention(8)
+      |> Enum.map(fn p ->
+        %{
+          value: "[[post:#{p.uuid}|#{mention_alias(p.title)}]]",
+          label: p.title,
+          sublabel: p.group_name || p.group_slug,
+          icon: "hero-document-text"
+        }
+      end)
+
+    send_update(Leaf,
+      id: "content-editor",
+      action: :suggestions,
+      trigger: "[[",
+      query: query,
+      seq: seq,
+      results: results
+    )
+
+    {:noreply, socket}
+  end
+
   def handle_info({:leaf_suggest, _}, socket), do: {:noreply, socket}
+
+  # Leaf found `[[…]]` targets it can't resolve itself — decorate `post:UUID`
+  # tokens with the target's current title and existence, so a mention of a
+  # deleted post reads as broken in the editor.
+  def handle_info({:leaf_resolve_links, %{editor_id: id, targets: targets, seq: seq}}, socket) do
+    resolved =
+      Map.new(targets, fn
+        "post:" <> uuid = target -> {target, mention_link_target(uuid)}
+        target -> {target, %{href: nil, exists: false, title: nil}}
+      end)
+
+    send_update(Leaf, id: id, action: :link_targets, seq: seq, targets: resolved)
+    {:noreply, socket}
+  end
+
+  # A `[[post:UUID|…]]` mention was clicked in the editor — jump to that
+  # post's editor. Any unsaved work here is covered by autosave's debounce
+  # plus Leaf's protect_navigation guard.
+  def handle_info({:leaf_link_clicked, %{target: "post:" <> uuid}}, socket) do
+    case Publishing.read_post_by_uuid(uuid) do
+      {:ok, post} ->
+        {:noreply, push_navigate(socket, to: Helpers.build_edit_url(post.group, %{uuid: uuid}))}
+
+      _ ->
+        {:noreply, put_flash(socket, :warning, gettext("That publication no longer exists."))}
+    end
+  end
+
+  def handle_info({:leaf_link_clicked, _}, socket), do: {:noreply, socket}
   # The editor component's own Save button. Publishing hides it today
   # (show_save_button defaults false), so this was a no-op — meaning the day
   # anyone enables that button they'd ship a Save that does nothing. Wire it to
@@ -2244,6 +2303,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   defp published_at_preview(_), do: nil
+
+  # The alias half of a `[[post:UUID|Alias]]` token — `|` and `]` would
+  # terminate the token early, so they can't survive into it.
+  defp mention_alias(title) do
+    title
+    |> to_string()
+    |> String.replace(~r/[\[\]|]/u, " ")
+    |> String.replace(~r/\s+/u, " ")
+    |> String.trim()
+    |> case do
+      "" -> gettext("Untitled")
+      alias_text -> alias_text
+    end
+  end
+
+  defp mention_link_target(uuid) do
+    case Publishing.read_post_by_uuid(uuid) do
+      {:ok, post} ->
+        %{
+          href: Helpers.build_public_url(post, post.language),
+          exists: true,
+          title: get_in(post, [:metadata, :title])
+        }
+
+      _ ->
+        %{href: nil, exists: false, title: nil}
+    end
+  rescue
+    _ -> %{href: nil, exists: false, title: nil}
+  end
 
   defp maybe_reclaim_lock(socket) do
     if socket.assigns[:lock_released_by_timeout] do
@@ -3398,6 +3487,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   gettext_backend={PhoenixKitPublishing.Gettext}
                   protect_navigation={true}
                   toolbar_extra={component_toolbar_buttons()}
+                  wiki_links={%{follow: :click}}
                   suggestions={[
                     %{
                       trigger: "#",
@@ -3412,6 +3502,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       debounce: 150,
                       max_results: 10,
                       allow_create: true,
+                      exclude: [:code, :link]
+                    },
+                    # `[[` mentions another publication: the popup lists posts
+                    # across groups (bare trigger browses recent ones, typing
+                    # filters by title — spaces allowed, titles have them), and
+                    # accepting replaces the typed text with the full
+                    # `[[post:UUID|Title]]` token (keep_trigger: false), which
+                    # the renderer resolves to the target's CURRENT URL at
+                    # request time. handle_info({:leaf_suggest, "[[", …}).
+                    %{
+                      trigger: "[[",
+                      boundary: :any,
+                      token: ~r/[\p{L}\p{N} _-]/u,
+                      max_length: 60,
+                      min_chars: 0,
+                      debounce: 200,
+                      max_results: 8,
+                      keep_trigger: false,
+                      label: gettext("Link a publication"),
                       exclude: [:code, :link]
                     }
                   ]}
