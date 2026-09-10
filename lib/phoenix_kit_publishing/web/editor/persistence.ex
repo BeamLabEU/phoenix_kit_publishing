@@ -92,20 +92,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       ])
       |> Map.put("content", socket.assigns.content)
 
-    # On the primary language no url_slug input is rendered — the slug IS the
-    # URL — so the form's "url_slug" is only a mirror of where the content was
-    # at the last read, never something the writer typed. Persisting it wrote
-    # that stale mirror over the content row BEFORE sync_default_url_slugs
-    # ran, and since the stale value no longer matched the pre-rename post
-    # slug, the sync couldn't recognize the row as default-tracking: every
-    # quick rename burst left the public URL one save behind the slug. Drop
-    # it and let upsert's absent-means-leave-alone plus the rename sync own
-    # the primary URL. Translations keep theirs — their input is real.
-    params =
-      if socket.assigns[:is_primary_language],
-        do: Map.delete(params, "url_slug"),
-        else: params
-
     params =
       params
       |> normalize_typed_slug("slug")
@@ -125,15 +111,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           Map.delete(params, "slug")
       end
 
-    # Validate url_slug before saving (for translations)
+    # Validate url_slug before saving (for translations AND the primary
+    # language's mirror — a mirror that happens to collide with another
+    # post's custom url_slug must still be caught and blocked, not silently
+    # written).
     # For post slug conflicts, we auto-clear and show a notice instead of blocking
     case validate_url_slug_for_save(socket, params) do
       {:ok, validated_params} ->
-        do_perform_save(socket, validated_params)
+        do_perform_save(socket, drop_primary_language_url_slug(socket, validated_params))
 
       {:ok, validated_params, notice} ->
         socket = Phoenix.LiveView.put_flash(socket, :info, notice)
-        do_perform_save(socket, validated_params)
+        do_perform_save(socket, drop_primary_language_url_slug(socket, validated_params))
 
       {:slug_conflict, info} ->
         # Don't silently clear or save — show the user which post owns the slug
@@ -194,6 +183,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   end
 
   defp restore_default_url_slug(params, _post), do: params
+
+  # On the primary language no url_slug input is rendered — the slug IS the
+  # URL — so the form's "url_slug" is only a mirror of where the content was
+  # at the last read, never something the writer typed. Persisting it wrote
+  # that stale mirror over the content row BEFORE sync_default_url_slugs
+  # ran, and since the stale value no longer matched the pre-rename post
+  # slug, the sync couldn't recognize the row as default-tracking: every
+  # quick rename burst left the public URL one save behind the slug. Drop
+  # it and let upsert's absent-means-leave-alone plus the rename sync own
+  # the primary URL. Translations keep theirs — their input is real.
+  #
+  # This runs AFTER validate_url_slug_for_save, not before: the mirror is
+  # still worth validating for a conflict (it can legitimately equal another
+  # post's custom url_slug — see the M13 test in editor_live_test.exs), it
+  # just must never be the thing that gets WRITTEN on the primary language.
+  defp drop_primary_language_url_slug(socket, params) do
+    if socket.assigns[:is_primary_language],
+      do: Map.delete(params, "url_slug"),
+      else: params
+  end
 
   defp validate_url_slug_for_save(socket, params) do
     url_slug = Map.get(params, "url_slug", "")

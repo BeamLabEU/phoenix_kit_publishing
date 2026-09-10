@@ -13,10 +13,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias Phoenix.HTML.Safe
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Hashtags
-  alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.PageBuilder
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio, as: AudioComponent
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Embed, as: EmbedComponent
+  alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Shared.Components.Image

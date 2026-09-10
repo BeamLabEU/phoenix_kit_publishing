@@ -693,4 +693,78 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
       assert ref =~ "#elixir"
     end
   end
+
+  # ============================================================================
+  # [[post:UUID|Alias]] publication mentions
+  # ============================================================================
+  #
+  # These exercise the paths that don't need a resolvable DB target — the
+  # cases where `resolve_post_link_target/2` rescues to `nil` (unit test,
+  # no repo configured) cover the "missing/unresolvable target" branch the
+  # public renderer degrades to plain text for. The "found, published
+  # target" branch is covered end-to-end by
+  # `web/controller/post_links_test.exs`, which needs a real post to link
+  # to.
+
+  @mention_uuid "018e3c4a-9f6b-7890-abcd-ef1234567890"
+
+  describe "resolve_post_links/2" do
+    test "html with no [[post: tokens is returned unchanged" do
+      html = "<p>Nothing to see here</p>"
+      assert Renderer.resolve_post_links(html, "en") == html
+    end
+
+    test "an alias survives verbatim, not double-escaped, when the target can't be resolved" do
+      html = Renderer.render_markdown(~s([[post:#{@mention_uuid}|Tom & Jerry]]))
+      resolved = Renderer.resolve_post_links(html, "en")
+
+      refute resolved =~ "<a href"
+      assert resolved =~ "Tom &amp; Jerry"
+      refute resolved =~ "&amp;amp;"
+    end
+
+    test "a bare token (no alias) with an unresolvable target renders as nothing" do
+      html = Renderer.render_markdown(~s(before [[post:#{@mention_uuid}]] after))
+      resolved = Renderer.resolve_post_links(html, "en")
+
+      refute resolved =~ "[[post:"
+      assert resolved =~ "before"
+      assert resolved =~ "after"
+    end
+
+    test "a token inside <pre>, <code> or an existing <a> is left as literal text" do
+      for wrapper <- ["pre", "code", "a"] do
+        html = "<#{wrapper}>[[post:#{@mention_uuid}|Alias]]</#{wrapper}>"
+        assert Renderer.resolve_post_links(html, "en") == html
+      end
+    end
+
+    test "nil language is accepted" do
+      html = Renderer.render_markdown(~s([[post:#{@mention_uuid}|Alias]]))
+      assert Renderer.resolve_post_links(html, nil) =~ "Alias"
+    end
+  end
+
+  describe "post_links_to_text/1" do
+    test "an aliased token reduces to its alias" do
+      assert Renderer.post_links_to_text("See [[post:#{@mention_uuid}|My Post]] for more") ==
+               "See My Post for more"
+    end
+
+    test "a bare token with no alias is dropped entirely" do
+      assert Renderer.post_links_to_text("See [[post:#{@mention_uuid}]] for more") ==
+               "See  for more"
+    end
+
+    test "a token straddling a naive character-count slice still reduces cleanly" do
+      # The bug this guards: slicing BEFORE reducing tokens can cut a token's
+      # `]]` off, leaving an unmatched fragment no downstream pass can catch.
+      markdown = String.duplicate("x", 290) <> " [[post:#{@mention_uuid}|Alias]] tail"
+      reduced = Renderer.post_links_to_text(markdown)
+      excerpt = String.slice(reduced, 0, 300)
+
+      refute excerpt =~ "[[post:"
+      assert excerpt =~ "Alias"
+    end
+  end
 end

@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.10.0 - 2026-09-10
+
+### Added
+
+- Cross-post mentions: typing `[[` in the body editor opens a publication picker
+  (browses recently updated posts, or filters by title as you type) and inserts a
+  `[[post:UUID|Title]]` token linked by UUID, so the target's slug, custom URL slug
+  and translation slugs can all change freely without ever breaking the mention.
+  Resolved to the target's current public URL on every request, after the render
+  cache — so a renamed target never leaves a stale link inside a cached page. A
+  missing, trashed or unpublished target degrades to plain text, never a dead link.
+- The `<Embed>` PHK component: a sandboxed, lazy-loaded iframe for dropping a live,
+  interactive demo directly into a post body (`<Embed src="/demos/leaf" height="520"
+  title="Try the editor" />`).
+- The publishing editor now honors the site-wide Content Editor mode (Settings →
+  Content Editor: visual/hybrid/markdown/html) instead of always opening in
+  markdown. A post body carrying raw HTML still opens in markdown regardless of the
+  setting, since the other editing surfaces flatten hand-authored HTML wrappers.
+- The Publication Date field now echoes its value underneath the picker in the
+  site's configured Date/Time Format, since the native browser picker always
+  renders in the browser's own locale.
+
+### Fixed
+
+- A burst of post-slug renames in the editor could leave the public URL frozen one
+  save behind the typed slug, occasionally causing "URL slug already in use"
+  conflicts against unrelated new posts. The save now carries default-tracking
+  `url_slug`s along with a post-slug rename inside the same transaction, filing the
+  displaced slug as a 301.
+- Fast typing in the editor could lose keystrokes: every autosave rebuilt the form
+  from a fresh DB read and re-rendered the text inputs with that echo, overwriting
+  whatever the writer had typed in the debounce window since the save started. The
+  save's own live form values are now preserved through the rebuild instead.
+- Every autosave `push_patch`ed to the edit URL even when the URL hadn't changed,
+  which re-ran `handle_params` and clobbered any keystroke that landed between the
+  save completing and the reload. The editor now only patches when the save
+  actually moves the URL (a new post, a new translation, a new version).
+- The slug and URL-slug inputs could reject a legitimate in-progress edit (a save
+  firing mid-word, e.g. on a trailing hyphen) with a hard validation error instead
+  of just normalizing it on the next pause.
+- A mid-rename save could die on a self-collision ("that slug is already in use")
+  naming the post's own current URL, because the uniqueness check excluded the
+  post by its in-memory (already-renamed) slug instead of its persisted one.
+- A primary-language save whose URL-slug mirror happened to collide with another
+  post's custom URL slug no longer skipped the "URL slug already in use" conflict
+  check — the mirror is validated before being dropped, not after.
+- The autosave status indicator no longer flashes a filled badge on every
+  keystroke and debounce settle; saved/unsaved/new states are now quiet muted
+  text, while the autosave-blocked state keeps its loud badge since it carries a
+  reason the writer must act on.
+- A `[[post:…]]` mention token straddling a listing excerpt's 300-character cut
+  used to leave a dangling, unmatched fragment (including in the RSS feed's item
+  description); excerpts now reduce a mention to its visible text before slicing.
+
 ## 0.9.1 - 2026-09-07
 
 ### Added
