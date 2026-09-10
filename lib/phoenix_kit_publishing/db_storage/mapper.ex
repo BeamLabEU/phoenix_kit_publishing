@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.PublishingVersion
+  alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Utils.Values
 
@@ -337,6 +338,11 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
     # could cut MID-TAG — the broken tag then survives downstream
     # tag-stripping as escaped junk in the card preview.
     |> Shared.strip_components()
+    # Publication links next, for the same slice reason: a `[[post:UUID|…]]`
+    # token straddling char 300 loses its `]]` and no downstream pass can
+    # match the fragment — listing cards and the RSS feed both read this
+    # excerpt, so the token must reduce to its visible text BEFORE the cut.
+    |> Renderer.post_links_to_text()
     |> String.split(~r/\n\n+/)
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#")))

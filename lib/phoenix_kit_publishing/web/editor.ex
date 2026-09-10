@@ -454,7 +454,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     # rewrites from the form on every keystroke. The URL preview needs it to
     # tell a default-tracking url_slug (== this) from a customized one.
     |> assign(:db_post_slug, post[:slug])
+    |> assign(:editor_mode, __effective_editor_mode__(default_editor_mode(), post[:content]))
   end
+
+  @doc false
+  # Honoring the site-wide Content Editor mode must not destroy content the
+  # trust model deliberately allows: admin-authored raw HTML
+  # (`<div class="grid">…</div>`) renders fine, but Leaf's hybrid/visual/html
+  # surfaces round-trip the body through a serializer that keeps only the
+  # INNER TEXT of tags it doesn't own — the wrapper and its attributes are
+  # gone on the next autosave, silently. `preserve_tags` shields PHK
+  # components only. So a body carrying raw HTML opens in :markdown — the
+  # one surface that edits it losslessly — and everything else follows the
+  # admin's chosen mode. Public only so the guard can be pinned by a test.
+  def __effective_editor_mode__(mode, content) when mode in [:hybrid, :visual, :html] do
+    if __raw_html_content__?(content), do: :markdown, else: mode
+  end
+
+  def __effective_editor_mode__(mode, _content), do: mode
+
+  @doc false
+  # Raw HTML outside code regions. Fences and inline code are stripped first
+  # so documentation ABOUT HTML doesn't trip the guard; PHK component tags
+  # are capitalized and miss the lowercase requirement; autolinks
+  # (`<https://…>`) fail the `[\s/>]` terminator after the tag name.
+  def __raw_html_content__?(content) when is_binary(content) do
+    content
+    |> String.replace(~r/```.*?```/s, " ")
+    |> String.replace(~r/`[^`\n]*`/, " ")
+    |> String.match?(~r/<[a-z][a-z0-9-]*[\s\/>]/)
+  end
+
+  def __raw_html_content__?(_), do: false
 
   defp handle_path_post_params(socket, path, params) do
     group_slug = socket.assigns.group_slug

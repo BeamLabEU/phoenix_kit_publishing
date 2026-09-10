@@ -71,6 +71,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorPreserveTagsTest do
            "renderer components missing from component_tags/0: #{inspect(MapSet.to_list(missing))}"
   end
 
+  describe "the raw-HTML mode guard" do
+    alias PhoenixKit.Modules.Publishing.Web.Editor
+
+    test "a body carrying raw HTML opens in markdown regardless of the setting" do
+      assert Editor.__effective_editor_mode__(:hybrid, ~s(<div class="grid">x</div>)) ==
+               :markdown
+
+      assert Editor.__effective_editor_mode__(:visual, "before <span >after") == :markdown
+    end
+
+    test "markdown-only bodies follow the site setting" do
+      assert Editor.__effective_editor_mode__(:hybrid, "plain **markdown** text") == :hybrid
+
+      assert Editor.__effective_editor_mode__(:hybrid, ~s(<Showcase src="x">band</Showcase>)) ==
+               :hybrid
+    end
+
+    test "code regions and autolinks don't trip the guard" do
+      assert Editor.__effective_editor_mode__(:hybrid, "```\n<div class=x>\n```") == :hybrid
+      assert Editor.__effective_editor_mode__(:hybrid, "inline `<div>` sample") == :hybrid
+
+      assert Editor.__effective_editor_mode__(:hybrid, "see <https://example.com> link") ==
+               :hybrid
+    end
+
+    test "markdown mode is never overridden" do
+      assert Editor.__effective_editor_mode__(:markdown, "<div >x") == :markdown
+    end
+  end
+
   test "the components the demo content actually uses are all covered" do
     # A concrete guard against a clever-but-wrong regex above: these are the
     # tags real posts are written with today.

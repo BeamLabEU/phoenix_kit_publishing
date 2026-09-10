@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
   alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
@@ -167,10 +168,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   # completed word saves normalized on the next pause. A value that
   # normalizes away entirely ("-") counts as absent and falls into the
   # existing empty-value handling below.
+  # `cap: false`: the default cap trims to the 60-char SEO budget, which is
+  # right for slugs DERIVED from titles but silently truncated a writer's
+  # deliberately long typed slug (the input allows 200, the changeset 500).
+  # Normalization here is about shape, not length.
   defp normalize_typed_slug(params, key) do
     case Map.get(params, key) do
-      val when is_binary(val) and val != "" -> Map.put(params, key, Publishing.slugify(val))
-      _ -> params
+      val when is_binary(val) and val != "" ->
+        Map.put(params, key, SlugHelpers.slugify(val, cap: false))
+
+      _ ->
+        params
     end
   end
 

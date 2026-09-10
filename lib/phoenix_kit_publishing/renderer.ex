@@ -496,23 +496,30 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     _ -> nil
   end
 
+  # The alias slice comes out of ALREADY-RENDERED HTML — MDEx escaped its
+  # entities (`&` is `&amp;` by the time the token reaches this pass), so
+  # re-escaping double-encoded them ("Tom &amp; Jerry" displayed literally).
+  # The alias is inserted verbatim; only the title fallback (raw text from
+  # the DB) and the href are escaped here.
   defp render_post_link(target, alias_text) do
-    text =
+    {text, pre_escaped?} =
       case String.trim(alias_text || "") do
-        "" -> String.trim(to_string((target && target.title) || ""))
-        aliased -> aliased
+        "" -> {String.trim(to_string((target && target.title) || "")), false}
+        aliased -> {aliased, true}
       end
+
+    safe_text = if pre_escaped?, do: text, else: Plug.HTML.html_escape(text)
 
     cond do
       text == "" ->
         ""
 
       is_nil(target) or is_nil(target.href) ->
-        Plug.HTML.html_escape(text)
+        safe_text
 
       true ->
         ~s(<a href="#{Plug.HTML.html_escape(target.href)}" class="link link-hover publishing-post-link">) <>
-          Plug.HTML.html_escape(text) <> "</a>"
+          safe_text <> "</a>"
     end
   end
 
