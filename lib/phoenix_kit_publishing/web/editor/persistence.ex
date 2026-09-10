@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
   alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
@@ -91,6 +92,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       ])
       |> Map.put("content", socket.assigns.content)
 
+    # On the primary language no url_slug input is rendered — the slug IS the
+    # URL — so the form's "url_slug" is only a mirror of where the content was
+    # at the last read, never something the writer typed. Persisting it wrote
+    # that stale mirror over the content row BEFORE sync_default_url_slugs
+    # ran, and since the stale value no longer matched the pre-rename post
+    # slug, the sync couldn't recognize the row as default-tracking: every
+    # quick rename burst left the public URL one save behind the slug. Drop
+    # it and let upsert's absent-means-leave-alone plus the rename sync own
+    # the primary URL. Translations keep theirs — their input is real.
+    params =
+      if socket.assigns[:is_primary_language],
+        do: Map.delete(params, "url_slug"),
+        else: params
+
+    params =
+      params
+      |> normalize_typed_slug("slug")
+      |> normalize_typed_slug("url_slug")
+
     params = restore_default_url_slug(params, socket.assigns.post)
 
     params =
@@ -138,6 +158,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     end
   end
 
+  # The slug inputs save on a 500ms debounce, so a save routinely fires
+  # mid-word — "dogs-" one keystroke away from "dogs-house". validate_slug
+  # rejects a trailing hyphen (and uppercase, and doubled hyphens), which
+  # failed the WHOLE save with "lowercase letters, numbers, and hyphens only"
+  # while the writer was, in fact, typing a hyphen. Normalize the typed value
+  # through slugify — the same treatment generate_unique_slug gives a
+  # preferred slug on create — and let the input keep the raw text: the
+  # completed word saves normalized on the next pause. A value that
+  # normalizes away entirely ("-") counts as absent and falls into the
+  # existing empty-value handling below.
+  # `cap: false`: the default cap trims to the 60-char SEO budget, which is
+  # right for slugs DERIVED from titles but silently truncated a writer's
+  # deliberately long typed slug (the input allows 200, the changeset 500).
+  # Normalization here is about shape, not length.
+  defp normalize_typed_slug(params, key) do
+    case Map.get(params, key) do
+      val when is_binary(val) and val != "" ->
+        Map.put(params, key, SlugHelpers.slugify(val, cap: false))
+
+      _ ->
+        params
+    end
+  end
+
   # The UI promises "leave empty to restore the default slug", but the
   # domain layer deliberately reads a blank url_slug as "leave it alone"
   # (protecting programmatic partial maps — see upsert_post_content).
@@ -157,7 +201,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     if url_slug != "" do
       group_slug = socket.assigns.group_slug
       language = editor_language(socket.assigns)
-      post_slug = socket.assigns.post.slug || socket.assigns.post[:uuid]
+      post_slug = persisted_post_slug(socket.assigns.post) || socket.assigns.post[:uuid]
 
       case Publishing.validate_url_slug(group_slug, url_slug, language, post_slug) do
         {:ok, _} ->
@@ -174,6 +218,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       end
     else
       {:ok, params}
+    end
+  end
+
+  # The uniqueness check excludes "this post" by its slug — but the in-memory
+  # post mirrors the FORM (update_post_from_form rewrites :slug on every
+  # keystroke), so mid-rename it carries the NEW, not-yet-saved slug. Excluding
+  # by that meant the post's own DB rows (still under the old slug) counted as
+  # "another post", and every rename died on a self-collision ("<old slug> is
+  # already in use") the writer could not resolve. Resolve the persisted slug
+  # by uuid, which is stable across renames; a post not yet in the DB has
+  # nothing to exclude.
+  defp persisted_post_slug(post) do
+    case post[:uuid] do
+      nil ->
+        post[:slug]
+
+      uuid ->
+        case DBStorage.get_post_by_uuid(uuid) do
+          %{slug: slug} -> slug
+          nil -> post[:slug]
+        end
     end
   end
 
@@ -566,6 +631,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     end
   end
 
+  # Keep the writer's live text buffers through a save's form rebuild. The
+  # client can hold keystrokes newer than what the save captured (debounce
+  # in flight); re-rendering the inputs with the save's echo made the patch
+  # overwrite the focused field and undo them — edits crawled one character
+  # per save cycle. Saving is synchronous within the LV process, so the
+  # current form IS what was just saved: keeping its values means the value
+  # attribute doesn't change across the save render and the patch leaves
+  # the input alone. Only fields with a RENDERED input in the current mode
+  # are preserved — on the primary language there is no url_slug input, and
+  # preserving that mirrored value froze it one save behind, failing the URL
+  # preview's default-tracking comparison (mirror != persisted slug); the
+  # input-less field adopts the echo, which can't fight a typist who has no
+  # input to type in. New posts and new translations adopt everything —
+  # creation may legitimately rewrite the slug (uniquification), and the
+  # writer isn't focused in these fields then.
+  defp preserve_live_buffers(form, socket) do
+    if socket.assigns[:is_new_post] || socket.assigns[:is_new_translation] do
+      form
+    else
+      preserved_keys =
+        if socket.assigns[:is_primary_language],
+          do: ["title", "slug"],
+          else: ["title", "url_slug"]
+
+      Map.merge(form, Map.take(socket.assigns.form, preserved_keys))
+    end
+  end
+
   defp handle_post_save_success(socket, post) do
     group_slug = socket.assigns.group_slug
 
@@ -618,7 +711,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           Map.put(post, :language_statuses, updated_statuses)
       end
 
-    form = Forms.post_form_with_primary_status(group_slug, refreshed_post, current_version)
+    form =
+      group_slug
+      |> Forms.post_form_with_primary_status(refreshed_post, current_version)
+      |> preserve_live_buffers(socket)
 
     is_published = Constants.published?(form["status"])
 
@@ -628,6 +724,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     socket =
       socket
       |> Phoenix.Component.assign(:post, refreshed_post)
+      |> Phoenix.Component.assign(:db_post_slug, refreshed_post[:slug])
       |> Forms.assign_form_with_tracking(form)
       |> Phoenix.Component.assign(:content, refreshed_post.content)
       |> Helpers.mark_clean()
@@ -704,13 +801,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
             else: success_message
 
         alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
-        form = Forms.post_form(updated_post)
+        form = updated_post |> Forms.post_form() |> preserve_live_buffers(socket)
 
         public_url = Helpers.build_public_url(updated_post, updated_post.language)
 
         socket =
           socket
           |> Phoenix.Component.assign(:post, updated_post)
+          |> Phoenix.Component.assign(:db_post_slug, updated_post[:slug])
           |> Phoenix.Component.assign(:public_url, public_url)
           |> Forms.assign_form_with_tracking(form)
           |> Phoenix.Component.assign(:content, updated_post.content)
@@ -718,13 +816,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           |> Helpers.mark_clean()
           |> Phoenix.Component.assign(extra_assigns)
           |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-          |> Phoenix.LiveView.push_patch(
-            to:
-              Helpers.build_edit_url(socket.assigns.group_slug, updated_post,
-                lang: updated_post.language,
-                version: updated_post[:version]
-              )
-          )
+          |> maybe_patch_edit_url(updated_post)
 
         {:noreply,
          if(flash_message,
@@ -734,6 +826,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
 
       {:error, error} ->
         handle_post_update_error(socket, error)
+    end
+  end
+
+  # Patch the address bar only when the edit URL actually changed — a new
+  # post landing on its real UUID URL, or a save that moved to another
+  # version. The edit URL is UUID-based, so routine saves (slug renames
+  # included) resolve to the SAME url — and patching to it anyway re-ran
+  # handle_params, whose DB reload clobbered any keystrokes whose debounced
+  # event landed between the save and the reload: form reset from the DB,
+  # mark_clean defusing the pending autosave, editor silently behind what
+  # the writer typed until a full page refresh.
+  defp maybe_patch_edit_url(socket, updated_post) do
+    target =
+      Helpers.build_edit_url(socket.assigns.group_slug, updated_post,
+        lang: updated_post.language,
+        version: updated_post[:version]
+      )
+
+    if target == socket.assigns[:current_edit_url] do
+      socket
+    else
+      socket
+      |> Phoenix.Component.assign(:current_edit_url, target)
+      |> Phoenix.LiveView.push_patch(to: target)
     end
   end
 

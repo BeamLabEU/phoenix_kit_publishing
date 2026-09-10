@@ -13,8 +13,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias Phoenix.HTML.Safe
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Hashtags
+  alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.PageBuilder
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio, as: AudioComponent
+  alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Embed, as: EmbedComponent
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Shared.Components.Image
@@ -56,7 +58,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @global_cache_key "publishing_render_cache_enabled"
   @per_group_cache_prefix "publishing_render_cache_enabled_"
 
-  @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|Audio|EntityForm)\s+([^>]*?)\/>/s
+  @component_regex ~r/<(Image|CTA|Headline|Subheadline|Video|Audio|EntityForm|Embed)\s+([^>]*?)\/>/s
   @component_block_regex ~r/<(CTA|Headline|Subheadline|Video|Audio|EntityForm|Showcase|Gallery)\s*([^>]*)>(.*?)<\/\1>/s
 
   # Every tag this module knows how to render. The editor hands this list to
@@ -68,7 +70,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # containing `<Showcase>`, touch anything, and the autosave writes back a
   # body with the bands flattened to loose paragraphs. It is silent, it looks
   # like nothing happened, and the only copy of the original is gone.
-  @component_tags ~w(Image CTA Headline Subheadline Video Audio EntityForm Showcase Gallery Note)
+  @component_tags ~w(Image CTA Headline Subheadline Video Audio EntityForm Showcase Gallery Note Embed)
 
   @doc """
   The PHK component tags the renderer understands, for editors that must keep
@@ -331,6 +333,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     render: [unsafe: true]
   ]
 
+  # Editor-inserted publication links: `[[post:UUID]]` / `[[post:UUID|Alias]]`.
+  # The UUID is the stable identity — slugs and translations may change freely.
+  @post_link_re ~r/\[\[post:([0-9a-fA-F-]{36})(?:\|([^\]]*))?\]\]/
+  # Regions where the token is literal text (or already inside a link).
+  @post_link_skip_re ~r{(<(?:pre|code|a)\b[^>]*>.*?</(?:pre|code|a)>)}is
+
   # Sentinel for a `<` that sits inside a code span/fence. The component scanner
   # is plain regex over the source, so without this it would extract a `<Image>`
   # / `<CTA>` / … shown *literally* inside a code block and render it as a real
@@ -407,6 +415,111 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
          tag_links: tag_link_context(post),
          notes_style: Keyword.get(opts, :notes_style)
        )}
+    end
+  end
+
+  @doc """
+  Resolves editor-inserted publication links (`[[post:UUID|Alias]]`) in
+  rendered HTML to the target post's CURRENT public URL.
+
+  Runs AFTER the render cache on purpose: cached HTML keeps the literal
+  token, and this pass rebuilds the href on every request — so renaming a
+  target's slug (or any of its translation slugs) can never leave a stale
+  link inside a cached page. The URL is built for the requested `language`,
+  riding the read path's normal language fallbacks.
+
+  Degrades safely: a missing, trashed or unpublished target renders as the
+  alias in plain text (never a dead link); a token with no alias uses the
+  target's current title. Tokens inside `<pre>`, `<code>` or an existing
+  `<a>` are left as literal text, mirroring Leaf's own decoration rules.
+  """
+  @spec resolve_post_links(String.t(), String.t() | nil) :: String.t()
+  def resolve_post_links(html, language) when is_binary(html) do
+    if String.contains?(html, "[[post:") do
+      targets = build_post_link_targets(html, language)
+
+      html
+      |> String.split(@post_link_skip_re, include_captures: true)
+      |> Enum.map_join("", fn chunk ->
+        if Regex.match?(~r/^<(?:pre|code|a)\b/i, chunk) do
+          chunk
+        else
+          Regex.replace(@post_link_re, chunk, fn _full, uuid, alias_text ->
+            render_post_link(Map.get(targets, uuid), alias_text)
+          end)
+        end
+      end)
+    else
+      html
+    end
+  end
+
+  def resolve_post_links(html, _language), do: html
+
+  @doc """
+  Reduces publication link tokens in MARKDOWN to their visible text —
+  for excerpts and other plain-text-ish surfaces where a link isn't wanted.
+  A token with no alias is dropped entirely (resolving titles per excerpt
+  would cost a read per token per listing row).
+  """
+  @spec post_links_to_text(String.t()) :: String.t()
+  def post_links_to_text(markdown) when is_binary(markdown) do
+    Regex.replace(@post_link_re, markdown, fn _full, _uuid, alias_text -> alias_text end)
+  end
+
+  def post_links_to_text(other), do: other
+
+  # One read per UNIQUE target per document, not per token occurrence.
+  defp build_post_link_targets(html, language) do
+    @post_link_re
+    |> Regex.scan(html, capture: :all_but_first)
+    |> Enum.map(&hd/1)
+    |> Enum.uniq()
+    |> Map.new(fn uuid -> {uuid, resolve_post_link_target(uuid, language)} end)
+  end
+
+  defp resolve_post_link_target(uuid, language) do
+    case Posts.read_post_by_uuid(uuid, language) do
+      {:ok, post} ->
+        href =
+          if Constants.published?(post.metadata.status) do
+            PublishingHTML.build_post_url(post.group, post, post.language)
+          end
+
+        %{href: href, title: get_in(post, [:metadata, :title])}
+
+      _ ->
+        nil
+    end
+  rescue
+    # A link must never take the page down — degrade to plain text.
+    _ -> nil
+  end
+
+  # The alias slice comes out of ALREADY-RENDERED HTML — MDEx escaped its
+  # entities (`&` is `&amp;` by the time the token reaches this pass), so
+  # re-escaping double-encoded them ("Tom &amp; Jerry" displayed literally).
+  # The alias is inserted verbatim; only the title fallback (raw text from
+  # the DB) and the href are escaped here.
+  defp render_post_link(target, alias_text) do
+    {text, pre_escaped?} =
+      case String.trim(alias_text || "") do
+        "" -> {String.trim(to_string((target && target.title) || "")), false}
+        aliased -> {aliased, true}
+      end
+
+    safe_text = if pre_escaped?, do: text, else: Plug.HTML.html_escape(text)
+
+    cond do
+      text == "" ->
+        ""
+
+      is_nil(target) or is_nil(target.href) ->
+        safe_text
+
+      true ->
+        ~s(<a href="#{Plug.HTML.html_escape(target.href)}" class="link link-hover publishing-post-link">) <>
+          safe_text <> "</a>"
     end
   end
 
@@ -744,7 +857,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       String.contains?(content, "<Audio") ||
       String.contains?(content, "<Showcase") ||
       String.contains?(content, "<Gallery") ||
-      String.contains?(content, "<EntityForm")
+      String.contains?(content, "<EntityForm") ||
+      String.contains?(content, "<Embed")
   end
 
   # Render markdown using MDEx (comrak), then inject Tailwind/daisyUI classes
@@ -1063,6 +1177,27 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     error ->
       Logger.warning("Error rendering Audio component: #{inspect(error)}")
       "<div class='error'>Error rendering audio</div>"
+  end
+
+  defp render_inline_component("Embed", attrs) do
+    attr_map = parse_xml_attributes(attrs)
+
+    assigns = %{
+      __changed__: nil,
+      attributes: attr_map,
+      variant: Map.get(attr_map, "variant", "default"),
+      content: nil,
+      children: []
+    }
+
+    EmbedComponent.render(assigns)
+    |> PageBuilder.Renderer.wrap_stretch(attr_map)
+    |> Safe.to_iodata()
+    |> IO.iodata_to_binary()
+  rescue
+    error ->
+      Logger.warning("Error rendering Embed component: #{inspect(error)}")
+      "<div class='error'>Error rendering embed</div>"
   end
 
   defp render_inline_component("EntityForm", attrs) do

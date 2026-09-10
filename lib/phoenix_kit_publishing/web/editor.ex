@@ -30,6 +30,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # we tell it the symbol is expected to be undefined in that case.
   @compile {:no_warn_undefined, PhoenixKitOG}
 
+  # `get_editor_mode/0` only exists in newer phoenix_kit builds, but the pin
+  # still allows older ones — `default_editor_mode/0` probes for it at runtime.
+  @compile {:no_warn_undefined, {PhoenixKit.Settings, :get_editor_mode, 0}}
+
   alias Phoenix.LiveView.JS
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
@@ -66,6 +70,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   # Save quickly — DB writes are ~5ms, no reason to delay
   @autosave_debounce_ms 500
+
+  @leaf_editor_modes [:visual, :hybrid, :markdown, :html]
+  # Fallback when the site-wide setting is unavailable (older core, no repo).
+  # Markdown, not :hybrid, to match what this editor always opened in before
+  # it honored the setting — the PHK component blocks are markdown-first.
+  @default_editor_mode :markdown
 
   # ============================================================================
   # Template Helper Delegations
@@ -119,6 +129,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     _ -> nil
   end
 
+  # Site-wide default editor mode (admin-set under Settings → Content Editor).
+  # `PhoenixKit.Settings.get_editor_mode/0` only exists in newer core builds,
+  # but the pin allows older ones — probe before calling (the
+  # `no_warn_undefined` above covers the compile side). Settings reads can
+  # also raise when no repo is configured — hence the rescue. Mirrors
+  # phoenix_kit_posts, which reads the same setting.
+  defp default_editor_mode do
+    if Code.ensure_loaded?(Settings) and function_exported?(Settings, :get_editor_mode, 0) do
+      normalize_editor_mode(Settings.get_editor_mode())
+    else
+      @default_editor_mode
+    end
+  rescue
+    _ -> @default_editor_mode
+  end
+
+  # Leaf's mode clauses have no catch-all, so a string setting value or
+  # anything unrecognised must be normalised here rather than blowing up
+  # inside Leaf.
+  defp normalize_editor_mode(mode) when mode in @leaf_editor_modes, do: mode
+
+  defp normalize_editor_mode(mode) when is_binary(mode) do
+    Enum.find(@leaf_editor_modes, @default_editor_mode, &(to_string(&1) == mode))
+  end
+
+  defp normalize_editor_mode(_mode), do: @default_editor_mode
+
   # ============================================================================
   # Mount
   # ============================================================================
@@ -141,6 +178,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign(:show_media_selector, false)
       |> assign(:autosave_blocked, nil)
+      |> assign(:editor_mode, default_editor_mode())
       |> assign(:media_selector_target, "featured_image_uuid")
       |> assign(:media_selection_mode, :single)
       |> assign(:media_selected_uuids, MapSet.new())
@@ -387,6 +425,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           )
           |> Translation.maybe_restore_translation_status()
           |> assign(:editor_loading, false)
+          |> track_current_edit_url(group_slug, post)
 
         {:noreply, socket}
 
@@ -398,6 +437,55 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
          |> push_navigate(to: Routes.path("/admin/publishing/#{group_slug}"))}
     end
   end
+
+  # The canonical edit URL of the currently loaded post scope. The post-save
+  # path compares its patch target against this and SKIPS the push_patch when
+  # nothing changed: a same-URL patch re-runs handle_params, whose DB reload
+  # clobbers any keystrokes whose debounced event landed between the save and
+  # the reload — form reset, mark_clean, pending autosave defused — leaving
+  # the editor silently behind what the writer typed until a full refresh.
+  defp track_current_edit_url(socket, group_slug, post) do
+    socket
+    |> assign(
+      :current_edit_url,
+      Helpers.build_edit_url(group_slug, post, lang: post.language, version: post[:version])
+    )
+    # The slug as PERSISTED, unlike @post.slug which update_post_from_form
+    # rewrites from the form on every keystroke. The URL preview needs it to
+    # tell a default-tracking url_slug (== this) from a customized one.
+    |> assign(:db_post_slug, post[:slug])
+    |> assign(:editor_mode, __effective_editor_mode__(default_editor_mode(), post[:content]))
+  end
+
+  @doc false
+  # Honoring the site-wide Content Editor mode must not destroy content the
+  # trust model deliberately allows: admin-authored raw HTML
+  # (`<div class="grid">…</div>`) renders fine, but Leaf's hybrid/visual/html
+  # surfaces round-trip the body through a serializer that keeps only the
+  # INNER TEXT of tags it doesn't own — the wrapper and its attributes are
+  # gone on the next autosave, silently. `preserve_tags` shields PHK
+  # components only. So a body carrying raw HTML opens in :markdown — the
+  # one surface that edits it losslessly — and everything else follows the
+  # admin's chosen mode. Public only so the guard can be pinned by a test.
+  def __effective_editor_mode__(mode, content) when mode in [:hybrid, :visual, :html] do
+    if __raw_html_content__?(content), do: :markdown, else: mode
+  end
+
+  def __effective_editor_mode__(mode, _content), do: mode
+
+  @doc false
+  # Raw HTML outside code regions. Fences and inline code are stripped first
+  # so documentation ABOUT HTML doesn't trip the guard; PHK component tags
+  # are capitalized and miss the lowercase requirement; autolinks
+  # (`<https://…>`) fail the `[\s/>]` terminator after the tag name.
+  def __raw_html_content__?(content) when is_binary(content) do
+    content
+    |> String.replace(~r/```.*?```/s, " ")
+    |> String.replace(~r/`[^`\n]*`/, " ")
+    |> String.match?(~r/<[a-z][a-z0-9-]*[\s\/>]/)
+  end
+
+  def __raw_html_content__?(_), do: false
 
   defp handle_path_post_params(socket, path, params) do
     group_slug = socket.assigns.group_slug
@@ -442,6 +530,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           )
           |> Translation.maybe_restore_translation_status()
           |> assign(:editor_loading, false)
+          |> track_current_edit_url(group_slug, post)
 
         {:noreply, socket}
 
@@ -489,6 +578,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> Helpers.mark_clean()
       |> assign(:is_new_post, true)
       |> assign(:public_url, nil)
+      |> assign(:current_edit_url, nil)
+      |> assign(:db_post_slug, nil)
       |> assign(:form_key, form_key)
       |> assign(:current_version, 1)
       |> assign(:available_versions, [])
@@ -726,7 +817,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       language = Helpers.editor_language(socket.assigns)
 
       {updated_post, public_url} =
-        update_post_from_form(socket.assigns.post, new_form, language)
+        update_post_from_form(
+          socket.assigns.post,
+          new_form,
+          language,
+          socket.assigns[:db_post_slug]
+        )
 
       socket =
         assign_meta_updates(
@@ -1239,7 +1335,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   # Update post struct with current form values for accurate public URL and status display
-  defp update_post_from_form(post, form, language) do
+  defp update_post_from_form(post, form, language, db_post_slug) do
     # Status is version-level — all languages share the same status
     new_status = form["status"]
     available_langs = Map.get(post, :available_languages, [language])
@@ -1256,8 +1352,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         if form_slug && form_slug != "", do: Map.put(p, :slug, form_slug), else: p
       end)
       |> Map.put(:url_slug, if(form_url_slug in [nil, ""], do: nil, else: form_url_slug))
+      |> refresh_language_slug(language, form_slug, form_url_slug, db_post_slug)
 
     {updated_post, Helpers.build_public_url(updated_post, language)}
+  end
+
+  # `build_post_url` resolves the rendered slug through `language_slugs`
+  # FIRST, before `url_slug` — so the in-memory post must carry the form's
+  # current value there too, or the displayed public URL keeps rendering the
+  # slug from the last DB read while the writer edits the title/slug/URL.
+  # The effective per-language slug mirrors what the save will persist: a
+  # url_slug that is empty OR still equals the PERSISTED post slug is only
+  # tracking the default — the save's rename-sync will carry it along — so
+  # the slug being typed drives the preview; only a url_slug the writer
+  # actually customized (differs from the persisted slug) wins over it.
+  # Comparing against @post.slug instead broke deletes: that copy mirrors
+  # the form, so the form's stale url_slug looked "customized" the moment
+  # the two fields diverged, and the preview froze until a save round-trip
+  # refreshed the form — timing the writer read as "sometimes updates".
+  defp refresh_language_slug(post, language, form_slug, form_url_slug, db_post_slug) do
+    default_tracking? = form_url_slug in [nil, ""] or form_url_slug == db_post_slug
+    effective = if default_tracking?, do: form_slug, else: form_url_slug
+
+    if is_nil(language) or effective in [nil, ""] do
+      post
+    else
+      slugs = Map.get(post, :language_slugs) || %{}
+
+      key =
+        Enum.find(Map.keys(slugs), &(String.downcase(&1) == String.downcase(language))) ||
+          language
+
+      Map.put(post, :language_slugs, Map.put(slugs, key, effective))
+    end
   end
 
   # ============================================================================
@@ -1585,7 +1712,66 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply, socket}
   end
 
+  # `[[` opens the publication-mention popup: pick a post and the typed
+  # `[[query` is replaced (keep_trigger: false) with `[[post:UUID|Title]]` —
+  # linked by UUID, so the target's slug and translations can change freely
+  # without breaking the mention. Cross-group on purpose: a writer linking
+  # a post remembers its title, not which group holds it.
+  def handle_info({:leaf_suggest, %{trigger: "[[", query: query, seq: seq}}, socket) do
+    results =
+      query
+      |> Publishing.search_posts_for_mention(8)
+      |> Enum.map(fn p ->
+        %{
+          value: "[[post:#{p.uuid}|#{mention_alias(p.title)}]]",
+          label: p.title,
+          sublabel: p.group_name || p.group_slug,
+          icon: "hero-document-text"
+        }
+      end)
+
+    send_update(Leaf,
+      id: "content-editor",
+      action: :suggestions,
+      trigger: "[[",
+      query: query,
+      seq: seq,
+      results: results
+    )
+
+    {:noreply, socket}
+  end
+
   def handle_info({:leaf_suggest, _}, socket), do: {:noreply, socket}
+
+  # Leaf found `[[…]]` targets it can't resolve itself — decorate `post:UUID`
+  # tokens with the target's current title and existence, so a mention of a
+  # deleted post reads as broken in the editor.
+  def handle_info({:leaf_resolve_links, %{editor_id: id, targets: targets, seq: seq}}, socket) do
+    resolved =
+      Map.new(targets, fn
+        "post:" <> uuid = target -> {target, mention_link_target(uuid)}
+        target -> {target, %{href: nil, exists: false, title: nil}}
+      end)
+
+    send_update(Leaf, id: id, action: :link_targets, seq: seq, targets: resolved)
+    {:noreply, socket}
+  end
+
+  # A `[[post:UUID|…]]` mention was clicked in the editor — jump to that
+  # post's editor. Any unsaved work here is covered by autosave's debounce
+  # plus Leaf's protect_navigation guard.
+  def handle_info({:leaf_link_clicked, %{target: "post:" <> uuid}}, socket) do
+    case Publishing.read_post_by_uuid(uuid) do
+      {:ok, post} ->
+        {:noreply, push_navigate(socket, to: Helpers.build_edit_url(post.group, %{uuid: uuid}))}
+
+      _ ->
+        {:noreply, put_flash(socket, :warning, gettext("That publication no longer exists."))}
+    end
+  end
+
+  def handle_info({:leaf_link_clicked, _}, socket), do: {:noreply, socket}
   # The editor component's own Save button. Publishing hides it today
   # (show_save_button defaults false), so this was a no-op — meaning the day
   # anyone enables that button they'd ship a Save that does nothing. Wire it to
@@ -2124,6 +2310,61 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # The Publication Date value formatted per the site's Date/Time Format
+  # settings (Settings → General). Accepts the shapes the form can hold: a
+  # full ISO8601 with offset, or the naive "YYYY-MM-DDTHH:MM[:SS]" a
+  # datetime-local input submits. Nil when empty or unparseable — the
+  # preview line simply doesn't render then.
+  defp published_at_preview(value) when is_binary(value) and value != "" do
+    naive =
+      case DateTime.from_iso8601(value) do
+        {:ok, dt, _} ->
+          DateTime.to_naive(dt)
+
+        _ ->
+          padded = if byte_size(value) == 16, do: value <> ":00", else: value
+
+          case NaiveDateTime.from_iso8601(padded) do
+            {:ok, naive} -> naive
+            _ -> nil
+          end
+      end
+
+    naive && UtilsDate.format_datetime_full_with_user_format(naive)
+  end
+
+  defp published_at_preview(_), do: nil
+
+  # The alias half of a `[[post:UUID|Alias]]` token — `|` and `]` would
+  # terminate the token early, so they can't survive into it.
+  defp mention_alias(title) do
+    title
+    |> to_string()
+    |> String.replace(~r/[\[\]|]/u, " ")
+    |> String.replace(~r/\s+/u, " ")
+    |> String.trim()
+    |> case do
+      "" -> gettext("Untitled")
+      alias_text -> alias_text
+    end
+  end
+
+  defp mention_link_target(uuid) do
+    case Publishing.read_post_by_uuid(uuid) do
+      {:ok, post} ->
+        %{
+          href: Helpers.build_public_url(post, post.language),
+          exists: true,
+          title: get_in(post, [:metadata, :title])
+        }
+
+      _ ->
+        %{href: nil, exists: false, title: nil}
+    end
+  rescue
+    _ -> %{href: nil, exists: false, title: nil}
+  end
+
   defp maybe_reclaim_lock(socket) do
     if socket.assigns[:lock_released_by_timeout] do
       Collaborative.try_reclaim_lock(socket)
@@ -2424,6 +2665,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         id: "phk-cta",
         title: gettext("Call to action"),
         icon: toolbar_glyph("▭")
+      },
+      %{
+        id: "phk-embed",
+        title: gettext("Live demo (iframe)"),
+        icon: toolbar_glyph("▦")
       }
     ]
   end
@@ -2466,6 +2712,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   defp component_snippet("phk-cta", selected) do
     body = fallback(selected, gettext("What should the reader do next?"))
     ~s(<CTA>#{body}</CTA>\n\n)
+  end
+
+  defp component_snippet("phk-embed", selected) do
+    title = fallback(selected, gettext("Try it"))
+    ~s(<Embed src="" height="480" title="#{title}" />\n\n)
   end
 
   defp component_snippet(_unknown, _selected), do: nil
@@ -3172,10 +3423,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       </span>
                     </div>
                   <% end %>
+                  <%!-- Save-state text is deliberately quiet: it flips on every
+                        keystroke (unsaved) and every debounce settle (saved), so
+                        a filled badge here flashes constantly while typing. Only
+                        the blocked state keeps a loud badge — it carries a reason
+                        the writer must act on. --%>
                   <%= cond do %>
                     <% @is_autosaving -> %>
-                      <span class="badge badge-info badge-sm gap-1">
-                        <span class="loading loading-spinner loading-xs"></span>
+                      <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
+                        <span class="loading loading-spinner loading-2xs"></span>
                         {gettext("Saving...")}
                       </span>
                     <% @autosave_blocked -> %>
@@ -3184,14 +3440,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         {@autosave_blocked}
                       </span>
                     <% @has_pending_changes -> %>
-                      <span class="badge badge-warning badge-sm h-auto">
+                      <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
+                        <span class="w-1.5 h-1.5 rounded-full bg-warning/70"></span>
                         {gettext("Unsaved changes")}
                       </span>
                     <% @is_new_post -> %>
-                      <span class="badge badge-ghost badge-sm h-auto">{gettext("New")}</span>
+                      <span class="text-xs text-base-content/50">{gettext("New")}</span>
                     <% true -> %>
-                      <span class="badge badge-success badge-sm gap-1">
-                        <.icon name="hero-check" class="w-3 h-3" />
+                      <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
+                        <.icon name="hero-check" class="w-3 h-3 text-success/70" />
                         {gettext("Saved")}
                       </span>
                   <% end %>
@@ -3232,16 +3489,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       Tags come from the group's existing ones — see
                       handle_info({:leaf_suggest, …}).
 
-                      `mode` is set deliberately, not left at Leaf's default of
-                      :hybrid. The hybrid and visual surfaces round-trip the
-                      body through HTML, which is fine for prose but makes PHK
-                      components second-class: `preserve_tags` keeps them
-                      intact, but only as opaque blocks nobody can edit without
-                      dropping to markdown anyway. Posts here are written with
-                      <Showcase>, <Note>, <Audio> and friends, so markdown is
-                      the mode that can actually edit them. The toolbar still
-                      offers the other modes — Leaf has no supported way to
-                      remove them — but nothing depends on anyone using one.
+                      `mode` follows the site-wide Content Editor setting
+                      (Settings → Content Editor), same as the posts module;
+                      when the setting is unavailable it falls back to
+                      :markdown, this editor's historical default. One caveat
+                      carries over from that default: the hybrid and visual
+                      surfaces round-trip the body through HTML, which makes
+                      PHK components second-class — `preserve_tags` keeps
+                      <Showcase>, <Note>, <Audio> and friends intact, but as
+                      opaque blocks that can only be edited by switching to
+                      markdown in the toolbar.
 
                       `protect_navigation` predates the move to Leaf and was
                       dropped in the swap — it warns before leaving with
@@ -3266,11 +3523,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   debounce={400}
                   toolbar={[:image, :video]}
                   readonly={edit_disabled? or @viewing_older_version}
-                  mode={:markdown}
+                  mode={@editor_mode}
                   preserve_tags={Renderer.component_tags()}
                   gettext_backend={PhoenixKitPublishing.Gettext}
                   protect_navigation={true}
                   toolbar_extra={component_toolbar_buttons()}
+                  wiki_links={%{follow: :click}}
                   suggestions={[
                     %{
                       trigger: "#",
@@ -3285,6 +3543,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       debounce: 150,
                       max_results: 10,
                       allow_create: true,
+                      exclude: [:code, :link]
+                    },
+                    # `[[` mentions another publication: the popup lists posts
+                    # across groups (bare trigger browses recent ones, typing
+                    # filters by title — spaces allowed, titles have them), and
+                    # accepting replaces the typed text with the full
+                    # `[[post:UUID|Title]]` token (keep_trigger: false), which
+                    # the renderer resolves to the target's CURRENT URL at
+                    # request time. handle_info({:leaf_suggest, "[[", …}).
+                    %{
+                      trigger: "[[",
+                      boundary: :any,
+                      token: ~r/[\p{L}\p{N} _-]/u,
+                      max_length: 60,
+                      min_chars: 0,
+                      debounce: 200,
+                      max_results: 8,
+                      keep_trigger: false,
+                      label: gettext("Link a publication"),
                       exclude: [:code, :link]
                     }
                   ]}
@@ -3316,6 +3593,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         name="slug"
                         id="slug-input"
                         value={@form["slug"]}
+                        phx-debounce="300"
                         pattern="[a-z0-9]+(-[a-z0-9]+)*"
                         class={"input w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                         placeholder={gettext("auto-generated from title")}
@@ -3363,6 +3641,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         name="url_slug"
                         id="url-slug-input"
                         value={@form["url_slug"] || ""}
+                        phx-debounce="300"
                         maxlength="200"
                         pattern={SlugHelpers.html_input_pattern()}
                         class={"input w-full lowercase #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
@@ -3905,6 +4184,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     class={"input w-full #{if edit_disabled? or @viewing_older_version, do: "input-disabled bg-base-200"}"}
                     readonly={edit_disabled? or @viewing_older_version}
                   />
+                  <%!-- A native datetime-local renders in the BROWSER locale's
+                        format, which need not match the site's Date/Time
+                        Format settings — so echo the value in the configured
+                        format, the way it will appear on the public site. --%>
+                  <% published_preview = published_at_preview(@form["published_at"]) %>
+                  <p :if={published_preview} class="text-xs text-base-content/60 mt-1">
+                    {gettext("Displays as:")} {published_preview}
+                  </p>
                 </div>
 
                 <%!-- Clear translation button (for any language with existing content) --%>

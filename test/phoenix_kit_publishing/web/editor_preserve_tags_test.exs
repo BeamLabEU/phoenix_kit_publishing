@@ -31,15 +31,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorPreserveTagsTest do
              "visual mode silently flattens them on the next autosave"
   end
 
-  test "the body editor opens in markdown mode" do
+  test "the body editor's mode is chosen explicitly, falling back to markdown" do
     source = File.read!(@editor_source)
 
-    # Leaf defaults to :hybrid, which is a visual surface. Posts here are
-    # written with PHK components, and those are only editable as text — so
-    # the mode is chosen explicitly and should stay chosen.
-    assert source =~ "mode={:markdown}",
-           "the body editor must open in markdown mode; Leaf's :hybrid default " <>
-             "renders PHK components as uneditable blocks"
+    # The mode follows the site-wide Content Editor setting, resolved at
+    # mount — never left at Leaf's :hybrid default by omission. When the
+    # setting is unavailable the fallback stays :markdown, the mode PHK
+    # components are actually editable in.
+    assert source =~ "mode={@editor_mode}",
+           "the body editor must pass the resolved site-wide editor mode; " <>
+             "leaving Leaf's default renders PHK components as uneditable blocks"
+
+    assert source =~ "@default_editor_mode :markdown",
+           "the editor-mode fallback must stay :markdown — with the setting " <>
+             "unavailable, PHK components are only editable as text"
   end
 
   test "every tag the renderer dispatches on is declared" do
@@ -64,6 +69,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorPreserveTagsTest do
 
     assert MapSet.size(missing) == 0,
            "renderer components missing from component_tags/0: #{inspect(MapSet.to_list(missing))}"
+  end
+
+  describe "the raw-HTML mode guard" do
+    alias PhoenixKit.Modules.Publishing.Web.Editor
+
+    test "a body carrying raw HTML opens in markdown regardless of the setting" do
+      assert Editor.__effective_editor_mode__(:hybrid, ~s(<div class="grid">x</div>)) ==
+               :markdown
+
+      assert Editor.__effective_editor_mode__(:visual, "before <span >after") == :markdown
+    end
+
+    test "markdown-only bodies follow the site setting" do
+      assert Editor.__effective_editor_mode__(:hybrid, "plain **markdown** text") == :hybrid
+
+      assert Editor.__effective_editor_mode__(:hybrid, ~s(<Showcase src="x">band</Showcase>)) ==
+               :hybrid
+    end
+
+    test "code regions and autolinks don't trip the guard" do
+      assert Editor.__effective_editor_mode__(:hybrid, "```\n<div class=x>\n```") == :hybrid
+      assert Editor.__effective_editor_mode__(:hybrid, "inline `<div>` sample") == :hybrid
+
+      assert Editor.__effective_editor_mode__(:hybrid, "see <https://example.com> link") ==
+               :hybrid
+    end
+
+    test "markdown mode is never overridden" do
+      assert Editor.__effective_editor_mode__(:markdown, "<div >x") == :markdown
+    end
   end
 
   test "the components the demo content actually uses are all covered" do

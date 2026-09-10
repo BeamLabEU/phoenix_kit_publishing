@@ -2678,7 +2678,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     # PHK components must not reach the preview: rendering a <Note> here
     # would bake its body text AND the notes-section CSS into the excerpt,
     # and a truncated component tag survives tag-stripping as escaped junk.
-    html = excerpt_markdown |> Shared.strip_components() |> Renderer.render_markdown()
+    # Publication links reduce to their visible text — an excerpt is
+    # plain-text-ish, and per-row target resolution would be a read per link.
+    html =
+      excerpt_markdown
+      |> Shared.strip_components()
+      |> Renderer.post_links_to_text()
+      |> Renderer.render_markdown()
 
     # Strip HTML tags to get plain text
     html

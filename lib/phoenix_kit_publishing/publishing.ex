@@ -59,6 +59,7 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate generate_unique_slug(group_slug, title, preferred_slug, opts), to: SlugHelpers
   defdelegate validate_url_slug(group_slug, url_slug, language, exclude), to: SlugHelpers
   defdelegate clear_url_slug_from_post(group_slug, post_slug, url_slug), to: DBStorage
+  defdelegate search_posts_for_mention(query, limit \\ 10), to: DBStorage
 
   # ============================================================================
   # Cache Delegates
