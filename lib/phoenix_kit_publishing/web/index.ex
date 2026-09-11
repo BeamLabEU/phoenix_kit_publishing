@@ -648,9 +648,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
               <.link
                 navigate={Routes.path("/admin/publishing/new-group")}
                 aria-label={gettext("Create Publishing Group")}
-                class="card h-full min-h-40 border border-dashed border-base-300 bg-base-100/50 shadow-none transition hover:border-primary/60 hover:bg-base-100 group"
+                class="card h-full min-h-40 border-2 border-dashed border-base-content/25 bg-base-200/40 shadow-none transition hover:border-primary/70 hover:bg-base-100 group"
               >
-                <div class="card-body h-full items-center justify-center gap-2 text-base-content/50 transition-colors group-hover:text-primary">
+                <div class="card-body h-full items-center justify-center gap-2 text-base-content/70 transition-colors group-hover:text-primary">
                   <.icon name="hero-plus" class="w-10 h-10" />
                   <span class="text-sm font-medium">
                     {gettext("Create Publishing Group")}
