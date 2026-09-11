@@ -49,7 +49,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostLinksTest do
 
       assert html =~ ~s(<a href="/#{slug}/target-post")
       assert html =~ "the target"
-      assert html =~ "publishing-post-link"
+
+      # `link-primary`, not `link-hover` (PR #49): daisyUI's hover-only
+      # underline made a mention read as plain prose until the pointer
+      # crossed it. These are the same classes add_tailwind_classes puts
+      # on an ordinary in-body anchor, and this pass runs after it, so
+      # they have to be inlined here — a revert shows up as a silent
+      # styling regression, not a failure, without this assertion.
+      assert html =~ ~s(class="link link-primary publishing-post-link")
+      refute html =~ "link-hover publishing-post-link"
     end
 
     test "a token with no alias uses the target's current title", %{conn: conn, slug: slug} do

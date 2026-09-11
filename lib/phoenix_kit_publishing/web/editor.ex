@@ -145,14 +145,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     _ -> @default_editor_mode
   end
 
-  # Leaf's mode clauses have no catch-all, so a string setting value or
-  # anything unrecognised must be normalised here rather than blowing up
-  # inside Leaf.
+  # Leaf's mode clauses have no catch-all, so anything unrecognised must be
+  # normalised here rather than blowing up inside Leaf. Core already promises
+  # one of the four atoms (`Settings.get_editor_mode/0` folds an unknown
+  # stored string to `:hybrid` itself), so the catch-all is a contract guard,
+  # not a live branch — a string-matching clause here was dead code, and
+  # dialyzer said so.
   defp normalize_editor_mode(mode) when mode in @leaf_editor_modes, do: mode
-
-  defp normalize_editor_mode(mode) when is_binary(mode) do
-    Enum.find(@leaf_editor_modes, @default_editor_mode, &(to_string(&1) == mode))
-  end
 
   defp normalize_editor_mode(_mode), do: @default_editor_mode
 

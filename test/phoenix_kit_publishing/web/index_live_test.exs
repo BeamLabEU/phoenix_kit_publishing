@@ -176,4 +176,51 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
     send(view.pid, {:group_deleted, "any-slug"})
     assert is_binary(render(view))
   end
+
+  # PR #50 moved the create action out of the navbar (`:page_action`) and
+  # into the groups grid as a ghost card. The grid is now the ONLY create
+  # affordance on a populated dashboard, so its two gates are pinned here:
+  # it closes the ACTIVE grid, and it must never appear in Trash — nothing
+  # gets created there.
+  describe "the ghost create-group card" do
+    test "closes the grid in the active view", %{conn: conn} do
+      {:ok, _group} =
+        Groups.add_group("Index Ghost #{System.unique_integer([:positive])}", mode: "slug")
+
+      {:ok, _view, html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing")
+
+      # Tail-matched, not anchored at "/": the test router mounts the
+      # LOCALIZED admin routes too, so Routes.path/1 renders this as
+      # "/en/admin/publishing/new-group". Anchoring on the bare path made
+      # the sibling `refute` below pass for the wrong reason.
+      assert html =~ ~s|/admin/publishing/new-group"|
+      assert html =~ "border-dashed border-base-content/25"
+    end
+
+    test "is absent in the trashed view", %{conn: conn} do
+      {:ok, group} =
+        Groups.add_group("Index Ghost Trash #{System.unique_integer([:positive])}", mode: "slug")
+
+      {:ok, _} = Groups.trash_group(group["slug"])
+
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing")
+
+      _ = render_click(view, "switch_view", %{"mode" => "trashed"})
+
+      # Re-render AFTER the deferred switch lands: the click itself only
+      # sets loading, and the skeleton has no create link either — so
+      # asserting on the click's own render would pass for the wrong
+      # reason. The trashed card proves the real grid is on screen.
+      html = render(view)
+
+      assert html =~ group["name"]
+      refute html =~ ~s|/admin/publishing/new-group"|
+    end
+  end
 end

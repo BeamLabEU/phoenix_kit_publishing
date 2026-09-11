@@ -17,12 +17,12 @@ msgstr ""
 msgid "\"In Memory\" means the cache is loaded into :persistent_term for sub-microsecond reads."
 msgstr "\"In Memory\" means the cache is loaded into :persistent_term for sub-microsecond reads."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3058
+#: lib/phoenix_kit_publishing/web/editor.ex:3309
 #, elixir-autogen, elixir-format
 msgid "\"Translate Missing\" will only create translations for languages that don't have one yet."
 msgstr "\"Translate Missing\" will only create translations for languages that don't have one yet."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3052
+#: lib/phoenix_kit_publishing/web/editor.ex:3303
 #, elixir-autogen, elixir-format
 msgid "\"Translate to All\" will create or overwrite translations for all enabled languages."
 msgstr "\"Translate to All\" will create or overwrite translations for all enabled languages."
@@ -31,13 +31,13 @@ msgstr "\"Translate to All\" will create or overwrite translations for all enabl
 #: lib/phoenix_kit_publishing/web/html.ex:2529
 #: lib/phoenix_kit_publishing/web/html.ex:2543
 #: lib/phoenix_kit_publishing/web/html.ex:2551
-#: lib/phoenix_kit_publishing/web/html.ex:2768
-#: lib/phoenix_kit_publishing/web/html.ex:2772
+#: lib/phoenix_kit_publishing/web/html.ex:2774
+#: lib/phoenix_kit_publishing/web/html.ex:2778
 #, elixir-autogen, elixir-format
 msgid "%B %d, %Y"
 msgstr "%B %d, %Y"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1569
+#: lib/phoenix_kit_publishing/web/editor.ex:1696
 #: lib/phoenix_kit_publishing/web/html.ex:852
 #, elixir-autogen, elixir-format
 msgid "%{count} post"
@@ -54,12 +54,12 @@ msgstr[1] "%{count} versions"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2545
 #: lib/phoenix_kit_publishing/web/html.ex:2553
-#: lib/phoenix_kit_publishing/web/html.ex:2785
+#: lib/phoenix_kit_publishing/web/html.ex:2791
 #, elixir-autogen, elixir-format
 msgid "%{date} at %{time}"
 msgstr "%{date} at %{time}"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2778
+#: lib/phoenix_kit_publishing/web/editor.ex:3029
 #, elixir-autogen, elixir-format
 msgid "%{email} is currently editing this post. You can view but not make changes."
 msgstr "%{email} is currently editing this post. You can view but not make changes."
@@ -79,7 +79,7 @@ msgstr "%{language} is currently being edited by %{user}. They will be locked ou
 msgid "(live)"
 msgstr "(live)"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3166
+#: lib/phoenix_kit_publishing/web/editor.ex:3417
 #, elixir-autogen, elixir-format
 msgid "1 other viewing"
 msgid_plural "%{count} others viewing"
@@ -93,17 +93,17 @@ msgid_plural "%{count} posts"
 msgstr[0] "1 post"
 msgstr[1] "%{count} posts"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1819
+#: lib/phoenix_kit_publishing/web/editor.ex:2005
 #, elixir-autogen, elixir-format
 msgid "A new version was created by another editor"
 msgstr "A new version was created by another editor"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2743
+#: lib/phoenix_kit_publishing/web/editor.ex:2994
 #, elixir-autogen, elixir-format
 msgid "AI Translate"
 msgstr "AI Translate"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2843
+#: lib/phoenix_kit_publishing/web/editor.ex:3094
 #, elixir-autogen, elixir-format
 msgid "AI Translation"
 msgstr "AI Translation"
@@ -149,17 +149,17 @@ msgstr "ASCII only — strip"
 msgid "Actions"
 msgstr "Actions"
 
-#: lib/phoenix_kit_publishing/web/index.ex:455
+#: lib/phoenix_kit_publishing/web/index.ex:450
 #, elixir-autogen, elixir-format
 msgid "Active"
 msgstr "Active"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3509
+#: lib/phoenix_kit_publishing/web/editor.ex:3788
 #, elixir-autogen, elixir-format
 msgid "Advanced: Manual Media ID"
 msgstr "Advanced: Manual Media ID"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:992
+#: lib/phoenix_kit_publishing/web/editor.ex:1088
 #, elixir-autogen, elixir-format
 msgid "All languages already have translations"
 msgstr "All languages already have translations"
@@ -174,34 +174,34 @@ msgstr "All versions of this post have been deleted. Please navigate away."
 msgid "Already exists"
 msgstr "Already exists"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4044
+#: lib/phoenix_kit_publishing/web/editor.ex:4331
 #, elixir-autogen, elixir-format
 msgid "Another post"
 msgstr "Another post"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2783
+#: lib/phoenix_kit_publishing/web/editor.ex:3034
 #, elixir-autogen, elixir-format
 msgid "Another user is currently editing this post. You can view but not make changes."
 msgstr "Another user is currently editing this post. You can view but not make changes."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3875
+#: lib/phoenix_kit_publishing/web/editor.ex:4154
 #, elixir-autogen, elixir-format
 msgid "Applies to all languages in this version."
 msgstr "Applies to all languages in this version."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2959
+#: lib/phoenix_kit_publishing/web/html.ex:2965
 #, elixir-autogen, elixir-format
 msgid "Apr"
 msgstr "Apr"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2942
+#: lib/phoenix_kit_publishing/web/html.ex:2948
 #, elixir-autogen, elixir-format
 msgid "April"
 msgstr "April"
 
 #: lib/phoenix_kit_publishing/web/components/version_switcher.ex:227
-#: lib/phoenix_kit_publishing/web/editor.ex:3859
-#: lib/phoenix_kit_publishing/web/editor.ex:3869
+#: lib/phoenix_kit_publishing/web/editor.ex:4138
+#: lib/phoenix_kit_publishing/web/editor.ex:4148
 #: lib/phoenix_kit_publishing/web/listing.ex:1084
 #: lib/phoenix_kit_publishing/web/listing.ex:1171
 #: lib/phoenix_kit_publishing/web/listing.ex:1388
@@ -210,35 +210,35 @@ msgstr "April"
 msgid "Archived"
 msgstr "Archived"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2963
+#: lib/phoenix_kit_publishing/web/html.ex:2969
 #, elixir-autogen, elixir-format
 msgid "Aug"
 msgstr "Aug"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2946
+#: lib/phoenix_kit_publishing/web/html.ex:2952
 #, elixir-autogen, elixir-format
 msgid "August"
 msgstr "August"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2857
+#: lib/phoenix_kit_publishing/web/editor.ex:3108
 #, elixir-autogen, elixir-format
 msgid "Automatically translate this post to other languages using AI. Each translation runs as a background job — you can keep editing while it finishes, or safely leave this page."
 msgstr "Automatically translate this post to other languages using AI. Each translation runs as a background job — you can keep editing while it finishes, or safely leave this page."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1377
+#: lib/phoenix_kit_publishing/web/editor.ex:1504
 #, elixir-autogen, elixir-format
 msgid "Autosave failed — click Save to retry"
 msgstr "Autosave failed — click Save to retry"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2645
+#: lib/phoenix_kit_publishing/web/editor.ex:2896
 #: lib/phoenix_kit_publishing/web/html.ex:2027
 #: lib/phoenix_kit_publishing/web/html.ex:2311
-#: lib/phoenix_kit_publishing/web/preview.ex:340
+#: lib/phoenix_kit_publishing/web/preview.ex:341
 #, elixir-autogen, elixir-format
 msgid "Back to %{group}"
 msgstr "Back to %{group}"
 
-#: lib/phoenix_kit_publishing/web/preview.ex:218
+#: lib/phoenix_kit_publishing/web/preview.ex:219
 #, elixir-autogen, elixir-format
 msgid "Back to Editor"
 msgstr "Back to Editor"
@@ -286,8 +286,8 @@ msgstr "Cached rendered HTML for published posts. Uses content-hash keys so edit
 #: lib/phoenix_kit_publishing/web/categories_live.ex:549
 #: lib/phoenix_kit_publishing/web/categories_live.ex:581
 #: lib/phoenix_kit_publishing/web/edit.ex:756
-#: lib/phoenix_kit_publishing/web/editor.ex:4009
-#: lib/phoenix_kit_publishing/web/editor.ex:4081
+#: lib/phoenix_kit_publishing/web/editor.ex:4296
+#: lib/phoenix_kit_publishing/web/editor.ex:4368
 #: lib/phoenix_kit_publishing/web/new.ex:690
 #, elixir-autogen, elixir-format
 msgid "Cancel"
@@ -308,40 +308,40 @@ msgstr "Cannot delete the last version"
 msgid "Cannot delete the live version"
 msgstr "Cannot delete the live version"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1229
+#: lib/phoenix_kit_publishing/web/editor.ex:1325
 #, elixir-autogen, elixir-format
 msgid "Cannot remove the last language from a post"
 msgstr "Cannot remove the last language from a post"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:807
+#: lib/phoenix_kit_publishing/web/editor.ex:903
 #, elixir-autogen, elixir-format
 msgid "Cannot save - you are spectating"
 msgstr "Cannot save - you are spectating"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:811
-#: lib/phoenix_kit_publishing/web/editor.ex:820
+#: lib/phoenix_kit_publishing/web/editor.ex:907
+#: lib/phoenix_kit_publishing/web/editor.ex:916
 #, elixir-autogen, elixir-format
 msgid "Cannot save while translation is in progress"
 msgstr "Cannot save while translation is in progress"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3429
-#: lib/phoenix_kit_publishing/web/editor.ex:3454
-#: lib/phoenix_kit_publishing/web/editor.ex:3763
+#: lib/phoenix_kit_publishing/web/editor.ex:3708
+#: lib/phoenix_kit_publishing/web/editor.ex:3733
+#: lib/phoenix_kit_publishing/web/editor.ex:4042
 #, elixir-autogen, elixir-format
 msgid "Change"
 msgstr "Change"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3792
+#: lib/phoenix_kit_publishing/web/editor.ex:4071
 #, elixir-autogen, elixir-format
 msgid "Choose OG image"
 msgstr "Choose OG image"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4058
+#: lib/phoenix_kit_publishing/web/editor.ex:4345
 #, elixir-autogen, elixir-format
 msgid "Choose a different URL slug for this post, or change the other post's slug."
 msgstr "Choose a different URL slug for this post, or change the other post's slug."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3945
+#: lib/phoenix_kit_publishing/web/editor.ex:4232
 #, elixir-autogen, elixir-format
 msgid "Choose how to create the new version:"
 msgstr "Choose how to create the new version:"
@@ -373,12 +373,12 @@ msgstr "Clear cache"
 msgid "Clear cache for this group"
 msgstr "Clear cache for this group"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3920
+#: lib/phoenix_kit_publishing/web/editor.ex:4207
 #, elixir-autogen, elixir-format
 msgid "Clear the %{language} translation content? You can always add a new translation for this language later."
 msgstr "Clear the %{language} translation content? You can always add a new translation for this language later."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3927
+#: lib/phoenix_kit_publishing/web/editor.ex:4214
 #, elixir-autogen, elixir-format
 msgid "Clear translation"
 msgstr "Clear translation"
@@ -388,7 +388,7 @@ msgstr "Clear translation"
 msgid "Cleared %{count} cached posts for %{group}"
 msgstr "Cleared %{count} cached posts for %{group}"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3916
+#: lib/phoenix_kit_publishing/web/editor.ex:4203
 #: lib/phoenix_kit_publishing/web/settings.ex:805
 #: lib/phoenix_kit_publishing/web/settings.ex:874
 #: lib/phoenix_kit_publishing/web/settings.ex:975
@@ -396,17 +396,17 @@ msgstr "Cleared %{count} cached posts for %{group}"
 msgid "Clearing…"
 msgstr "Clearing…"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3484
+#: lib/phoenix_kit_publishing/web/editor.ex:3763
 #, elixir-autogen, elixir-format
 msgid "Click to choose from media library"
 msgstr "Click to choose from media library"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2957
+#: lib/phoenix_kit_publishing/web/editor.ex:3208
 #, elixir-autogen, elixir-format
 msgid "Complete"
 msgstr "Complete"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4076
+#: lib/phoenix_kit_publishing/web/editor.ex:4363
 #, elixir-autogen, elixir-format
 msgid "Confirm Translation"
 msgstr "Confirm Translation"
@@ -426,12 +426,12 @@ msgstr "Content type determines default item naming and may affect how content i
 msgid "Control whether the default language keeps its locale segment in public URLs."
 msgstr "Control whether the default language keeps its locale segment in public URLs."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3982
+#: lib/phoenix_kit_publishing/web/editor.ex:4269
 #, elixir-autogen, elixir-format
 msgid "Copy from v%{version}"
 msgstr "Copy from v%{version}"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:989
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1114
 #, elixir-autogen, elixir-format
 msgid "Could not reload post - it may have been moved or deleted"
 msgstr "Could not reload post - it may have been moved or deleted"
@@ -441,38 +441,38 @@ msgstr "Could not reload post - it may have been moved or deleted"
 msgid "Couldn't clear the cache for this group."
 msgstr "Couldn't clear the cache for this group."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1236
+#: lib/phoenix_kit_publishing/web/editor.ex:1332
 #, elixir-autogen, elixir-format
 msgid "Couldn't clear this translation."
 msgstr "Couldn't clear this translation."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:438
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:512
 #: lib/phoenix_kit_publishing/web/editor/versions.ex:140
 #, elixir-autogen, elixir-format
 msgid "Couldn't create a new version."
 msgstr "Couldn't create a new version."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:949
+#: lib/phoenix_kit_publishing/web/editor.ex:1045
 #, elixir-autogen, elixir-format
 msgid "Couldn't create the default translation prompt."
 msgstr "Couldn't create the default translation prompt."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:325
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:399
 #, elixir-autogen, elixir-format
 msgid "Couldn't create this post."
 msgstr "Couldn't create this post."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:369
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:443
 #, elixir-autogen, elixir-format
 msgid "Couldn't create this translation."
 msgstr "Couldn't create this translation."
 
-#: lib/phoenix_kit_publishing/web/index.ex:240
+#: lib/phoenix_kit_publishing/web/index.ex:235
 #, elixir-autogen, elixir-format
 msgid "Couldn't delete this group."
 msgstr "Couldn't delete this group."
 
-#: lib/phoenix_kit_publishing/web/index.ex:197
+#: lib/phoenix_kit_publishing/web/index.ex:192
 #, elixir-autogen, elixir-format
 msgid "Couldn't move this group to trash."
 msgstr "Couldn't move this group to trash."
@@ -487,7 +487,7 @@ msgstr "Couldn't move this post to trash."
 msgid "Couldn't regenerate the cache for this group."
 msgstr "Couldn't regenerate the cache for this group."
 
-#: lib/phoenix_kit_publishing/web/index.ex:217
+#: lib/phoenix_kit_publishing/web/index.ex:212
 #, elixir-autogen, elixir-format
 msgid "Couldn't restore this group."
 msgstr "Couldn't restore this group."
@@ -497,8 +497,8 @@ msgstr "Couldn't restore this group."
 msgid "Couldn't restore this post."
 msgstr "Couldn't restore this post."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:679
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:783
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:785
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:908
 #, elixir-autogen, elixir-format
 msgid "Couldn't save this post."
 msgstr "Couldn't save this post."
@@ -508,7 +508,7 @@ msgstr "Couldn't save this post."
 msgid "Couldn't start the translation job."
 msgstr "Couldn't start the translation job."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:971
+#: lib/phoenix_kit_publishing/web/editor.ex:1067
 #, elixir-autogen, elixir-format
 msgid "Couldn't update the default translation prompt."
 msgstr "Couldn't update the default translation prompt."
@@ -518,12 +518,7 @@ msgstr "Couldn't update the default translation prompt."
 msgid "Couldn't update the post status."
 msgstr "Couldn't update the post status."
 
-#: lib/phoenix_kit_publishing/web/index.ex:75
-#, elixir-autogen, elixir-format
-msgid "Create Group"
-msgstr "Create Group"
-
-#: lib/phoenix_kit_publishing/web/editor.ex:3942
+#: lib/phoenix_kit_publishing/web/editor.ex:4229
 #, elixir-autogen, elixir-format
 msgid "Create New Version"
 msgstr "Create New Version"
@@ -533,14 +528,16 @@ msgstr "Create New Version"
 msgid "Create Post"
 msgstr "Create Post"
 
-#: lib/phoenix_kit_publishing/web/index.ex:438
+#: lib/phoenix_kit_publishing/web/index.ex:433
+#: lib/phoenix_kit_publishing/web/index.ex:650
+#: lib/phoenix_kit_publishing/web/index.ex:656
 #: lib/phoenix_kit_publishing/web/new.ex:27
 #: lib/phoenix_kit_publishing/web/new.ex:685
 #, elixir-autogen, elixir-format
 msgid "Create Publishing Group"
 msgstr "Create Publishing Group"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4019
+#: lib/phoenix_kit_publishing/web/editor.ex:4306
 #, elixir-autogen, elixir-format
 msgid "Create Version"
 msgstr "Create Version"
@@ -555,12 +552,12 @@ msgstr "Create a New Publishing Group"
 msgid "Create a publishing group to manage its cache."
 msgstr "Create a publishing group to manage its cache."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3962
+#: lib/phoenix_kit_publishing/web/editor.ex:4249
 #, elixir-autogen, elixir-format
 msgid "Create an empty version with no content"
 msgstr "Create an empty version with no content"
 
-#: lib/phoenix_kit_publishing/web/index.ex:431
+#: lib/phoenix_kit_publishing/web/index.ex:426
 #, elixir-autogen, elixir-format
 msgid "Create your first publishing group to start drafting posts."
 msgstr "Create your first publishing group to start drafting posts."
@@ -570,7 +567,7 @@ msgstr "Create your first publishing group to start drafting posts."
 msgid "Created new blank version %{version}"
 msgstr "Created new blank version %{version}"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:420
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:494
 #, elixir-autogen, elixir-format
 msgid "Created new version %{version} (draft)"
 msgstr "Created new version %{version} (draft)"
@@ -585,7 +582,7 @@ msgstr "Created new version %{version} from v%{source}"
 msgid "Created:"
 msgstr "Created:"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4015
+#: lib/phoenix_kit_publishing/web/editor.ex:4302
 #: lib/phoenix_kit_publishing/web/listing.ex:1158
 #: lib/phoenix_kit_publishing/web/new.ex:683
 #, elixir-autogen, elixir-format
@@ -597,17 +594,17 @@ msgstr "Creating…"
 msgid "Custom"
 msgstr "Custom"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3378
+#: lib/phoenix_kit_publishing/web/editor.ex:3657
 #, elixir-autogen, elixir-format
 msgid "Custom URL for this language. Leave empty to use default: %{slug}"
 msgstr "Custom URL for this language. Leave empty to use default: %{slug}"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:213
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:287
 #, elixir-autogen, elixir-format
 msgid "Custom URL slug '%{slug}' for %{language} was cleared because it conflicts with another post's post slug"
 msgstr "Custom URL slug '%{slug}' for %{language} was cleared because it conflicts with another post's post slug"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:205
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:279
 #, elixir-autogen, elixir-format
 msgid "Custom URL slug '%{slug}' was cleared from %{count} translations because it conflicts with another post's post slug"
 msgstr "Custom URL slug '%{slug}' was cleared from %{count} translations because it conflicts with another post's post slug"
@@ -622,12 +619,12 @@ msgstr "Database update failed"
 msgid "Date"
 msgstr "Date"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2967
+#: lib/phoenix_kit_publishing/web/html.ex:2973
 #, elixir-autogen, elixir-format
 msgid "Dec"
 msgstr "Dec"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2950
+#: lib/phoenix_kit_publishing/web/html.ex:2956
 #, elixir-autogen, elixir-format
 msgid "December"
 msgstr "December"
@@ -642,22 +639,22 @@ msgstr "Default Language"
 msgid "Default Language Without Prefix"
 msgstr "Default Language Without Prefix"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:942
+#: lib/phoenix_kit_publishing/web/editor.ex:1038
 #, elixir-autogen, elixir-format
 msgid "Default translation prompt created"
 msgstr "Default translation prompt created"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:964
+#: lib/phoenix_kit_publishing/web/editor.ex:1060
 #, elixir-autogen, elixir-format
 msgid "Default translation prompt updated"
 msgstr "Default translation prompt updated"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3733
+#: lib/phoenix_kit_publishing/web/editor.ex:4012
 #, elixir-autogen, elixir-format
 msgid "Defaults to post description"
 msgstr "Defaults to post description"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3715
+#: lib/phoenix_kit_publishing/web/editor.ex:3994
 #, elixir-autogen, elixir-format
 msgid "Defaults to post title"
 msgstr "Defaults to post title"
@@ -667,13 +664,13 @@ msgstr "Defaults to post title"
 msgid "Define your own content type and item names."
 msgstr "Define your own content type and item names."
 
-#: lib/phoenix_kit_publishing/web/index.ex:641
+#: lib/phoenix_kit_publishing/web/index.ex:636
 #, elixir-autogen, elixir-format
 msgid "Delete Forever"
 msgstr "Delete Forever"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:502
-#: lib/phoenix_kit_publishing/web/index.ex:632
+#: lib/phoenix_kit_publishing/web/index.ex:627
 #, elixir-autogen, elixir-format
 msgid "Deleting…"
 msgstr "Deleting…"
@@ -694,18 +691,18 @@ msgstr "Destination already exists"
 msgid "Details"
 msgstr "Details"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2809
+#: lib/phoenix_kit_publishing/web/editor.ex:3060
 #, elixir-autogen, elixir-format
 msgid "Disabled language:"
 msgstr "Disabled language:"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4079
+#: lib/phoenix_kit_publishing/web/editor.ex:4366
 #, elixir-autogen, elixir-format
 msgid "Do you want to continue with the translation?"
 msgstr "Do you want to continue with the translation?"
 
 #: lib/phoenix_kit_publishing/web/components/version_switcher.ex:226
-#: lib/phoenix_kit_publishing/web/editor.ex:3863
+#: lib/phoenix_kit_publishing/web/editor.ex:4142
 #: lib/phoenix_kit_publishing/web/listing.ex:1082
 #: lib/phoenix_kit_publishing/web/listing.ex:1170
 #: lib/phoenix_kit_publishing/web/listing.ex:1382
@@ -714,7 +711,7 @@ msgstr "Do you want to continue with the translation?"
 msgid "Draft"
 msgstr "Draft"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3994
+#: lib/phoenix_kit_publishing/web/editor.ex:4281
 #, elixir-autogen, elixir-format
 msgid "Duplicate all content and translations from version %{version}"
 msgstr "Duplicate all content and translations from version %{version}"
@@ -730,7 +727,7 @@ msgstr "Edit"
 msgid "Edit Group"
 msgstr "Edit Group"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2828
+#: lib/phoenix_kit_publishing/web/editor.ex:3079
 #, elixir-autogen, elixir-format
 msgid "Editing is paused while AI translates this content. It will unlock automatically when finished."
 msgstr "Editing is paused while AI translates this content. It will unlock automatically when finished."
@@ -740,8 +737,8 @@ msgstr "Editing is paused while AI translates this content. It will unlock autom
 msgid "Enabled"
 msgstr "Enabled"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3001
-#: lib/phoenix_kit_publishing/web/editor.ex:3017
+#: lib/phoenix_kit_publishing/web/editor.ex:3252
+#: lib/phoenix_kit_publishing/web/editor.ex:3268
 #, elixir-autogen, elixir-format
 msgid "Enqueueing…"
 msgstr "Enqueueing…"
@@ -751,7 +748,7 @@ msgstr "Enqueueing…"
 msgid "Entries Cached"
 msgstr "Entries Cached"
 
-#: lib/phoenix_kit_publishing/renderer.ex:775
+#: lib/phoenix_kit_publishing/renderer.ex:894
 #, elixir-autogen, elixir-format
 msgid "Error rendering markdown"
 msgstr "Error rendering markdown"
@@ -776,17 +773,17 @@ msgstr "Failed to extract AI response: %{reason}"
 msgid "Failed to read source post: %{reason}"
 msgstr "Failed to read source post: %{reason}"
 
-#: lib/phoenix_kit_publishing/web/preview.ex:191
+#: lib/phoenix_kit_publishing/web/preview.ex:192
 #, elixir-autogen, elixir-format
 msgid "Failed to render preview."
 msgstr "Failed to render preview."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3401
+#: lib/phoenix_kit_publishing/web/editor.ex:3680
 #, elixir-autogen, elixir-format
 msgid "Featured Image"
 msgstr "Featured Image"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3414
+#: lib/phoenix_kit_publishing/web/editor.ex:3693
 #: lib/phoenix_kit_publishing/web/html.ex:1107
 #: lib/phoenix_kit_publishing/web/html.ex:1118
 #: lib/phoenix_kit_publishing/web/html.ex:1269
@@ -797,22 +794,22 @@ msgstr "Featured Image"
 msgid "Featured image"
 msgstr "Featured image"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:888
+#: lib/phoenix_kit_publishing/web/editor.ex:984
 #, elixir-autogen, elixir-format
 msgid "Featured image cleared"
 msgstr "Featured image cleared"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2634
+#: lib/phoenix_kit_publishing/web/editor.ex:2885
 #, elixir-autogen, elixir-format
 msgid "Featured image selected"
 msgstr "Featured image selected"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2957
+#: lib/phoenix_kit_publishing/web/html.ex:2963
 #, elixir-autogen, elixir-format
 msgid "Feb"
 msgstr "Feb"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2940
+#: lib/phoenix_kit_publishing/web/html.ex:2946
 #, elixir-autogen, elixir-format
 msgid "February"
 msgstr "February"
@@ -828,22 +825,22 @@ msgstr "Format"
 msgid "Frequently asked questions. Items called \"%{plural}\"."
 msgstr "Frequently asked questions. Items called \"%{plural}\"."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2930
+#: lib/phoenix_kit_publishing/web/editor.ex:3181
 #, elixir-autogen, elixir-format
 msgid "Generate Default Prompt"
 msgstr "Generate Default Prompt"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3820
+#: lib/phoenix_kit_publishing/web/editor.ex:4099
 #, elixir-autogen, elixir-format
 msgid "Generated OG image"
 msgstr "Generated OG image"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3832
+#: lib/phoenix_kit_publishing/web/editor.ex:4111
 #, elixir-autogen, elixir-format
 msgid "Generated OG image preview"
 msgstr "Generated OG image preview"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2646
+#: lib/phoenix_kit_publishing/web/editor.ex:2897
 #: lib/phoenix_kit_publishing/web/listing.ex:1116
 #: lib/phoenix_kit_publishing/web/settings.ex:764
 #: lib/phoenix_kit_publishing/web/settings.ex:949
@@ -862,7 +859,7 @@ msgstr "Group Name"
 msgid "Group Slug"
 msgstr "Group Slug"
 
-#: lib/phoenix_kit_publishing/web/index.ex:188
+#: lib/phoenix_kit_publishing/web/index.ex:183
 #, elixir-autogen, elixir-format
 msgid "Group moved to trash"
 msgstr "Group moved to trash"
@@ -873,12 +870,12 @@ msgstr "Group moved to trash"
 msgid "Group not found"
 msgstr "Group not found"
 
-#: lib/phoenix_kit_publishing/web/index.ex:231
+#: lib/phoenix_kit_publishing/web/index.ex:226
 #, elixir-autogen, elixir-format
 msgid "Group permanently deleted"
 msgstr "Group permanently deleted"
 
-#: lib/phoenix_kit_publishing/web/index.ex:208
+#: lib/phoenix_kit_publishing/web/index.ex:203
 #, elixir-autogen, elixir-format
 msgid "Group restored"
 msgstr "Group restored"
@@ -898,7 +895,7 @@ msgstr "Hit Rate"
 msgid "How titles in non-Latin scripts (e.g. Cyrillic) are turned into URL slugs."
 msgstr "How titles in non-Latin scripts (e.g. Cyrillic) are turned into URL slugs."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2589
+#: lib/phoenix_kit_publishing/web/editor.ex:2840
 #, elixir-autogen, elixir-format
 msgid "Image component inserted"
 msgstr "Image component inserted"
@@ -985,9 +982,9 @@ msgstr "Invalid slug"
 msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
 msgstr "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:650
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:745
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:821
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:756
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:870
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:946
 #, elixir-autogen, elixir-format
 msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
 msgstr "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
@@ -1017,42 +1014,42 @@ msgstr "Item Naming"
 msgid "Items called \"%{plural}\"."
 msgstr "Items called \"%{plural}\"."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2956
+#: lib/phoenix_kit_publishing/web/html.ex:2962
 #, elixir-autogen, elixir-format
 msgid "Jan"
 msgstr "Jan"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2939
+#: lib/phoenix_kit_publishing/web/html.ex:2945
 #, elixir-autogen, elixir-format
 msgid "January"
 msgstr "January"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2962
+#: lib/phoenix_kit_publishing/web/html.ex:2968
 #, elixir-autogen, elixir-format
 msgid "Jul"
 msgstr "Jul"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2945
+#: lib/phoenix_kit_publishing/web/html.ex:2951
 #, elixir-autogen, elixir-format
 msgid "July"
 msgstr "July"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2961
+#: lib/phoenix_kit_publishing/web/html.ex:2967
 #, elixir-autogen, elixir-format
 msgid "Jun"
 msgstr "Jun"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2944
+#: lib/phoenix_kit_publishing/web/html.ex:2950
 #, elixir-autogen, elixir-format
 msgid "June"
 msgstr "June"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4094
+#: lib/phoenix_kit_publishing/web/editor.ex:4381
 #, elixir-autogen, elixir-format
 msgid "Keep editing"
 msgstr "Keep editing"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3141
+#: lib/phoenix_kit_publishing/web/editor.ex:3392
 #, elixir-autogen, elixir-format
 msgid "Language:"
 msgstr "Language:"
@@ -1062,17 +1059,17 @@ msgstr "Language:"
 msgid "Languages"
 msgstr "Languages"
 
-#: lib/phoenix_kit_publishing/web/index.ex:556
+#: lib/phoenix_kit_publishing/web/index.ex:551
 #, elixir-autogen, elixir-format
 msgid "Languages used"
 msgstr "Languages used"
 
-#: lib/phoenix_kit_publishing/web/index.ex:513
+#: lib/phoenix_kit_publishing/web/index.ex:508
 #, elixir-autogen, elixir-format
 msgid "Last published"
 msgstr "Last published"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4093
+#: lib/phoenix_kit_publishing/web/editor.ex:4380
 #, elixir-autogen, elixir-format
 msgid "Leave"
 msgstr "Leave"
@@ -1098,12 +1095,12 @@ msgstr "Load more"
 msgid "Manage"
 msgstr "Manage"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2887
+#: lib/phoenix_kit_publishing/web/editor.ex:3138
 #, elixir-autogen, elixir-format
 msgid "Manage Endpoints"
 msgstr "Manage Endpoints"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2918
+#: lib/phoenix_kit_publishing/web/editor.ex:3169
 #, elixir-autogen, elixir-format
 msgid "Manage Prompts"
 msgstr "Manage Prompts"
@@ -1113,18 +1110,18 @@ msgstr "Manage Prompts"
 msgid "Manage caching and performance settings for the publishing module."
 msgstr "Manage caching and performance settings for the publishing module."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2958
+#: lib/phoenix_kit_publishing/web/html.ex:2964
 #, elixir-autogen, elixir-format
 msgid "Mar"
 msgstr "Mar"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2941
+#: lib/phoenix_kit_publishing/web/html.ex:2947
 #, elixir-autogen, elixir-format
 msgid "March"
 msgstr "March"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2943
-#: lib/phoenix_kit_publishing/web/html.ex:2960
+#: lib/phoenix_kit_publishing/web/html.ex:2949
+#: lib/phoenix_kit_publishing/web/html.ex:2966
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr "May"
@@ -1159,7 +1156,7 @@ msgstr "Memory cache is disabled. Listing pages will query the database on every
 msgid "Mode"
 msgstr "Mode"
 
-#: lib/phoenix_kit_publishing/web/index.ex:613
+#: lib/phoenix_kit_publishing/web/index.ex:608
 #, elixir-autogen, elixir-format
 msgid "Move this group to trash?"
 msgstr "Move this group to trash?"
@@ -1174,12 +1171,12 @@ msgstr "Move this post to trash?"
 msgid "Move to trash"
 msgstr "Move to trash"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3191
+#: lib/phoenix_kit_publishing/web/editor.ex:3448
 #, elixir-autogen, elixir-format
 msgid "New"
 msgstr "New"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2733
+#: lib/phoenix_kit_publishing/web/editor.ex:2984
 #, elixir-autogen, elixir-format
 msgid "New Version"
 msgstr "New Version"
@@ -1189,7 +1186,7 @@ msgstr "New Version"
 msgid "No AI prompt selected"
 msgstr "No AI prompt selected"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3781
+#: lib/phoenix_kit_publishing/web/editor.ex:4060
 #, elixir-autogen, elixir-format
 msgid "No OG image set."
 msgstr "No OG image set."
@@ -1199,7 +1196,7 @@ msgstr "No OG image set."
 msgid "No UUID"
 msgstr "No UUID"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:982
+#: lib/phoenix_kit_publishing/web/editor.ex:1078
 #, elixir-autogen, elixir-format
 msgid "No other languages enabled to translate to"
 msgstr "No other languages enabled to translate to"
@@ -1219,7 +1216,7 @@ msgstr "No post specified"
 msgid "No posts found"
 msgstr "No posts found"
 
-#: lib/phoenix_kit_publishing/web/index.ex:517
+#: lib/phoenix_kit_publishing/web/index.ex:512
 #, elixir-autogen, elixir-format
 msgid "No published posts yet"
 msgstr "No published posts yet"
@@ -1234,12 +1231,12 @@ msgstr "No published posts yet."
 msgid "No published version"
 msgstr "No published version"
 
-#: lib/phoenix_kit_publishing/web/index.ex:428
+#: lib/phoenix_kit_publishing/web/index.ex:423
 #, elixir-autogen, elixir-format
 msgid "No publishing groups yet"
 msgstr "No publishing groups yet"
 
-#: lib/phoenix_kit_publishing/web/index.ex:571
+#: lib/phoenix_kit_publishing/web/index.ex:566
 #, elixir-autogen, elixir-format
 msgid "None"
 msgstr "None"
@@ -1254,12 +1251,12 @@ msgstr "Not found"
 msgid "Not published"
 msgstr "Not published"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2966
+#: lib/phoenix_kit_publishing/web/html.ex:2972
 #, elixir-autogen, elixir-format
 msgid "Nov"
 msgstr "Nov"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2949
+#: lib/phoenix_kit_publishing/web/html.ex:2955
 #, elixir-autogen, elixir-format
 msgid "November"
 msgstr "November"
@@ -1269,37 +1266,37 @@ msgstr "November"
 msgid "OFF — primary language URLs include the locale prefix (e.g. /en/blog/post). Managed on the Languages page."
 msgstr "OFF — primary language URLs include the locale prefix (e.g. /en/blog/post). Managed on the Languages page."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3724
+#: lib/phoenix_kit_publishing/web/editor.ex:4003
 #, elixir-autogen, elixir-format
 msgid "OG description"
 msgstr "OG description"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3741
+#: lib/phoenix_kit_publishing/web/editor.ex:4020
 #, elixir-autogen, elixir-format
 msgid "OG image"
 msgstr "OG image"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:891
+#: lib/phoenix_kit_publishing/web/editor.ex:987
 #, elixir-autogen, elixir-format
 msgid "OG image cleared"
 msgstr "OG image cleared"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3749
+#: lib/phoenix_kit_publishing/web/editor.ex:4028
 #, elixir-autogen, elixir-format
 msgid "OG image preview"
 msgstr "OG image preview"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2632
+#: lib/phoenix_kit_publishing/web/editor.ex:2883
 #, elixir-autogen, elixir-format
 msgid "OG image selected"
 msgstr "OG image selected"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3707
+#: lib/phoenix_kit_publishing/web/editor.ex:3986
 #, elixir-autogen, elixir-format
 msgid "OG title"
 msgstr "OG title"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4063
+#: lib/phoenix_kit_publishing/web/editor.ex:4350
 #, elixir-autogen, elixir-format
 msgid "OK"
 msgstr "OK"
@@ -1309,12 +1306,12 @@ msgstr "OK"
 msgid "ON — primary language URLs are prefixless (e.g. /blog/post). Managed on the Languages page."
 msgstr "ON — primary language URLs are prefixless (e.g. /blog/post). Managed on the Languages page."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2965
+#: lib/phoenix_kit_publishing/web/html.ex:2971
 #, elixir-autogen, elixir-format
 msgid "Oct"
 msgstr "Oct"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2948
+#: lib/phoenix_kit_publishing/web/html.ex:2954
 #, elixir-autogen, elixir-format
 msgid "October"
 msgstr "October"
@@ -1325,12 +1322,12 @@ msgstr "October"
 msgid "Only lowercase letters (a-z), numbers (0-9), and hyphens (-) are allowed. Must not start or end with a hyphen."
 msgstr "Only lowercase letters (a-z), numbers (0-9), and hyphens (-) are allowed. Must not start or end with a hyphen."
 
-#: lib/phoenix_kit_publishing/web/index.ex:583
+#: lib/phoenix_kit_publishing/web/index.ex:578
 #, elixir-autogen, elixir-format
 msgid "Open"
 msgstr "Open"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4052
+#: lib/phoenix_kit_publishing/web/editor.ex:4339
 #, elixir-autogen, elixir-format
 msgid "Open that post"
 msgstr "Open that post"
@@ -1340,12 +1337,12 @@ msgstr "Open that post"
 msgid "Organizes posts by date/time in URLs. Great for news, updates, and chronological feeds."
 msgstr "Organizes posts by date/time in URLs. Great for news, updates, and chronological feeds."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3689
+#: lib/phoenix_kit_publishing/web/editor.ex:3968
 #, elixir-autogen, elixir-format
 msgid "Override how this post looks when shared on social media. Leave a field blank to use the post's own title, description, or featured image."
 msgstr "Override how this post looks when shared on social media. Leave a field blank to use the post's own title, description, or featured image."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3523
+#: lib/phoenix_kit_publishing/web/editor.ex:3802
 #, elixir-autogen, elixir-format
 msgid "Paste a Phoenix Kit Media ID if you know it."
 msgstr "Paste a Phoenix Kit Media ID if you know it."
@@ -1355,7 +1352,7 @@ msgstr "Paste a Phoenix Kit Media ID if you know it."
 msgid "Per-translation URLs are always exposed on the conn under :phoenix_kit_publishing_translations — your host layout can read them whether the in-page switcher is enabled or not."
 msgstr "Per-translation URLs are always exposed on the conn under :phoenix_kit_publishing_translations — your host layout can read them whether the in-page switcher is enabled or not."
 
-#: lib/phoenix_kit_publishing/web/index.ex:635
+#: lib/phoenix_kit_publishing/web/index.ex:630
 #, elixir-autogen, elixir-format
 msgid "Permanently delete this group and all its posts? This cannot be undone."
 msgstr "Permanently delete this group and all its posts? This cannot be undone."
@@ -1404,7 +1401,7 @@ msgstr "Post Overview"
 msgid "Post analytics will appear here."
 msgstr "Post analytics will appear here."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:320
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:394
 #, elixir-autogen, elixir-format
 msgid "Post created and saved"
 msgstr "Post created and saved"
@@ -1420,9 +1417,9 @@ msgid "Post moved to trash"
 msgstr "Post moved to trash"
 
 #: lib/phoenix_kit_publishing/errors.ex:147
-#: lib/phoenix_kit_publishing/web/editor.ex:277
-#: lib/phoenix_kit_publishing/web/editor.ex:397
-#: lib/phoenix_kit_publishing/web/editor.ex:452
+#: lib/phoenix_kit_publishing/web/editor.ex:315
+#: lib/phoenix_kit_publishing/web/editor.ex:436
+#: lib/phoenix_kit_publishing/web/editor.ex:541
 #: lib/phoenix_kit_publishing/web/listing.ex:190
 #: lib/phoenix_kit_publishing/web/post_show.ex:74
 #: lib/phoenix_kit_publishing/web/preview.ex:109
@@ -1435,23 +1432,23 @@ msgstr "Post not found"
 msgid "Post restored as draft"
 msgstr "Post restored as draft"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:598
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:700
 #, elixir-autogen, elixir-format
 msgid "Post saved"
 msgstr "Post saved"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3227
+#: lib/phoenix_kit_publishing/web/editor.ex:3484
 #, elixir-autogen, elixir-format
 msgid "Post title"
 msgstr "Post title"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:983
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1108
 #, elixir-autogen, elixir-format
 msgid "Post updated by another user"
 msgstr "Post updated by another user"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:447
-#: lib/phoenix_kit_publishing/web/index.ex:533
+#: lib/phoenix_kit_publishing/web/index.ex:528
 #: lib/phoenix_kit_publishing/web/settings.ex:765
 #, elixir-autogen, elixir-format
 msgid "Posts"
@@ -1462,34 +1459,34 @@ msgstr "Posts"
 msgid "Posts, news articles, and updates. Items called \"%{plural}\"."
 msgstr "Posts, news articles, and updates. Items called \"%{plural}\"."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2662
+#: lib/phoenix_kit_publishing/web/editor.ex:2913
 #: lib/phoenix_kit_publishing/web/post_show.ex:191
 #: lib/phoenix_kit_publishing/web/preview.ex:32
 #, elixir-autogen, elixir-format
 msgid "Preview"
 msgstr "Preview"
 
-#: lib/phoenix_kit_publishing/web/preview.ex:230
+#: lib/phoenix_kit_publishing/web/preview.ex:231
 #, elixir-autogen, elixir-format
 msgid "Preview Error"
 msgstr "Preview Error"
 
-#: lib/phoenix_kit_publishing/web/preview.ex:210
+#: lib/phoenix_kit_publishing/web/preview.ex:211
 #, elixir-autogen, elixir-format
 msgid "Preview Mode"
 msgstr "Preview Mode"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3384
+#: lib/phoenix_kit_publishing/web/editor.ex:3663
 #, elixir-autogen, elixir-format
 msgid "Preview: /%{language}/%{group}/%{slug}"
 msgstr "Preview: /%{language}/%{group}/%{slug}"
 
-#: lib/phoenix_kit_publishing/web/index.ex:604
+#: lib/phoenix_kit_publishing/web/index.ex:599
 #, elixir-autogen, elixir-format
 msgid "Public"
 msgstr "Public"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2694
+#: lib/phoenix_kit_publishing/web/editor.ex:2945
 #: lib/phoenix_kit_publishing/web/listing.ex:1122
 #: lib/phoenix_kit_publishing/web/listing.ex:1334
 #: lib/phoenix_kit_publishing/web/new.ex:637
@@ -1503,15 +1500,15 @@ msgstr "Public URL"
 msgid "Public URL Language"
 msgstr "Public URL Language"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3898
+#: lib/phoenix_kit_publishing/web/editor.ex:4177
 #, elixir-autogen, elixir-format
 msgid "Publication Date & Time (UTC)"
 msgstr "Publication Date & Time (UTC)"
 
 #: lib/phoenix_kit_publishing/web/components/version_switcher.ex:225
-#: lib/phoenix_kit_publishing/web/editor.ex:3856
-#: lib/phoenix_kit_publishing/web/editor.ex:3866
-#: lib/phoenix_kit_publishing/web/index.ex:541
+#: lib/phoenix_kit_publishing/web/editor.ex:4135
+#: lib/phoenix_kit_publishing/web/editor.ex:4145
+#: lib/phoenix_kit_publishing/web/index.ex:536
 #: lib/phoenix_kit_publishing/web/listing.ex:1083
 #: lib/phoenix_kit_publishing/web/listing.ex:1169
 #: lib/phoenix_kit_publishing/web/listing.ex:1385
@@ -1547,7 +1544,7 @@ msgstr "Publishing group \"%{name}\" created"
 msgid "Read More →"
 msgstr "Read More →"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2892
+#: lib/phoenix_kit_publishing/web/editor.ex:3143
 #, elixir-autogen, elixir-format
 msgid "Reasoning (\"thinking\") models are slower and may return unstructured output — a standard model is recommended for translation."
 msgstr "Reasoning (\"thinking\") models are slower and may return unstructured output — a standard model is recommended for translation."
@@ -1567,7 +1564,7 @@ msgstr "Refreshing…"
 msgid "Regenerate All"
 msgstr "Regenerate All"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2944
+#: lib/phoenix_kit_publishing/web/editor.ex:3195
 #, elixir-autogen, elixir-format
 msgid "Regenerate Default Prompt"
 msgstr "Regenerate Default Prompt"
@@ -1594,17 +1591,17 @@ msgstr "Regenerated %{count} caches"
 msgid "Regenerating…"
 msgstr "Regenerating…"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3439
-#: lib/phoenix_kit_publishing/web/editor.ex:3464
-#: lib/phoenix_kit_publishing/web/editor.ex:3773
+#: lib/phoenix_kit_publishing/web/editor.ex:3718
+#: lib/phoenix_kit_publishing/web/editor.ex:3743
+#: lib/phoenix_kit_publishing/web/editor.ex:4052
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "Remove"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3435
-#: lib/phoenix_kit_publishing/web/editor.ex:3460
-#: lib/phoenix_kit_publishing/web/editor.ex:3651
-#: lib/phoenix_kit_publishing/web/editor.ex:3769
+#: lib/phoenix_kit_publishing/web/editor.ex:3714
+#: lib/phoenix_kit_publishing/web/editor.ex:3739
+#: lib/phoenix_kit_publishing/web/editor.ex:3930
+#: lib/phoenix_kit_publishing/web/editor.ex:4048
 #, elixir-autogen, elixir-format
 msgid "Removing…"
 msgstr "Removing…"
@@ -1666,36 +1663,36 @@ msgstr "Render the language switcher on listing + post pages. Disable when your 
 msgid "Resource not found"
 msgstr "Resource not found"
 
-#: lib/phoenix_kit_publishing/web/index.ex:626
+#: lib/phoenix_kit_publishing/web/index.ex:621
 #: lib/phoenix_kit_publishing/web/listing.ex:1414
 #: lib/phoenix_kit_publishing/web/listing.ex:1417
 #, elixir-autogen, elixir-format
 msgid "Restore"
 msgstr "Restore"
 
-#: lib/phoenix_kit_publishing/web/index.ex:622
+#: lib/phoenix_kit_publishing/web/index.ex:617
 #: lib/phoenix_kit_publishing/web/listing.ex:1412
 #, elixir-autogen, elixir-format
 msgid "Restoring…"
 msgstr "Restoring…"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3214
+#: lib/phoenix_kit_publishing/web/editor.ex:3471
 #, elixir-autogen, elixir-format
 msgid "Save now"
 msgstr "Save now"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1135
+#: lib/phoenix_kit_publishing/web/editor.ex:1231
 #, elixir-autogen, elixir-format
 msgid "Save the post to enable language switching"
 msgstr "Save the post to enable language switching"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3195
+#: lib/phoenix_kit_publishing/web/editor.ex:3452
 #, elixir-autogen, elixir-format
 msgid "Saved"
 msgstr "Saved"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3179
-#: lib/phoenix_kit_publishing/web/editor.ex:3211
+#: lib/phoenix_kit_publishing/web/editor.ex:3435
+#: lib/phoenix_kit_publishing/web/editor.ex:3468
 #, elixir-autogen, elixir-format
 msgid "Saving..."
 msgstr "Saving..."
@@ -1703,22 +1700,22 @@ msgstr "Saving..."
 #: lib/phoenix_kit_publishing/web/categories_live.ex:554
 #: lib/phoenix_kit_publishing/web/edit.ex:742
 #: lib/phoenix_kit_publishing/web/edit.ex:751
-#: lib/phoenix_kit_publishing/web/editor.ex:3202
+#: lib/phoenix_kit_publishing/web/editor.ex:3459
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "Saving…"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3481
+#: lib/phoenix_kit_publishing/web/editor.ex:3760
 #, elixir-autogen, elixir-format
 msgid "Select Featured Image"
 msgstr "Select Featured Image"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2904
+#: lib/phoenix_kit_publishing/web/editor.ex:3155
 #, elixir-autogen, elixir-format
 msgid "Select a prompt..."
 msgstr "Select a prompt..."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2874
+#: lib/phoenix_kit_publishing/web/editor.ex:3125
 #, elixir-autogen, elixir-format
 msgid "Select an endpoint..."
 msgstr "Select an endpoint..."
@@ -1728,22 +1725,22 @@ msgstr "Select an endpoint..."
 msgid "Semantic URLs ideal for evergreen content."
 msgstr "Semantic URLs ideal for evergreen content."
 
-#: lib/phoenix_kit_publishing/web/html.ex:2964
+#: lib/phoenix_kit_publishing/web/html.ex:2970
 #, elixir-autogen, elixir-format
 msgid "Sep"
 msgstr "Sep"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2947
+#: lib/phoenix_kit_publishing/web/html.ex:2953
 #, elixir-autogen, elixir-format
 msgid "September"
 msgstr "September"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2758
+#: lib/phoenix_kit_publishing/web/editor.ex:3009
 #, elixir-autogen, elixir-format
 msgid "Session paused:"
 msgstr "Session paused:"
 
-#: lib/phoenix_kit_publishing/web/index.ex:590
+#: lib/phoenix_kit_publishing/web/index.ex:585
 #: lib/phoenix_kit_publishing/web/listing.ex:1152
 #: lib/phoenix_kit_publishing/web/settings.ex:46
 #, elixir-autogen, elixir-format
@@ -1758,8 +1755,8 @@ msgstr "Singular"
 #: lib/phoenix_kit_publishing/web/categories_live.ex:446
 #: lib/phoenix_kit_publishing/web/categories_live.ex:541
 #: lib/phoenix_kit_publishing/web/edit.ex:445
-#: lib/phoenix_kit_publishing/web/editor.ex:3311
-#: lib/phoenix_kit_publishing/web/index.ex:510
+#: lib/phoenix_kit_publishing/web/editor.ex:3588
+#: lib/phoenix_kit_publishing/web/index.ex:505
 #: lib/phoenix_kit_publishing/web/post_show.ex:175
 #, elixir-autogen, elixir-format
 msgid "Slug"
@@ -1785,7 +1782,7 @@ msgstr "Slug conflicts with a reserved language code"
 msgid "Slug conflicts with a reserved route word"
 msgstr "Slug conflicts with a reserved route word"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:50
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:51
 #, elixir-autogen, elixir-format
 msgid "Slug is required. Enter a title to auto-generate one, or type a slug manually."
 msgstr "Slug is required. Enter a title to auto-generate one, or type a slug manually."
@@ -1801,13 +1798,13 @@ msgid "Slug taken"
 msgstr "Slug taken"
 
 #: lib/phoenix_kit_publishing/web/edit.ex:475
-#: lib/phoenix_kit_publishing/web/index.ex:523
+#: lib/phoenix_kit_publishing/web/index.ex:518
 #: lib/phoenix_kit_publishing/web/new.ex:653
 #, elixir-autogen, elixir-format
 msgid "Slug-based"
 msgstr "Slug-based"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3683
+#: lib/phoenix_kit_publishing/web/editor.ex:3962
 #, elixir-autogen, elixir-format
 msgid "Social / OpenGraph"
 msgstr "Social / OpenGraph"
@@ -1822,17 +1819,17 @@ msgstr "Some fields are invalid. Please review and try again."
 msgid "Something went wrong while saving this group."
 msgstr "Something went wrong while saving this group."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:833
+#: lib/phoenix_kit_publishing/web/editor.ex:929
 #, elixir-autogen, elixir-format
 msgid "Something went wrong while saving this post."
 msgstr "Something went wrong while saving this post."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3960
+#: lib/phoenix_kit_publishing/web/editor.ex:4247
 #, elixir-autogen, elixir-format
 msgid "Start blank"
 msgstr "Start blank"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2973
+#: lib/phoenix_kit_publishing/web/editor.ex:3224
 #, elixir-autogen, elixir-format
 msgid "Starting..."
 msgstr "Starting..."
@@ -1842,7 +1839,7 @@ msgstr "Starting..."
 msgid "Stats"
 msgstr "Stats"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3843
+#: lib/phoenix_kit_publishing/web/editor.ex:4122
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Status"
@@ -1862,12 +1859,12 @@ msgstr "Store in :persistent_term for sub-microsecond reads"
 msgid "That publishing group already exists"
 msgstr "That publishing group already exists"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:794
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:919
 #, elixir-autogen, elixir-format
 msgid "That slug is already used by another post in this group. Please choose a different one."
 msgstr "That slug is already used by another post in this group. Please choose a different one."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3699
+#: lib/phoenix_kit_publishing/web/editor.ex:3978
 #, elixir-autogen, elixir-format
 msgid "The OpenGraph plugin is enabled — the final image is generated from a template. Values you set below feed into that template (title, description, image) in place of the post's own; leave a field blank to use the post default."
 msgstr "The OpenGraph plugin is enabled — the final image is generated from a template. Values you set below feed into that template (title, description, image) in place of the post's own; leave a field blank to use the post default."
@@ -1877,7 +1874,7 @@ msgstr "The OpenGraph plugin is enabled — the final image is generated from a 
 msgid "The URL mode locks in after creation to keep your structure consistent."
 msgstr "The URL mode locks in after creation to keep your structure consistent."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4037
+#: lib/phoenix_kit_publishing/web/editor.ex:4324
 #, elixir-autogen, elixir-format
 msgid "The URL slug %{slug} is already used by another post in this group:"
 msgstr "The URL slug %{slug} is already used by another post in this group:"
@@ -1893,7 +1890,7 @@ msgstr "The page you requested was not found. Showing closest match."
 msgid "The requested group could not be found."
 msgstr "The requested group could not be found."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:798
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:923
 #, elixir-autogen, elixir-format
 msgid "The slug \"%{slug}\" is already used by another post in this group. Choose a different slug or change the title."
 msgstr "The slug \"%{slug}\" is already used by another post in this group. Choose a different slug or change the title."
@@ -1933,43 +1930,43 @@ msgstr "The version you were editing was deleted and no other versions are avail
 msgid "The version you were editing was deleted. Switched to version %{version}."
 msgstr "The version you were editing was deleted. Switched to version %{version}."
 
-#: lib/phoenix_kit_publishing/web/preview.ex:212
+#: lib/phoenix_kit_publishing/web/preview.ex:213
 #, elixir-autogen, elixir-format
 msgid "This is how the post will appear to visitors"
 msgstr "This is how the post will appear to visitors"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3826
+#: lib/phoenix_kit_publishing/web/editor.ex:4105
 #, elixir-autogen, elixir-format
 msgid "This is the image the OG plugin will show on social shares for this post — rendered from the assigned template using the values set above."
 msgstr "This is the image the OG plugin will show on social shares for this post — rendered from the assigned template using the values set above."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2803
+#: lib/phoenix_kit_publishing/web/editor.ex:3054
 #, elixir-autogen, elixir-format
 msgid "This language (%{code}) doesn't match a recognized language code. The publishing status will still be respected."
 msgstr "This language (%{code}) doesn't match a recognized language code. The publishing status will still be respected."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2811
+#: lib/phoenix_kit_publishing/web/editor.ex:3062
 #, elixir-autogen, elixir-format
 msgid "This language (%{code}) is no longer enabled in the Languages module. The publishing status will still be respected for legacy content."
 msgstr "This language (%{code}) is no longer enabled in the Languages module. The publishing status will still be respected for legacy content."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2939
+#: lib/phoenix_kit_publishing/web/editor.ex:3190
 #, elixir-autogen, elixir-format
 msgid "This prompt predates the current format and may mistranslate. Click to update it."
 msgstr "This prompt predates the current format and may mistranslate. Click to update it."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:661
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:756
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:767
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:881
 #, elixir-autogen, elixir-format
 msgid "This slug is reserved because it's a language code (like 'en', 'es', 'fr'). Please choose a different slug to avoid routing conflicts."
 msgstr "This slug is reserved because it's a language code (like 'en', 'es', 'fr'). Please choose a different slug to avoid routing conflicts."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:855
+#: lib/phoenix_kit_publishing/web/editor.ex:951
 #, elixir-autogen, elixir-format
 msgid "This translation is currently locked by another editor"
 msgstr "This translation is currently locked by another editor"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3332
+#: lib/phoenix_kit_publishing/web/editor.ex:3610
 #, elixir-autogen, elixir-format
 msgid "This will be the default URL for all languages."
 msgstr "This will be the default URL for all languages."
@@ -1979,13 +1976,13 @@ msgstr "This will be the default URL for all languages."
 msgid "This will overwrite existing content in: %{languages}"
 msgstr "This will overwrite existing content in: %{languages}"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3065
+#: lib/phoenix_kit_publishing/web/editor.ex:3316
 #, elixir-autogen, elixir-format
 msgid "This will translate the %{source} content to %{target}, overwriting any existing content."
 msgstr "This will translate the %{source} content to %{target}, overwriting any existing content."
 
 #: lib/phoenix_kit_publishing/web/edit.ex:477
-#: lib/phoenix_kit_publishing/web/index.ex:525
+#: lib/phoenix_kit_publishing/web/index.ex:520
 #: lib/phoenix_kit_publishing/web/new.ex:628
 #, elixir-autogen, elixir-format
 msgid "Timestamp-based"
@@ -1996,59 +1993,59 @@ msgstr "Timestamp-based"
 msgid "Title is required to publish"
 msgstr "Title is required to publish"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2171
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:44
+#: lib/phoenix_kit_publishing/web/editor.ex:2412
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:45
 #, elixir-autogen, elixir-format
 msgid "Title is required to save."
 msgstr "Title is required to save."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:771
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:896
 #, elixir-autogen, elixir-format
 msgid "Title is required."
 msgstr "Title is required."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4080
+#: lib/phoenix_kit_publishing/web/editor.ex:4367
 #, elixir-autogen, elixir-format
 msgid "Translate"
 msgstr "Translate"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3026
+#: lib/phoenix_kit_publishing/web/editor.ex:3277
 #, elixir-autogen, elixir-format
 msgid "Translate Missing Only"
 msgstr "Translate Missing Only"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2861
+#: lib/phoenix_kit_publishing/web/editor.ex:3112
 #, elixir-autogen, elixir-format
 msgid "Translate the %{source} post to %{target} using AI. It runs as a background job — you can keep editing while it finishes, or safely leave this page."
 msgstr "Translate the %{source} post to %{target} using AI. It runs as a background job — you can keep editing while it finishes, or safely leave this page."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3010
+#: lib/phoenix_kit_publishing/web/editor.ex:3261
 #, elixir-autogen, elixir-format
 msgid "Translate to All Languages"
 msgstr "Translate to All Languages"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3042
+#: lib/phoenix_kit_publishing/web/editor.ex:3293
 #, elixir-autogen, elixir-format
 msgid "Translate to This Language"
 msgstr "Translate to This Language"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2961
+#: lib/phoenix_kit_publishing/web/editor.ex:3212
 #, elixir-autogen, elixir-format
 msgid "Translating to %{languages}..."
 msgstr "Translating to %{languages}..."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2965
+#: lib/phoenix_kit_publishing/web/editor.ex:3216
 #: lib/phoenix_kit_publishing/web/listing.ex:1449
 #, elixir-autogen, elixir-format
 msgid "Translating..."
 msgstr "Translating..."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3033
+#: lib/phoenix_kit_publishing/web/editor.ex:3284
 #, elixir-autogen, elixir-format
 msgid "Translating…"
 msgstr "Translating…"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1224
+#: lib/phoenix_kit_publishing/web/editor.ex:1320
 #, elixir-autogen, elixir-format
 msgid "Translation cleared"
 msgstr "Translation cleared"
@@ -2060,23 +2057,23 @@ msgid_plural "Translation complete - %{count} languages"
 msgstr[0] "Translation complete - %{count} language"
 msgstr[1] "Translation complete - %{count} languages"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2018
+#: lib/phoenix_kit_publishing/web/editor.ex:2204
 #, elixir-autogen, elixir-format
 msgid "Translation completed successfully for %{count} languages"
 msgstr "Translation completed successfully for %{count} languages"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2023
+#: lib/phoenix_kit_publishing/web/editor.ex:2209
 #, elixir-autogen, elixir-format
 msgid "Translation completed with %{success} succeeded, %{failed} failed"
 msgstr "Translation completed with %{success} succeeded, %{failed} failed"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:351
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:359
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:425
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:433
 #, elixir-autogen, elixir-format
 msgid "Translation created and saved"
 msgstr "Translation created and saved"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2826
+#: lib/phoenix_kit_publishing/web/editor.ex:3077
 #, elixir-autogen, elixir-format
 msgid "Translation in progress"
 msgstr "Translation in progress"
@@ -2096,13 +2093,13 @@ msgstr "Transliterate"
 msgid "Transliterate — privet"
 msgstr "Transliterate — privet"
 
-#: lib/phoenix_kit_publishing/web/index.ex:463
+#: lib/phoenix_kit_publishing/web/index.ex:458
 #: lib/phoenix_kit_publishing/web/listing.ex:1172
 #, elixir-autogen, elixir-format
 msgid "Trash"
 msgstr "Trash"
 
-#: lib/phoenix_kit_publishing/web/index.ex:654
+#: lib/phoenix_kit_publishing/web/index.ex:667
 #: lib/phoenix_kit_publishing/web/listing.ex:1251
 #, elixir-autogen, elixir-format
 msgid "Trash is empty"
@@ -2114,7 +2111,7 @@ msgstr "Trash is empty"
 msgid "Trashed"
 msgstr "Trashed"
 
-#: lib/phoenix_kit_publishing/web/index.ex:611
+#: lib/phoenix_kit_publishing/web/index.ex:606
 #: lib/phoenix_kit_publishing/web/listing.ex:1400
 #, elixir-autogen, elixir-format
 msgid "Trashing…"
@@ -2125,7 +2122,7 @@ msgstr "Trashing…"
 msgid "URL Mode"
 msgstr "URL Mode"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3355
+#: lib/phoenix_kit_publishing/web/editor.ex:3633
 #, elixir-autogen, elixir-format
 msgid "URL Slug"
 msgstr "URL Slug"
@@ -2135,17 +2132,17 @@ msgstr "URL Slug"
 msgid "URL mode"
 msgstr "URL mode"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4033
+#: lib/phoenix_kit_publishing/web/editor.ex:4320
 #, elixir-autogen, elixir-format
 msgid "URL slug already in use"
 msgstr "URL slug already in use"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:224
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:298
 #, elixir-autogen, elixir-format
 msgid "URL slug cannot be a language code"
 msgstr "URL slug cannot be a language code"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:227
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:301
 #, elixir-autogen, elixir-format
 msgid "URL slug cannot be a reserved word (admin, api, assets, etc.)"
 msgstr "URL slug cannot be a reserved word (admin, api, assets, etc.)"
@@ -2155,12 +2152,12 @@ msgstr "URL slug cannot be a reserved word (admin, api, assets, etc.)"
 msgid "URL slug conflicts with another post"
 msgstr "URL slug conflicts with another post"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:231
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:305
 #, elixir-autogen, elixir-format
 msgid "URL slug is a previous address of another post — using it would hijack that post's redirect"
 msgstr "URL slug is a previous address of another post — using it would hijack that post's redirect"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:221
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:295
 #, elixir-autogen, elixir-format
 msgid "URL slug must be lowercase letters, numbers, and hyphens only"
 msgstr "URL slug must be lowercase letters, numbers, and hyphens only"
@@ -2185,7 +2182,7 @@ msgstr "Unicode — привет"
 msgid "Unknown"
 msgstr "Unknown"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2801
+#: lib/phoenix_kit_publishing/web/editor.ex:3052
 #, elixir-autogen, elixir-format
 msgid "Unknown language:"
 msgstr "Unknown language:"
@@ -2195,8 +2192,8 @@ msgstr "Unknown language:"
 msgid "Unpublished"
 msgstr "Unpublished"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3188
-#: lib/phoenix_kit_publishing/web/editor.ex:4090
+#: lib/phoenix_kit_publishing/web/editor.ex:3445
+#: lib/phoenix_kit_publishing/web/editor.ex:4377
 #, elixir-autogen, elixir-format
 msgid "Unsaved changes"
 msgstr "Unsaved changes"
@@ -2207,6 +2204,7 @@ msgstr "Unsaved changes"
 msgid "Unsaved draft"
 msgstr "Unsaved draft"
 
+#: lib/phoenix_kit_publishing/web/editor.ex:2347
 #: lib/phoenix_kit_publishing/web/post_show.ex:163
 #, elixir-autogen, elixir-format
 msgid "Untitled"
@@ -2218,17 +2216,17 @@ msgstr "Untitled"
 msgid "Untitled post"
 msgstr "Untitled post"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3331
+#: lib/phoenix_kit_publishing/web/editor.ex:3609
 #, elixir-autogen, elixir-format
 msgid "Use lowercase letters, numbers, and hyphens only."
 msgstr "Use lowercase letters, numbers, and hyphens only."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3371
+#: lib/phoenix_kit_publishing/web/editor.ex:3650
 #, elixir-autogen, elixir-format
 msgid "Use lowercase letters, numbers, and hyphens only. Leave empty to use the default slug."
 msgstr "Use lowercase letters, numbers, and hyphens only. Leave empty to use the default slug."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3323
+#: lib/phoenix_kit_publishing/web/editor.ex:3601
 #, elixir-autogen, elixir-format
 msgid "Use lowercase letters, numbers, and hyphens only. No spaces or special characters."
 msgstr "Use lowercase letters, numbers, and hyphens only. No spaces or special characters."
@@ -2259,12 +2257,12 @@ msgstr "Valid examples"
 msgid "Version %{version} - %{status}"
 msgstr "Version %{version} - %{status}"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1863
+#: lib/phoenix_kit_publishing/web/editor.ex:2049
 #, elixir-autogen, elixir-format
 msgid "Version %{version} was published by another editor"
 msgstr "Version %{version} was published by another editor"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3301
+#: lib/phoenix_kit_publishing/web/editor.ex:3578
 #, elixir-autogen, elixir-format
 msgid "Version Settings"
 msgstr "Version Settings"
@@ -2274,14 +2272,14 @@ msgstr "Version Settings"
 msgid "Version access is disabled"
 msgstr "Version access is disabled"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:1047
-#: lib/phoenix_kit_publishing/web/editor.ex:2208
+#: lib/phoenix_kit_publishing/web/editor.ex:1143
+#: lib/phoenix_kit_publishing/web/editor.ex:2449
 #, elixir-autogen, elixir-format
 msgid "Version not found"
 msgstr "Version not found"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2711
-#: lib/phoenix_kit_publishing/web/editor.ex:2722
+#: lib/phoenix_kit_publishing/web/editor.ex:2962
+#: lib/phoenix_kit_publishing/web/editor.ex:2973
 #, elixir-autogen, elixir-format
 msgid "Version:"
 msgstr "Version:"
@@ -2291,17 +2289,17 @@ msgstr "Version:"
 msgid "Versions"
 msgstr "Versions"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2684
+#: lib/phoenix_kit_publishing/web/editor.ex:2935
 #, elixir-autogen, elixir-format
 msgid "View Public"
 msgstr "View Public"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2775
+#: lib/phoenix_kit_publishing/web/editor.ex:3026
 #, elixir-autogen, elixir-format
 msgid "View only mode:"
 msgstr "View only mode:"
 
-#: lib/phoenix_kit_publishing/web/index.ex:601
+#: lib/phoenix_kit_publishing/web/index.ex:596
 #, elixir-autogen, elixir-format
 msgid "View public site"
 msgstr "View public site"
@@ -2316,17 +2314,17 @@ msgstr "What do you call items in this publishing group? These names appear in t
 msgid "When enabled, default-language public URLs become prefixless and prefixed default-language URLs redirect to the canonical prefixless version."
 msgstr "When enabled, default-language public URLs become prefixless and prefixed default-language URLs redirect to the canonical prefixless version."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3264
+#: lib/phoenix_kit_publishing/web/editor.ex:3521
 #, elixir-autogen, elixir-format
 msgid "Write your content here..."
 msgstr "Write your content here..."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:848
+#: lib/phoenix_kit_publishing/web/editor.ex:944
 #, elixir-autogen, elixir-format
 msgid "You don't have permission to clear translations"
 msgstr "You don't have permission to clear translations"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:4092
+#: lib/phoenix_kit_publishing/web/editor.ex:4379
 #, elixir-autogen, elixir-format
 msgid "You have unsaved changes. Leave without saving?"
 msgstr "You have unsaved changes. Leave without saving?"
@@ -2347,7 +2345,7 @@ msgstr "Your editing lock will expire in %{minutes} minutes due to inactivity"
 msgid "at"
 msgstr "at"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3321
+#: lib/phoenix_kit_publishing/web/editor.ex:3599
 #, elixir-autogen, elixir-format
 msgid "auto-generated from title"
 msgstr "auto-generated from title"
@@ -2379,7 +2377,7 @@ msgstr "e.g. product-updates"
 msgid "e.g. tutorials, recipes"
 msgstr "e.g. tutorials, recipes"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3357
+#: lib/phoenix_kit_publishing/web/editor.ex:3635
 #, elixir-autogen, elixir-format
 msgid "optional"
 msgstr "optional"
@@ -2394,7 +2392,7 @@ msgstr "showing"
 msgid "your-group"
 msgstr "your-group"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2738
+#: lib/phoenix_kit_publishing/web/html.ex:2744
 #, elixir-autogen, elixir-format
 msgid "%{count} min read"
 msgid_plural "%{count} min read"
@@ -2481,7 +2479,7 @@ msgstr "Content width"
 msgid "Default — the browser's native scrollbar"
 msgstr "Default — the browser's native scrollbar"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3556
+#: lib/phoenix_kit_publishing/web/editor.ex:3835
 #, elixir-autogen, elixir-format
 msgid "Feature this post"
 msgstr "Feature this post"
@@ -2568,7 +2566,7 @@ msgstr "On this page"
 msgid "Only recolors the real scrollbar — keyboard and touch scrolling stay normal."
 msgstr "Only recolors the real scrollbar — keyboard and touch scrolling stay normal."
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3560
+#: lib/phoenix_kit_publishing/web/editor.ex:3839
 #, elixir-autogen, elixir-format
 msgid "Pins this post to the top of its listing and shows it larger. The group's settings control whether featured posts appear and how they're displayed."
 msgstr "Pins this post to the top of its listing and shows it larger. The group's settings control whether featured posts appear and how they're displayed."
@@ -3075,7 +3073,7 @@ msgstr[1] ""
 msgid "A comment thread under each post. Requires the Comments module; logged-in readers can post."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3617
+#: lib/phoenix_kit_publishing/web/editor.ex:3896
 #, elixir-autogen, elixir-format
 msgid "Audio version"
 msgstr ""
@@ -3287,27 +3285,27 @@ msgstr ""
 msgid "to comment on this note."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3660
+#: lib/phoenix_kit_publishing/web/editor.ex:3939
 #, elixir-autogen, elixir-format
 msgid "An audio file (e.g. a narration). Shows a player above the post and rides the RSS feed as a podcast enclosure."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2633
+#: lib/phoenix_kit_publishing/web/editor.ex:2884
 #, elixir-autogen, elixir-format
 msgid "Audio version selected"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3642
+#: lib/phoenix_kit_publishing/web/editor.ex:3921
 #, elixir-autogen, elixir-format
 msgid "Choose"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3654
+#: lib/phoenix_kit_publishing/web/editor.ex:3933
 #, elixir-autogen, elixir-format
 msgid "Remove the audio version"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:884
+#: lib/phoenix_kit_publishing/web/editor.ex:980
 #, elixir-autogen, elixir-format
 msgid "Audio version removed"
 msgstr ""
@@ -3322,72 +3320,72 @@ msgstr ""
 msgid "Thanks — your comment is awaiting review."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2599
+#: lib/phoenix_kit_publishing/web/editor.ex:2850
 #, elixir-autogen, elixir-format
 msgid "That file isn't audio — pick an audio file."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:132
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:141
 #, elixir-autogen, elixir-format
 msgid "That slug is taken — pick another to save."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3595
+#: lib/phoenix_kit_publishing/web/editor.ex:3874
 #, elixir-autogen, elixir-format
 msgid "Adds ?v=N access to this post's published versions. Off by default — only the live version is public."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3346
+#: lib/phoenix_kit_publishing/web/editor.ex:3624
 #, elixir-autogen, elixir-format
 msgid "From title"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3591
+#: lib/phoenix_kit_publishing/web/editor.ex:3870
 #, elixir-autogen, elixir-format
 msgid "Let readers browse older versions"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3343
+#: lib/phoenix_kit_publishing/web/editor.ex:3621
 #, elixir-autogen, elixir-format
 msgid "Re-derive the slug from the current title"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3341
+#: lib/phoenix_kit_publishing/web/editor.ex:3619
 #, elixir-autogen, elixir-format
 msgid "Working…"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2772
+#: lib/phoenix_kit_publishing/web/editor.ex:3023
 #, elixir-autogen, elixir-format
 msgid "Resume editing"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2768
+#: lib/phoenix_kit_publishing/web/editor.ex:3019
 #, elixir-autogen, elixir-format
 msgid "Resuming…"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2172
+#: lib/phoenix_kit_publishing/web/editor.ex:2413
 #, elixir-autogen, elixir-format
 msgid "Slug is required to save."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:760
+#: lib/phoenix_kit_publishing/web/editor.ex:856
 #, elixir-autogen, elixir-format
 msgid "Someone else is editing this post now — you can still watch."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:763
+#: lib/phoenix_kit_publishing/web/editor.ex:859
 #, elixir-autogen, elixir-format
 msgid "You're editing again."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2760
+#: lib/phoenix_kit_publishing/web/editor.ex:3011
 #, elixir-autogen, elixir-format
 msgid "Your editing lock expired due to inactivity."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2066
+#: lib/phoenix_kit_publishing/web/editor.ex:2252
 #, elixir-autogen, elixir-format
 msgid "You're the editor now. The previous editor's unsaved changes were kept."
 msgstr ""
@@ -3417,82 +3415,82 @@ msgstr ""
 msgid "Searching…"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2503
+#: lib/phoenix_kit_publishing/web/editor.ex:2754
 #, elixir-autogen, elixir-format
 msgid "Someone else is editing this post — nothing was changed."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2420
+#: lib/phoenix_kit_publishing/web/editor.ex:2661
 #, elixir-autogen, elixir-format
 msgid "Author note"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2425
+#: lib/phoenix_kit_publishing/web/editor.ex:2666
 #, elixir-autogen, elixir-format
 msgid "Call to action"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2448
+#: lib/phoenix_kit_publishing/web/editor.ex:2694
 #, elixir-autogen, elixir-format
 msgid "Heading"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2400
+#: lib/phoenix_kit_publishing/web/editor.ex:2641
 #, elixir-autogen, elixir-format
 msgid "Headline (wide)"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2439
+#: lib/phoenix_kit_publishing/web/editor.ex:2685
 #, elixir-autogen, elixir-format
 msgid "Headline text"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2405
+#: lib/phoenix_kit_publishing/web/editor.ex:2646
 #, elixir-autogen, elixir-format
 msgid "Showcase band"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2467
+#: lib/phoenix_kit_publishing/web/editor.ex:2713
 #, elixir-autogen, elixir-format
 msgid "What should the reader do next?"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2444
+#: lib/phoenix_kit_publishing/web/editor.ex:2690
 #, elixir-autogen, elixir-format
 msgid "Words beside the picture."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2460
+#: lib/phoenix_kit_publishing/web/editor.ex:2706
 #, elixir-autogen, elixir-format
 msgid "Your note here"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2459
+#: lib/phoenix_kit_publishing/web/editor.ex:2705
 #, elixir-autogen, elixir-format
 msgid "the phrase"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2415
+#: lib/phoenix_kit_publishing/web/editor.ex:2656
 #, elixir-autogen, elixir-format
 msgid "Audio player"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2560
+#: lib/phoenix_kit_publishing/web/editor.ex:2811
 #, elixir-autogen, elixir-format
 msgid "Audio player inserted"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2410
+#: lib/phoenix_kit_publishing/web/editor.ex:2651
 #, elixir-autogen, elixir-format
 msgid "Gallery (helix)"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:2574
+#: lib/phoenix_kit_publishing/web/editor.ex:2825
 #, elixir-autogen, elixir-format
 msgid "Gallery inserted"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor.ex:3887
+#: lib/phoenix_kit_publishing/web/editor.ex:4166
 #, elixir-autogen, elixir-format
 msgid "Saving will publish this version and archive v%{version}, which is live now."
 msgstr ""
@@ -3542,12 +3540,12 @@ msgstr ""
 msgid "Setting updated"
 msgstr ""
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:954
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1079
 #, elixir-autogen, elixir-format
 msgid "This post was saved somewhere else. Your unsaved changes are still here — saving will overwrite that copy."
 msgstr ""
 
-#: lib/phoenix_kit_publishing/renderer.ex:680
+#: lib/phoenix_kit_publishing/renderer.ex:798
 #, elixir-autogen, elixir-format
 msgid "Back to text"
 msgstr "Back to text"
@@ -3557,7 +3555,7 @@ msgstr "Back to text"
 msgid "No posts in this language yet. Showing closest match."
 msgstr "No posts in this language yet. Showing closest match."
 
-#: lib/phoenix_kit_publishing/renderer.ex:693
+#: lib/phoenix_kit_publishing/renderer.ex:811
 #, elixir-autogen, elixir-format
 msgid "Notes"
 msgstr "Notes"
@@ -3597,12 +3595,12 @@ msgstr "Parent category belongs to another group"
 msgid "Parent category not found"
 msgstr "Parent category not found"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:553
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:627
 #, elixir-autogen, elixir-format
 msgid "Post saved as a draft, but it can't be published: the primary language needs a title."
 msgstr "Post saved as a draft, but it can't be published: the primary language needs a title."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:558
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:632
 #, elixir-autogen, elixir-format
 msgid "Post saved, but publishing failed."
 msgstr "Post saved, but publishing failed."
@@ -3617,7 +3615,7 @@ msgstr "Save the changes against the new version — creating one doesn't apply 
 msgid "That slug is already used by another group."
 msgstr "That slug is already used by another group."
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:511
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:585
 #, elixir-autogen, elixir-format
 msgid "The live version stays published — to take it offline, use Unpublish on the group page."
 msgstr "The live version stays published — to take it offline, use Unpublish on the group page."
@@ -3627,7 +3625,7 @@ msgstr "The live version stays published — to take it offline, use Unpublish o
 msgid "The primary language's content anchors the post and can't be deleted — edit it instead"
 msgstr "The primary language's content anchors the post and can't be deleted — edit it instead"
 
-#: lib/phoenix_kit_publishing/web/editor.ex:139
+#: lib/phoenix_kit_publishing/web/editor.ex:176
 #, elixir-autogen, elixir-format
 msgid "Publishing Editor"
 msgstr "Publishing Editor"
@@ -3635,4 +3633,34 @@ msgstr "Publishing Editor"
 #: lib/phoenix_kit_publishing/web/settings.ex:479
 #, elixir-autogen, elixir-format
 msgid "General"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4193
+#, elixir-autogen, elixir-format
+msgid "Displays as:"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/page_builder/components/embed.ex:46
+#, elixir-autogen, elixir-format
+msgid "Interactive demo"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3564
+#, elixir-autogen, elixir-format
+msgid "Link a publication"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2671
+#, elixir-autogen, elixir-format
+msgid "Live demo (iframe)"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1770
+#, elixir-autogen, elixir-format
+msgid "That publication no longer exists."
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2718
+#, elixir-autogen, elixir-format
+msgid "Try it"
 msgstr ""

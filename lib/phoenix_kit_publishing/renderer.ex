@@ -339,6 +339,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # Regions where the token is literal text (or already inside a link).
   @post_link_skip_re ~r{(<(?:pre|code|a)\b[^>]*>.*?</(?:pre|code|a)>)}is
 
+  # Identifies a chunk that IS one of the captured skip regions above, so the
+  # split's captures can be told apart from the prose between them.
+  @post_link_skip_head_re ~r/^<(?:pre|code|a)\b/i
+
   # Sentinel for a `<` that sits inside a code span/fence. The component scanner
   # is plain regex over the source, so without this it would extract a `<Image>`
   # / `<CTA>` / … shown *literally* inside a code block and render it as a real
@@ -440,21 +444,25 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
       html
       |> String.split(@post_link_skip_re, include_captures: true)
-      |> Enum.map_join("", fn chunk ->
-        if Regex.match?(~r/^<(?:pre|code|a)\b/i, chunk) do
-          chunk
-        else
-          Regex.replace(@post_link_re, chunk, fn _full, uuid, alias_text ->
-            render_post_link(Map.get(targets, uuid), alias_text)
-          end)
-        end
-      end)
+      |> Enum.map_join("", &resolve_post_links_in_chunk(&1, targets))
     else
       html
     end
   end
 
   def resolve_post_links(html, _language), do: html
+
+  # A chunk that is itself a <pre>/<code>/<a> region passes through untouched:
+  # a token in there is literal text, mirroring Leaf's own decoration rules.
+  defp resolve_post_links_in_chunk(chunk, targets) do
+    if Regex.match?(@post_link_skip_head_re, chunk) do
+      chunk
+    else
+      Regex.replace(@post_link_re, chunk, fn _full, uuid, alias_text ->
+        render_post_link(Map.get(targets, uuid), alias_text)
+      end)
+    end
+  end
 
   @doc """
   Reduces publication link tokens in MARKDOWN to their visible text —
@@ -496,37 +504,43 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     _ -> nil
   end
 
+  defp render_post_link(target, alias_text) do
+    target
+    |> mention_text(alias_text)
+    |> wrap_mention_in_anchor(target)
+  end
+
   # The alias slice comes out of ALREADY-RENDERED HTML — MDEx escaped its
   # entities (`&` is `&amp;` by the time the token reaches this pass), so
   # re-escaping double-encoded them ("Tom &amp; Jerry" displayed literally).
   # The alias is inserted verbatim; only the title fallback (raw text from
-  # the DB) and the href are escaped here.
-  defp render_post_link(target, alias_text) do
-    {text, pre_escaped?} =
-      case String.trim(alias_text || "") do
-        "" -> {String.trim(to_string((target && target.title) || "")), false}
-        aliased -> {aliased, true}
-      end
-
-    safe_text = if pre_escaped?, do: text, else: Plug.HTML.html_escape(text)
-
-    cond do
-      text == "" ->
-        ""
-
-      is_nil(target) or is_nil(target.href) ->
-        safe_text
-
-      true ->
-        # `link link-primary`: the same classes add_tailwind_classes puts on
-        # ordinary in-body anchors, so a mention reads as a link at rest.
-        # (This pass runs AFTER that styling step, so the classes must be
-        # inlined here — and `link-hover`, tried first, styled the mention
-        # as plain text until hover.)
-        ~s(<a href="#{Plug.HTML.html_escape(target.href)}" class="link link-primary publishing-post-link">) <>
-          safe_text <> "</a>"
+  # the DB) is escaped here. Returns display-ready text either way.
+  defp mention_text(target, alias_text) do
+    case String.trim(alias_text || "") do
+      "" -> target |> mention_title() |> Plug.HTML.html_escape()
+      aliased -> aliased
     end
   end
+
+  defp mention_title(%{title: title}), do: title |> to_string() |> String.trim()
+  defp mention_title(_target), do: ""
+
+  # No text at all (no alias, and an unresolvable target has no title to fall
+  # back on) renders as nothing rather than an empty anchor.
+  defp wrap_mention_in_anchor("", _target), do: ""
+
+  # `link link-primary`: the same classes add_tailwind_classes puts on ordinary
+  # in-body anchors, so a mention reads as a link at rest. (This pass runs AFTER
+  # that styling step, so the classes must be inlined here — and `link-hover`,
+  # tried first, styled the mention as plain text until hover.)
+  defp wrap_mention_in_anchor(safe_text, %{href: href}) when is_binary(href) do
+    ~s(<a href="#{Plug.HTML.html_escape(href)}" class="link link-primary publishing-post-link">) <>
+      safe_text <> "</a>"
+  end
+
+  # A missing, trashed or unpublished target degrades to plain text, never a
+  # dead link.
+  defp wrap_mention_in_anchor(safe_text, _target), do: safe_text
 
   @doc """
   Returns whether render caching is enabled for a group.
@@ -849,21 +863,18 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   defp heal_signed_file_urls(other), do: other
 
+  # Every PHK component tag whose presence routes content down the mixed
+  # markdown+XML pipeline instead of the plain-markdown one. A new component
+  # is one entry here — `<Image>` is the exception below, not the pattern.
+  @component_tags ~w(<CTA <Headline <Subheadline <Video <Audio <Showcase <Gallery <EntityForm <Embed)
+
   # Detect if markdown content has embedded XML components
   defp has_embedded_components?(content) do
     # `<Image` may be followed by a space OR a newline (the format spec's own
     # examples put the attributes on the next line); match either so multi-line
     # tags route through the component path instead of being smartypants-mangled.
-    Regex.match?(~r/<Image[\s>]/, content) ||
-      String.contains?(content, "<CTA") ||
-      String.contains?(content, "<Headline") ||
-      String.contains?(content, "<Subheadline") ||
-      String.contains?(content, "<Video") ||
-      String.contains?(content, "<Audio") ||
-      String.contains?(content, "<Showcase") ||
-      String.contains?(content, "<Gallery") ||
-      String.contains?(content, "<EntityForm") ||
-      String.contains?(content, "<Embed")
+    Regex.match?(~r/<Image[\s>]/, content) or
+      Enum.any?(@component_tags, &String.contains?(content, &1))
   end
 
   # Render markdown using MDEx (comrak), then inject Tailwind/daisyUI classes

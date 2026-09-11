@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.10.1 - 2026-09-11
+
+### Fixed
+
+- Publication mentions on a public post now read as links at rest. The resolved
+  `[[post:UUID|Alias]]` anchor carried daisyUI's `link link-hover`, whose underline
+  appears only on hover, so a mention looked like plain prose until the pointer
+  happened to cross it. It now carries `link link-primary` — the same classes an
+  ordinary in-body anchor gets. No render-cache bump is needed: mentions are
+  resolved after the cache, on every request.
+- `mix precommit` is green again. `credo --strict` had been failing on `main` since
+  the mention/`<Embed>` work landed (three refactoring findings in `renderer.ex`),
+  which aborted the alias before `dialyzer` ever ran. `resolve_post_links/2`,
+  `render_post_link/2` and `has_embedded_components?/1` are refactored — same
+  behaviour, clause for clause. With credo no longer aborting the run, `dialyzer`
+  executed for the first time since that work landed and caught a genuine dead
+  branch it had been masking: `normalize_editor_mode/1`'s `is_binary` clause was
+  unreachable, because core's `Settings.get_editor_mode/0` always returns one of
+  four atoms. Removed.
+
+### Changed
+
+- The Create Group action moved out of the admin navbar and into the groups grid as
+  a ghost card closing the row — where the eye already is when scanning groups.
+  Shown in the active view only; the empty state keeps its own call to action.
+- Translations: the six admin strings introduced with cross-post mentions and
+  `<Embed>` ("Link a publication", "That publication no longer exists.",
+  "Displays as:", "Interactive demo", "Live demo (iframe)", "Try it") had never been
+  extracted, and leaked English into the German, Estonian, French, Italian and
+  Russian admin UIs. All six are now translated in all five languages, and the
+  orphaned "Create Group" msgid was dropped from the catalogs.
+
 ## 0.10.0 - 2026-09-10
 
 ### Added
