@@ -518,7 +518,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         safe_text
 
       true ->
-        ~s(<a href="#{Plug.HTML.html_escape(target.href)}" class="link link-hover publishing-post-link">) <>
+        # `link link-primary`: the same classes add_tailwind_classes puts on
+        # ordinary in-body anchors, so a mention reads as a link at rest.
+        # (This pass runs AFTER that styling step, so the classes must be
+        # inlined here — and `link-hover`, tried first, styled the mention
+        # as plain text until hover.)
+        ~s(<a href="#{Plug.HTML.html_escape(target.href)}" class="link link-primary publishing-post-link">) <>
           safe_text <> "</a>"
     end
   end
