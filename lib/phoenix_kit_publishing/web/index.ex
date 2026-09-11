@@ -70,11 +70,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       socket
       |> assign(:project_title, Settings.get_project_title())
       |> assign(:page_title, gettext("Publishing"))
-      |> assign(:page_action, %{
-        icon: "hero-plus",
-        label: gettext("Create Group"),
-        navigate: Routes.path("/admin/publishing/new-group")
-      })
       |> assign(
         :current_path,
         Routes.path("/admin/publishing")
@@ -644,6 +639,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                   </div>
                 </div>
               </div>
+            <% end %>
+            <%!-- The create action lives IN the grid, a ghost card closing
+                  the row of groups — where the eye already is — instead of
+                  a small navbar button beside the page title that nobody
+                  found. Active view only: nothing gets created in Trash. --%>
+            <%= if @view_mode == "active" do %>
+              <.link
+                navigate={Routes.path("/admin/publishing/new-group")}
+                aria-label={gettext("Create Publishing Group")}
+                class="card h-full min-h-40 border-2 border-dashed border-base-content/25 bg-base-200/40 shadow-none transition hover:border-primary/70 hover:bg-base-100 group"
+              >
+                <div class="card-body h-full items-center justify-center gap-2 text-base-content/70 transition-colors group-hover:text-primary">
+                  <.icon name="hero-plus" class="w-10 h-10" />
+                  <span class="text-sm font-medium">
+                    {gettext("Create Publishing Group")}
+                  </span>
+                </div>
+              </.link>
             <% end %>
           </div>
         <% end %>
