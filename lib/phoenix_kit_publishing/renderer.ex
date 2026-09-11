@@ -863,10 +863,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   defp heal_signed_file_urls(other), do: other
 
-  # Every PHK component tag whose presence routes content down the mixed
-  # markdown+XML pipeline instead of the plain-markdown one. A new component
-  # is one entry here — `<Image>` is the exception below, not the pattern.
-  @component_tags ~w(<CTA <Headline <Subheadline <Video <Audio <Showcase <Gallery <EntityForm <Embed)
+  # Prefixes that route content down the mixed markdown+XML pipeline.
+  # Named distinctly from `@component_tags` (the Leaf preserve-tags list at
+  # the top of this file) — reusing that attribute here silently shadowed it
+  # for every subsequent use. A new component is one entry; `<Image>` is the
+  # exception below, not the pattern.
+  @embedded_component_prefixes ~w(<CTA <Headline <Subheadline <Video <Audio <Showcase <Gallery <EntityForm <Embed)
 
   # Detect if markdown content has embedded XML components
   defp has_embedded_components?(content) do
@@ -874,7 +876,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     # examples put the attributes on the next line); match either so multi-line
     # tags route through the component path instead of being smartypants-mangled.
     Regex.match?(~r/<Image[\s>]/, content) or
-      Enum.any?(@component_tags, &String.contains?(content, &1))
+      Enum.any?(@embedded_component_prefixes, &String.contains?(content, &1))
   end
 
   # Render markdown using MDEx (comrak), then inject Tailwind/daisyUI classes

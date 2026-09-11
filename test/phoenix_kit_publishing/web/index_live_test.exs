@@ -222,5 +222,54 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
       assert html =~ group["name"]
       refute html =~ ~s|/admin/publishing/new-group"|
     end
+
+    test "a dashboard whose only groups are in Trash still shows the tabs, not the empty-state card",
+         %{conn: conn} do
+      {:ok, group} =
+        Groups.add_group("Index Only Trash #{System.unique_integer([:positive])}", mode: "slug")
+
+      {:ok, _} = Groups.trash_group(group["slug"])
+
+      {:ok, _view, html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing")
+
+      # The empty-state card used to win whenever the active list was empty,
+      # which hid the Trash tab and made the groups unreachable on a fresh
+      # mount (and after trashing the last active group).
+      refute html =~ "No publishing groups yet"
+      assert html =~ ~s|phx-value-mode="trashed"|
+      assert html =~ ~s|/admin/publishing/new-group"|
+      assert html =~ "border-dashed border-base-content/25"
+    end
+
+    test "trashing the last active group keeps the Trash tab on screen", %{conn: conn} do
+      {:ok, group} =
+        Groups.add_group("Index Last Trash #{System.unique_integer([:positive])}", mode: "slug")
+
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing")
+
+      html = render_click(view, "trash_group", %{"slug" => group["slug"]})
+
+      refute html =~ "No publishing groups yet"
+      assert html =~ ~s|phx-value-mode="trashed"|
+      assert html =~ "border-dashed border-base-content/25"
+    end
+
+    test "a truly empty dashboard (nothing in Trash either) still shows the empty-state CTA",
+         %{conn: conn} do
+      {:ok, _view, html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing")
+
+      assert html =~ "No publishing groups yet"
+      assert html =~ ~s|/admin/publishing/new-group"|
+      refute html =~ ~s|phx-value-mode="trashed"|
+    end
   end
 end

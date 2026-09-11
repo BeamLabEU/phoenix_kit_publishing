@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.2 - 2026-09-11
+
+### Fixed
+
+- Trashing the last group (or opening the dashboard when every group is already
+  in Trash) no longer replaces the page with the "No publishing groups yet"
+  empty state. That card hid the Trash tab, so the groups were unreachable from
+  the UI. The empty state now only appears when Trash is empty too; otherwise
+  the tabs stay and the ghost create-card remains.
+
+### Changed
+
+- The empty-state "Create Publishing Group" button uses LiveView `navigate`
+  instead of a full-page `href`, matching the ghost card on a populated
+  dashboard.
+
 ## 0.10.1 - 2026-09-11
 
 ### Fixed

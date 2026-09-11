@@ -66,6 +66,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
 
     socket = assign(socket, :subscribed_group_slugs, subscribed_slugs)
 
+    # Count trash before deciding empty-state: 0 active groups with items in
+    # Trash is not empty — hiding the tabs behind the empty-state card made
+    # those groups unreachable from the dashboard.
+    trashed_count = length(Publishing.list_groups("trashed"))
+
     socket =
       socket
       |> assign(:project_title, Settings.get_project_title())
@@ -76,7 +81,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       )
       |> assign(:groups, groups)
       |> assign(:dashboard_insights, insights)
-      |> assign(:empty_state?, groups == [])
+      |> assign(:empty_state?, empty_dashboard?(groups, "active", trashed_count))
       |> assign(:enabled_languages, Publishing.enabled_language_codes())
       |> assign(:default_url_language, Publishing.get_primary_language_base())
       |> assign(:endpoint_url, "")
@@ -88,7 +93,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       |> assign(:dashboard_refresh_timer, nil)
       |> assign(:view_mode, "active")
       |> assign(:loading, false)
-      |> assign(:trashed_count, length(Publishing.list_groups("trashed")))
+      |> assign(:trashed_count, trashed_count)
 
     {:ok, socket}
   end
@@ -282,10 +287,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     assign(socket,
       groups: groups,
       dashboard_insights: insights,
-      empty_state?: groups == [] and view_mode == "active",
+      empty_state?: empty_dashboard?(groups, view_mode, trashed_count),
       trashed_count: trashed_count
     )
   end
+
+  # The empty-state card replaces the whole dashboard, including the Active /
+  # Trash tabs. Only show it when there is truly nothing to recover.
+  defp empty_dashboard?([], "active", 0), do: true
+  defp empty_dashboard?(_groups, _view_mode, _trashed_count), do: false
 
   defp dashboard_snapshot(_locale, current_user, date_time_settings, view_mode \\ "active") do
     # Admin side reads from database only
@@ -427,7 +437,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
             </p>
             <div class="flex flex-wrap justify-center gap-3">
               <.link
-                href={Routes.path("/admin/publishing/new-group")}
+                navigate={Routes.path("/admin/publishing/new-group")}
                 class="btn btn-primary btn-sm"
               >
                 <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext(
