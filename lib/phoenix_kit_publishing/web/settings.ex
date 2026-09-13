@@ -27,6 +27,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @slug_style_key "publishing_slug_style"
   @valid_slug_styles ~w(transliterate unicode ascii)
 
+  # The settings strip. Tabs are `patch` links carrying `?tab=`, so a reload,
+  # the back button and a deep link from the docs all land on the same
+  # panel; an unknown or missing value falls back to the first tab rather
+  # than hiding every panel.
+  @settings_tabs ~w(general listing_cache render_cache)
+  @default_settings_tab "general"
+
   @impl true
   def mount(_params, _session, socket) do
     # Subscribe to group changes for live updates. All DB-backed reads
@@ -45,18 +52,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       )
       |> assign(:page_section, gettext("Settings"))
       |> assign(:page_section_path, Routes.path("/admin/settings"))
-      |> assign(:active_tab, "general")
+      |> assign(:active_tab, @default_settings_tab)
       |> assign(:current_path, Routes.path("/admin/settings/publishing"))
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_params(_params, _uri, socket) do
+  def handle_params(params, _uri, socket) do
     cache_groups = db_groups_to_maps()
 
     socket =
       socket
+      |> assign(:active_tab, settings_tab(params["tab"]))
       |> assign(:project_title, Settings.get_project_title())
       |> assign(:module_enabled, Publishing.enabled?())
       |> assign(:cache_groups, cache_groups)
@@ -94,11 +102,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     # keeps the subscribe / unsubscribe sites paired in code review.
     PublishingPubSub.unsubscribe_from_groups()
     :ok
-  end
-
-  @impl true
-  def handle_event("switch_settings_tab", %{"tab" => tab}, socket) do
-    {:noreply, assign(socket, :active_tab, tab)}
   end
 
   @impl true
@@ -466,6 +469,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     end)
   end
 
+  defp settings_tab(tab) when tab in @settings_tabs, do: tab
+  defp settings_tab(_tab), do: @default_settings_tab
+
+  # The first tab is the bare page URL, so the address bar stays clean on
+  # the default panel and the existing bookmark/sidebar link keeps working.
+  defp settings_tab_path(@default_settings_tab), do: Routes.path("/admin/settings/publishing")
+  defp settings_tab_path(tab), do: Routes.path("/admin/settings/publishing") <> "?tab=" <> tab
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -473,12 +484,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     <div class="max-w-2xl mx-auto space-y-6">
       <.nav_tabs
         active_tab={@active_tab}
-        on_change="switch_settings_tab"
         variant={:border}
         tabs={[
-          %{id: "general", label: gettext("General"), icon: "hero-language"},
-          %{id: "listing_cache", label: gettext("Listing Cache"), icon: "hero-bolt"},
-          %{id: "render_cache", label: gettext("Render Cache"), icon: "hero-document-text"}
+          %{
+            id: "general",
+            label: gettext("General"),
+            icon: "hero-language",
+            patch: settings_tab_path("general")
+          },
+          %{
+            id: "listing_cache",
+            label: gettext("Listing Cache"),
+            icon: "hero-bolt",
+            patch: settings_tab_path("listing_cache")
+          },
+          %{
+            id: "render_cache",
+            label: gettext("Render Cache"),
+            icon: "hero-document-text",
+            patch: settings_tab_path("render_cache")
+          }
         ]}
       />
 

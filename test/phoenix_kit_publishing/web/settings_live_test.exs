@@ -53,6 +53,48 @@ defmodule PhoenixKit.Modules.Publishing.Web.SettingsLiveTest do
     assert html =~ "Default Language Without Prefix"
   end
 
+  describe "settings tabs" do
+    test "?tab= selects the panel, so a reload or deep link lands on it", %{conn: conn} do
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/settings/publishing?tab=render_cache")
+
+      assert has_element?(view, "a[role=tab].tab-active", "Render Cache")
+      refute has_element?(view, "a[role=tab].tab-active", "General")
+    end
+
+    test "an unknown tab falls back to General instead of hiding every panel", %{conn: conn} do
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/settings/publishing?tab=../etc")
+
+      assert has_element?(view, "a[role=tab].tab-active", "General")
+    end
+
+    test "switching tabs patches the URL", %{conn: conn} do
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/settings/publishing")
+
+      # The admin path may carry a locale segment (`/en/admin/…`) depending
+      # on the Languages settings, so pin the tail rather than the whole path.
+      view |> element("a[role=tab]", "Listing Cache") |> render_click()
+
+      assert view
+             |> assert_patch()
+             |> String.ends_with?("/admin/settings/publishing?tab=listing_cache")
+
+      assert has_element?(view, "a[role=tab].tab-active", "Listing Cache")
+
+      # The first tab is the bare page URL, not `?tab=general`.
+      view |> element("a[role=tab]", "General") |> render_click()
+      assert view |> assert_patch() |> String.ends_with?("/admin/settings/publishing")
+    end
+  end
+
   test "regenerate cache buttons carry phx-disable-with", %{conn: conn} do
     {:ok, _group} =
       Groups.add_group("Settings PXDisable #{System.unique_integer([:positive])}", mode: "slug")

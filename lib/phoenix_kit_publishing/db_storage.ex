@@ -1136,6 +1136,61 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc """
+  Loads the PUBLIC-facing state of the posts a page mentions, in two
+  queries for the whole page instead of ~six per mention.
+
+  Only targets a public reader could actually open come back: the post is
+  not trashed, its group is active, and it has an ACTIVE version with status
+  `"published"`. Everything else is absent from the result, which the
+  renderer reads as "degrade to plain text" — the same outcome
+  `read_post_by_uuid/2` gave, minus the per-target repair pass a link
+  resolution has no business running.
+
+  Each entry is `{post, active_version, contents}` with the group preloaded,
+  the shape `Mapper.to_post_map/6` takes. Malformed UUIDs are dropped before
+  the query so a hand-typed token can't raise `Ecto.Query.CastError`.
+  """
+  @spec list_published_link_targets([String.t()]) ::
+          [{PublishingPost.t(), PublishingVersion.t(), [PublishingContent.t()]}]
+  def list_published_link_targets(uuids) do
+    uuids = Enum.filter(uuids, &match?({:ok, _}, Ecto.UUID.cast(&1)))
+
+    rows =
+      if uuids == [] do
+        []
+      else
+        from(p in PublishingPost,
+          join: g in assoc(p, :group),
+          join: v in PublishingVersion,
+          on: v.uuid == p.active_version_uuid,
+          where: p.uuid in ^uuids and is_nil(p.trashed_at) and g.status == "active",
+          where: v.status == ^Constants.status_published(),
+          preload: [group: g],
+          select: {p, v}
+        )
+        |> repo().all()
+      end
+
+    contents_by_version =
+      case Enum.map(rows, fn {_post, version} -> version.uuid end) do
+        [] ->
+          %{}
+
+        version_uuids ->
+          from(c in PublishingContent,
+            where: c.version_uuid in ^version_uuids,
+            order_by: [asc: c.language]
+          )
+          |> repo().all()
+          |> Enum.group_by(& &1.version_uuid)
+      end
+
+    Enum.map(rows, fn {post, version} ->
+      {post, version, Map.get(contents_by_version, version.uuid, [])}
+    end)
+  end
+
+  @doc """
   Row-locks a post (`FOR UPDATE`) inside the caller's transaction — the
   same lock `Versions.publish_version/unpublish/delete` take, so any writer
   that acquires it serializes with the publish machinery. Returns the fresh
@@ -1497,19 +1552,24 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   Fallback chain: exact language match → site default language → first available.
   """
   @spec resolve_content([PublishingContent.t()], String.t() | nil) :: PublishingContent.t() | nil
-  def resolve_content(contents, nil) do
-    default = LanguageHelpers.get_primary_language()
+  def resolve_content(contents, language),
+    do: resolve_content(contents, language, LanguageHelpers.get_primary_language())
 
+  @doc """
+  `resolve_content/2` with the site default language hoisted — for callers
+  resolving many posts in one pass (`Posts.resolve_link_targets/2`), where
+  reading the setting per post turned a batched lookup back into N reads.
+  """
+  @spec resolve_content([PublishingContent.t()], String.t() | nil, String.t() | nil) ::
+          PublishingContent.t() | nil
+  def resolve_content(contents, nil, default) do
     Enum.find(contents, fn c -> c.language == default end) ||
       List.first(contents)
   end
 
-  def resolve_content(contents, language) do
-    default = LanguageHelpers.get_primary_language()
-
+  def resolve_content(contents, language, default) do
     Enum.find(contents, fn c -> c.language == language end) ||
-      Enum.find(contents, fn c -> c.language == default end) ||
-      List.first(contents)
+      resolve_content(contents, nil, default)
   end
 
   defp order_by_mode(query) do

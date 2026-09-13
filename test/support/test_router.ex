@@ -56,13 +56,26 @@ defmodule PhoenixKitPublishing.Test.Router do
     end
   end
 
-  scope "/admin/settings", PhoenixKit.Modules.Publishing.Web do
-    pipe_through(:browser)
+  # One live_session with both the bare and the locale-prefixed shape, the
+  # way production's `admin_routes/0` + `admin_locale_routes/0` register it.
+  # `Routes.path/1` emits `/en/admin/…` under the test scope, so a `patch`
+  # link rendered by the Settings LV must resolve to the SAME LiveView here
+  # or the LiveViewTest proxy never delivers the patch to handle_params.
+  # Declared before the public catch-all scope below, which would otherwise
+  # claim `/:language/:group/*path` for the controller.
+  live_session :admin_publishing_settings,
+    on_mount: [{PhoenixKitPublishing.Test.Hooks, :assign_scope}],
+    layout: {PhoenixKitPublishing.Test.Layouts, :live} do
+    scope "/admin/settings", PhoenixKit.Modules.Publishing.Web do
+      pipe_through(:browser)
 
-    live_session :admin_publishing_settings,
-      on_mount: [{PhoenixKitPublishing.Test.Hooks, :assign_scope}],
-      layout: {PhoenixKitPublishing.Test.Layouts, :live} do
       live("/publishing", Settings, :index, as: :publishing_settings)
+    end
+
+    scope "/:locale/admin/settings", PhoenixKit.Modules.Publishing.Web do
+      pipe_through(:browser)
+
+      live("/publishing", Settings, :index, as: :publishing_settings_localized)
     end
   end
 

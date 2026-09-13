@@ -12,6 +12,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostLinksTest do
   use PhoenixKitPublishing.ConnCase, async: false
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
@@ -175,6 +176,135 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostLinksTest do
 
       assert html =~ "the trashed one"
       refute html =~ ~s(href="/#{slug}/soon-trashed")
+    end
+
+    test "a scheduled target degrades to plain text and leaks no URL", %{conn: conn, slug: slug} do
+      # Status alone said "published" for an embargoed timestamp post, so a
+      # mention linked it — handing out the not-yet-live URL (its date) to
+      # every reader of the source. The public gate is status AND not
+      # scheduled ahead; the link resolver must apply the same gate.
+      {:ok, ts_group} = Groups.add_group(unique_name(), mode: "timestamp")
+      ts_slug = ts_group["slug"]
+
+      {:ok, target} = Posts.create_post(ts_slug, %{title: "Embargoed", content: "Body."})
+
+      future = Date.add(Date.utc_today(), 30)
+
+      {:ok, _} =
+        target.uuid
+        |> DBStorage.get_post_by_uuid()
+        |> Ecto.Changeset.change(post_date: future)
+        |> PhoenixKit.RepoHelper.repo().update()
+
+      :ok = Versions.publish_version(ts_slug, target.uuid, 1)
+
+      {:ok, source} =
+        Posts.create_post(slug, %{
+          title: "Points At Embargo",
+          slug: "points-at-embargo",
+          content: "See [[post:#{target.uuid}|the embargoed one]] for details."
+        })
+
+      :ok = Versions.publish_version(slug, source.uuid, 1)
+
+      html = get(conn, "/#{slug}/points-at-embargo") |> html_response(200)
+
+      assert html =~ "the embargoed one"
+      refute html =~ "publishing-post-link"
+      refute html =~ Date.to_iso8601(future)
+    end
+
+    test "an unpublished target with no alias renders nothing, not its draft title", %{
+      conn: conn,
+      slug: slug
+    } do
+      {:ok, target} =
+        Posts.create_post(slug, %{title: "Secret Draft Title", slug: "secret", content: "Body."})
+
+      {:ok, source} =
+        Posts.create_post(slug, %{
+          title: "Bare Mention Of Draft",
+          slug: "bare-mention-of-draft",
+          content: "Before [[post:#{target.uuid}]] after."
+        })
+
+      :ok = Versions.publish_version(slug, source.uuid, 1)
+
+      html = get(conn, "/#{slug}/bare-mention-of-draft") |> html_response(200)
+
+      refute html =~ "Secret Draft Title"
+      refute html =~ "[[post:"
+      assert html =~ "Before"
+    end
+
+    test "the token's UUID may be written in either hex case", %{conn: conn, slug: slug} do
+      {:ok, target} =
+        Posts.create_post(slug, %{title: "Cased Target", slug: "cased-target", content: "Body."})
+
+      :ok = Versions.publish_version(slug, target.uuid, 1)
+
+      {:ok, source} =
+        Posts.create_post(slug, %{
+          title: "Upper Source",
+          slug: "upper-source",
+          content: "See [[post:#{String.upcase(target.uuid)}|shouted]] for details."
+        })
+
+      :ok = Versions.publish_version(slug, source.uuid, 1)
+
+      html = get(conn, "/#{slug}/upper-source") |> html_response(200)
+      assert html =~ ~s(<a href="/#{slug}/cased-target")
+      assert html =~ "shouted"
+    end
+  end
+
+  describe "resolution cost" do
+    @query_event [:phoenix_kit_publishing, :test, :repo, :query]
+
+    def handle_query(_event, _measurements, _meta, pid), do: send(pid, :query)
+
+    test "the number of queries does not grow with the number of mentions", %{slug: slug} do
+      # Mentions resolve AFTER the render cache, on every public request —
+      # a per-target read (~6 queries each, before) made every mention a
+      # standing tax on the page. The resolver is batched: N targets cost
+      # the same as one.
+      uuids =
+        for n <- 1..4 do
+          {:ok, post} =
+            Posts.create_post(slug, %{title: "Target #{n}", slug: "target-#{n}", content: "x"})
+
+          :ok = Versions.publish_version(slug, post.uuid, 1)
+          post.uuid
+        end
+
+      # Warm any settings/language caches so both measurements see the same
+      # fixed cost.
+      Posts.resolve_link_targets(Enum.take(uuids, 1), "en")
+
+      handler_id = {__MODULE__, make_ref()}
+      :ok = :telemetry.attach(handler_id, @query_event, &__MODULE__.handle_query/4, self())
+
+      try do
+        one = Posts.resolve_link_targets(Enum.take(uuids, 1), "en")
+        queries_for_one = drain_query_count()
+
+        four = Posts.resolve_link_targets(uuids, "en")
+        queries_for_four = drain_query_count()
+
+        assert map_size(one) == 1
+        assert map_size(four) == 4
+        assert queries_for_four == queries_for_one
+      after
+        :telemetry.detach(handler_id)
+      end
+    end
+
+    defp drain_query_count(count \\ 0) do
+      receive do
+        :query -> drain_query_count(count + 1)
+      after
+        0 -> count
+      end
     end
   end
 

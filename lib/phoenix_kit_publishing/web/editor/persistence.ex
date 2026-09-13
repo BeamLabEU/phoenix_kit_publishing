@@ -210,7 +210,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     if url_slug != "" do
       group_slug = socket.assigns.group_slug
       language = editor_language(socket.assigns)
-      post_slug = persisted_post_slug(socket.assigns.post) || socket.assigns.post[:uuid]
+
+      post_slug =
+        socket.assigns[:db_post_slug] || persisted_post_slug(socket.assigns.post) ||
+          socket.assigns.post[:uuid]
 
       case Publishing.validate_url_slug(group_slug, url_slug, language, post_slug) do
         {:ok, _} ->
@@ -238,6 +241,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   # already in use") the writer could not resolve. Resolve the persisted slug
   # by uuid, which is stable across renames; a post not yet in the DB has
   # nothing to exclude.
+  #
+  # `@db_post_slug` (assigned on load and refreshed after every save) already
+  # IS that slug, so this read is only the fallback for a socket that predates
+  # the assign — not a query per save.
   defp persisted_post_slug(post) do
     case post[:uuid] do
       nil ->

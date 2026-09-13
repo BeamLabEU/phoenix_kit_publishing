@@ -21,6 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Modules.Publishing.DBStorage.Mapper
   alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
@@ -232,6 +233,47 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     case Ecto.UUID.cast(post_uuid) do
       {:ok, _} -> do_read_post_by_uuid(post_uuid, language, version)
       :error -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Resolves the posts a rendered page mentions (`[[post:UUID|…]]`) to their
+  public post maps, keyed by uuid — only the targets a public reader could
+  open right now (not trashed, group active, active version published, not
+  scheduled ahead). A target missing from the map degrades to plain text.
+
+  Batched: two queries for the whole page, however many mentions it has.
+  `read_post_by_uuid/2` per target cost ~six each, on every public request
+  (mentions resolve AFTER the render cache so a renamed target can never
+  leave a stale href). Language fallback matches the read path: requested
+  dialect → site default → first available, via `DBStorage.resolve_content/2`.
+  """
+  @spec resolve_link_targets([String.t()], String.t() | nil) :: %{String.t() => map()}
+  def resolve_link_targets(uuids, language) do
+    # Every settings read is hoisted out of the per-target loop — the batch
+    # is only a batch if nothing inside it scales with the target count.
+    resolved_language = resolve_language_to_dialect(language)
+    default_language = LanguageHelpers.get_primary_language()
+    now = DateTime.utc_now()
+    tz = Constants.site_tz()
+
+    uuids
+    |> Enum.uniq()
+    |> DBStorage.list_published_link_targets()
+    |> Enum.flat_map(&public_link_target(&1, resolved_language, default_language, now, tz))
+    |> Map.new()
+  end
+
+  # `[{uuid, post}]` for a target a public reader can open right now, `[]`
+  # otherwise — the row is already published and un-trashed (the query saw
+  # to that); what's left is a content row to render and the schedule gate.
+  defp public_link_target({db_post, version, contents}, language, default_language, now, tz) do
+    with %{} = content <- DBStorage.resolve_content(contents, language, default_language),
+         post = Mapper.to_post_map(db_post, version, content, contents, [version]),
+         false <- Constants.scheduled_ahead?(post, now, tz) do
+      [{db_post.uuid, post}]
+    else
+      _ -> []
     end
   end
 

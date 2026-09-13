@@ -432,10 +432,13 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   link inside a cached page. The URL is built for the requested `language`,
   riding the read path's normal language fallbacks.
 
-  Degrades safely: a missing, trashed or unpublished target renders as the
-  alias in plain text (never a dead link); a token with no alias uses the
-  target's current title. Tokens inside `<pre>`, `<code>` or an existing
-  `<a>` are left as literal text, mirroring Leaf's own decoration rules.
+  Degrades safely: a missing, trashed, unpublished or not-yet-scheduled
+  target renders as the alias in plain text (never a dead link, and never
+  an embargoed slug); a token with no alias uses the target's current title
+  when the target is public, and renders nothing otherwise — a draft's
+  title is not public information. Tokens inside `<pre>`, `<code>` or an
+  existing `<a>` are left as literal text, mirroring Leaf's own decoration
+  rules. Resolution is batched: two queries per document, not per mention.
   """
   @spec resolve_post_links(String.t(), String.t() | nil) :: String.t()
   def resolve_post_links(html, language) when is_binary(html) do
@@ -459,7 +462,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       chunk
     else
       Regex.replace(@post_link_re, chunk, fn _full, uuid, alias_text ->
-        render_post_link(Map.get(targets, uuid), alias_text)
+        render_post_link(Map.get(targets, String.downcase(uuid)), alias_text)
       end)
     end
   end
@@ -477,30 +480,38 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   def post_links_to_text(other), do: other
 
-  # One read per UNIQUE target per document, not per token occurrence.
+  # Two queries per document, however many mentions it carries (it used to
+  # be a full `read_post_by_uuid/2` — ~six queries — per unique target, on
+  # every public request, since this pass runs after the render cache).
+  # Only targets a public reader could open come back: an unpublished,
+  # trashed or SCHEDULED target has no entry and degrades to plain text.
+  # Scheduled matters — its status is already "published", and an href to it
+  # would hand out the embargoed slug before the post goes live.
+  #
+  # Keys are lowercased: the token regex accepts either hex case, the DB
+  # answers in lowercase, and the chunk pass looks tokens up by the same
+  # normalized key.
   defp build_post_link_targets(html, language) do
-    @post_link_re
-    |> Regex.scan(html, capture: :all_but_first)
-    |> Enum.map(&hd/1)
-    |> Enum.uniq()
-    |> Map.new(fn uuid -> {uuid, resolve_post_link_target(uuid, language)} end)
+    uuids =
+      @post_link_re
+      |> Regex.scan(html, capture: :all_but_first)
+      |> Enum.map(fn [uuid | _] -> String.downcase(uuid) end)
+      |> Enum.uniq()
+
+    uuids
+    |> Posts.resolve_link_targets(language)
+    |> Map.new(fn {uuid, post} -> {String.downcase(uuid), post_link_target(post)} end)
+  rescue
+    # A link must never take the page down — every mention degrades to text.
+    _ -> %{}
   end
 
-  defp resolve_post_link_target(uuid, language) do
-    case Posts.read_post_by_uuid(uuid, language) do
-      {:ok, post} ->
-        href =
-          if Constants.published?(post.metadata.status) do
-            PublishingHTML.build_post_url(post.group, post, post.language)
-          end
-
-        %{href: href, title: get_in(post, [:metadata, :title])}
-
-      _ ->
-        nil
-    end
+  defp post_link_target(post) do
+    %{
+      href: PublishingHTML.build_post_url(post.group, post, post.language),
+      title: get_in(post, [:metadata, :title])
+    }
   rescue
-    # A link must never take the page down — degrade to plain text.
     _ -> nil
   end
 

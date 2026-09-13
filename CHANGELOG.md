@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.10.3 - 2026-09-13
+
+### Security
+
+- A `[[post:UUID|…]]` mention of a **scheduled** timestamp post no longer renders
+  as a link. The resolver checked only the version status, which is already
+  `"published"` for an embargoed post, so the public page carried an `href` to a
+  URL whose date segment is the release date — handing every reader the
+  not-yet-live URL. Mentions now apply the same gate as the public read path:
+  published AND not scheduled ahead. A scheduled target degrades to the alias in
+  plain text, like a draft or a trashed post.
+- A mention with no alias of an **unpublished** target rendered the draft's
+  current title into the public page. It now renders nothing — a draft's title is
+  not public information. An aliased mention still shows its alias.
+
+### Changed
+
+- Mention resolution is batched. It runs after the render cache on every public
+  request (so a renamed target never leaves a stale link), and it used a full
+  `read_post_by_uuid/2` per unique target — six queries each, plus a stale-post
+  repair pass a link lookup has no business running. `Posts.resolve_link_targets/2`
+  now loads every target on the page in two queries, with the language and
+  time-zone settings read once rather than per target. A test pins that four
+  mentions cost the same number of queries as one.
+- `DBStorage.resolve_content/3` takes the site default language as an argument for
+  batch callers; `resolve_content/2` is unchanged.
+- The Publishing settings tabs are `?tab=` patch links instead of a click event,
+  so a reload, the back button and a deep link all land on the same panel. An
+  unknown `tab` value falls back to General instead of hiding every panel. The
+  first tab keeps the bare page URL, so existing links are unaffected.
+- The editor no longer reads the post row from the DB on every save that carries
+  a `url_slug`: the persisted post slug the uniqueness check excludes is already
+  held in the `@db_post_slug` assign since 0.10.0. The DB read remains as the
+  fallback for a socket that predates the assign.
+- A mention token's UUID may be written in either hex case; lookups are
+  normalised so an upper-cased token resolves like a lower-cased one.
+
 ## 0.10.2 - 2026-09-11
 
 ### Fixed
