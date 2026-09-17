@@ -906,8 +906,9 @@ defmodule PhoenixKitPublishing.Migrations do
   # column list; `pg_get_expr(i.indpred, i.indrelid)` is Postgres's own
   # canonical rendering of a partial index's predicate (NULL when the index
   # isn't partial) — both sides of that comparison are verified-live text,
-  # not guessed. `CREATE INDEX` is DDL, not a plain SQL statement PL/pgSQL
-  # can run directly inside `IF`, hence `EXECUTE`.
+  # not guessed. `CREATE INDEX` goes through `EXECUTE` (with the literal's
+  # quotes doubled) so the whole statement is one quoted string inside the
+  # block — PL/pgSQL could run it directly, `EXECUTE` is a choice, not a need.
   #
   # `i.indexprs IS NULL` and the `array_length` check below both exist for
   # the same real bug, caught by testing against a live catalog rather than
