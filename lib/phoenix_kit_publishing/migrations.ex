@@ -59,12 +59,12 @@ defmodule PhoenixKitPublishing.Migrations do
 
   `V135`'s squashed text creates this index as a plain (non-partial) UNIQUE
   index on `(group_uuid, slug)`. `V164` (core `2.0.0`) rebuilds it as a
-  PARTIAL unique index, `WHERE (slug IS NOT NULL)` — a real, post-squash
-  shape change, not a squash artifact, because a NULL `slug` (every
-  timestamp-mode post) must never collide under the old plain-UNIQUE
-  semantics that treated all NULLs as multiple violations only on some
-  Postgres versions' interpretation quirks; the partial form makes the
-  "no NULL blocks anything" intent explicit and portable. Core's own manifest
+  PARTIAL unique index, `WHERE (slug IS NOT NULL)`. The partial shape is
+  historical (pre-squash `V68`), but `V68` dropped the old index with a
+  bare, unqualified `DROP INDEX IF EXISTS` — effective on `public`, a
+  silent no-op under a named prefix — so prefixed installs, and the `V135`
+  squash generated into a named schema, kept the plain shape. `V164`
+  converges both install paths onto the partial form. Core's own manifest
   records this as a 3rd revision (`{164, %{predicate: "(slug IS NOT NULL)",
   ...}}`) on top of the `V59`/`V62` id-rename revisions — reading only
   `V135`'s literal text here would have adopted the WRONG (pre-`V164`) index
@@ -199,7 +199,7 @@ defmodule PhoenixKitPublishing.Migrations do
   tables" — that is nondeterministic (depends on which packages are compiled
   in) and destroys data on a host that merely removed the package. Removing
   this module's data is a human, manual step — see README.md "Removing this
-  module" for the operator SQL (7 `DROP TABLE`s in FK-safe order). There is
+  module" for the operator SQL (one `DROP TABLE` over all 7). There is
   deliberately no automated uninstall path, and `down/1` NEVER drops any of
   the 7 tables for ANY target version, including `0` — it only unstamps (or
   re-stamps) the marker on the anchor table. The rows are every host's real

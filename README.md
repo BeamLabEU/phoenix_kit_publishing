@@ -383,27 +383,27 @@ dependency from `mix.exs` has not consented to deleting every content group,
 post, version, per-language content row, category, category assignment, and
 view counter, and a migration whose result depended on which packages happen
 to be compiled in would be nondeterministic. Removing the data is therefore
-a deliberate, manual operator step, in FK-safe order (children before
-parents):
+a deliberate, manual operator step:
 
 ```sql
 -- Only after removing :phoenix_kit_publishing from mix.exs, and only if you
 -- actually want every group, post, version, content row, category,
 -- assignment, and view counter gone for good.
 --
--- posts <-> versions is a genuine FK cycle (fk_publishing_posts_active_version
--- points forward to the live version, fk_publishing_versions_post points back
--- to the owning post), so DROP TABLE phoenix_kit_publishing_versions fails
--- with "other objects depend on it" while posts still holds the forward FK.
--- Break the cycle first:
-ALTER TABLE phoenix_kit_publishing_posts DROP CONSTRAINT fk_publishing_posts_active_version;
-DROP TABLE phoenix_kit_publishing_post_views;
-DROP TABLE phoenix_kit_publishing_post_categories;
-DROP TABLE phoenix_kit_publishing_categories;
-DROP TABLE phoenix_kit_publishing_contents;
-DROP TABLE phoenix_kit_publishing_versions;
-DROP TABLE phoenix_kit_publishing_posts;
-DROP TABLE phoenix_kit_publishing_groups;
+-- One statement, on purpose: posts <-> versions is a genuine FK cycle
+-- (posts.active_version_uuid points forward to the live version,
+-- versions.post_uuid points back to the owning post), so dropping the tables
+-- one at a time fails with "other objects depend on it". A single DROP TABLE
+-- listing all 7 resolves the cycle itself, without naming any constraint —
+-- which matters on a host whose constraints were renamed.
+DROP TABLE
+  phoenix_kit_publishing_post_views,
+  phoenix_kit_publishing_post_categories,
+  phoenix_kit_publishing_categories,
+  phoenix_kit_publishing_contents,
+  phoenix_kit_publishing_versions,
+  phoenix_kit_publishing_posts,
+  phoenix_kit_publishing_groups;
 ```
 
 Dropping `phoenix_kit_publishing_groups` last also removes the

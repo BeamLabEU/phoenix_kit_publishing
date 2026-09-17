@@ -344,6 +344,7 @@ lib/phoenix_kit_publishing/
 ├── {language_helpers,slug_helpers,hashtags,views,metadata,constants,shared,errors}.ex
 ├── {presence,presence_helpers,pubsub}.ex        # collaborative editing + broadcasts
 ├── {routes,router_dispatch}.ex                  # admin route tree; host-side public dispatch
+├── migrations.ex                                # module-owned versioned migration chain (V1 = adoption)
 ├── stale_fixer.ex, activity_log.ex, group_settings.ex, comments.ex, gettext.ex
 ├── listing_cache.ex (+ cache_sync, lock_table_owner), renderer.ex
 ├── page_builder.ex (+ parser, renderer, components/)
@@ -670,8 +671,9 @@ newest-created release as Latest and demotes the current one.
 - **Add a partial UNIQUE index for custom `url_slug`s** on
   `phoenix_kit_publishing_contents (version_uuid/group, language, url_slug)` for
   non-trashed rows, so a duplicate becomes impossible at the source instead of
-  something the read path's auto-renamer cleans up. This module owns no chain, so
-  it is a core migration — do it when the next core migration touches publishing.
+  something the read path's auto-renamer cleans up. This is a shape change, so it
+  is V2 of `PhoenixKitPublishing.Migrations` plus the core-side `ExpectedSchema`
+  exclusion and floor bump that Phase 1 requires (see Database & migrations).
 - **Unify the two base→dialect resolvers.** `new_translation_request?/2` (against
   `post.available_languages`) and `Posts.resolve_language_to_dialect/1` (against
   `enabled_language_codes/0`) answer the same question with different tie-breaks;

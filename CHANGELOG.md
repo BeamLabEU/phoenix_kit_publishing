@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.11.0 - 2026-09-17
+
+### Added
+
+- `PhoenixKitPublishing.Migrations`, a versioned migration chain owned by this
+  module and exposed through `migration_module/0`, so `mix phoenix_kit.update`
+  and `mix phoenix_kit.status` now track this module's schema. V1 only adopts
+  the existing tables. Core's chain still creates all 7 tables; V1 creates
+  anything missing, using guards that match on shape so a host with renamed
+  constraints or indexes never gets duplicates, and stamps a `pkpub_schema:1`
+  marker on `phoenix_kit_publishing_groups`. On an existing install that marker
+  is the only change. `down/1` never drops a table or a row.
+- A test that builds V1 into an empty schema and requires its catalog (columns,
+  constraints, indexes) to match what core's chain built, row for row.
+- Each schema's `column_widths/0`, the one source for the varchar widths in the
+  V1 DDL.
+- README: the 3 category/view tables are documented, plus a manual "Removing
+  this module" recipe.
+
+### Changed
+
+- Dependencies refreshed (`phoenix_kit` 2.28.1, `phoenix_kit_ai` 0.23.0,
+  `phoenix_kit_comments` 0.4.8, `phoenix` 1.8.14, `phoenix_live_view` 1.2.12,
+  and transitive packages). The `phoenix_kit ~> 2.14` floor is unchanged.
+
 ## 0.10.3 - 2026-09-13
 
 ### Security
