@@ -33,6 +33,10 @@ defmodule PhoenixKit.Modules.Publishing.FacadeCallbacksTest do
       assert Publishing.route_module() == PhoenixKitPublishing.Routes
     end
 
+    test "migration_module returns PhoenixKitPublishing.Migrations" do
+      assert Publishing.migration_module() == PhoenixKitPublishing.Migrations
+    end
+
     test "children returns Presence in the supervision child list" do
       children = Publishing.children()
       assert PhoenixKit.Modules.Publishing.Presence in children

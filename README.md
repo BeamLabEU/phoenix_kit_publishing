@@ -20,7 +20,16 @@ Then run `mix deps.get` and `mix phoenix_kit.install`. The module is auto-discov
 
 ### Database Setup
 
-The publishing tables (`phoenix_kit_publishing_groups`, `_posts`, `_versions`, `_contents`) are created by PhoenixKit's core versioned migrations (V59). Run `mix phoenix_kit.install` in the host app and they're set up automatically — no module-owned migration to invoke.
+The 7 publishing tables — `phoenix_kit_publishing_groups`, `_posts`,
+`_versions`, `_contents` (core `V135` baseline) and `_categories`,
+`_post_categories`, `_post_views` (core `V159`) — are created by PhoenixKit's
+core versioned migrations. Run `mix phoenix_kit.install` in the host app and
+they're set up automatically. This module also owns their *future* shape
+through its own versioned chain, `PhoenixKitPublishing.Migrations`
+(`migration_module/0`), which `mix phoenix_kit.update` discovers and drives
+alongside core's own chain — no separate command to run. Its current version
+(V1) is a pure adoption of the shape core already creates: it changes
+nothing on an existing install beyond stamping a version marker.
 
 ### Enable the Module
 
@@ -67,10 +76,13 @@ Single-language mode omits the language segment automatically.
 
 ## Architecture
 
-### Database Schema (4 tables)
+### Database Schema (7 tables)
 
 ```
 Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many) Content
+Group (1) ──→ (many) Category (self-referencing tree)
+Post  (many) ──→ (many) Category   via PostCategory
+Post  (1) ──→ (many) PostView (one row per day)
 ```
 
 #### `phoenix_kit_publishing_groups` — Content containers
@@ -134,6 +146,32 @@ One row per language per version. All languages share the version's status and m
 | url_slug | string | Per-language URL slug (for localized URLs) |
 | status | string | Reserved for future per-language overrides (unused by UI) |
 | data | JSONB | Reserved for future per-language overrides (unused by UI) |
+
+#### `phoenix_kit_publishing_categories` — Hierarchical per-group taxonomy
+
+WordPress-parity categories. `slug` is unique per group (not globally).
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| uuid | UUIDv7 | PK |
+| group_uuid | UUIDv7 | FK → groups (`ON DELETE CASCADE`) |
+| parent_uuid | UUIDv7 | FK → categories, self-referencing (`ON DELETE SET NULL` — deleting a parent lifts children to the root) |
+| name | string | Display name |
+| slug | string | URL segment, unique per group |
+| name_i18n | JSONB | Per-language display-name overrides |
+| description | string | Optional description |
+| position | integer | Display ordering |
+
+#### `phoenix_kit_publishing_post_categories` — Post ↔ category assignment
+
+Many-to-many, post-level (not per-version) — WordPress semantics. Composite
+primary key `(post_uuid, category_uuid)`; both FKs cascade.
+
+#### `phoenix_kit_publishing_post_views` — Per-day view counters
+
+One `(post_uuid, view_date)` row incremented in place; no per-request rows,
+no reader PII. Composite primary key `(post_uuid, view_date)`; `post_uuid`
+FK cascades. Queried schemaless (no Ecto schema module) via `Publishing.Views`.
 
 All tables use UUIDv7 primary keys. Language fallback chain: requested language → site default → first available.
 
@@ -335,6 +373,50 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_memory_cache_enabled` | `true` | Listing cache toggle |
 | `publishing_render_cache_enabled` | `true` | Render cache global toggle |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group render cache |
+
+## Removing this module
+
+There is deliberately **no automated uninstall**.
+`PhoenixKitPublishing.Migrations.down/1` never drops any of the 7 tables or a
+row in them, for any target version — a host that merely removes this
+dependency from `mix.exs` has not consented to deleting every content group,
+post, version, per-language content row, category, category assignment, and
+view counter, and a migration whose result depended on which packages happen
+to be compiled in would be nondeterministic. Removing the data is therefore
+a deliberate, manual operator step, in FK-safe order (children before
+parents):
+
+```sql
+-- Only after removing :phoenix_kit_publishing from mix.exs, and only if you
+-- actually want every group, post, version, content row, category,
+-- assignment, and view counter gone for good.
+--
+-- posts <-> versions is a genuine FK cycle (fk_publishing_posts_active_version
+-- points forward to the live version, fk_publishing_versions_post points back
+-- to the owning post), so DROP TABLE phoenix_kit_publishing_versions fails
+-- with "other objects depend on it" while posts still holds the forward FK.
+-- Break the cycle first:
+ALTER TABLE phoenix_kit_publishing_posts DROP CONSTRAINT fk_publishing_posts_active_version;
+DROP TABLE phoenix_kit_publishing_post_views;
+DROP TABLE phoenix_kit_publishing_post_categories;
+DROP TABLE phoenix_kit_publishing_categories;
+DROP TABLE phoenix_kit_publishing_contents;
+DROP TABLE phoenix_kit_publishing_versions;
+DROP TABLE phoenix_kit_publishing_posts;
+DROP TABLE phoenix_kit_publishing_groups;
+```
+
+Dropping `phoenix_kit_publishing_groups` last also removes the
+`pkpub_schema:<N>` version marker, which is a `COMMENT` on that table — no
+separate step is needed.
+
+If you want to keep the tables (e.g. you plan to reinstall the module
+later) but stop this chain from tracking them, clear the version marker
+instead:
+
+```sql
+COMMENT ON TABLE phoenix_kit_publishing_groups IS NULL;
+```
 
 ## Testing
 

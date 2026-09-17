@@ -68,6 +68,13 @@ repo_available =
       # `dev_docs/migration_cleanup.md` for the staleness story.
       PhoenixKit.Migration.ensure_current(TestRepo, log: false)
 
+      # This module's own chain (PhoenixKitPublishing.Migrations) stamps
+      # phoenix_kit_publishing_groups with pkpub_schema:1 on top of what
+      # core's chain above already created — every test run starts from a
+      # database at this chain's current version, not just core's.
+      PhoenixKitPublishing.Migrations.up_statements()
+      |> Enum.each(&Ecto.Adapters.SQL.query!(TestRepo, &1, []))
+
       Ecto.Adapters.SQL.Sandbox.mode(TestRepo, :manual)
       true
     rescue
