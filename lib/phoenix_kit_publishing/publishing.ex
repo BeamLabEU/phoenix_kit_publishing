@@ -665,6 +665,13 @@ defmodule PhoenixKit.Modules.Publishing do
   @impl PhoenixKit.Module
   def css_sources, do: [:phoenix_kit_publishing]
 
+  # Decentralized-migrations protocol (see PhoenixKitPublishing.Migrations'
+  # moduledoc): this module owns the future shape of its 7 tables even
+  # though core's chain still creates them (V135 baseline + V159) on every
+  # install.
+  @impl PhoenixKit.Module
+  def migration_module, do: PhoenixKitPublishing.Migrations
+
   # ============================================================================
   # Shared Helpers (used across submodules)
   # ============================================================================

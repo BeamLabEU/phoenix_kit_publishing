@@ -73,8 +73,15 @@ Deliberate non-features, so nobody adds them assuming they were missed.
 - **No frontend bundle and no LiveView JS hooks.** Tailwind/daisyUI classes are
   emitted by the renderer; the host's `app.css` gets an `@source` for
   `phoenix_kit_publishing` from `css_sources/0`.
-- **No migrations of its own.** Every table ships in core's chain; see
-  Database & migrations.
+- **No migrations of its own that change shape.** This module owns its 7
+  tables' *future* shape through its own versioned chain,
+  `PhoenixKitPublishing.Migrations` (`migration_module/0`) — but core's chain
+  still *creates* all 7 on every install (V135 baseline for
+  groups/posts/versions/contents, V159 for categories/post_categories/
+  post_views, V164 rebuilds one index). V1 of this chain is a pure adoption
+  of that current shape (see "Database & migrations" below and the chain's
+  own moduledoc) — it changes nothing on an existing install beyond stamping
+  a version marker.
 - **No all-groups public overview.** If one returns it returns as an opt-in
   reserved route, not as a catch-all sibling.
 - **No guest commenting.** The comments seam requires a logged-in user because
@@ -505,11 +512,30 @@ the locale-rewrite default.
 
 ## Database & migrations
 
-None. All seven `phoenix_kit_publishing_*` tables ship in core's chain — the
-group/post/version/content four in the V135 squash baseline, categories,
-post_categories and post_views in a later core migration — and
-`migration_module/0` is unset. A schema change is a core migration first, then
-schema edits here.
+Core's `V135` squash baseline still **creates** the group/post/version/content
+four tables on every existing/fresh install, `V159` creates
+categories/post_categories/post_views, and `V164` rebuilds
+`idx_publishing_posts_group_slug` as a partial unique index. This module now
+owns all 7 tables' **future shape** through its own versioned chain,
+`PhoenixKitPublishing.Migrations` (`migration_module/0`), which
+`mix phoenix_kit.update` discovers and drives the same way it drives core's
+own chain. V1 is a pure **adoption** (Phase 0): it changes nothing except
+stamping a `pkpub_schema:1` marker (a `COMMENT ON TABLE`) on the anchor
+table, `phoenix_kit_publishing_groups` (the root of this chain's FK tree) —
+every `CREATE TABLE`/PK/UNIQUE-constraint/index/FK statement is
+`IF NOT EXISTS`/DO-guarded and semantic (matches by shape via
+`pg_constraint`/`pg_index`, never by object name alone — a renamed host must
+never get a duplicate), so on every existing install it is a no-op against
+tables core already built. `down/1` never drops any of the 7 tables, for any
+target — see `PhoenixKitPublishing.Migrations`' moduledoc for the full
+ownership writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL`
+safety-net section here.
+
+Phase 1 (a future shape change) needs a core-side `ExpectedSchema` manifest
+update first, or `mix phoenix_kit.repair` silently reverts it. Phase 2 (a
+future core baseline squash that drops these tables from core) is already
+covered: V1 alone can build the complete shape of all 7 tables from nothing,
+so a fresh install still gets a working schema even without core's chain.
 
 All tables use UUIDv7 primary keys, and every table-backed schema declares
 `use PhoenixKit.SchemaPrefix`.

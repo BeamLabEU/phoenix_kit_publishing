@@ -28,6 +28,12 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
   @primary_key {:uuid, UUIDv7, autogenerate: true}
   @foreign_key_type UUIDv7
 
+  # `phoenix_kit_publishing_posts` `character varying` column widths,
+  # interpolated into `PhoenixKitPublishing.Migrations`' V1 DDL — the single
+  # source of truth so the migration chain and core's `ExpectedSchema`
+  # manifest can never independently disagree on a number.
+  @column_widths %{slug: 500, mode: 20}
+
   @type t :: %__MODULE__{
           uuid: UUIDv7.t() | nil,
           group_uuid: UUIDv7.t(),
@@ -106,6 +112,17 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
     |> foreign_key_constraint(:created_by_uuid, name: :fk_publishing_posts_created_by)
     |> foreign_key_constraint(:updated_by_uuid, name: :fk_publishing_posts_updated_by)
   end
+
+  @doc """
+  `character varying` column widths for `phoenix_kit_publishing_posts`,
+  keyed by field name.
+
+  The single source of truth `PhoenixKitPublishing.Migrations`' V1 DDL
+  interpolates, so the migration chain and core's `ExpectedSchema` manifest
+  can never independently disagree on a number.
+  """
+  @spec column_widths() :: %{atom() => pos_integer()}
+  def column_widths, do: @column_widths
 
   @doc "Check if post is published (has an active version)."
   def published?(%__MODULE__{active_version_uuid: uuid}) when not is_nil(uuid), do: true
