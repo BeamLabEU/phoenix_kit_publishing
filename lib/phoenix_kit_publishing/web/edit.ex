@@ -17,7 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   import PhoenixKitWeb.Components.MultilangForm,
     only: [
       multilang_fields_wrapper: 1,
-      mount_multilang: 1,
+      mount_multilang: 2,
       handle_switch_language: 2
     ]
 
@@ -55,7 +55,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          )
          |> assign(:group, group)
          |> assign(:form, form)
-         |> mount_multilang()
+         # Always an edit: open on the language the admin is viewing.
+         |> mount_multilang(open_on: :viewing_language)
          |> FormGlue.assign_ai_translation(
            "publishing_group",
            # The glue only reads .uuid; a minimal struct satisfies its

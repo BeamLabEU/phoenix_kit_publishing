@@ -16,6 +16,8 @@ defmodule PhoenixKitPublishing.Test.Hooks do
 
   import Phoenix.Component, only: [assign: 3]
 
+  alias PhoenixKit.Modules.Languages
+
   @doc """
   `on_mount` callback. Reads `"phoenix_kit_test_scope"` from session and
   assigns `:phoenix_kit_current_scope` / `:phoenix_kit_current_user`
@@ -23,6 +25,12 @@ defmodule PhoenixKitPublishing.Test.Hooks do
   with the same nil-scope state production sees for logged-out users).
   """
   def on_mount(:assign_scope, _params, session, socket) do
+    # The page language, as production's locale hook sets it from a `/fr/…`
+    # URL — `LiveCase.with_request_locale/2` puts it in the session.
+    with %{"pk_test_request_locale" => dialect} when is_binary(dialect) <- session do
+      Languages.put_request_locale(dialect)
+    end
+
     socket =
       socket
       # Mirror what core's auth on_mount adds in production. Without these,

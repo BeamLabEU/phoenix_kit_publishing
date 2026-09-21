@@ -68,6 +68,15 @@ defmodule PhoenixKitPublishing.LiveCase do
   end
 
   @doc """
+  Views the page in `dialect` (e.g. `"fr-FR"`), as production's locale hook
+  would for a `/fr/…` URL: `Multilang.current_locale/0` answers it inside
+  the LiveView.
+  """
+  def with_request_locale(conn, dialect) do
+    Plug.Test.init_test_session(conn, %{"pk_test_request_locale" => dialect})
+  end
+
+  @doc """
   Builds a minimal admin scope for tests. Pass `roles:` to override
   the default `["Owner", "Admin"]` (the roles `Scope.admin?/1`
   pattern-matches against).

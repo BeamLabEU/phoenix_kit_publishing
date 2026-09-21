@@ -8,10 +8,11 @@ Rules for this live in [AGENTS.md](../../AGENTS.md) → Conventions → Activity
 ## The wrapper
 
 Mutations route through `PhoenixKit.Modules.Publishing.ActivityLog` — a thin
-wrapper around `PhoenixKit.Activity.log/1` that injects `module: "publishing"`,
-guards with `Code.ensure_loaded?/1`, and rescues `Postgrex.Error` (the
-missing-`phoenix_kit_activities`-table case) silently plus all other exceptions
-with a `Logger.warning`. Audit failures must never crash the primary mutation.
+wrapper around core's `PhoenixKit.Activity.log/1` that injects
+`module: "publishing"`. Core never raises: a missing `phoenix_kit_activities`
+table, a sandbox-ownership error or a dead pool is logged there and returned as
+`{:error, _}`, and the wrapper returns `:ok` regardless. Audit failures must
+never crash the primary mutation.
 
 The wrapper exposes three call shapes:
 
@@ -61,20 +62,14 @@ def handle_event("trash_post", %{"uuid" => post_uuid}, socket) do
 end
 ```
 
-Reading the actor in one place keeps
-`socket.assigns.phoenix_kit_current_scope.user.uuid` from being copy-pasted into
-every event handler. The equivalent local helper shape in an admin LV:
+Reading the actor in one place keeps assign-reading from being copy-pasted
+into every event handler. `Shared.actor_uuid_from_socket/1` is core's
+`PhoenixKitWeb.Actor.uuid/1` (the scope first, then the bare current user);
+for an options list use `PhoenixKitWeb.Actor.opts/1` directly:
 
 ```elixir
-defp actor_opts(socket) do
-  case socket.assigns[:phoenix_kit_current_scope] do
-    %{user: %{uuid: uuid}} -> [actor_uuid: uuid]
-    _ -> []
-  end
-end
-
 # in handle_event/3:
-Posts.trash_post(group_slug, post_uuid, actor_opts(socket))
+Posts.trash_post(group_slug, post_uuid, PhoenixKitWeb.Actor.opts(socket))
 ```
 
 Mutating context fns accept `opts \\ []` and pull `actor_uuid` out via

@@ -44,6 +44,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
+  alias PhoenixKitWeb.Actor
   @admin_edit_helper_mod PhoenixKitWeb.AdminEditHelper
 
   # Phase 2 seam: the `phoenix_kit_og` plugin (PhoenixKitOG) exports `refine_og/4`
@@ -211,7 +212,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       not comment_token_valid?(conn, params["ft"]) ->
         comment_outcome(conn, :error, gettext("The form expired — please try again."), back_path)
 
-      is_nil(current_user_uuid(conn)) ->
+      is_nil(Actor.uuid(conn)) ->
         comment_outcome(conn, :error, gettext("Please log in to comment."), back_path)
 
       true ->
@@ -248,7 +249,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     # view of the thread; success re-derives from the created comment.)
     back_path = comment_anchor(back_path, note_id, parent_uuid)
 
-    case PublishingComments.create(post[:uuid], current_user_uuid(conn), content,
+    case PublishingComments.create(post[:uuid], Actor.uuid(conn), content,
            parent_uuid: parent_uuid,
            note_id: note_id
          ) do
@@ -336,13 +337,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   end
 
   defp comment_token_valid?(_conn, _), do: false
-
-  defp current_user_uuid(conn) do
-    case conn.assigns[:phoenix_kit_current_scope] do
-      %{user: %{uuid: uuid}} when is_binary(uuid) -> uuid
-      _ -> nil
-    end
-  end
 
   # When `Language.detect_*` reinterprets which segment is the group and which
   # is the language, downstream code (including the smart-fallback in

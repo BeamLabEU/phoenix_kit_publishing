@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing.Web.Editor.Persistence
+  alias PhoenixKitWeb.Actor
 
   import Ecto.Query, only: [from: 2]
 
@@ -522,14 +523,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   defp other_editor_for_language(nil, _socket, _lang_code), do: []
 
   defp other_editor_for_language(owner_meta, socket, lang_code) do
-    current_uuid = current_user_uuid(socket)
+    current_uuid = Actor.uuid(socket)
     if owner_meta.user_uuid != current_uuid, do: [{lang_code, owner_meta.user_email}], else: []
   end
 
   defp source_editor_warning(nil, _socket, _source_language, warnings), do: warnings
 
   defp source_editor_warning(owner_meta, socket, source_language, warnings) do
-    current_uuid = current_user_uuid(socket)
+    current_uuid = Actor.uuid(socket)
 
     if owner_meta.user_uuid != current_uuid do
       lang_name = get_language_display_name(source_language)
@@ -545,13 +546,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
       ]
     else
       warnings
-    end
-  end
-
-  defp current_user_uuid(socket) do
-    case socket.assigns[:phoenix_kit_current_scope] do
-      nil -> nil
-      scope -> scope.user.uuid
     end
   end
 

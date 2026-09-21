@@ -1,52 +1,16 @@
 defmodule PhoenixKit.Modules.Publishing.ActivityLog do
   @moduledoc false
-  # Activity-logging helper for Publishing mutations.
-  #
-  # Wraps `PhoenixKit.Activity.log/1` with the `"publishing"` module key
-  # injected and guards with `Code.ensure_loaded?/1` so the module stays
-  # usable in environments where the Activity context isn't available
-  # (library tests, misconfigured parent apps). Any exception from the
-  # Activity path is swallowed with a `Logger.warning` so audit failures
-  # never crash the primary mutation.
-
-  require Logger
+  # Activity-logging helper for Publishing mutations: hands the entry to
+  # `PhoenixKit.Activity.log/1` with the `"publishing"` module key. Core
+  # never raises — a missing table, a sandbox-ownership error or a dead pool
+  # is logged there and returned — so audit failures never crash the
+  # primary mutation.
 
   @module_key "publishing"
 
   @spec log(map()) :: :ok
   def log(attrs) when is_map(attrs) do
-    if Code.ensure_loaded?(PhoenixKit.Activity) do
-      try do
-        PhoenixKit.Activity.log(Map.put(attrs, :module, @module_key))
-      rescue
-        Postgrex.Error ->
-          # phoenix_kit_activities table may be missing in test sandboxes
-          # or hosts that haven't run the Activity migration. Silent —
-          # we don't want to spam Logger on every mutation.
-          :ok
-
-        DBConnection.OwnershipError ->
-          # Test process not allowed on sandbox connection (background
-          # task / async PubSub broadcast crossing into a logging path).
-          # The primary mutation already succeeded; audit failure is
-          # acceptable here. Silent for the same reason as Postgrex.Error.
-          :ok
-
-        error ->
-          Logger.warning(
-            "PhoenixKit.Modules.Publishing activity log failed: " <>
-              "#{Exception.message(error)} — " <>
-              "attrs=#{inspect(Map.take(attrs, [:action, :resource_type, :resource_uuid]))}"
-          )
-      catch
-        :exit, _reason ->
-          # Sandbox connection lost mid-call. Same rationale as
-          # rescue clauses above — primary write already done, audit
-          # row drop is acceptable.
-          :ok
-      end
-    end
-
+    _ = PhoenixKit.Activity.log(Map.put(attrs, :module, @module_key))
     :ok
   end
 

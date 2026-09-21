@@ -261,9 +261,9 @@ Four rules; the mechanism is in
 ### Activity logging
 
 Every mutation logs through `PhoenixKit.Modules.Publishing.ActivityLog`, a thin
-wrapper over `PhoenixKit.Activity.log/1` that injects `module: "publishing"`,
-guards with `Code.ensure_loaded?/1`, and rescues so an audit failure can never
-crash the mutation it describes. Three call shapes:
+wrapper over core's `PhoenixKit.Activity.log/1` that injects
+`module: "publishing"`; core never raises, so an audit failure can never crash
+the mutation it describes. Three call shapes:
 
 ```elixir
 # Standard user-driven mutation — every CRUD context fn.
@@ -279,8 +279,8 @@ ActivityLog.log(%{action: …, mode: "auto", resource_type: …, resource_uuid: 
 Rules: metadata is PII-safe keys only — `ActivityLog.reason_string/1` collapses
 an `%Ecto.Changeset{}` to `"changeset_error"` precisely because a changeset
 carries submitted names and free text. LiveView callers thread the actor with
-`Shared.actor_uuid_from_socket/1` rather than reading
-`socket.assigns.phoenix_kit_current_scope.user.uuid` inline. Failures log too, as
+`Shared.actor_uuid_from_socket/1` (core's `PhoenixKitWeb.Actor`: the scope
+first, then the bare current user) rather than reading assigns inline. Failures log too, as
 `db_pending` rows via `log_failed_mutation/5`, so a vanished admin action stays
 auditable. Patterns and the auto-event details are in
 [dev_docs/guides/activity-logging.md](dev_docs/guides/activity-logging.md).

@@ -105,23 +105,18 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   end
 
   @doc """
-  Reads the current user's UUID from a LiveView socket's
-  `phoenix_kit_current_scope` assign. Returns `nil` when the LV is
-  mounted in a logged-out context (no scope, no user). LV callers
-  thread the result into mutating context functions as
-  `actor_uuid: actor_uuid_from_socket(socket)` so the activity log
-  records who initiated the change.
+  The current user's UUID from a LiveView socket, or `nil` when the LV is
+  mounted in a logged-out context — see `PhoenixKitWeb.Actor.uuid/1` (the
+  scope first, then the bare current user). LV callers thread the result
+  into mutating context functions as `actor_uuid: actor_uuid_from_socket(socket)`
+  so the activity log records who initiated the change.
   """
-  @spec actor_uuid_from_socket(struct() | map() | any()) :: String.t() | nil
-  def actor_uuid_from_socket(%{assigns: assigns}), do: actor_uuid_from_assigns(assigns)
-  def actor_uuid_from_socket(_), do: nil
+  @spec actor_uuid_from_socket(Phoenix.LiveView.Socket.t() | map() | nil) :: String.t() | nil
+  defdelegate actor_uuid_from_socket(socket), to: PhoenixKitWeb.Actor, as: :uuid
 
   @doc "Like `actor_uuid_from_socket/1` but for a template's assigns map."
-  def actor_uuid_from_assigns(%{phoenix_kit_current_scope: %{user: %{uuid: uuid}}})
-      when is_binary(uuid),
-      do: uuid
-
-  def actor_uuid_from_assigns(_), do: nil
+  @spec actor_uuid_from_assigns(map() | nil) :: String.t() | nil
+  defdelegate actor_uuid_from_assigns(assigns), to: PhoenixKitWeb.Actor, as: :uuid
 
   # ============================================================================
   # Post Reading (shared by Posts, Versions, TranslationManager)
