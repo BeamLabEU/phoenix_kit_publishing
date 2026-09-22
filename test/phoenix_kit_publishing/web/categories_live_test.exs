@@ -95,6 +95,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     assert [{%{name: "Parent"}, 0}, {%{name: "Child"}, 1}] = Categories.list_tree(slug)
   end
 
+  test "a validate still carrying the old parent does not undo a pick", %{
+    conn: conn,
+    slug: slug
+  } do
+    {:ok, parent} = Categories.create_category(slug, %{"name" => "Parent"})
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+    view |> element("button[phx-click='new']") |> render_click()
+
+    view |> element("#category-parent-picker-change") |> render_click()
+    view |> element(row("category-parent-picker", parent.uuid)) |> render_click()
+
+    # A keystroke sent before the pick's patch reached the browser.
+    render_change(view, "validate", %{"category" => %{"name" => "Chi", "parent_uuid" => ""}})
+    assert has_element?(view, parent_input("category", parent.uuid))
+
+    render_submit(view, "save", %{"category" => %{"name" => "Child", "parent_uuid" => ""}})
+    assert [{%{name: "Parent"}, 0}, {%{name: "Child"}, 1}] = Categories.list_tree(slug)
+  end
+
   test "editing a category excludes itself and descendants from the parent picker", %{
     conn: conn,
     slug: slug
@@ -221,6 +240,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     # Malformed confirm_move payloads are ignored, not crashes.
     render_hook(view, "confirm_move", %{"move" => nil})
     assert render(view) =~ "A"
+  end
+
+  test "Move takes the picked target, not a stale or crafted post", %{conn: conn, slug: slug} do
+    {:ok, a} = Categories.create_category(slug, %{"name" => "A"})
+    {:ok, b} = Categories.create_category(slug, %{"name" => "B"})
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+
+    view |> element("button[phx-value-uuid='#{b.uuid}'][phx-click='open_move']") |> render_click()
+    view |> element(row("category-move-picker", a.uuid)) |> render_click()
+
+    # Sent before the pick's patch landed: still the old, top-level value.
+    render_submit(view, "confirm_move", %{"move" => %{"parent_uuid" => ""}})
+
+    {:ok, reloaded} = Categories.get_category(b.uuid)
+    assert reloaded.parent_uuid == a.uuid
+  end
+
+  test "a parent that is not a uuid is refused, not a crash", %{conn: conn, slug: slug} do
+    assert {:error, :parent_not_found} =
+             Categories.create_category(slug, %{"name" => "X", "parent_uuid" => "root"})
+
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+    render_click(view, "new_child", %{"uuid" => "not-a-uuid"})
+
+    html = render_submit(view, "save", %{"category" => %{"name" => "Orphan"}})
+    assert html =~ "That parent no longer exists."
+    assert Categories.list_tree(slug) == []
   end
 
   test "Move-to dialog preselects the current parent", %{conn: conn, slug: slug} do

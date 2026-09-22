@@ -35,6 +35,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
          |> assign(:group_slug, group_slug)
          |> assign(:editing, nil)
          |> assign(:form, blank_form())
+         |> assign(:parent_pick, Tree.root_id())
          |> assign(:form_open, false)
          |> assign(:move, nil)
          |> reload_tree()}
@@ -55,25 +56,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   # ===========================================================================
 
   @impl true
-  def handle_event("new", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:editing, nil)
-     |> assign(:form, blank_form())
-     |> assign(:form_open, true)
-     |> assign(:move, nil)
-     |> refresh_parent_tree()}
-  end
+  def handle_event("new", _params, socket),
+    do: {:noreply, open_form(socket, blank_form(), nil)}
 
-  def handle_event("new_child", %{"uuid" => parent_uuid}, socket) do
-    {:noreply,
-     socket
-     |> assign(:editing, nil)
-     |> assign(:form, blank_form(parent_uuid))
-     |> assign(:form_open, true)
-     |> assign(:move, nil)
-     |> refresh_parent_tree()}
-  end
+  def handle_event("new_child", %{"uuid" => parent_uuid}, socket),
+    do: {:noreply, open_form(socket, blank_form(parent_uuid), nil)}
 
   def handle_event("edit", %{"uuid" => uuid}, socket) do
     case get_group_category(socket, uuid) do
@@ -86,13 +73,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           "position" => to_string(category.position || 0)
         }
 
-        {:noreply,
-         socket
-         |> assign(:editing, category.uuid)
-         |> assign(:form, to_form(params, as: :category))
-         |> assign(:form_open, true)
-         |> assign(:move, nil)
-         |> refresh_parent_tree()}
+        {:noreply, open_form(socket, to_form(params, as: :category), category.uuid)}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Category not found")) |> reload_tree()}
@@ -104,13 +85,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   end
 
   def handle_event("validate", %{"category" => params}, socket) do
+    params = Map.put(params, "parent_uuid", parent_param(socket.assigns.parent_pick))
     {:noreply, assign(socket, :form, to_form(params, as: :category))}
   end
 
   def handle_event("save", %{"category" => params}, socket) do
     attrs =
       params
-      |> Map.take(["name", "slug", "parent_uuid", "description", "position"])
+      |> Map.take(["name", "slug", "description", "position"])
+      |> Map.put("parent_uuid", parent_param(socket.assigns.parent_pick))
       # A cleared position input arrives as "" — Ecto would cast it to nil and
       # the DB rejects NULL; treat blank as the 0 default instead.
       |> Map.update("position", "0", fn
@@ -182,7 +165,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     {:noreply, assign(socket, :move, nil)}
   end
 
-  def handle_event("confirm_move", %{"move" => %{"parent_uuid" => parent_uuid}}, socket) do
+  # The target is the server's pick (`move.pick`), not the posted value — a
+  # crafted or stale post cannot move the category elsewhere.
+  def handle_event("confirm_move", _params, socket) do
+    parent_uuid = socket.assigns.move && parent_param(socket.assigns.move.pick)
+
     case socket.assigns.move do
       # The select is pre-filled with the current parent, so submitting the
       # dialog untouched must do nothing. Without this, moving to the parent a
@@ -212,11 +199,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
       nil ->
         {:noreply, socket}
     end
-  end
-
-  # Defensive: malformed payloads from a misbehaving client.
-  def handle_event("confirm_move", _params, socket) do
-    {:noreply, socket}
   end
 
   # ===========================================================================
@@ -284,14 +266,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     end
   end
 
-  # A parent picked in the form: into the form's params, so the picker's
-  # hidden input posts it with validate and save like any other field.
+  # A parent picked in the form. The server owns it (`parent_pick`): the
+  # picker renders — and its hidden input posts — from this assign, so a
+  # validate still carrying the old value cannot undo the pick.
   @impl true
-  def handle_info({TreePicker, "category-parent-picker", id}, socket) do
-    parent = if id == Tree.root_id(), do: "", else: id
-    params = Map.put(socket.assigns.form.params, "parent_uuid", parent)
-    {:noreply, assign(socket, :form, to_form(params, as: :category))}
-  end
+  def handle_info({TreePicker, "category-parent-picker", id}, socket),
+    do: {:noreply, assign(socket, :parent_pick, id)}
 
   # A parent picked in the Move dialog; the dialog's form posts it on Move.
   def handle_info(
@@ -379,6 +359,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   defp refresh_parent_tree(socket),
     do: assign(socket, :parent_tree, parent_tree(socket.assigns.tree, socket.assigns[:editing]))
 
+  # Opening the form takes its parent from the form's params; from then on
+  # only a pick changes it.
+  defp open_form(socket, form, editing) do
+    socket
+    |> assign(:editing, editing)
+    |> assign(:form, form)
+    |> assign(:parent_pick, parent_pick(form))
+    |> assign(:form_open, true)
+    |> assign(:move, nil)
+    |> refresh_parent_tree()
+  end
+
   # The parent picker's tree: every category, nested, under a row that means
   # no parent — without `excluding` and everything under it, which would
   # make a cycle. The context re-checks; this keeps invalid picks out.
@@ -391,6 +383,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
 
     [Tree.root(gettext("None (top level)"), nodes)]
   end
+
+  defp parent_param(pick), do: if(pick == Tree.root_id(), do: "", else: pick)
 
   # The form's parent field is a params map value; the picker reads it as a
   # row id, "root" for none.
@@ -413,6 +407,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
 
   defp parent_error_message(:parent_wrong_group),
     do: gettext("The parent must belong to the same group.")
+
+  defp parent_error_message(:parent_not_found),
+    do: gettext("That parent no longer exists.")
 
   defp parent_error_message(_), do: gettext("Couldn't save this category.")
 
@@ -552,7 +549,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
               module={TreePicker}
               id="category-parent-picker"
               tree={@parent_tree}
-              value={parent_pick(@form)}
+              value={@parent_pick}
               field
               name="category[parent_uuid]"
             />

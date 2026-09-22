@@ -839,6 +839,17 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   defp validate_parent("", _group_uuid, _category), do: :ok
 
   defp validate_parent(parent_uuid, group_uuid, category) when is_binary(parent_uuid) do
+    # Not a uuid names no category — a crafted value must not reach
+    # `Repo.get`, which raises a cast error on it.
+    case Ecto.UUID.cast(parent_uuid) do
+      {:ok, uuid} -> validate_parent_row(uuid, group_uuid, category)
+      :error -> {:error, :parent_not_found}
+    end
+  end
+
+  defp validate_parent(_bad, _group_uuid, _category), do: {:error, :parent_not_found}
+
+  defp validate_parent_row(parent_uuid, group_uuid, category) do
     case repo().get(PublishingCategory, parent_uuid) do
       nil ->
         {:error, :parent_not_found}
@@ -854,8 +865,6 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         {:error, :parent_wrong_group}
     end
   end
-
-  defp validate_parent(_bad, _group_uuid, _category), do: {:error, :parent_not_found}
 
   # Walks up from `node_uuid` looking for `ancestor_uuid`. Depth-capped so a
   # pre-existing corrupt loop can't spin this forever.
