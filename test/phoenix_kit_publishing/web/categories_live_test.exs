@@ -257,6 +257,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     assert reloaded.parent_uuid == a.uuid
   end
 
+  test "a save and a move from the page are logged with the signed-in actor", %{
+    conn: conn,
+    slug: slug
+  } do
+    editor = "019cce93-0000-7000-8000-00000000e7e7"
+    conn = put_test_scope(conn, fake_scope(user_uuid: editor))
+    {:ok, a} = Categories.create_category(slug, %{"name" => "A"})
+    {:ok, b} = Categories.create_category(slug, %{"name" => "B"})
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+
+    view |> element("button[phx-value-uuid='#{a.uuid}'][phx-click='edit']") |> render_click()
+
+    view
+    |> form("#category-form", category: %{"name" => "A2", "slug" => a.slug})
+    |> render_submit()
+
+    view |> element("button[phx-value-uuid='#{b.uuid}'][phx-click='open_move']") |> render_click()
+    view |> element(row("category-move-picker", a.uuid)) |> render_click()
+    render_submit(view, "confirm_move", %{})
+
+    for uuid <- [a.uuid, b.uuid] do
+      assert_activity_logged("publishing.category.updated",
+        resource_uuid: uuid,
+        actor_uuid: editor
+      )
+    end
+  end
+
   test "a move to a parent that is not a uuid is refused, not a crash", %{slug: slug} do
     {:ok, lone} = Categories.create_category(slug, %{"name" => "Lone"})
     assert {:error, :parent_not_found} = Categories.move_category(lone.uuid, "root")
