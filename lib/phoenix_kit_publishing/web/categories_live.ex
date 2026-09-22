@@ -171,7 +171,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     parent_uuid = socket.assigns.move && parent_param(socket.assigns.move.pick)
 
     case socket.assigns.move do
-      # The select is pre-filled with the current parent, so submitting the
+      # The picker opens on the current parent, so submitting the
       # dialog untouched must do nothing. Without this, moving to the parent a
       # row already has appends it at the end of its own sibling group — a
       # silent reorder from one careless click on the DEFAULT state.

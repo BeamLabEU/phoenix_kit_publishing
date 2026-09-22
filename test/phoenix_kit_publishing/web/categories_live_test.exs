@@ -257,6 +257,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     assert reloaded.parent_uuid == a.uuid
   end
 
+  test "a move to a parent that is not a uuid is refused, not a crash", %{slug: slug} do
+    {:ok, lone} = Categories.create_category(slug, %{"name" => "Lone"})
+    assert {:error, :parent_not_found} = Categories.move_category(lone.uuid, "root")
+    {:ok, still} = Categories.get_category(lone.uuid)
+    assert still.parent_uuid == nil
+  end
+
   test "a parent that is not a uuid is refused, not a crash", %{conn: conn, slug: slug} do
     assert {:error, :parent_not_found} =
              Categories.create_category(slug, %{"name" => "X", "parent_uuid" => "root"})

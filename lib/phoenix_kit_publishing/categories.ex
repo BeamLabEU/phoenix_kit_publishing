@@ -401,25 +401,32 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   """
   def move_category(uuid, new_parent_uuid, opts \\ []) do
     with {:ok, category} <- get_category(uuid) do
-      parent = if new_parent_uuid in [nil, ""], do: nil, else: new_parent_uuid
+      case move_parent(new_parent_uuid) do
+        {:ok, parent} ->
+          update_category(
+            uuid,
+            %{"parent_uuid" => new_parent_uuid, "position" => next_position(category, parent)},
+            opts
+          )
 
-      next_position =
-        from(c in PublishingCategory,
-          where: c.group_uuid == ^category.group_uuid,
-          where: ^parent_condition(parent),
-          select: max(c.position)
-        )
-        |> repo().one()
-        |> case do
-          nil -> 0
-          max -> max + 1
-        end
+        # Not a uuid: `update_category/3` refuses it (and logs the attempt);
+        # the position query would raise on it first.
+        :error ->
+          update_category(uuid, %{"parent_uuid" => new_parent_uuid}, opts)
+      end
+    end
+  end
 
-      update_category(
-        uuid,
-        %{"parent_uuid" => new_parent_uuid, "position" => next_position},
-        opts
-      )
+  defp next_position(category, parent) do
+    from(c in PublishingCategory,
+      where: c.group_uuid == ^category.group_uuid,
+      where: ^parent_condition(parent),
+      select: max(c.position)
+    )
+    |> repo().one()
+    |> case do
+      nil -> 0
+      max -> max + 1
     end
   end
 
@@ -835,6 +842,10 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
 
   # nil parent (root) is always valid; otherwise the parent must exist, be
   # same-group, and — on update — not be the category or its descendant.
+  # The parent a move names, as a uuid the position query can bind.
+  defp move_parent(parent) when parent in [nil, ""], do: {:ok, nil}
+  defp move_parent(parent), do: Ecto.UUID.cast(parent)
+
   defp validate_parent(nil, _group_uuid, _category), do: :ok
   defp validate_parent("", _group_uuid, _category), do: :ok
 
