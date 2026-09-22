@@ -423,7 +423,10 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
   site default → first available.
 - **`..._categories`** — hierarchical per-group taxonomy; nullable `parent_uuid`
   self-FK, `slug` unique per group, `name_i18n` display names. Deleting a group
-  cascades; deleting a parent lifts children to the root.
+  cascades; deleting a parent lifts children to the root. A parent is picked in
+  core's `TreePicker` (the category form and the Move dialog), never an
+  indented flat select; the tree leaves out the category's own subtree and the
+  context still refuses a cycle.
 - **`..._post_categories`** — post ↔ category M:N, post-level not per-version.
   Both sides cascade.
 - **`..._post_views`** — one `(post_uuid, view_date)` counter row per day, queried

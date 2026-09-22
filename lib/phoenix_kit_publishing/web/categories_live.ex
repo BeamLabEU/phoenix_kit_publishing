@@ -4,7 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   in the house folder-tree style (catalogue/entities patterns): a
   full-width indented tree table with handle-only drag reorder among
   siblings (SortableGrid), kebab row menus, a "Move to…" dialog for
-  re-parenting (depth-indented picker, self + descendants excluded),
+  re-parenting (core's tree picker, self + descendants excluded),
   and a modal add/edit form. Routed at
   `/admin/publishing/categories/:group`.
   """
@@ -18,6 +18,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
+  alias PhoenixKit.Utils.Tree
+  alias PhoenixKitWeb.Components.TreePicker
 
   @impl true
   def mount(%{"group" => group_slug}, _session, socket) do
@@ -60,7 +62,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
      |> assign(:form, blank_form())
      |> assign(:form_open, true)
      |> assign(:move, nil)
-     |> refresh_parent_options()}
+     |> refresh_parent_tree()}
   end
 
   def handle_event("new_child", %{"uuid" => parent_uuid}, socket) do
@@ -70,7 +72,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
      |> assign(:form, blank_form(parent_uuid))
      |> assign(:form_open, true)
      |> assign(:move, nil)
-     |> refresh_parent_options()}
+     |> refresh_parent_tree()}
   end
 
   def handle_event("edit", %{"uuid" => uuid}, socket) do
@@ -90,7 +92,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
          |> assign(:form, to_form(params, as: :category))
          |> assign(:form_open, true)
          |> assign(:move, nil)
-         |> refresh_parent_options()}
+         |> refresh_parent_tree()}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Category not found")) |> reload_tree()}
@@ -159,16 +161,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   def handle_event("open_move", %{"uuid" => uuid}, socket) do
     case get_group_category(socket, uuid) do
       {:ok, category} ->
-        excluded = Categories.subtree_uuids(socket.assigns.group_slug, uuid)
-
-        options =
-          [{gettext("None (top level)"), ""}] ++
-            (socket.assigns.tree
-             |> Enum.reject(fn {node, _depth} -> MapSet.member?(excluded, node.uuid) end)
-             |> Enum.map(fn {node, depth} ->
-               {String.duplicate("— ", depth) <> node.name, node.uuid}
-             end))
-
         {:noreply,
          socket
          |> assign(:form_open, false)
@@ -177,7 +169,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
            uuid: uuid,
            name: category.name,
            parent_uuid: category.parent_uuid || "",
-           options: options
+           pick: category.parent_uuid || Tree.root_id(),
+           tree: parent_tree(socket.assigns.tree, uuid)
          })}
 
       {:error, _} ->
@@ -291,7 +284,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     end
   end
 
+  # A parent picked in the form: into the form's params, so the picker's
+  # hidden input posts it with validate and save like any other field.
   @impl true
+  def handle_info({TreePicker, "category-parent-picker", id}, socket) do
+    parent = if id == Tree.root_id(), do: "", else: id
+    params = Map.put(socket.assigns.form.params, "parent_uuid", parent)
+    {:noreply, assign(socket, :form, to_form(params, as: :category))}
+  end
+
+  # A parent picked in the Move dialog; the dialog's form posts it on Move.
+  def handle_info(
+        {TreePicker, "category-move-picker", id},
+        %{assigns: %{move: %{} = move}} = socket
+      ),
+      do: {:noreply, assign(socket, :move, %{move | pick: id})}
+
   def handle_info(msg, socket) do
     Logger.debug("[Publishing.CategoriesLive] unhandled message: #{inspect(msg)}")
     {:noreply, socket}
@@ -306,7 +314,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     |> assign(:editing, nil)
     |> assign(:form, blank_form())
     |> assign(:form_open, false)
-    |> refresh_parent_options()
+    |> refresh_parent_tree()
   end
 
   # Page-scope guard: every uuid arriving from the client must belong to
@@ -363,37 +371,34 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     |> assign(:counts, counts)
     |> assign(:sibling_counts, sibling_counts)
     |> assign(:parents_with_children, parents_with_children)
-    |> refresh_parent_options()
+    |> refresh_parent_tree()
   end
 
-  # Precomputed on tree/editing changes — parent_options walks the subtree in
-  # the DB, which must not run per render (validate fires per keystroke).
-  defp refresh_parent_options(socket) do
-    assign(
-      socket,
-      :parent_options,
-      parent_options(socket.assigns.tree, socket.assigns.group_slug, socket.assigns[:editing])
-    )
-  end
+  # Precomputed on tree/editing changes, not per render (validate fires per
+  # keystroke).
+  defp refresh_parent_tree(socket),
+    do: assign(socket, :parent_tree, parent_tree(socket.assigns.tree, socket.assigns[:editing]))
 
-  # Parent options: every category except (when editing) the category itself
-  # and its descendants — the context re-checks, this just keeps invalid picks
-  # out of the select.
-  defp parent_options(tree, group_slug, editing) do
-    excluded =
-      case editing do
-        nil -> MapSet.new()
-        uuid -> Categories.subtree_uuids(group_slug, uuid)
-      end
-
-    options =
+  # The parent picker's tree: every category, nested, under a row that means
+  # no parent — without `excluding` and everything under it, which would
+  # make a cycle. The context re-checks; this keeps invalid picks out.
+  defp parent_tree(tree, excluding) do
+    nodes =
       tree
-      |> Enum.reject(fn {category, _depth} -> MapSet.member?(excluded, category.uuid) end)
-      |> Enum.map(fn {category, depth} ->
-        {String.duplicate("— ", depth) <> category.name, category.uuid}
-      end)
+      |> Enum.map(&elem(&1, 0))
+      |> Tree.from_flat(node: &%{name: &1.name, icon: "hero-tag"})
+      |> Tree.prune(List.wrap(excluding))
 
-    [{gettext("None (top level)"), ""} | options]
+    [Tree.root(gettext("None (top level)"), nodes)]
+  end
+
+  # The form's parent field is a params map value; the picker reads it as a
+  # row id, "root" for none.
+  defp parent_pick(form) do
+    case form[:parent_uuid].value do
+      uuid when is_binary(uuid) and uuid != "" -> uuid
+      _ -> Tree.root_id()
+    end
   end
 
   defp changeset_error_message(%Ecto.Changeset{errors: errors}) do
@@ -541,7 +546,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
             label={gettext("Slug")}
             placeholder={gettext("auto from the name")}
           />
-          <.select field={@form[:parent_uuid]} label={gettext("Parent")} options={@parent_options} />
+          <div>
+            <.label>{gettext("Parent")}</.label>
+            <.live_component
+              module={TreePicker}
+              id="category-parent-picker"
+              tree={@parent_tree}
+              value={parent_pick(@form)}
+              field
+              name="category[parent_uuid]"
+            />
+          </div>
           <.input field={@form[:position]} type="number" label={gettext("Position")} />
           <.textarea field={@form[:description]} label={gettext("Description")} rows="2" />
           <div class="flex items-center justify-end gap-2 pt-2">
@@ -570,12 +585,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           {gettext("Move “%{name}”", name: @move && @move.name)}
         </:title>
         <.form for={to_form(%{}, as: :move)} id="category-move-form" phx-submit="confirm_move">
-          <.select
-            name="move[parent_uuid]"
-            value={(@move && @move.parent_uuid) || ""}
-            label={gettext("New parent")}
-            options={(@move && @move.options) || []}
-          />
+          <div :if={@move}>
+            <.label>{gettext("New parent")}</.label>
+            <.live_component
+              module={TreePicker}
+              id="category-move-picker"
+              tree={@move.tree}
+              value={@move.pick}
+              current={if @move.parent_uuid == "", do: Tree.root_id(), else: @move.parent_uuid}
+              name="move[parent_uuid]"
+            />
+          </div>
           <div class="flex items-center justify-end gap-2 pt-4">
             <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_move">
               {gettext("Cancel")}
