@@ -46,9 +46,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
         {:ok,
          socket
          |> assign(:project_title, Settings.get_project_title())
-         |> assign(:page_title, gettext("Edit Group"))
+         |> assign(:page_title, gettext("Edit"))
          |> assign(:page_section, gettext("Publishing"))
          |> assign(:page_section_path, Routes.path("/admin/publishing"))
+         |> assign(:page_crumbs, [
+           %{
+             label: group["name"] || group_slug,
+             path: Routes.path("/admin/publishing/#{group_slug}")
+           }
+         ])
          |> assign(
            :current_path,
            Routes.path("/admin/publishing/edit-group/#{group_slug}")

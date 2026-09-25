@@ -23,6 +23,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   def mount(params, _session, socket) do
     group_slug = params["group"]
     post_uuid = params["post_uuid"]
+    group_name = Publishing.group_name(group_slug) || group_slug
 
     if connected?(socket) && group_slug do
       PublishingPubSub.subscribe_to_posts(group_slug)
@@ -43,10 +44,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
       |> assign(:group_slug, group_slug)
       |> assign(:post_uuid, post_uuid)
       |> assign(:post, nil)
-      |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
+      |> assign(:group_name, group_name)
       |> assign(:date_time_settings, date_time_settings)
       |> assign(:enabled_languages, Publishing.enabled_language_codes())
-      |> assign(:page_title, gettext("Post Overview"))
+      |> assign(:page_title, gettext("Untitled"))
+      |> assign(:page_section, gettext("Publishing"))
+      |> assign(:page_section_path, Routes.path("/admin/publishing"))
+      |> assign(:page_crumbs, [
+        %{label: group_name, path: Routes.path("/admin/publishing/#{group_slug}")}
+      ])
 
     {:ok, socket}
   end
@@ -64,7 +70,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
           socket
           |> assign(:post, post)
           |> assign(:post_uuid, post_uuid)
-          |> assign(:page_title, post.metadata.title || gettext("Post Overview"))
+          |> assign(:page_title, post.metadata.title || gettext("Untitled"))
 
         {:noreply, socket}
 

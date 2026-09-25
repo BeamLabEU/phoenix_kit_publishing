@@ -34,7 +34,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
       |> put_test_scope(fake_scope())
       |> live("/admin/publishing/edit-group/#{group["slug"]}")
 
-    assert html =~ "Edit Group"
+    # The header trail owns the shape (Publishing / <group> / Edit); the
+    # page title is the last step only.
+    assert html =~ "<title>Edit</title>"
     assert html =~ group["name"]
     assert html =~ group["slug"]
     assert html =~ ~s|phx-disable-with="Saving…"|

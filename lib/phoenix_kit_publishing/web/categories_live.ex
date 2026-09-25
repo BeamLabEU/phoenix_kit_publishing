@@ -30,6 +30,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
          |> assign(:project_title, Settings.get_project_title())
          |> assign(:page_title, gettext("Categories"))
          |> assign(:page_subtitle, group["name"])
+         |> assign(:page_section, gettext("Publishing"))
+         |> assign(:page_section_path, Routes.path("/admin/publishing"))
+         |> assign(:page_crumbs, [
+           %{
+             label: group["name"] || group_slug,
+             path: Routes.path("/admin/publishing/#{group_slug}")
+           }
+         ])
          |> assign(:current_path, Routes.path("/admin/publishing/categories/#{group_slug}"))
          |> assign(:group, group)
          |> assign(:group_slug, group_slug)

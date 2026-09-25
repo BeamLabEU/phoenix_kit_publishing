@@ -39,11 +39,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     socket =
       socket
       |> assign(:project_title, Settings.get_project_title())
-      |> assign(:page_title, gettext("Publishing"))
+      |> assign(:page_section, gettext("Publishing"))
+      |> assign(:page_section_path, Routes.path("/admin/publishing"))
+      |> assign(:page_crumbs, [])
       |> assign(:current_path, Routes.path("/admin/publishing/#{group_slug}"))
       |> assign(:groups, groups)
       |> assign(:current_group, current_group)
       |> assign(:group_slug, group_slug)
+      |> assign_page_title()
       |> assign(:enabled_languages, Publishing.enabled_language_codes())
       |> assign(:default_language, Publishing.get_primary_language())
       |> assign(:default_url_language, Publishing.get_primary_language_base())
@@ -475,6 +478,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       socket
       |> assign(:groups, groups)
       |> assign(:current_group, current_group || group)
+      |> assign_page_title()
 
     {:noreply, socket}
   end
@@ -814,6 +818,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     socket
     |> assign(:groups, groups)
     |> assign(:current_group, current_group)
+    |> assign_page_title()
     |> assign(:posts, filtered_posts)
     |> assign(:post_view_mode, default_mode)
     |> assign(:visible_count, 20)
@@ -846,6 +851,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   defp load_db_groups do
     Publishing.list_groups()
+  end
+
+  # The header trail's title is the group itself (this page IS the group);
+  # the group is data, so its name is not translated. A group renamed while
+  # the page is open re-derives it through the same path.
+  defp assign_page_title(%{assigns: %{current_group: group, group_slug: slug}} = socket) do
+    assign(socket, :page_title, (group && group["name"]) || slug)
   end
 
   defp redirect_if_missing(%{assigns: %{current_group: nil}} = socket) do

@@ -24,7 +24,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
     socket =
       socket
       |> assign(:project_title, Settings.get_project_title())
-      |> assign(:page_title, gettext("Create Publishing Group"))
+      |> assign(:page_title, gettext("New group"))
+      |> assign(:page_section, gettext("Publishing"))
+      |> assign(:page_section_path, Routes.path("/admin/publishing"))
+      |> assign(:page_crumbs, [])
       |> assign(
         :current_path,
         Routes.path("/admin/publishing/new-group")

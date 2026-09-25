@@ -25,13 +25,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
   @impl true
   def mount(params, _session, socket) do
     group_slug = params["group"] || params["category"] || params["type"]
+    group_name = Publishing.group_name(group_slug) || group_slug
 
     socket =
       socket
       |> assign(:project_title, Settings.get_project_title())
       |> assign(:page_title, gettext("Preview"))
+      |> assign(:page_section, gettext("Publishing"))
+      |> assign(:page_section_path, Routes.path("/admin/publishing"))
+      |> assign(:page_crumbs, [
+        %{label: group_name, path: Routes.path("/admin/publishing/#{group_slug}")}
+      ])
       |> assign(:group_slug, group_slug)
-      |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
+      |> assign(:group_name, group_name)
       |> assign(
         :current_path,
         Routes.path("/admin/publishing/#{group_slug}/preview")
@@ -88,7 +94,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
              |> assign(:translations, translations)
              |> assign(:breadcrumbs, breadcrumbs)
              |> assign(:version_dropdown, version_dropdown)
-             |> assign(:page_title, post.metadata.title || Constants.default_title())
+             |> assign(:page_crumbs, [
+               %{label: group_name, path: Routes.path("/admin/publishing/#{post.group}")},
+               %{
+                 label: post.metadata.title || Constants.default_title(),
+                 path: Routes.path("/admin/publishing/#{post.group}/#{post_uuid}")
+               }
+             ])
              |> assign(:error, nil)}
 
           {:error, error_message} ->

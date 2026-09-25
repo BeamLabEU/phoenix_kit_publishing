@@ -172,9 +172,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     socket =
       socket
       |> assign(:project_title, Settings.get_project_title())
-      |> assign(:page_title, gettext("Publishing Editor"))
+      |> assign(:page_title, gettext("Edit"))
+      |> assign(:page_section, gettext("Publishing"))
+      |> assign(:page_section_path, Routes.path("/admin/publishing"))
       |> assign(:group_slug, group_slug)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
+      |> assign_page_trail(nil)
       |> assign(:show_media_selector, false)
       |> assign(:autosave_blocked, nil)
       |> assign(:editor_mode, default_editor_mode())
@@ -250,6 +253,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:current_path, Routes.path("/admin/publishing/#{group_slug}/edit"))
 
     {:ok, socket}
+  end
+
+  # The header trail: `Publishing / <group> / New post` for a draft that is
+  # not saved yet, `Publishing / <group> / <post> / Edit` once it has a page
+  # of its own. The post crumb reads the SAVED title — a new translation
+  # blanks the virtual post's title, so callers pass the source post.
+  defp assign_page_trail(socket, post) do
+    group_slug = socket.assigns.group_slug
+
+    group_crumb = %{
+      label: socket.assigns.group_name || group_slug,
+      path: Routes.path("/admin/publishing/#{group_slug}")
+    }
+
+    case post && post[:uuid] do
+      nil ->
+        socket
+        |> assign(:page_crumbs, [group_crumb])
+        |> assign(:page_title, gettext("New post"))
+
+      post_uuid ->
+        post_crumb = %{
+          label: get_in(post, [:metadata, :title]) || gettext("Untitled"),
+          path: Routes.path("/admin/publishing/#{group_slug}/#{post_uuid}")
+        }
+
+        socket
+        |> assign(:page_crumbs, [group_crumb, post_crumb])
+        |> assign(:page_title, gettext("Edit"))
+    end
   end
 
   @impl true
@@ -568,6 +601,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:group_mode, group_mode)
       |> assign(:post, virtual_post)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
+      |> assign_page_trail(nil)
       |> Forms.assign_form_with_tracking(form, slug_manually_set: false)
       |> assign(:content, "")
       |> assign(:available_languages, virtual_post.available_languages)
@@ -694,6 +728,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:group_mode, group_mode)
       |> assign(:post, virtual_post)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
+      |> assign_page_trail(post)
       |> Forms.assign_form_with_tracking(form, slug_manually_set: false)
       |> assign(:content, "")
       |> assign(:available_languages, post.available_languages)
@@ -743,6 +778,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:group_mode, group_mode)
       |> assign(:post, %{post | group: group_slug})
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
+      |> assign_page_trail(post)
       |> Forms.assign_form_with_tracking(form)
       |> assign(:content, post.content)
       |> assign(:available_languages, post.available_languages)
