@@ -93,7 +93,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     attrs =
       params
       |> Map.take(["name", "slug", "description", "position"])
-      |> Map.put("parent_uuid", parent_param(socket.assigns.parent_pick))
+      |> put_parent(socket)
       # A cleared position input arrives as "" — Ecto would cast it to nil and
       # the DB rejects NULL; treat blank as the 0 default instead.
       |> Map.update("position", "0", fn
@@ -362,13 +362,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   # Opening the form takes its parent from the form's params; from then on
   # only a pick changes it.
   defp open_form(socket, form, editing) do
+    pick = parent_pick(form)
+
     socket
     |> assign(:editing, editing)
     |> assign(:form, form)
-    |> assign(:parent_pick, parent_pick(form))
+    |> assign(:parent_pick, pick)
+    |> assign(:parent_at_open, pick)
     |> assign(:form_open, true)
     |> assign(:move, nil)
     |> refresh_parent_tree()
+  end
+
+  # A new category always names its parent. An edit names it only when the
+  # picker was touched: the pick is a snapshot from when the form opened, and
+  # a move made elsewhere since (the Move dialog, another admin) must not be
+  # undone by a rename pressed on a stale form. It also keeps renames off the
+  # group's row lock, which only re-parents need.
+  defp put_parent(attrs, %{assigns: %{editing: nil}} = socket),
+    do: Map.put(attrs, "parent_uuid", parent_param(socket.assigns.parent_pick))
+
+  defp put_parent(attrs, socket) do
+    if socket.assigns.parent_pick == socket.assigns.parent_at_open,
+      do: attrs,
+      else: Map.put(attrs, "parent_uuid", parent_param(socket.assigns.parent_pick))
   end
 
   # The parent picker's tree: every category, nested, under a row that means

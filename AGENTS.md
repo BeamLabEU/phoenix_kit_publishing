@@ -11,7 +11,7 @@ the `PhoenixKit.Module` behaviour, so a host app gets it by adding the dependenc
 — no config, no route wiring. Public pages are served by a plain Phoenix
 controller (dead views); the admin side is LiveView.
 
-- **Depends on:** `phoenix_kit` `~> 2.14` (Hex), `phoenix_kit_ai` `~> 0.18`
+- **Depends on:** `phoenix_kit` `>= 2.38.0 and < 3.0.0` (Hex — the release that carries `PhoenixKitWeb.Actor`, `Activity.log/3` and `Components.TreePicker`; the compound form keeps the ceiling open across later 2.x minors), `phoenix_kit_ai` `~> 0.18`
   (hard — it owns the `Translatable` adapter behaviour, the per-language Oban
   fan-out, the LLM call and `ai_multilang_tabs/1`; publishing contributes only
   the adapters and the editor wiring), `phoenix_kit_comments` `~> 0.3`

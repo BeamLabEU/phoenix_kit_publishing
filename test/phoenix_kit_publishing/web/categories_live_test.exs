@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
 
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Groups
+  alias PhoenixKit.Utils.Tree
 
   defp unique_name, do: "catlv-#{System.unique_integer([:positive])}"
 
@@ -134,6 +135,46 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     # The context still guards a raced/direct invalid re-parent.
     assert {:error, :category_cycle} =
              Categories.update_category(a.uuid, %{"parent_uuid" => b.uuid})
+  end
+
+  test "Save after a move made elsewhere keeps the category where it is", %{
+    conn: conn,
+    slug: slug
+  } do
+    {:ok, p} = Categories.create_category(slug, %{"name" => "P"})
+    {:ok, q} = Categories.create_category(slug, %{"name" => "Q"})
+    {:ok, c} = Categories.create_category(slug, %{"name" => "C", "parent_uuid" => p.uuid})
+
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+    view |> element("button[phx-value-uuid='#{c.uuid}'][phx-click='edit']") |> render_click()
+
+    # Another admin moves C under Q while this form sits open on P.
+    {:ok, _} = Categories.move_category(c.uuid, q.uuid)
+
+    view
+    |> form("#category-form", category: %{"name" => "C renamed", "slug" => c.slug})
+    |> render_submit()
+
+    {:ok, reloaded} = Categories.get_category(c.uuid)
+    assert reloaded.name == "C renamed"
+    assert reloaded.parent_uuid == q.uuid
+  end
+
+  test "a parent picked on the form still moves the category", %{conn: conn, slug: slug} do
+    {:ok, p} = Categories.create_category(slug, %{"name" => "P"})
+    {:ok, c} = Categories.create_category(slug, %{"name" => "C", "parent_uuid" => p.uuid})
+
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+    view |> element("button[phx-value-uuid='#{c.uuid}'][phx-click='edit']") |> render_click()
+    view |> element("#category-parent-picker-change") |> render_click()
+    view |> element(row("category-parent-picker", Tree.root_id())) |> render_click()
+
+    view
+    |> form("#category-form", category: %{"name" => "C", "slug" => c.slug})
+    |> render_submit()
+
+    {:ok, reloaded} = Categories.get_category(c.uuid)
+    assert reloaded.parent_uuid == nil
   end
 
   test "Move-to dialog re-parents a category", %{conn: conn, slug: slug} do
@@ -283,6 +324,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
         actor_uuid: editor
       )
     end
+  end
+
+  test "a category id that is not a uuid is not found, not a crash", %{slug: slug} do
+    assert {:error, :not_found} = Categories.get_category("not-a-uuid")
+    assert {:error, :not_found} = Categories.move_category("not-a-uuid", nil)
+    {:ok, lone} = Categories.create_category(slug, %{"name" => "Lone"})
+    assert {:error, :not_found} = Categories.update_category("not-a-uuid", %{"name" => "x"})
+    {:ok, still} = Categories.get_category(lone.uuid)
+    assert still.name == "Lone"
   end
 
   test "a move to a parent that is not a uuid is refused, not a crash", %{slug: slug} do
