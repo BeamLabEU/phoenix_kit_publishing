@@ -97,9 +97,15 @@ defmodule PhoenixKitPublishing.MixProject do
       #     `offset_to_seconds/1`, which reads an IANA id as 0 — so on an older
       #     core every timestamp post is stamped, released and syndicated on UTC
       #     while the editor shows the site's clock, silently, which is the exact
-      #     bug PR #45 fixed. The true floor is 2.13.9; rounded up to the nearest
-      #     minor to keep the ecosystem's `~> X.Y` shape.
-      pk_dep(:phoenix_kit, "~> 2.14"),
+      #     bug PR #45 fixed.
+      #   * 2.38.0 is the floor now: the category parent pickers are core's
+      #     `TreePicker` (`Utils.Tree`), the actor and activity log come from
+      #     `PhoenixKitWeb.Actor` and `Activity.log/3`, and the edit forms use
+      #     `mount_multilang(open_on:)` — none feature-detected, so an older
+      #     core fails to compile the package. Patch-precise floor in the
+      #     compound form so the ceiling stays open through every later 2.x
+      #     minor (see test/core_pin_conformance_test.exs).
+      pk_dep(:phoenix_kit, ">= 2.38.0 and < 3.0.0"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
       # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
       # which the group editor imports directly.
