@@ -16,6 +16,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Utils.Routes
 
+  @handover_timeout_ms 1_500
+
   # ============================================================================
   # Language Helpers
   # ============================================================================
@@ -242,7 +244,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   the ref is back (`awaiting_buffer_ref`), which is what stopped a switch
   from autosaving the English body into the Russian row.
   """
-  def set_editor_content(socket, content) do
+  def set_editor_content(socket, content, opts \\ []) do
     content = content || ""
     ref = "buffer-#{System.unique_integer([:positive])}"
 
@@ -254,10 +256,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
     )
 
     Phoenix.LiveView.send_update(Leaf, id: "content-editor", action: :flush, ref: ref)
+    # An unanswered hand-over is retried once, then abandoned (`Web.Editor`).
+    Process.send_after(self(), {:handover_check, ref}, @handover_timeout_ms)
 
     socket
     |> Phoenix.Component.assign(:content, content)
     |> Phoenix.Component.assign(:awaiting_buffer_ref, ref)
+    |> then(fn socket ->
+      if Keyword.get(opts, :retry, false),
+        do: socket,
+        else: Phoenix.Component.assign(socket, :handover_retried?, false)
+    end)
   end
 
   @doc """

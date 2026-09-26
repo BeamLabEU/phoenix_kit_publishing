@@ -61,6 +61,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   alias PhoenixKit.Modules.Publishing.Web.Editor.Persistence
   alias PhoenixKit.Modules.Publishing.Web.Editor.Translation
   alias PhoenixKit.Modules.Publishing.Web.Editor.Versions
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Utils.Date, as: UtilsDate
 
   # Import publishing-specific components
@@ -167,10 +168,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   def mount(params, _session, socket) do
     group_slug = params["group"] || params["category"] || params["type"]
 
-    live_source =
-      socket.id ||
-        "publishing-editor-" <> Base.url_encode64(:crypto.strong_rand_bytes(6), padding: false)
-
     ai_endpoints = Translation.list_ai_endpoints()
 
     socket =
@@ -187,19 +184,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:editor_mode, default_editor_mode())
       |> assign(:media_selector_target, "featured_image_uuid")
       |> assign(:media_selection_mode, :single)
-      |> assign(:media_selected_uuids, MapSet.new())
+      |> assign(:media_selected_uuids, [])
       |> assign(:is_autosaving, false)
       |> assign(:autosave_timer, nil)
       |> assign(:slug_manually_set, false)
       |> assign(:last_auto_slug, "")
       |> assign(:url_slug_manually_set, false)
       |> assign(:last_auto_url_slug, "")
-      |> assign(:slug_truncated, false)
-      |> assign(:live_source, live_source)
       |> assign(:form_key, nil)
       |> assign(:awaiting_buffer_ref, nil)
       |> assign(:pending_after_flush, nil)
       |> assign(:leaf_dirty, false)
+      |> assign(:handover_retried?, false)
       |> assign(:media_selector_scope, nil)
       |> assign(:lock_owner?, true)
       |> assign(:readonly?, false)
@@ -403,10 +399,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   defp version_scope(nil), do: nil
   defp version_scope(version), do: to_string(version)
 
-  # Derive the public-facing origin (scheme://host[:port]) from the current
-  # request URI so the edit page can show the same full public URL the post
-  # listing does. Mirrors Web.Listing.extract_endpoint_url/1.
+  # The public origin (scheme://host[:port]) for the edit page's public-URL
+  # copy: the same source the public pages use (`site_url`, else the
+  # endpoint), and only then the LiveView's own URI — which says http behind
+  # a TLS-terminating proxy.
   defp extract_endpoint_url(uri) when is_binary(uri) do
+    PublishingHTML.public_origin() || origin_from_uri(uri)
+  end
+
+  defp extract_endpoint_url(_), do: PublishingHTML.public_origin() || ""
+
+  defp origin_from_uri(uri) do
     case URI.parse(uri) do
       %URI{scheme: scheme, host: host, port: port}
       when not is_nil(scheme) and not is_nil(host) ->
@@ -417,8 +420,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         ""
     end
   end
-
-  defp extract_endpoint_url(_), do: ""
 
   # Which language and version the editor's buffer holds.
   defp editor_scope(socket),
@@ -474,8 +475,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         old_form_key = socket.assigns[:form_key]
         old_scope = editor_scope(socket)
 
-        old_post_slug =
-          socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+        old_post_slug = Collaborative.current_post_id(socket)
 
         {socket, form_key} =
           if language && new_translation_request?(language, post) do
@@ -581,8 +581,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         old_form_key = socket.assigns[:form_key]
         old_scope = editor_scope(socket)
 
-        old_post_slug =
-          socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+        old_post_slug = Collaborative.current_post_id(socket)
 
         {socket, form_key} =
           if requested_lang && new_translation_request?(requested_lang, post) do
@@ -646,7 +645,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       PublishingPubSub.generate_form_key(group_slug, virtual_post, :new) <> ":" <> socket.id
 
     old_form_key = socket.assigns[:form_key]
-    old_post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+    old_post_slug = Collaborative.current_post_id(socket)
 
     socket =
       socket
@@ -1005,13 +1004,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     e ->
       Logger.error("Editor save failed: #{Exception.message(e)}")
 
+      # The message stays in the log: an Ecto or Postgrex raise names tables
+      # and constraints, which is not for the flash.
       {:noreply,
-       put_flash(
-         socket,
-         :error,
-         gettext("Something went wrong while saving this post.") <>
-           " " <> Errors.truncate_for_log(Exception.message(e), 200)
-       )}
+       put_flash(socket, :error, gettext("Something went wrong while saving this post."))}
   end
 
   def handle_event("noop", _params, socket), do: {:noreply, socket}
@@ -1144,38 +1140,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  def handle_event("translate_to_all_languages", _params, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
+
   def handle_event("translate_to_all_languages", _params, socket) do
-    if socket.assigns[:readonly?] do
-      {:noreply, socket}
-    else
-      # The worker reads the source text from the row, so Leaf's last
-      # keystrokes have to be in before the save that precedes the enqueue.
-      after_flush(socket, fn socket ->
-        target_languages = Translation.get_all_target_languages(socket)
-        empty_opts = {:warning, gettext("No other languages enabled to translate to")}
-        Translation.enqueue_translation(socket, target_languages, empty_opts)
-      end)
-    end
+    # The worker reads the source text from the row, so Leaf's last
+    # keystrokes have to be in before the save that precedes the enqueue.
+    after_flush(socket, fn socket ->
+      target_languages = Translation.get_all_target_languages(socket)
+      empty_opts = {:warning, gettext("No other languages enabled to translate to")}
+      Translation.enqueue_translation(socket, target_languages, empty_opts)
+    end)
   end
+
+  def handle_event("translate_missing_languages", _params, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
 
   def handle_event("translate_missing_languages", _params, socket) do
-    if socket.assigns[:readonly?] do
-      {:noreply, socket}
-    else
-      after_flush(socket, fn socket ->
-        target_languages = Translation.get_target_languages_for_translation(socket)
-        empty_opts = {:info, gettext("All languages already have translations")}
-        Translation.enqueue_translation(socket, target_languages, empty_opts)
-      end)
-    end
+    after_flush(socket, fn socket ->
+      target_languages = Translation.get_target_languages_for_translation(socket)
+      empty_opts = {:info, gettext("All languages already have translations")}
+      Translation.enqueue_translation(socket, target_languages, empty_opts)
+    end)
   end
 
+  def handle_event("translate_to_this_language", _params, socket)
+      when socket.assigns.readonly? == true,
+      do: {:noreply, socket}
+
   def handle_event("translate_to_this_language", _params, socket) do
-    if socket.assigns[:readonly?] do
-      {:noreply, socket}
-    else
-      after_flush(socket, &Translation.start_translation_to_current/1)
-    end
+    after_flush(socket, &Translation.start_translation_to_current/1)
   end
 
   def handle_event("confirm_translation", _params, socket)
@@ -1605,21 +1601,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       when is_binary(ref),
       do: {:noreply, assign(socket, :leaf_dirty, leaf_dirty?(payload))}
 
-  # A change the surface reports as NOT dirty while nothing is pending here
-  # is an echo, not an edit: a blur or a flush re-serialises the surface,
-  # and in hybrid mode that is the normalised markdown ("* item" → "- item",
-  # a trailing newline gone), which differs from a row nobody has touched.
-  # Applying it would mark the post dirty and autosave text nobody wrote.
-  # With work pending it IS applied — the writer may have typed back to the
-  # saved text, and the server copy must follow.
+  # A change the surface reports as NOT dirty is not an edit: the body
+  # equals what Leaf baselined at the last save or hand-over. What arrives is
+  # the surface re-serialised — in hybrid mode the normalised markdown
+  # ("* item" → "- item", a trailing newline gone), which differs textually
+  # from a row nobody has touched — so it is never taken as the body.
+  # Instead the server copy settles on the SAVED body: a writer who typed
+  # and then typed back to the saved text inside the autosave window is
+  # back on the row, and a title-only edit followed by a blur saves the
+  # title with the body untouched.
   def handle_info({:leaf_changed, %{markdown: content} = payload}, socket) do
     dirty? = leaf_dirty?(payload)
     socket = assign(socket, :leaf_dirty, dirty?)
 
-    if dirty? or socket.assigns.has_pending_changes do
+    if dirty? do
       apply_leaf_change(socket, content)
     else
-      {:noreply, socket}
+      settle_on_saved_body(socket)
     end
   end
 
@@ -1657,27 +1655,56 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   # Leaf never answered `after_flush/2`: no script on the page, or it went
   # away. Act on what the server holds rather than leaving the click dead.
+  # First, though, one trip to the back of the mailbox: a `content_changed`
+  # that arrived just ahead of this timer has only produced its
+  # `{:leaf_changed, …}` (Leaf sends it to self), which now sits BEHIND the
+  # timer. Acting at once would switch without those keystrokes and then
+  # drop them as belonging to the old document.
   def handle_info(
         {:flush_timeout, ref},
+        %{assigns: %{pending_after_flush: {ref, _action}}} = socket
+      ) do
+    send(self(), {:flush_timeout, ref, :final})
+    {:noreply, socket}
+  end
+
+  def handle_info(
+        {:flush_timeout, ref, :final},
         %{assigns: %{pending_after_flush: {ref, action}}} = socket
       ) do
     action.(assign(socket, :pending_after_flush, nil))
   end
 
   def handle_info({:flush_timeout, _}, socket), do: {:noreply, socket}
+  def handle_info({:flush_timeout, _, :final}, socket), do: {:noreply, socket}
 
-  # A surface that has just mounted, while a document hand-over is open: the
-  # commands were pushed before the hook existed (a switch made while Leaf's
-  # script was still loading), so the node still shows whatever it rendered
-  # at first — the PREVIOUS document — and their ack will never come. Merely
-  # clearing the wait here let the next blur save that old text into the new
-  # language; handing the document over again gives the mounted hook the
-  # right text and a fresh ref to answer. With no hand-over open there is
-  # nothing to do: the hook rendered `@content` itself.
-  def handle_info({:leaf_ready, _}, %{assigns: %{awaiting_buffer_ref: ref}} = socket)
-      when is_binary(ref),
-      do: {:noreply, Helpers.set_editor_content(socket, socket.assigns.content)}
+  # A hand-over nobody answered in time. Either the commands were pushed
+  # before Leaf's script mounted (a switch made while it was still loading:
+  # the node still shows the PREVIOUS document, and merely clearing the wait
+  # let the next blur save that old text into the new language), or the
+  # reply is only late. Hand the document over once more — a mounted hook
+  # answers the fresh ref, and a late first reply is dropped by its ref —
+  # then give up on the wait, or a page with no script would be handed the
+  # document forever. Not driven by `leaf_ready`: a `ready` that merely
+  # arrives late, after the hook has already taken the hand-over, would make
+  # a re-issue wipe whatever was typed meanwhile.
+  def handle_info(
+        {:handover_check, ref},
+        %{assigns: %{awaiting_buffer_ref: ref}} = socket
+      ) do
+    if socket.assigns[:handover_retried?] do
+      {:noreply, socket |> assign(:awaiting_buffer_ref, nil) |> assign(:handover_retried?, false)}
+    else
+      {:noreply,
+       socket
+       |> assign(:handover_retried?, true)
+       |> Helpers.set_editor_content(socket.assigns.content, retry: true)}
+    end
+  end
 
+  def handle_info({:handover_check, _}, socket), do: {:noreply, socket}
+
+  # The mounted hook rendered `@content` itself; nothing to do here.
   def handle_info({:leaf_ready, _}, socket), do: {:noreply, socket}
 
   def handle_info({:leaf_insert_request, %{type: :image}}, socket)
@@ -2199,6 +2226,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   defp leaf_dirty?(payload), do: Map.get(payload, :dirty, true) != false
 
+  defp version_status_label("published"), do: gettext("Published")
+  defp version_status_label("draft"), do: gettext("Draft")
+  defp version_status_label("archived"), do: gettext("Archived")
+  defp version_status_label(_), do: gettext("Unknown")
+
+  defp version_status_badge_class("published"), do: "badge-success"
+  defp version_status_badge_class("draft"), do: "badge-warning"
+  defp version_status_badge_class(_), do: "badge-ghost"
+
+  # Leaf said its body equals the saved one: the server copy is the row's
+  # body again, and only the form can be pending.
+  defp settle_on_saved_body(socket) do
+    case socket.assigns[:post] do
+      %{content: saved} = post when is_binary(saved) ->
+        pending? = Forms.dirty?(post, socket.assigns.form, saved)
+
+        {:noreply,
+         socket
+         |> assign(:content, saved)
+         |> assign(:has_pending_changes, pending?)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   # A flush reply is applied only when the `leaf_changed` just before it said
   # the surface was dirty; otherwise it is the current document re-serialised.
   defp apply_flushed(socket, content) do
@@ -2612,9 +2665,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
-  # Saves outstanding work before a navigation that swaps the editor's buffer.
-  # A read-only spectator never saves — they read has_pending_changes: true
-  # after a remote sync, so saving would clobber the owner.
   # Ask Leaf for its buffer before acting on it. The saves in
   # `flush_before_switch/1`, the preview and the translation enqueue only see
   # what the server holds, and Leaf keeps up to a debounce of keystrokes —
@@ -2664,6 +2714,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # Saves outstanding work before a navigation that swaps the editor's buffer.
+  # A read-only spectator never saves — they read has_pending_changes: true
+  # after a remote sync, so saving would clobber the owner.
   defp flush_before_switch(socket) do
     if socket.assigns.has_pending_changes and not socket.assigns[:readonly?] do
       {:noreply, saved} = Persistence.perform_save(socket)
@@ -2758,7 +2811,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     available_versions = socket.assigns.available_versions || []
     new_form_key = PublishingPubSub.generate_form_key(group_slug, virtual_post, :edit)
     old_form_key = socket.assigns[:form_key]
-    old_post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+    old_post_slug = Collaborative.current_post_id(socket)
 
     form = Forms.post_form_with_primary_status(group_slug, virtual_post, current_version)
 
@@ -2988,9 +3041,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       # the owner's featured image, OG image or audio.
       {:noreply,
        socket
-       |> assign(:show_media_selector, false)
-       |> assign(:media_selector_target, "featured_image_uuid")
-       |> assign(:inserting_image_component, false)
+       |> close_media_selector()
        |> put_flash(:warning, gettext("Someone else is editing this post — nothing was changed."))}
     else
       do_handle_media_selected(socket, file_ids)
@@ -3123,8 +3174,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     )
 
     {socket
-     |> assign(:show_media_selector, false)
-     |> assign(:inserting_image_component, false)
+     |> close_media_selector()
      |> put_flash(:info, gettext("Image component inserted")), false}
   end
 
@@ -4547,7 +4597,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <span class="font-medium">
                     {gettext("Copy from v%{version}", version: version)}
                   </span>
-                  <.status_badge status={status} size={:xs} />
+                  <%!-- Core's status_badge capitalises the raw status; the
+                        label here must be translated like everywhere else. --%>
+                  <span class={["badge badge-xs h-auto", version_status_badge_class(status)]}>
+                    {version_status_label(status)}
+                  </span>
                 </div>
                 <div class="text-xs text-base-content/60">
                   {gettext("Duplicate all content and translations from version %{version}",

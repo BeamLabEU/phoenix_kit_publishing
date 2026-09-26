@@ -361,16 +361,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   # shrinks back under the cap.
   defp maybe_warn_slug_truncated(socket, title) do
     if Publishing.slug_truncated?(title) do
-      socket
-      |> Phoenix.Component.assign(:slug_truncated, true)
-      |> Phoenix.LiveView.put_flash(
+      Phoenix.LiveView.put_flash(
+        socket,
         :warning,
         gettext(
           "The title was too long for a URL, so the slug was shortened. Edit it manually if you'd like a different one."
         )
       )
     else
-      Phoenix.Component.assign(socket, :slug_truncated, false)
+      socket
     end
   end
 

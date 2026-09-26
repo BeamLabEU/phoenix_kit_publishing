@@ -189,6 +189,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
   end
 
+  test "a change already in the mailbox ahead of the timeout goes with the switch", ctx do
+    user = with_real_user()
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid, user_uuid: user)
+
+    render_click(view, "switch_language", %{"language" => "de-DE"})
+    assert_push_event(view, @leaf, %{action: "flush", ref: ref})
+
+    # Leaf's change event was ahead of the timer, but the component turns it
+    # into a message to self, which lands BEHIND the timer. Acting at once
+    # would switch without it and then drop it as the old document's.
+    send(view.pid, {:flush_timeout, ref})
+    send(view.pid, {:leaf_changed, leaf_payload("English body. X")})
+    assert_patch(view)
+
+    {:ok, english} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
+    assert english.content == "English body. X"
+  end
+
   test "a surface that never answers the flush does not leave the click dead", ctx do
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
 
@@ -272,26 +290,47 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     assert render(view) =~ "Unsaved changes"
   end
 
-  test "a surface that mounts after a switch holds the current document", ctx do
+  test "a hand-over nobody answers is retried once, then abandoned", ctx do
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
 
     switch(view, "switch_language", %{"language" => "de-DE"}, "English body.", dirty: false)
-    assert_push_event(view, @leaf, %{action: "flush", ref: _ref})
-
-    # Leaf's script finished loading only now: the commands above never
-    # reached it, and the node still shows the English text it rendered at
-    # first. The document is handed over again, with a fresh ref.
-    send(view.pid, {:leaf_ready, %{editor_id: "content-editor", markdown: "English body."}})
     assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
+    assert_push_event(view, @leaf, %{action: "flush", ref: first_ref})
 
-    # Until that hand-over is answered, the old text is still not an edit.
+    # Leaf's script had not mounted when the commands were pushed: the node
+    # still shows the English text it rendered at first, and nothing answers.
+    # A late `ready` alone changes nothing (a ready that merely arrives late
+    # would otherwise wipe text typed meanwhile).
+    send(view.pid, {:leaf_ready, %{editor_id: "content-editor", markdown: "English body."}})
+    refute_push_event(view, @leaf, %{action: "set_content"})
+
+    # The check fires: the document is handed over again with a fresh ref,
+    # and the old text is still not an edit.
+    send(view.pid, {:handover_check, first_ref})
+    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
+    assert_push_event(view, @leaf, %{action: "flush", ref: second_ref})
+    assert second_ref != first_ref
     send(view.pid, {:leaf_changed, leaf_payload("English body.")})
     refute render(view) =~ "Unsaved changes"
 
-    answer_flush(view, "Deutscher Text.", dirty: false)
+    # Still nothing: the wait is abandoned rather than retried forever.
+    send(view.pid, {:handover_check, second_ref})
+    refute_push_event(view, @leaf, %{action: "set_content"})
     send(view.pid, {:leaf_changed, leaf_payload("Deutscher Text. Mehr.")})
     assert render(view) =~ "Unsaved changes"
     assert buffer(view) == "Deutscher Text. Mehr."
+  end
+
+  test "a title-only edit followed by a not-dirty blur keeps the stored body", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
+
+    render_change(view, "update_meta", %{"title" => "Renamed", "_target" => ["title"]})
+    assert render(view) =~ "Unsaved changes"
+
+    # The blur re-serialises the untouched body; Leaf says it is not dirty.
+    send(view.pid, {:leaf_changed, leaf_payload("- English body.\n", false)})
+    assert render(view) =~ "Unsaved changes"
+    assert buffer(view) == "English body."
   end
 
   test "closing the media picker forgets every insertion mode", ctx do
@@ -335,7 +374,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     end
 
     helper = File.read!("lib/phoenix_kit_publishing/web/editor/helpers.ex")
-    assert helper =~ "def set_editor_content(socket, content)"
+    assert helper =~ "def set_editor_content(socket, content"
     assert helper =~ "action: :set_content"
   end
 end
