@@ -2340,18 +2340,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @spec public_origin(Plug.Conn.t()) :: String.t()
   def public_origin(%Plug.Conn{} = conn), do: public_origin() || request_origin(conn)
 
-  @doc "The origin the request arrived on — the last resort, see `public_origin/0`."
+  @doc """
+  The origin the request arrived on — the last resort, see `public_origin/0`.
+
+  The scheme is the proxy's when it says so (`x-forwarded-proto`): behind a
+  TLS-terminating proxy `conn.scheme` is the hop's, not the visitor's.
+  """
   @spec request_origin(Plug.Conn.t()) :: String.t()
-  def request_origin(%Plug.Conn{scheme: scheme, host: host, port: port}) do
+  def request_origin(%Plug.Conn{scheme: scheme, host: host, port: port} = conn) do
+    scheme =
+      case Plug.Conn.get_req_header(conn, "x-forwarded-proto") do
+        [forwarded | _] when forwarded in ["http", "https"] -> forwarded
+        _ -> scheme
+      end
+
     "#{scheme}://#{host}#{if port in [80, 443], do: "", else: ":#{port}"}"
   end
 
-  # Core's static `Config.get_base_url/0` ("http://localhost:4000" unless a
-  # host is configured) is deliberately not consulted: it is a placeholder,
-  # and the request origin is a better last resort than a placeholder.
+  # The endpoint's `url:` config — but an endpoint that never got one answers
+  # `http://localhost:4000`, and that placeholder must not beat the request
+  # the visitor actually made (a dev box served the listing's public URL as
+  # localhost for exactly this reason).
+  @placeholder_hosts ~w(localhost 127.0.0.1 0.0.0.0 [::1] ::1)
+
   defp configured_endpoint_origin do
-    case Config.get_parent_endpoint_url() do
-      {:ok, url} when is_binary(url) and url != "" -> String.trim_trailing(url, "/")
+    with {:ok, url} when is_binary(url) and url != "" <- Config.get_parent_endpoint_url(),
+         %URI{host: host} when is_binary(host) and host not in @placeholder_hosts <-
+           URI.parse(url) do
+      String.trim_trailing(url, "/")
+    else
       _ -> nil
     end
   end
