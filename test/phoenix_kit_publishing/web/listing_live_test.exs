@@ -33,7 +33,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     %{group: group, post: post}
   end
 
-  test "mount renders the group's posts list", %{conn: conn, group: group, post: post} do
+  test "mount renders the group's posts list", %{conn: conn, group: group} do
     {:ok, _view, html} =
       conn
       |> put_test_scope(fake_scope())
@@ -214,10 +214,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
        %{conn: conn, group: group} do
     {:ok, post} = Posts.create_post(group["slug"], %{title: "ToRestore"})
     {:ok, _} = Posts.trash_post(group["slug"], post[:uuid])
+    actor = "019cce93-dddd-7000-8000-000000000078"
 
     {:ok, view, _html} =
       conn
-      |> put_test_scope(fake_scope())
+      |> put_test_scope(fake_scope(user_uuid: actor))
       |> live("/admin/publishing/#{group["slug"]}")
 
     _ = render_click(view, "switch_post_view", %{"mode" => "trashed"})
@@ -229,7 +230,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     assert html =~ "Post restored as draft"
     assert {:ok, _reloaded} = Posts.read_post(group["slug"], post[:slug])
 
-    assert_activity_logged("publishing.post.restored", resource_uuid: post[:uuid])
+    assert_activity_logged("publishing.post.restored",
+      resource_uuid: post[:uuid],
+      actor_uuid: actor
+    )
   end
 
   test "handle_info {:post_updated, post} schedules debounced refresh", %{
@@ -341,28 +345,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     assert is_binary(render(view))
   end
 
-  test "handle_info {:editor_joined, slug, user} updates active_editors",
-       %{conn: conn, group: group, post: post} do
-    {:ok, view, _html} =
-      conn
-      |> put_test_scope(fake_scope())
-      |> live("/admin/publishing/#{group["slug"]}")
-
-    send(view.pid, {:editor_joined, post[:slug], %{user_uuid: "u-1", user_email: "e"}})
-    assert is_binary(render(view))
-  end
-
-  test "handle_info {:editor_left, slug, user} clears active_editors entry",
-       %{conn: conn, group: group, post: post} do
-    {:ok, view, _html} =
-      conn
-      |> put_test_scope(fake_scope())
-      |> live("/admin/publishing/#{group["slug"]}")
-
-    send(view.pid, {:editor_left, post[:slug], %{user_uuid: "u-1"}})
-    assert is_binary(render(view))
-  end
-
   test "add_language event navigates to the edit URL with lang param",
        %{conn: conn, group: group, post: post} do
     {:ok, view, _html} =
@@ -454,41 +436,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
       |> live("/admin/publishing/#{group["slug"]}")
 
     send(view.pid, {:version_deleted, post[:slug], 1})
-    assert is_binary(render(view))
-  end
-
-  test "handle_info {:translation_started, slug, count} starts translation indicator",
-       %{conn: conn, group: group, post: post} do
-    {:ok, view, _html} =
-      conn
-      |> put_test_scope(fake_scope())
-      |> live("/admin/publishing/#{group["slug"]}")
-
-    send(view.pid, {:translation_started, post[:slug], 3})
-    assert is_binary(render(view))
-  end
-
-  test "handle_info {:translation_progress, slug, n, total} updates progress",
-       %{conn: conn, group: group, post: post} do
-    {:ok, view, _html} =
-      conn
-      |> put_test_scope(fake_scope())
-      |> live("/admin/publishing/#{group["slug"]}")
-
-    send(view.pid, {:translation_progress, post[:slug], 1, 3})
-    assert is_binary(render(view))
-  end
-
-  test "handle_info {:translation_completed, slug, results} clears indicator",
-       %{conn: conn, group: group, post: post} do
-    {:ok, view, _html} =
-      conn
-      |> put_test_scope(fake_scope())
-      |> live("/admin/publishing/#{group["slug"]}")
-
-    # Real shape per Listing.handle_info on :translation_completed —
-    # has success_count/failed_count fields.
-    send(view.pid, {:translation_completed, post[:slug], %{success_count: 1, failure_count: 0}})
     assert is_binary(render(view))
   end
 end

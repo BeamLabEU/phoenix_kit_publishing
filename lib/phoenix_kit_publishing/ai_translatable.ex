@@ -135,8 +135,8 @@ defmodule PhoenixKitPublishing.AITranslatable do
 
   # Lowercase keys ("title"/"content") match the prompt's {{title}}/
   # {{content}} placeholders — the same convention as the catalogue and
-  # projects adapters. Core's prompt substitution is case-SENSITIVE
-  # (PhoenixKitAI.Prompt.get_variable_value) and these keys also drive
+  # projects adapters. The AI module's prompt substitution is
+  # case-SENSITIVE (`PhoenixKitAI.Prompt.render/2`) and these keys also drive
   # response parsing (markers are upcased either way), so they must line
   # up with the prompt placeholders or the model gets a literal {{title}}
   # and hallucinates. editor_translation_test.exs pins the default

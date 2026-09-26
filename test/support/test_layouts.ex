@@ -48,14 +48,25 @@ defmodule PhoenixKitPublishing.Test.Layouts do
   def app(assigns) do
     email = (assigns[:current_user] && assigns[:current_user].email) || ""
     translations = assigns[:phoenix_kit_publishing_translations] || []
-    assigns = Map.merge(assigns, %{current_user_email: email, translations: translations})
+    og_title = assigns[:og] && assigns[:og][:title]
+
+    assigns =
+      Map.merge(assigns, %{
+        current_user_email: email,
+        translations: translations,
+        og_title: og_title
+      })
 
     ~H"""
     <main data-current-user-email={@current_user_email}>
       <div :if={msg = Phoenix.Flash.get(@flash || %{}, :info)} id="flash-info">{msg}</div>
       <div :if={msg = Phoenix.Flash.get(@flash || %{}, :error)} id="flash-error">{msg}</div>
       <div :if={msg = Phoenix.Flash.get(@flash || %{}, :warning)} id="flash-warning">{msg}</div>
-      <nav data-testid="host-publishing-translations" data-count={length(@translations)}>
+      <nav
+        data-testid="host-publishing-translations"
+        data-count={length(@translations)}
+        data-og-title={@og_title}
+      >
         <a :for={t <- @translations} href={t.url} data-lang={t.code}>{t.name}</a>
       </nav>
       {@inner_content}

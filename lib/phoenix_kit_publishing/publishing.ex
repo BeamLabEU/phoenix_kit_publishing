@@ -174,8 +174,6 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate unpublish_post(group_slug, post_uuid, opts \\ []), to: Versions
   defdelegate delete_version(group_slug, post_uuid, version), to: Versions
   defdelegate delete_version(group_slug, post_uuid, version, opts), to: Versions
-  @doc false
-  defdelegate broadcast_version_created(group_slug, broadcast_id, new_version), to: Versions
 
   # ============================================================================
   # Translation Delegates
@@ -250,14 +248,20 @@ defmodule PhoenixKit.Modules.Publishing do
   def enable_system do
     result = settings_call(:update_boolean_setting, [@publishing_enabled_key, true])
 
-    with {:ok, _} <- result do
-      ActivityLog.log_manual(
-        "publishing.module.enabled",
-        nil,
-        "publishing_module",
-        nil,
-        %{}
-      )
+    case result do
+      {:ok, _} ->
+        ActivityLog.log_manual("publishing.module.enabled", nil, "publishing_module", nil, %{})
+
+      {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.module.enabled",
+          nil,
+          "publishing_module",
+          nil,
+          %{
+            "reason" => ActivityLog.reason_string(reason)
+          }
+        )
     end
 
     result
@@ -268,14 +272,20 @@ defmodule PhoenixKit.Modules.Publishing do
   def disable_system do
     result = settings_call(:update_boolean_setting, [@publishing_enabled_key, false])
 
-    with {:ok, _} <- result do
-      ActivityLog.log_manual(
-        "publishing.module.disabled",
-        nil,
-        "publishing_module",
-        nil,
-        %{}
-      )
+    case result do
+      {:ok, _} ->
+        ActivityLog.log_manual("publishing.module.disabled", nil, "publishing_module", nil, %{})
+
+      {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.module.disabled",
+          nil,
+          "publishing_module",
+          nil,
+          %{
+            "reason" => ActivityLog.reason_string(reason)
+          }
+        )
     end
 
     result

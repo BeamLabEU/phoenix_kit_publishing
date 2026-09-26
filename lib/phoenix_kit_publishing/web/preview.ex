@@ -316,7 +316,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
                         <span class={"flex items-center justify-between #{if v.is_current, do: "active"}"}>
                           <span>v{v.version}</span>
                           <%= if v.is_live do %>
-                            <span class="badge badge-success badge-xs h-auto">live</span>
+                            <span class="badge badge-success badge-xs h-auto">{gettext("live")}</span>
                           <% end %>
                         </span>
                       </li>

@@ -127,6 +127,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
          %{conn: conn, group_slug: group_slug} do
       {:ok, _} = Settings.update_boolean_setting("languages_enabled", true)
 
+      # Two enabled languages, or the site exposes no translations at all and
+      # the count floor below has nothing to measure.
+      prior_config = Settings.get_setting("languages_config")
+
+      {:ok, _} =
+        Settings.update_json_setting("languages_config", %{
+          "languages" => [
+            %{
+              "code" => "en",
+              "name" => "English",
+              "is_default" => true,
+              "is_enabled" => true,
+              "position" => 0
+            },
+            %{
+              "code" => "et",
+              "name" => "Estonian",
+              "is_default" => false,
+              "is_enabled" => true,
+              "position" => 1
+            }
+          ]
+        })
+
+      on_exit(fn ->
+        case prior_config do
+          nil -> :ok
+          config when is_map(config) -> Settings.update_json_setting("languages_config", config)
+          config when is_binary(config) -> Settings.update_setting("languages_config", config)
+        end
+      end)
+
       conn = get(conn, "/" <> group_slug)
       html = html_response(conn, 200)
 
@@ -134,8 +166,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSwitcherExposureT
       # the host's Layouts.app SHOULD see after forwarding.
       expected_count = length(conn.assigns[:phoenix_kit_publishing_translations] || [])
 
+      # Both halves default to an empty list, so a controller that stopped
+      # setting the assign would still "match" at zero.
+      assert expected_count > 0,
+             "the fixture exposes no translations — the test cannot see a drop"
+
       assert html =~ ~s(data-testid="host-publishing-translations"),
              "host Layouts.app didn't render — boundary marker missing"
+
+      # The :og map rides the same module_assigns chain; the layout reads its
+      # title back so a dropped forwarding step shows here, not only in
+      # conn.assigns.
+      assert conn.assigns[:og][:title]
+      assert html =~ ~s(data-og-title="#{conn.assigns[:og][:title]}")
 
       # If forwarding is broken, the layout defaults the value to `nil` and
       # renders `data-count="0"`, regardless of what the controller put on
