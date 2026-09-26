@@ -57,7 +57,6 @@ defmodule PhoenixKit.Modules.Publishing.FacadeTest do
       assert function_exported?(Publishing, :create_version_from, 4)
       assert function_exported?(Publishing, :create_version_from, 5)
       assert function_exported?(Publishing, :delete_version, 3)
-      assert function_exported?(Publishing, :broadcast_version_created, 3)
     end
   end
 

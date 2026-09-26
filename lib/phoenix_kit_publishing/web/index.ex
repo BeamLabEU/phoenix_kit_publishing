@@ -38,32 +38,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
         }
       )
 
-    # Subscribe to the global groups topic BEFORE the first read, so a
-    # group created/deleted between the snapshot and the subscription
-    # still reaches this LV (per-group post topics follow the read — a
-    # group arriving via the global topic gets its topic in refresh).
-    if connected?(socket) do
-      PublishingPubSub.subscribe_to_groups()
-    end
-
-    {groups, insights} =
-      dashboard_snapshot(
-        socket.assigns.current_locale_base,
-        socket.assigns[:phoenix_kit_current_user],
-        date_time_settings
-      )
+    # Subscribe BEFORE the first read — the global groups topic, then every
+    # existing group's posts topic — so a group or post event landing between
+    # the snapshot and the subscription still reaches this LV. A group
+    # created later arrives on the global topic and gets its posts topic in
+    # refresh_dashboard/1.
+    groups = Publishing.list_groups("active")
 
     subscribed_slugs =
       if connected?(socket) do
-        # Subscribe to all groups' post updates
-        Enum.each(groups, fn group ->
-          PublishingPubSub.subscribe_to_posts(group["slug"])
-        end)
-
+        PublishingPubSub.subscribe_to_groups()
+        Enum.each(groups, &PublishingPubSub.subscribe_to_posts(&1["slug"]))
         MapSet.new(groups, & &1["slug"])
       else
         MapSet.new()
       end
+
+    insights =
+      dashboard_insights(
+        groups,
+        socket.assigns[:phoenix_kit_current_user],
+        date_time_settings
+      )
 
     socket = assign(socket, :subscribed_group_slugs, subscribed_slugs)
 
@@ -304,16 +300,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   defp empty_dashboard?([], "active", 0), do: true
   defp empty_dashboard?(_groups, _view_mode, _trashed_count), do: false
 
-  defp dashboard_snapshot(_locale, current_user, date_time_settings, view_mode \\ "active") do
+  defp dashboard_snapshot(_locale, current_user, date_time_settings, view_mode) do
     # Admin side reads from database only
-    db_groups = Publishing.list_groups(view_mode)
+    groups = Publishing.list_groups(view_mode)
+    {groups, dashboard_insights(groups, current_user, date_time_settings)}
+  end
 
-    groups = db_groups
-
-    insights =
-      Enum.map(db_groups, &build_group_insight(&1, current_user, date_time_settings))
-
-    {groups, insights}
+  defp dashboard_insights(groups, current_user, date_time_settings) do
+    Enum.map(groups, &build_group_insight(&1, current_user, date_time_settings))
   end
 
   defp build_group_insight(db_group, current_user, date_time_settings) do
@@ -334,20 +328,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       |> Enum.uniq()
       |> Enum.sort()
 
-    latest_published_at = find_latest_published_at(posts)
-
     %{
       name: db_group["name"],
       slug: group_slug,
       mode: db_group["mode"],
       posts_count: length(posts),
       published_count: Map.get(status_counts, Constants.status_published(), 0),
-      draft_count: Map.get(status_counts, "draft", 0),
-      archived_count: Map.get(status_counts, "archived", 0),
       languages: languages,
-      last_published_at: latest_published_at,
       last_published_at_text:
-        format_datetime(latest_published_at, current_user, date_time_settings)
+        format_datetime(find_latest_published_at(posts), current_user, date_time_settings)
     }
   end
 
@@ -399,7 +388,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     _ -> nil
   end
 
-  defp extract_endpoint_url(uri) when is_binary(uri) do
+  # The public origin first (site_url setting, else the endpoint's configured
+  # URL): the connect URI's scheme is what the proxy handed the app, http on
+  # a TLS-terminated host, so the "public URL" copy said http://.
+  defp extract_endpoint_url(uri) do
+    PublishingHTML.public_origin() || origin_from_uri(uri)
+  end
+
+  defp origin_from_uri(uri) when is_binary(uri) do
     case URI.parse(uri) do
       %URI{scheme: scheme, host: host, port: port} when not is_nil(scheme) and not is_nil(host) ->
         port_string = if port in [80, 443], do: "", else: ":#{port}"
@@ -410,7 +406,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     end
   end
 
-  defp extract_endpoint_url(_), do: ""
+  defp origin_from_uri(_), do: ""
 
   defp build_language_pills(language_codes) when is_list(language_codes) do
     Enum.map(language_codes, fn lang ->

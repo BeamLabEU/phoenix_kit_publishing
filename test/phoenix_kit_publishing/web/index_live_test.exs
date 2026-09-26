@@ -11,6 +11,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
 
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
+  alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
 
   setup do
@@ -144,6 +146,43 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
       actor_uuid: @click_actor,
       metadata_has: %{"slug" => group["slug"]}
     )
+  end
+
+  # Behind a TLS-terminating proxy the LiveView's connect URI is http, so the
+  # "View public" link said http://. The `site_url` setting is the public origin.
+  test "the site_url setting is the origin of a group's public link", %{conn: conn} do
+    {:ok, _} = Settings.update_setting("site_url", "https://example.test/")
+    on_exit(fn -> {:ok, _} = Settings.update_setting("site_url", "") end)
+
+    {:ok, group} =
+      Groups.add_group("Index Origin #{System.unique_integer([:positive])}", mode: "slug")
+
+    {:ok, post} = Posts.create_post(group["slug"], %{title: "Published for origin"})
+    :ok = Versions.publish_version(group["slug"], post.uuid, 1)
+
+    {:ok, _view, html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing")
+
+    assert html =~ ~s|href="https://example.test/#{group["slug"]}"|
+    refute html =~ ~s|href="http://www.example.com/#{group["slug"]}"|
+  end
+
+  # A post event on an existing group that lands between the dashboard read
+  # and the per-group subscription is lost, so the subscription must come
+  # first. The race cannot be timed from a test; the source order can.
+  test "mount subscribes to every group's posts topic before reading the dashboard" do
+    source = File.read!("lib/phoenix_kit_publishing/web/index.ex")
+
+    [_, mount_body, _] =
+      Regex.split(~r/\n  def mount\(|\n  @impl true\n  def handle_params/, source)
+
+    {subscribe_at, _} = :binary.match(mount_body, "PublishingPubSub.subscribe_to_posts")
+    {insights_at, _} = :binary.match(mount_body, "dashboard_insights(")
+
+    assert subscribe_at < insights_at
+    refute mount_body =~ "dashboard_snapshot("
   end
 
   test "handle_info catch-all swallows unknown messages", %{conn: conn} do

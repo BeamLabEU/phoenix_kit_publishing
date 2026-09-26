@@ -56,7 +56,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
 
     # Save old form_key and post slug BEFORE assigning new one (for presence cleanup)
     old_form_key = socket.assigns[:form_key]
-    old_post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+    old_post_slug = Collaborative.current_post_id(socket)
 
     socket =
       socket
@@ -229,7 +229,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
     # The deleted version's presence and topics go with it — handle_params
     # sees the new key already assigned and would leave them registered.
     old_form_key = socket.assigns[:form_key]
-    old_post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+    old_post_slug = Collaborative.current_post_id(socket)
 
     socket
     |> Phoenix.Component.assign(:post, %{fresh_post | group: group_slug})

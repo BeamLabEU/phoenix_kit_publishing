@@ -59,8 +59,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       |> assign(:loading, false)
       |> assign(:endpoint_url, "")
       |> assign(:date_time_settings, load_date_time_settings())
-      |> assign(:active_editors, %{})
-      |> assign(:translating_posts, %{})
       |> assign(:pending_post_updates, %{})
       |> assign(:visible_count, 20)
       |> assign(:post_search, "")
@@ -377,101 +375,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     {:noreply, refresh_posts(socket)}
   end
 
-  # Editor presence handlers - show who's currently editing posts
-  def handle_info({:editor_joined, post_slug, user_info}, socket) do
-    # Only show actual editors (owners), not spectators
-    if user_info[:role] == :owner do
-      active_editors = socket.assigns.active_editors
-      post_editors = Map.get(active_editors, post_slug, [])
-
-      # Add user if not already in the list
-      updated_editors =
-        if Enum.any?(post_editors, fn e -> e.socket_id == user_info.socket_id end) do
-          post_editors
-        else
-          [user_info | post_editors]
-        end
-
-      {:noreply,
-       assign(socket, :active_editors, Map.put(active_editors, post_slug, updated_editors))}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def handle_info({:editor_left, post_slug, user_info}, socket) do
-    active_editors = socket.assigns.active_editors
-    post_editors = Map.get(active_editors, post_slug, [])
-
-    # Remove user from the list
-    updated_editors = Enum.reject(post_editors, fn e -> e.socket_id == user_info.socket_id end)
-
-    updated_active_editors =
-      if updated_editors == [] do
-        Map.delete(active_editors, post_slug)
-      else
-        Map.put(active_editors, post_slug, updated_editors)
-      end
-
-    {:noreply, assign(socket, :active_editors, updated_active_editors)}
-  end
-
-  # Translation progress handlers - show translation status on posts
-  def handle_info({:translation_started, post_slug, language_count}, socket) do
-    translating =
-      Map.put(socket.assigns.translating_posts, post_slug, %{
-        total: language_count,
-        completed: 0,
-        status: :in_progress
-      })
-
-    {:noreply, assign(socket, :translating_posts, translating)}
-  end
-
-  def handle_info({:translation_progress, post_slug, completed, total}, socket) do
-    # Update progress for this post
-    case Map.get(socket.assigns.translating_posts, post_slug) do
-      nil ->
-        # Post not in our tracking, add it
-        translating =
-          Map.put(socket.assigns.translating_posts, post_slug, %{
-            total: total,
-            completed: completed,
-            status: :in_progress
-          })
-
-        {:noreply, assign(socket, :translating_posts, translating)}
-
-      existing ->
-        # Update existing entry
-        translating =
-          Map.put(socket.assigns.translating_posts, post_slug, %{
-            existing
-            | completed: completed,
-              total: total
-          })
-
-        {:noreply, assign(socket, :translating_posts, translating)}
-    end
-  end
-
-  def handle_info({:translation_completed, post_slug, results}, socket) do
-    # Mark translation as complete - status stays visible
-    translating =
-      Map.put(socket.assigns.translating_posts, post_slug, %{
-        status: :completed,
-        success_count: results.success_count,
-        failure_count: results.failure_count
-      })
-
-    socket = assign(socket, :translating_posts, translating)
-
-    # Refresh posts to show new translations
-    socket = refresh_posts(socket)
-
-    {:noreply, socket}
-  end
-
   # Group change handlers - keep sidebar in sync
   def handle_info({:group_created, _group}, socket) do
     {:noreply, assign(socket, :groups, load_db_groups())}
@@ -579,7 +482,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     if group_slug = socket.assigns[:group_slug] do
       PublishingPubSub.unsubscribe_from_posts(group_slug)
       PublishingPubSub.unsubscribe_from_cache(group_slug)
-      PublishingPubSub.unsubscribe_from_group_editors(group_slug)
     end
 
     :ok
@@ -676,7 +578,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     if group_slug do
       PublishingPubSub.subscribe_to_posts(group_slug)
       PublishingPubSub.subscribe_to_cache(group_slug)
-      PublishingPubSub.subscribe_to_group_editors(group_slug)
     end
   end
 
@@ -685,13 +586,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       if old_slug do
         PublishingPubSub.unsubscribe_from_posts(old_slug)
         PublishingPubSub.unsubscribe_from_cache(old_slug)
-        PublishingPubSub.unsubscribe_from_group_editors(old_slug)
       end
 
       if new_slug do
         PublishingPubSub.subscribe_to_posts(new_slug)
         PublishingPubSub.subscribe_to_cache(new_slug)
-        PublishingPubSub.subscribe_to_group_editors(new_slug)
       end
 
       # Cancel any pending debounce timers before switching groups
@@ -703,8 +602,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
       socket
       |> assign(:group_slug, new_slug)
-      |> assign(:active_editors, %{})
-      |> assign(:translating_posts, %{})
       |> assign(:pending_post_updates, %{})
     else
       assign(socket, :group_slug, new_slug)
@@ -976,56 +873,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         status = Map.get(version_statuses, latest, "draft")
         {latest, status, :latest}
     end
-  end
-
-  @doc """
-  Builds language data for the display version (live > draft > latest).
-  """
-  def build_display_version_languages(post, enabled_languages, primary_language \\ nil) do
-    {version, status, _label} = get_display_version(post)
-
-    # Get languages for this specific version
-    version_languages = Map.get(post, :version_languages, %{})
-    available_languages = Map.get(version_languages, version, post[:available_languages] || [])
-
-    # Get primary language - prefer passed param, then post's stored value, then global
-    primary_lang =
-      primary_language || Publishing.get_primary_language()
-
-    # Use shared ordering function for consistent display
-    all_languages =
-      Publishing.order_languages_for_display(
-        available_languages,
-        enabled_languages,
-        primary_lang
-      )
-
-    Enum.map(all_languages, fn lang_code ->
-      lang_info = Publishing.get_language_info(lang_code)
-      content_exists = lang_code in available_languages
-      is_enabled = Publishing.language_enabled?(lang_code, enabled_languages)
-      is_known = lang_info != nil
-      # Status matches the version's status
-      lang_status = if content_exists, do: status, else: nil
-
-      # Get display code (base or full dialect depending on enabled languages)
-      display_code = Publishing.get_display_code(lang_code, enabled_languages)
-
-      %{
-        code: lang_code,
-        display_code: display_code,
-        name: if(lang_info, do: lang_info.name, else: lang_code),
-        flag: if(lang_info, do: lang_info.flag, else: ""),
-        status: lang_status,
-        exists: content_exists,
-        enabled: is_enabled,
-        known: is_known,
-        # is_default is used for ordering only, not for special UI treatment
-        is_default: lang_code == primary_lang,
-        uuid: post[:uuid]
-      }
-    end)
-    |> Enum.filter(fn lang -> lang.exists end)
   end
 
   # The public origin first (site_url setting, else the endpoint's configured
@@ -1463,38 +1310,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                         />
                       <% end %>
                     </div>
-                    <%!-- Translation Progress Bar --%>
-                    <%= if translation_status = Map.get(@translating_posts, post.slug) do %>
-                      <div class="border-t border-base-200 pt-3 mt-3">
-                        <%= if translation_status.status == :in_progress do %>
-                          <div class="flex items-center justify-between text-xs mb-1">
-                            <span class="text-base-content/70 flex items-center gap-1">
-                              <span class="loading loading-spinner loading-xs"></span>
-                              {gettext("Translating...")}
-                            </span>
-                            <span class="font-medium">
-                              {translation_status.completed} / {translation_status.total}
-                            </span>
-                          </div>
-                          <progress
-                            class="progress progress-primary w-full h-2"
-                            value={translation_status.completed}
-                            max={translation_status.total}
-                          >
-                          </progress>
-                        <% else %>
-                          <div class="flex items-center gap-2 text-xs text-success">
-                            <.icon name="hero-check-circle" class="w-4 h-4" />
-                            {ngettext(
-                              "Translation complete - %{count} language",
-                              "Translation complete - %{count} languages",
-                              translation_status.success_count,
-                              count: translation_status.success_count
-                            )}
-                          </div>
-                        <% end %>
-                      </div>
-                    <% end %>
                   </div>
                 </div>
               <% end %>

@@ -509,7 +509,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
       assert PublishingComments.for_post_page(post.uuid).count == 0
     end
 
-    test "the enhancement script and form markers render", %{conn: conn, slug: slug} do
+    test "the enhancement script and form markers render", %{slug: slug} do
       html = build_conn() |> get("/#{slug}/discussed") |> html_response(200)
       assert html =~ "data-pk-comment-form"
       assert html =~ "__pkCommentFetch"

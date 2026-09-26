@@ -394,7 +394,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
     end
   end
 
-  defp extract_endpoint_url(uri) when is_binary(uri) do
+  # The public origin first (site_url setting, else the endpoint's configured
+  # URL): the connect URI's scheme is what the proxy handed the app, http on
+  # a TLS-terminated host, so the sample URLs said http://.
+  defp extract_endpoint_url(uri) do
+    PublishingHTML.public_origin() || origin_from_uri(uri)
+  end
+
+  defp origin_from_uri(uri) when is_binary(uri) do
     case URI.parse(uri) do
       %URI{scheme: scheme, host: host, port: port} when not is_nil(scheme) and not is_nil(host) ->
         port_string = if port in [80, 443], do: "", else: ":#{port}"
@@ -405,7 +412,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
     end
   end
 
-  defp extract_endpoint_url(_), do: ""
+  defp origin_from_uri(_), do: ""
 
   @impl true
   def render(assigns) do

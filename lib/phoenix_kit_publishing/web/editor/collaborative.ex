@@ -51,19 +51,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
     try do
       cleanup_old_presence(old_form_key, form_key, socket, old_post_slug)
-      track_and_subscribe(form_key, socket, current_user)
-      subscribe_to_post_translations(socket)
-      subscribe_to_post_versions(socket)
-
-      # Cleared up front: switching language or version rebuilds this socket
-      # around a different row, so a marker left over from the previous one
-      # would make the next promotion adopt a buffer for the wrong content.
-      socket
-      |> clear_synced_from_owner()
-      |> assign_editing_role(form_key)
-      |> maybe_broadcast_editor_joined()
-      |> maybe_load_spectator_state(form_key)
-      |> maybe_start_lock_expiration_timer()
+      setup_new_presence(socket, form_key, current_user)
     rescue
       ArgumentError ->
         Logger.warning(
@@ -129,9 +117,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     subscribe_to_post_translations(socket)
     subscribe_to_post_versions(socket)
 
-    # Same up-front clear as the context-switch path above: a leftover
-    # synced-from-owner marker from a previous form key would make the next
-    # promotion adopt a buffer that belonged to different content.
+    # Cleared up front: switching language or version rebuilds this socket
+    # around a different row, so a synced-from-owner marker left over from the
+    # previous form key would make the next promotion adopt a buffer that
+    # belonged to different content.
     socket
     |> clear_synced_from_owner()
     |> assign_editing_role(form_key)
@@ -152,12 +141,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     end
   end
 
+  @doc false
+  @spec current_post_id(Phoenix.LiveView.Socket.t()) :: String.t() | nil
+  # The broadcast id of the post this socket is editing, nil before a post is
+  # assigned. Captured BEFORE a switch assigns the new post, so the old post's
+  # presence and topics are torn down under the right id.
+  def current_post_id(socket) do
+    case socket.assigns[:post] do
+      nil -> nil
+      post -> PublishingPubSub.broadcast_id(post)
+    end
+  end
+
   @doc """
   Unsubscribe from current post's topics (used in terminate when LiveView closes).
   """
   def unsubscribe_from_old_post_topics(socket) do
     group_slug = socket.assigns[:group_slug]
-    post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+    post_slug = current_post_id(socket)
 
     if group_slug && post_slug do
       PublishingPubSub.unsubscribe_from_post_translations(group_slug, post_slug)
@@ -168,16 +169,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   # ============================================================================
   # Tracking and Subscription
   # ============================================================================
-
-  defp track_and_subscribe(form_key, socket, current_user) do
-    case PresenceHelpers.track_editing_session(form_key, socket, current_user) do
-      {:ok, _ref} -> :ok
-      {:error, {:already_tracked, _pid, _topic, _key}} -> :ok
-    end
-
-    PresenceHelpers.subscribe_to_editing(form_key)
-    PublishingPubSub.subscribe_to_editor_form(form_key)
-  end
 
   defp subscribe_to_post_translations(socket) do
     case PublishingPubSub.broadcast_id(socket.assigns[:post]) do
@@ -355,12 +346,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     role = if socket.assigns[:lock_owner?], do: :owner, else: :spectator
 
     if user do
-      %{
-        id: user.uuid,
-        email: user.email,
-        socket_id: socket.id,
-        role: role
-      }
+      %{id: user.uuid, socket_id: socket.id, role: role}
     else
       %{socket_id: socket.id, role: role}
     end

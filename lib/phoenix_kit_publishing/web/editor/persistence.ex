@@ -674,15 +674,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     end
   end
 
-  defp handle_post_save_success(socket, post) do
-    group_slug = socket.assigns.group_slug
+  # A successful write: drop the listing cache for the group and tell the other
+  # tabs/users on this form key to reload.
+  defp broadcast_saved(socket, post) do
+    invalidate_post_cache(socket.assigns.group_slug, post)
 
-    invalidate_post_cache(group_slug, post)
-
-    # Broadcast save to other tabs/users
     if socket.assigns[:form_key] do
       Logger.debug(
-        "BROADCASTING editor_saved from update_existing_post: " <>
+        "BROADCASTING editor_saved: " <>
           "form_key=#{inspect(socket.assigns.form_key)}, source=#{inspect(socket.id)}"
       )
 
@@ -692,6 +691,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         {socket.assigns.group_slug, get_in(socket.assigns, [:post, :uuid])}
       )
     end
+
+    :ok
+  end
+
+  defp handle_post_save_success(socket, post) do
+    group_slug = socket.assigns.group_slug
+    broadcast_saved(socket, post)
 
     # A save that WORKS must retract a previous failure. update_meta now
     # deliberately preserves :error across keystrokes (so an autosave failure
@@ -795,20 +801,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   defp handle_post_update_result(socket, update_result, success_message, extra_assigns) do
     case update_result do
       {:ok, updated_post} ->
-        invalidate_post_cache(socket.assigns.group_slug, updated_post)
-
-        if socket.assigns[:form_key] do
-          Logger.debug(
-            "BROADCASTING editor_saved: " <>
-              "form_key=#{inspect(socket.assigns.form_key)}, source=#{inspect(socket.id)}"
-          )
-
-          PublishingPubSub.broadcast_editor_saved(
-            socket.assigns.form_key,
-            socket.id,
-            {socket.assigns.group_slug, get_in(socket.assigns, [:post, :uuid])}
-          )
-        end
+        broadcast_saved(socket, updated_post)
 
         flash_message =
           if socket.assigns.is_autosaving,

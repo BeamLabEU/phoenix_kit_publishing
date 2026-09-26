@@ -496,68 +496,19 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   # ============================================================================
 
   @doc """
-  Broadcasts that AI translation has started.
-  Sent to both posts_topic (for group listing) and post_translations_topic (for editor).
+  Broadcasts that AI translation has started, to the post's translations topic.
+
+  `scope` (the version the jobs target) rides the payload so an editor viewing
+  a different version ignores this start event — versions translate
+  independently. Progress and completion arrive through core's
+  `{:ai_translation, …}` events, not through this module.
   """
   @spec broadcast_translation_started(String.t(), String.t(), [String.t()], String.t() | nil) ::
           broadcast_result
   def broadcast_translation_started(group_slug, post_slug, target_languages, scope \\ nil) do
-    # `scope` (the version the jobs target) rides the editor payload so an editor
-    # viewing a different version ignores this start event — versions translate
-    # independently. The group-listing payload stays version-agnostic.
-    payload = {:translation_started, group_slug, post_slug, target_languages, scope}
-
-    # Broadcast to group listing
-    Manager.broadcast(
-      posts_topic(group_slug),
-      {:translation_started, post_slug, length(target_languages)}
-    )
-
-    # Broadcast to editor (more detailed info)
-    Manager.broadcast(post_translations_topic(group_slug, post_slug), payload)
-  end
-
-  @doc """
-  Broadcasts AI translation progress (after each language completes).
-  Sent to both posts_topic (for group listing) and post_translations_topic (for editor).
-  """
-  @spec broadcast_translation_progress(
-          String.t(),
-          String.t(),
-          non_neg_integer(),
-          non_neg_integer(),
-          String.t()
-        ) :: broadcast_result
-  def broadcast_translation_progress(group_slug, post_slug, completed, total, last_language) do
-    # Broadcast to group listing
-    Manager.broadcast(
-      posts_topic(group_slug),
-      {:translation_progress, post_slug, completed, total}
-    )
-
-    # Broadcast to editor (more detailed info)
     Manager.broadcast(
       post_translations_topic(group_slug, post_slug),
-      {:translation_progress, group_slug, post_slug, completed, total, last_language}
-    )
-  end
-
-  @doc """
-  Broadcasts that AI translation has completed (success or partial failure).
-  Sent to both posts_topic (for group listing) and post_translations_topic (for editor).
-  """
-  @spec broadcast_translation_completed(String.t(), String.t(), map()) :: broadcast_result
-  def broadcast_translation_completed(group_slug, post_slug, results) do
-    # Broadcast to group listing
-    Manager.broadcast(
-      posts_topic(group_slug),
-      {:translation_completed, post_slug, results}
-    )
-
-    # Broadcast to editor
-    Manager.broadcast(
-      post_translations_topic(group_slug, post_slug),
-      {:translation_completed, group_slug, post_slug, results}
+      {:translation_started, group_slug, post_slug, target_languages, scope}
     )
   end
 
@@ -566,28 +517,14 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   # ============================================================================
 
   @doc """
-  Returns the global topic for editor activity across a group.
-  Used by group listing to show who's editing what.
+  Returns the topic for editor activity across a group.
+
+  The editor broadcasts `:editor_joined` / `:editor_left` here; nothing in this
+  module subscribes to it (a host may).
   """
   @spec group_editors_topic(String.t()) :: String.t()
   def group_editors_topic(group_slug) do
     "#{@topic_prefix}:#{group_slug}:editors"
-  end
-
-  @doc """
-  Subscribes to editor activity for a group (used by group listing).
-  """
-  @spec subscribe_to_group_editors(String.t()) :: subscription_result
-  def subscribe_to_group_editors(group_slug) do
-    Manager.subscribe(group_editors_topic(group_slug))
-  end
-
-  @doc """
-  Unsubscribes from editor activity for a group.
-  """
-  @spec unsubscribe_from_group_editors(String.t()) :: :ok
-  def unsubscribe_from_group_editors(group_slug) do
-    Manager.unsubscribe(group_editors_topic(group_slug))
   end
 
   @doc """

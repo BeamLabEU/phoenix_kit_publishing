@@ -22,9 +22,11 @@ controller (dead views); the admin side is LiveView.
   seam), plus `leaf`, `phoenix_live_view`, `mdex`, `saxy`, `oban`, `gettext`.
 - **Consumed by:** core's Sitemap module, which calls
   `PhoenixKit.Modules.Publishing.{enabled?/0, list_groups/0, list_posts/2}`
-  behind `Code.ensure_loaded?/1`; `phoenix_kit_projects`, whose extension
-  registry duck-types `phoenix_kit_project_extensions/0` for its Docs project
-  tab.
+  behind `Code.ensure_loaded?/1`; core's Languages admin page, which calls
+  `enabled?/0`, `list_groups/0` and `ListingCache.regenerate/1` (guarded and
+  rescued on core's side) when a language is added or removed;
+  `phoenix_kit_projects`, whose extension registry duck-types
+  `phoenix_kit_project_extensions/0` for its Docs project tab.
 - **Admin surface:** one top-level tab `Publishing` at `/admin/publishing`
   (dynamic children, one per group, at `/admin/publishing/<slug>`), plus a
   settings subtab at `/admin/settings/publishing`. Public routes are served
@@ -238,11 +240,20 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   nothing to collaborate on). Anything comparing form keys by string must handle
   every shape — `same_post_and_version?/2` in `web/editor.ex` is the reference.
 - **The editor's text is replaced only through
-  `Web.Editor.Helpers.set_editor_content/2`.** Leaf's surface is
-  `phx-update="ignore"`, so assigning `@content` changes nothing on screen;
-  the helper sends Leaf the document and asks it straight back with a flush
-  ref, and the editor ignores `leaf_changed` until that ref returns — Leaf
-  flushes on blur, so the old document's text arrives after a switch.
+  `Web.Editor.Helpers.set_editor_content/2`, and a click that replaces the
+  buffer flushes first.** Leaf's surface is `phx-update="ignore"`, so
+  assigning `@content` changes nothing on screen; the helper sends Leaf the
+  document and asks it straight back with a flush ref, and the editor
+  ignores `leaf_changed` until that ref returns — Leaf flushes on blur, so
+  the old document's text arrives after a switch. A language or version
+  switch, Preview and the translation buttons go through `after_flush/2`
+  in `Web.Editor`: Leaf keeps up to a debounce of keystrokes, and the
+  action runs once its reply is back (1.5 s fallback). Leaf's `dirty` flag
+  decides whether a flush reply is an edit: in hybrid mode the reply is the
+  surface re-serialised, which differs from an untouched row. Every event
+  pushed with `push_event/3` must have a listener on the page —
+  `client_events_test.exs` pins the list; talk to Leaf through
+  `send_update` only.
 - **Admin LiveView assigns available on every admin page:**
   `@phoenix_kit_current_scope`, `@current_locale`, `@url_path`.
 
@@ -381,7 +392,12 @@ lib/phoenix_kit_publishing/
   most recent 5,000 posts per group. `invalidate/1` erases locally AND
   broadcasts; `erase_local/1` is the receive-side variant.
   `ListingCache.LockTableOwner` owns the regeneration-lock ETS table so it
-  outlives request processes; `ListingCache.CacheSync` erases on peer
+  outlives request processes, and is the single writer of the listing terms:
+  an install checks the erase tombstone and writes in one step inside it,
+  ordered by `next_sequence/0` (strictly increasing, never a tie), so a
+  regeneration that started before an invalidation can neither reinstall the
+  old listing nor overwrite the tombstone. Reads stay lock-free
+  `:persistent_term` lookups. `ListingCache.CacheSync` erases on peer
   invalidation.
 - `Publishing.Renderer` — Markdown → HTML via MDEx/comrak, cached in
   `PhoenixKit.Cache` under `:publishing_posts` (24h TTL, max 2000, FIFO). The key
@@ -472,7 +488,7 @@ raw `Phoenix.PubSub` call.
 | `publishing:<group>:post:<slug>:translations` | `post_translations_topic/2` | `:translation_created` / `:translation_deleted`, version scope as a STRING |
 | `publishing:editor_forms` + per-key topics | `editor_form_topic/1` | collaborative form sync |
 | per-group cache topics | `cache_topic/1`, `cache_invalidation_topic/0` | `{:cache_invalidated, slug}` |
-| `publishing:<group>:editors` | `group_editors_topic/1` | editor presence for a group |
+| `publishing:<group>:editors` | `group_editors_topic/1` | `{:editor_joined, uuid, user_info}` / `{:editor_left, uuid, user_info}` from the editor; nothing in this module subscribes |
 
 ### Settings keys
 
@@ -636,7 +652,9 @@ layout), `web/settings_live_test.exs` (LV smoke),
 `integration/activity_logging_test.exs`, `web/controller/public_routes_test.exs`
 (smart-fallback contract), `web/controller/language_switcher_exposure_test.exs`
 (host-integration boundary), `errors_test.exs`, `group_settings_test.exs`,
-`core_pin_conformance_test.exs`, `schema_prefix_conformance_test.exs`.
+`core_pin_conformance_test.exs`, `schema_prefix_conformance_test.exs`,
+`web/editor_switch_content_test.exs` (the Leaf hand-over and flush protocol),
+`web/client_events_test.exs` (every pushed event has a listener).
 
 The test router declares the admin LV routes in both the bare and the
 `/:locale/admin/…` shape inside one `live_session`, as production does: with
@@ -727,6 +745,47 @@ newest-created release as Latest and demotes the current one.
 - **Preview-tab loading indicator** (`web/preview.ex`): a `phx-update="ignore"`
   skeleton before `render_markdown_content/1` returns would smooth the hang on
   large PHK XML. Trigger: a benchmark showing it matters.
+- **A metadata-only edit made inside the autosave window leaves without a
+  prompt.** Leaf's `protect_navigation` compares its own buffer only; the
+  old hook's beforeunload guard covered the form too. Closing it means a
+  guard fed by `has_pending_changes`, which is this module's first JS
+  (`js_sources/0`), or a core hook.
+- **The browsable-version path still 301s a missing translation.**
+  `Web.Controller.PostRendering.respond_with_browsable_version/…` keeps the
+  permanent redirect that `render_published_post/4` no longer issues;
+  `language_sweep_test.exs` pins it, so changing it is a decision, not a fix.
+- **Core still carries a "publishing pushes changes-status" back-compat
+  listener** inside its MarkdownEditor hook (`phoenix_kit.js`); nothing
+  produces that event any more. A core follow-up.
+- **Two canonical 301s never fire for a segment owner's full-code URL.**
+  With `en-US` owning `/en/` and `en-GB` enabled, `/en-US/blog/post` serves
+  200 instead of redirecting to `/en/blog/post`, because
+  `canonical_redirect?/3` only compares URLs when the language changed;
+  `/de-DE/blog/feed.xml` serves the feed instead of redirecting to
+  `/de/blog/feed.xml` for the same reason (`Web.Controller.feed/2` checks
+  only the prefixed-default case). Both need a loop test before the fix.
+- **A switch whose flush reply is later than 1.5 s acts without it.**
+  `after_flush/2` falls back to what the server holds; the late reply is
+  then dropped as the old document's. A background tab's throttled timers
+  are the realistic case, where nobody is typing. Raising the fallback or
+  blocking the switch behind a "syncing…" state is the alternative.
+- **Core's Sitemap reads exclusion knobs publishing never writes.**
+  `group["sitemap_exclude"]` / `group["settings"]["sitemap_exclude"]` and
+  `post.metadata.sitemap_exclude` are matched by core but exist nowhere here;
+  either add them to `GroupSettings` and the version `data`, or ask core to
+  drop them.
+- **Group broadcasts ship the whole group map** (`{:group_updated, group}`),
+  name and settings included, while every receiver reloads from the DB.
+  `%{uuid, slug}` would do; `pubsub_test.exs` pins the payloads.
+- **`CategoriesLive` subscribes to nothing** and the categories context
+  broadcasts nothing, so two admins on the same group's categories go stale
+  until a reload (the context refuses stale targets, so no corruption).
+- **`get_`/`fetch_` return shapes are mixed:** `DBStorage.get_group/1` returns
+  a struct or nil, `Groups.get_group/1` a tuple; `get_category/1` a tuple,
+  `get_post_by_uuid/1` nil. A public API rename, so a release decision.
+- **The public view counter has no per-IP cap** (`Views.record_async/1`):
+  cookieless requests dedupe only by user agent, so a loop of curl requests
+  inflates a count and costs a pool checkout each.
 - **Translation button immediate-disable** in the editor. `phx-disable-with`
   covers most cases; the gap is a double-enqueue on slow networks before the
   server's `ai_translation_status` assign returns. Closing it means this module's
