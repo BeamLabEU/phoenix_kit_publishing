@@ -117,7 +117,9 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     )
     |> repo().all()
   rescue
-    _ -> []
+    e in [Ecto.QueryError, DBConnection.ConnectionError, Postgrex.Error] ->
+      Logger.warning("[Publishing] list_categories failed for #{group_slug}: #{inspect(e)}")
+      []
   end
 
   @doc "A group's category by slug."
@@ -133,7 +135,12 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       category -> {:ok, category}
     end
   rescue
-    _ -> {:error, :not_found}
+    e in [Ecto.QueryError, DBConnection.ConnectionError, Postgrex.Error] ->
+      Logger.warning(
+        "[Publishing] by_slug failed for #{group_slug}/#{category_slug}: #{inspect(e)}"
+      )
+
+      {:error, :not_found}
   end
 
   @doc "A category by uuid. Anything that is not a uuid is `:not_found`, never a raise."

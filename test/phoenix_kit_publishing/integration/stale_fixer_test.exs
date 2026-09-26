@@ -11,6 +11,7 @@ defmodule PhoenixKit.Integration.Publishing.StaleFixerTest do
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.StaleFixer
+  alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
 
   # Backdate a post past the empty-post grace period so the stale fixer acts on it.
@@ -214,6 +215,29 @@ defmodule PhoenixKit.Integration.Publishing.StaleFixerTest do
 
     [healed] = DBStorage.list_versions(post.uuid)
     assert healed.status == "draft"
+  end
+
+  test "a publish that landed after the fixer's read keeps its version (M4 CAS)" do
+    {:ok, _} = Settings.update_setting("content_language", "en-US")
+    {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
+    {:ok, post} = Posts.create_post(group["slug"], %{title: "Raced Publish", content: "body"})
+
+    # The fixer read the post while it had no active version...
+    stale = DBStorage.get_post_by_uuid(post.uuid, [:group])
+    assert stale.active_version_uuid == nil
+
+    # ...and a real publish committed before the fixer wrote.
+    :ok = Versions.publish_version(group["slug"], post.uuid, 1)
+    [v1] = DBStorage.list_versions(post.uuid)
+    assert v1.status == "published"
+
+    StaleFixer.fix_stale_post(stale)
+
+    # The compare-and-set saw the active version and left the row alone; the
+    # old unconditional write drafted a live post.
+    [after_fix] = DBStorage.list_versions(post.uuid)
+    assert after_fix.status == "published"
+    assert DBStorage.get_post_by_uuid(post.uuid).active_version_uuid == v1.uuid
   end
 
   test "trashes (not hard-deletes) an empty post past the grace period (M9)" do

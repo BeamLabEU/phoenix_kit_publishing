@@ -323,7 +323,19 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpers do
       _post -> true
     end
   rescue
-    _ -> false
+    error ->
+      # Fails OPEN, unlike url_slug_exists?/4 below, on purpose: the post
+      # slug has a unique index (`idx_publishing_posts_group_slug`), so a
+      # duplicate that slips past a DB hiccup here is rejected at the write
+      # and mapped to `:slug_already_exists`; treating the hiccup as "taken"
+      # would silently suffix a slug that was free. Logged so a persistent
+      # failure is diagnosable.
+      Logger.warning(
+        "[Slugs] slug uniqueness check failed for #{inspect(post_slug)}, " <>
+          "leaving it to the unique index: #{inspect(error)}"
+      )
+
+      false
   end
 
   @doc """
