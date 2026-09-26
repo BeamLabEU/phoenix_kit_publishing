@@ -241,18 +241,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   end
 
   @doc """
-  Returns true when the current request URL already matches the canonical URL.
+  Returns true when the canonical 301 would land on the request itself.
+
+  The redirect merges the request's query string onto the canonical URL
+  (`Controller.with_query_string/2`: the target's keys win, the request's
+  extra keys ride along), so the request already IS the target when the
+  paths agree and every key the canonical names is present with the
+  canonical's value. Comparing the raw strings sent every `?utm_source=`
+  request on a prefixless dialect primary back to itself, forever: the
+  request carried a query, the canonical none, and the 301 re-added it.
   """
   def request_matches_canonical_url?(conn, canonical_url) do
-    request_url =
-      case conn.query_string do
-        nil -> conn.request_path
-        "" -> conn.request_path
-        query -> conn.request_path <> "?" <> query
-      end
+    %URI{path: canonical_path, query: canonical_query} = URI.parse(canonical_url)
+    request_query = decode_query(conn.query_string)
 
-    request_url == canonical_url
+    conn.request_path == canonical_path and
+      Enum.all?(decode_query(canonical_query), fn {key, value} ->
+        Map.get(request_query, key) == value
+      end)
   end
+
+  defp decode_query(query) when is_binary(query) and query != "", do: URI.decode_query(query)
+  defp decode_query(_), do: %{}
 
   @doc """
   Returns true when the request is using an explicit prefix for the default language

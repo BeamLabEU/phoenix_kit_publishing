@@ -137,6 +137,12 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   @spec regenerate(String.t(), keyword()) :: :ok | {:error, any()}
   def regenerate(group_slug, opts \\ []) do
     broadcast? = Keyword.get(opts, :broadcast, true)
+    # Microseconds: the erase tombstone compares inclusively, and at ms
+    # resolution a regeneration in the same tick as the invalidation it
+    # follows was refused. `:started_at` is a test seam only: it stages a
+    # regeneration whose DB snapshot predates an invalidation, which no
+    # sandboxed test can otherwise time. Production callers never pass it.
+    started_at = Keyword.get(opts, :started_at) || System.monotonic_time(:microsecond)
 
     # Categories moved from a post-level join table onto the versions. This is
     # where the one-time move happens, because it is the one path every group
@@ -147,7 +153,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     Categories.backfill_version_categories(group_slug)
 
     if memory_cache_enabled?() do
-      do_regenerate(group_slug, broadcast?)
+      do_regenerate(group_slug, broadcast?, started_at)
     else
       :ok
     end
@@ -164,9 +170,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   # Groups exceeding this will still work but only cache the most recent posts.
   @max_cached_posts 5000
 
-  defp do_regenerate(group_slug, broadcast?) do
-    start_time = System.monotonic_time(:millisecond)
-
+  defp do_regenerate(group_slug, broadcast?, start_time) do
     # Verify the group actually exists BEFORE writing anything to
     # `:persistent_term`. `Language.has_content_for_language?/2` (and
     # other callers reachable from public URL parsing) treats any URL
@@ -228,7 +232,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
       safe_persistent_term_put(cache_generated_at_key(group_slug), {generated_at, start_time})
     end
 
-    elapsed = System.monotonic_time(:millisecond) - start_time
+    elapsed = div(System.monotonic_time(:microsecond) - start_time, 1000)
 
     Logger.debug(
       "[ListingCache] Regenerated cache from DB for #{group_slug} (#{length(posts)} posts) in #{elapsed}ms"
@@ -466,11 +470,16 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
       ArgumentError -> :ok
     end
 
-    try do
-      :persistent_term.erase(cache_generated_at_key(group_slug))
-    rescue
-      ArgumentError -> :ok
-    end
+    # A tombstone, not an erase: a regeneration whose DB snapshot predates
+    # this mutation (StaleFixer trashing a post mid-regeneration, say) compares
+    # its start against this reading and refuses to reinstall the pre-mutation
+    # listing — with the marker gone it had nothing to compare against, and
+    # warm reads never regenerate, so the stale listing stayed until the next
+    # mutation. One small term per erased slug outlives a renamed-away group.
+    safe_persistent_term_put(
+      cache_generated_at_key(group_slug),
+      {nil, System.monotonic_time(:microsecond)}
+    )
 
     :ok
   end
@@ -755,10 +764,14 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   end
 
   # True when a regeneration that started later has already installed its
-  # snapshot. An entry with no reading (or none at all) can't be compared, so
-  # the write goes ahead — the pre-existing behaviour.
+  # snapshot, or an invalidation (the `{nil, erased_at}` tombstone) landed
+  # after this one began. The tombstone compares inclusively: same-millisecond
+  # is ambiguous, and a cold read costs one regeneration where a stale
+  # listing costs a mutation. An entry with no reading (or none at all) can't
+  # be compared, so the write goes ahead — the pre-existing behaviour.
   defp stale_snapshot?(group_slug, start_time) do
     case safe_persistent_term_get(cache_generated_at_key(group_slug)) do
+      {:ok, {nil, erased_at}} when is_integer(erased_at) -> erased_at >= start_time
       {:ok, {_generated_at, started_at}} when is_integer(started_at) -> started_at > start_time
       _ -> false
     end

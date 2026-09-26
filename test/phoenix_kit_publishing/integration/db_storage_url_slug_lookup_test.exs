@@ -21,6 +21,7 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageUrlSlugLookupTest do
 
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
+  alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
@@ -75,6 +76,32 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageUrlSlugLookupTest do
       assert found != nil
       assert found.url_slug == "shiny-public-slug"
       assert found.version.post.slug == "custom-slug-post"
+    end
+
+    # The read-path auto-rename wrote the row but left the listing cache
+    # holding the displaced slug in the loser's language_slugs.
+    test "auto-renaming a collision invalidates the group's listing cache" do
+      {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
+      slug = group["slug"]
+
+      for post_slug <- ["incumbent", "latecomer"] do
+        {:ok, post} = Posts.create_post(slug, %{title: post_slug, slug: post_slug})
+        [version] = DBStorage.list_versions(post.uuid)
+        [content] = DBStorage.list_contents(version.uuid)
+        {:ok, _} = DBStorage.update_content(content, %{url_slug: "shared"})
+        :ok = Versions.publish_version(slug, post.uuid, version.version_number)
+      end
+
+      :ok = ListingCache.regenerate(slug, broadcast: false)
+      assert ListingCache.exists?(slug)
+
+      winner = DBStorage.find_by_url_slug(slug, "en-US", "shared")
+      assert winner.version.post.slug == "incumbent"
+
+      refute ListingCache.exists?(slug)
+      assert {:ok, posts} = ListingCache.read(slug)
+      latecomer = Enum.find(posts, &(&1[:slug] == "latecomer"))
+      assert latecomer[:language_slugs]["en-US"] == "shared-2"
     end
 
     test "falls back to post-slug match when content's url_slug is empty" do

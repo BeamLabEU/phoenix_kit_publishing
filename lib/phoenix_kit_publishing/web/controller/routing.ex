@@ -77,10 +77,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
     end
   end
 
+  # version_number is an int4 column: a larger value reached the query and
+  # raised DBConnection.EncodeError (a 500) instead of the invalid outcome.
+  @max_version 2_147_483_647
+
   # Version-specific URL: /group/post-slug/v/2
   def parse_path([group_slug, post_slug, "v", version_str]) do
     case Integer.parse(version_str) do
-      {version, ""} when version > 0 ->
+      {version, ""} when version > 0 and version <= @max_version ->
         {:versioned_post, group_slug, post_slug, version}
 
       _ ->

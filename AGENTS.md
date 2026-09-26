@@ -518,7 +518,7 @@ branches (`index/1`, `show/1` in `Web.HTML`).
 
 | Assign | Shape | Notes |
 |--------|-------|-------|
-| `:phoenix_kit_publishing_translations` | list of `%{code, name, flag, url, current}` | Always set on listing + post conns, regardless of `publishing_show_language_switcher`. Exactly those five fields on both route types — the controller normalises at the boundary, stripping internal-only fields (`display_code`; on post routes also `enabled`/`known`) so external consumers get one uniform shape |
+| `:phoenix_kit_publishing_translations` | list of `%{code, name, flag, url, current, enabled}` | Always set on listing + post conns, regardless of `publishing_show_language_switcher`. Exactly those six fields on both route types — the controller normalises at the boundary, stripping internal-only fields (`display_code`; on post routes also `known`) so external consumers get one uniform shape. `enabled` is `false` only for the current entry when it is a legacy/disabled language (every other disabled entry is dropped, since it is not publicly routable) — hosts use it to keep that entry out of hreflang |
 | `:og` | listing: `%{title, url, locale, type: "website"}`; post: `%{title, description, image, url, locale, type: "article"}` plus up to three `og:image:*` hints (`image_width`, `image_height`, `image_type`) | 4 fields on listings, 6–9 on posts. `description` and `image` may be `nil` |
 
 **Function-component layouts only see declared attrs.** Both assigns reach

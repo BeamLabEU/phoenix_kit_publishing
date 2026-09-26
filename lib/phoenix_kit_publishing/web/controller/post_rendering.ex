@@ -66,9 +66,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
           # The editor's "Add language" writes {title: "Untitled", content: ""}
           # onto the ACTIVE version — instantly public. An untranslated stub
           # must read as a MISSING translation, not an empty published page:
-          # :not_found sends it through the smart fallback (other language →
-          # group listing). The primary language can't hit this — publishing
-          # requires a real primary title.
+          # :not_found sends it straight to the group listing with the
+          # closest-match flash (Fallback treats :not_found as a missing
+          # post, so it never tries the other languages). The primary
+          # language can't hit this — publishing requires a real primary
+          # title.
           stub_translation?(post) ->
             log_404(conn, group_slug, identifier, language, :not_found)
             {:error, :not_found}
@@ -110,30 +112,62 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
     canonical_url = PublishingHTML.build_post_url(group_slug, post, canonical_language)
 
-    if canonical_redirect?(conn, language, canonical_language, canonical_url) do
-      {:redirect_301, canonical_url}
-    else
-      group = fetch_group(group_slug)
-      html_content = render_post_content(post, notes_style: group_notes_style(group))
-      group_name = resolve_group_name(group, group_slug, canonical_language)
-      translations = Translations.build_translation_links(group_slug, post, canonical_language)
-      breadcrumbs = build_breadcrumbs(group_slug, post, canonical_language, group_name)
-      version_dropdown = build_version_dropdown(group_slug, post, canonical_language)
+    cond do
+      # `read_post` resolves a missing translation to fallback content
+      # silently, so `post.language` is the SERVED row's language. A
+      # translation this post does not have is a content state: the same
+      # 302 + "closest match" the listing sends (Fallback picks the target
+      # language), never the cacheable 301 the canonical check below issues
+      # for prefix/display-code parity — that one kept bouncing readers
+      # after the translation was added.
+      served_by_fallback_language?(post, language) ->
+        log_404(conn, group_slug, post[:slug], language, :post_not_found)
+        {:error, :post_not_found}
 
-      {:ok,
-       %{
-         page_title: post.metadata.title || Constants.default_title(),
-         group_slug: group_slug,
-         group: group,
-         group_name: group_name,
-         post: post,
-         html_content: html_content,
-         current_language: canonical_language,
-         translations: translations,
-         breadcrumbs: breadcrumbs,
-         version_dropdown: version_dropdown
-       }}
+      canonical_redirect?(conn, language, canonical_language, canonical_url) ->
+        {:redirect_301, canonical_url}
+
+      true ->
+        build_post_page(group_slug, post, canonical_language)
     end
+  end
+
+  # The requested language names the served row when the codes match, or
+  # when a base-code request ("en") matches the row's base ("en-US") — that
+  # shape belongs to the display-code canonicalisation, not the fallback.
+  defp served_by_fallback_language?(%{language: served}, requested)
+       when is_binary(served) and is_binary(requested) do
+    served_down = String.downcase(served)
+    requested_down = String.downcase(requested)
+
+    served_down != requested_down and
+      not (Language.base_code?(requested) and
+             String.downcase(LanguageHelpers.url_language_code(served)) == requested_down)
+  end
+
+  defp served_by_fallback_language?(_post, _requested), do: false
+
+  defp build_post_page(group_slug, post, canonical_language) do
+    group = fetch_group(group_slug)
+    html_content = render_post_content(post, notes_style: group_notes_style(group))
+    group_name = resolve_group_name(group, group_slug, canonical_language)
+    translations = Translations.build_translation_links(group_slug, post, canonical_language)
+    breadcrumbs = build_breadcrumbs(group_slug, post, canonical_language, group_name)
+    version_dropdown = build_version_dropdown(group_slug, post, canonical_language)
+
+    {:ok,
+     %{
+       page_title: post.metadata.title || Constants.default_title(),
+       group_slug: group_slug,
+       group: group,
+       group_name: group_name,
+       post: post,
+       html_content: html_content,
+       current_language: canonical_language,
+       translations: translations,
+       breadcrumbs: breadcrumbs,
+       version_dropdown: version_dropdown
+     }}
   end
 
   @doc """

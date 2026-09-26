@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage.Mapper
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PublishingPost
@@ -950,6 +951,11 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
                 "from #{inspect(base_slug)} to #{inspect(new_slug)} (language=#{content.language})"
             )
 
+            # The row is renamed, but the listing cache still carries the
+            # displaced slug in the loser's `language_slugs`, and warm reads
+            # never regenerate — the URL builders kept emitting the old slug
+            # until the next mutation.
+            ListingCache.invalidate(group_slug)
             :ok
 
           {:error, changeset} ->

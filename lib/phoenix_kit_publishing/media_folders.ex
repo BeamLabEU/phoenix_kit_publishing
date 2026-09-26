@@ -296,6 +296,9 @@ defmodule PhoenixKit.Modules.Publishing.MediaFolders do
     post_uuid
     |> post_pointer_query()
     |> repo().all()
+    # Every version carries the same pointer once filed: one lookup, not one
+    # per version.
+    |> Enum.uniq()
     |> Enum.find_value(&media_folder/1)
   end
 

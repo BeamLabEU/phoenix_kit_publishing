@@ -2319,6 +2319,44 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   @doc """
+  The origin (`scheme://host[:port]`, no trailing slash) absolute public URLs
+  are built on — og:url, JSON-LD, feed links, the admin's public-URL copy.
+  The same source of truth as core's `PhoenixKit.Utils.Routes.base_url/0`:
+  the `site_url` setting, else the host endpoint's configured URL. `nil` when
+  neither is set, so a caller falls back to the request it holds.
+
+  Never the request's scheme first: behind a TLS-terminating proxy
+  `conn.scheme` (and a LiveView's connect URI) say `http://` on every page.
+  """
+  @spec public_origin() :: String.t() | nil
+  def public_origin do
+    case Settings.get_setting("site_url", "") do
+      url when is_binary(url) and url != "" -> String.trim_trailing(url, "/")
+      _ -> configured_endpoint_origin()
+    end
+  end
+
+  @doc "`public_origin/0`, falling back to the origin the request arrived on."
+  @spec public_origin(Plug.Conn.t()) :: String.t()
+  def public_origin(%Plug.Conn{} = conn), do: public_origin() || request_origin(conn)
+
+  @doc "The origin the request arrived on — the last resort, see `public_origin/0`."
+  @spec request_origin(Plug.Conn.t()) :: String.t()
+  def request_origin(%Plug.Conn{scheme: scheme, host: host, port: port}) do
+    "#{scheme}://#{host}#{if port in [80, 443], do: "", else: ":#{port}"}"
+  end
+
+  # Core's static `Config.get_base_url/0` ("http://localhost:4000" unless a
+  # host is configured) is deliberately not consulted: it is a placeholder,
+  # and the request origin is a better last resort than a placeholder.
+  defp configured_endpoint_origin do
+    case Config.get_parent_endpoint_url() do
+      {:ok, url} when is_binary(url) and url != "" -> String.trim_trailing(url, "/")
+      _ -> nil
+    end
+  end
+
+  @doc """
   Builds the public URL for a group listing page.
   Omits the locale prefix when the site is effectively single-language.
   Can also omit the default-language prefix when that setting is enabled.

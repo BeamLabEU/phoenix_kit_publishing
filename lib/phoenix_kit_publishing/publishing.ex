@@ -478,9 +478,10 @@ defmodule PhoenixKit.Modules.Publishing do
 
   defp og_get_meta(_, _), do: nil
 
+  # The public origin, not the request's scheme — behind a TLS-terminating
+  # proxy conn.scheme is http (see PublishingHTML.public_origin/0).
   defp absolute_post_url(%Plug.Conn{} = conn, path) when is_binary(path) do
-    port_suffix = if conn.port in [80, 443], do: "", else: ":#{conn.port}"
-    "#{conn.scheme}://#{conn.host}#{port_suffix}#{path}"
+    PublishingHTML.public_origin(conn) <> path
   end
 
   @impl PhoenixKit.Module

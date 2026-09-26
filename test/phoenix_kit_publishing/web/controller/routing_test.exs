@@ -38,6 +38,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RoutingTest do
     end
   end
 
+  describe "parse_path/1 — versioned URLs" do
+    test "parses a positive version number" do
+      assert Routing.parse_path(["blog", "post", "v", "2"]) ==
+               {:versioned_post, "blog", "post", 2}
+    end
+
+    test "rejects zero, negatives and non-integers" do
+      assert Routing.parse_path(["blog", "post", "v", "0"]) == {:error, :invalid_version}
+      assert Routing.parse_path(["blog", "post", "v", "-1"]) == {:error, :invalid_version}
+      assert Routing.parse_path(["blog", "post", "v", "1x"]) == {:error, :invalid_version}
+    end
+
+    # version_number is an int4 column; a larger value reached the query and
+    # raised DBConnection.EncodeError (a 500) instead of the invalid outcome.
+    test "rejects a version beyond the int4 column" do
+      assert Routing.parse_path(["blog", "post", "v", "2147483647"]) ==
+               {:versioned_post, "blog", "post", 2_147_483_647}
+
+      assert Routing.parse_path(["blog", "post", "v", "2147483648"]) == {:error, :invalid_version}
+
+      assert Routing.parse_path(["blog", "post", "v", "99999999999"]) ==
+               {:error, :invalid_version}
+    end
+  end
+
   # ============================================================================
   # parse_path/1
   # ============================================================================

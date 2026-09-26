@@ -63,6 +63,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CanonicalHostResolverTest
              ~s(property="og:url" content="http://www.example.com/#{group_slug}/canonical-post")
   end
 
+  # A TLS-terminating proxy hands the app http://, so og:url advertised the
+  # wrong scheme on every proxied host; the `site_url` setting is the public
+  # origin and outranks the request.
+  test "the site_url setting is the og:url origin ahead of the request host", %{
+    conn: conn,
+    group_slug: group_slug
+  } do
+    {:ok, _} = Settings.update_setting("site_url", "https://example.test")
+    on_exit(fn -> {:ok, _} = Settings.update_setting("site_url", "") end)
+
+    html = get(conn, "/#{group_slug}/canonical-post") |> html_response(200)
+
+    assert html =~
+             ~s(property="og:url" content="https://example.test/#{group_slug}/canonical-post")
+
+    listing = get(conn, "/#{group_slug}") |> html_response(200)
+    assert listing =~ ~s(property="og:url" content="https://example.test/#{group_slug}")
+  end
+
   test "resolver returning nil for the page language keeps the request host", %{
     conn: conn,
     group_slug: group_slug

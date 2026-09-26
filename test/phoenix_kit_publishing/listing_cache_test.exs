@@ -213,6 +213,32 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheRegenerateTest do
       {:ok, _} = Settings.update_boolean_setting("publishing_memory_cache_enabled", false)
       assert :ok = ListingCache.regenerate(group_slug)
     end
+
+    # A regeneration whose DB snapshot predates a mutation must not land on
+    # top of that mutation's invalidation: erasing the generated-at marker
+    # left nothing for the slow snapshot to compare against, so it reinstalled
+    # the pre-mutation listing and, warm reads never regenerating, it stayed.
+    test "a regeneration that started before an invalidation is refused",
+         %{group_slug: group_slug} do
+      assert :ok = ListingCache.regenerate(group_slug, broadcast: false)
+      assert ListingCache.exists?(group_slug)
+
+      started_before = System.monotonic_time(:microsecond)
+      :ok = ListingCache.invalidate(group_slug)
+      refute ListingCache.exists?(group_slug)
+
+      assert :ok =
+               ListingCache.regenerate(group_slug, broadcast: false, started_at: started_before)
+
+      refute ListingCache.exists?(group_slug)
+      assert ListingCache.cache_generated_at(group_slug) == nil
+
+      # A regeneration that starts after the erase installs as usual.
+      Process.sleep(2)
+      assert :ok = ListingCache.regenerate(group_slug, broadcast: false)
+      assert ListingCache.exists?(group_slug)
+      assert is_binary(ListingCache.cache_generated_at(group_slug))
+    end
   end
 
   describe "exists?/1 + invalidate/1" do

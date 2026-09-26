@@ -169,6 +169,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
     with true <- Publishing.enabled?() and public_enabled?(),
          {:ok, group} <- Publishing.get_group(group_slug),
+         # Same status the GET path's group_trashed?/1 reads — get_group
+         # returns trashed groups too, so a trashed group kept taking comments.
+         true <- group["status"] != "trashed",
          true <- Map.get(group, "comments_enabled", false),
          true <- PublishingComments.available?() do
       handle_comment_submission(conn, group, params)
@@ -632,9 +635,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     end
   end
 
-  defp base_url(conn) do
-    "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
-  end
+  # The public origin (site_url setting, else the endpoint's configured URL,
+  # else the request) — never conn.scheme first: behind a TLS-terminating
+  # proxy that is http on every page. See PublishingHTML.public_origin/0.
+  defp base_url(conn), do: PublishingHTML.public_origin(conn)
 
   # ============================================================================
   # Post Handlers
@@ -856,10 +860,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # independently, so a post can override just the title and inherit the rest.
   defp build_og_data(conn, post, canonical_url, language) do
     og_override = Map.get(post.metadata, :og) || %{}
-
-    base_url =
-      "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
-
+    base_url = base_url(conn)
     image_meta = og_image_meta(post, og_override)
 
     og =
@@ -973,10 +974,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp canonical_absolute_url(conn, language, relative_url) do
     case resolve_canonical_host(language) do
       nil ->
-        base_url =
-          "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
-
-        absolute_url(base_url, relative_url)
+        absolute_url(base_url(conn), relative_url)
 
       host ->
         absolute_url("https://#{host}", strip_language_prefix(relative_url, language))
