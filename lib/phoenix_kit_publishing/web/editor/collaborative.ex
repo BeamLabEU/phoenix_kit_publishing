@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
   alias PhoenixKit.Modules.Publishing.PresenceHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
   require Logger
 
@@ -387,7 +388,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
     socket
     |> Phoenix.Component.assign(:form, form)
-    |> Phoenix.Component.assign(:content, content)
     |> then(fn socket ->
       if ahead? do
         socket
@@ -397,7 +397,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
         socket
       end
     end)
-    |> Phoenix.LiveView.push_event("set-content", %{content: content})
+    |> Helpers.set_editor_content(content)
     |> Phoenix.LiveView.push_event("form-updated", %{form: form})
   end
 
@@ -424,10 +424,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
   def apply_remote_form_change(socket, %{type: :content, data: %{content: content, form: form}}) do
     socket
-    |> Phoenix.Component.assign(:content, content)
     |> Phoenix.Component.assign(:form, form)
     |> mark_synced_from_owner()
-    |> Phoenix.LiveView.push_event("set-content", %{content: content})
+    |> Helpers.set_editor_content(content)
     |> Phoenix.LiveView.push_event("form-updated", %{form: form})
   end
 

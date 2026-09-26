@@ -402,6 +402,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   defp extract_endpoint_url(_), do: ""
 
+  # Which language and version the editor's buffer holds.
+  defp editor_scope(socket),
+    do: {socket.assigns[:current_language], socket.assigns[:current_version]}
+
+  # Hand the buffer's new text to Leaf when a patch changed what it holds.
+  #
+  # `@content` only reaches the surface on its first render (it is
+  # `phx-update="ignore"`); afterwards a document reaches it through
+  # `Helpers.set_editor_content/2` alone. The deferred switch to a language
+  # that already exists lands here with nothing pre-assigned, so this is
+  # where it has to be said — without it the previous language's text stayed
+  # on screen until a reload. The first mount (no form key yet) and a patch
+  # that keeps the scope (a new post landing on its UUID URL, a save that
+  # already assigned the version it moved to) leave the surface alone:
+  # replacing the text under a writer would drop the keystrokes typed since
+  # the last flush.
+  defp refresh_editor_after_switch(socket, nil = _old_form_key, _old_scope), do: socket
+
+  defp refresh_editor_after_switch(socket, _old_form_key, old_scope) do
+    if editor_scope(socket) == old_scope do
+      socket
+    else
+      Helpers.set_editor_content(socket, socket.assigns.content)
+    end
+  end
+
   # Resolve a post by UUID but require it to belong to the group in the URL.
   # read_post_by_uuid/3 resolves purely by UUID, so without this the editor would
   # load a post from another group and then validate slug uniqueness against the
@@ -428,6 +454,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         all_enabled_languages = Publishing.enabled_language_codes()
 
         old_form_key = socket.assigns[:form_key]
+        old_scope = editor_scope(socket)
 
         old_post_slug =
           socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
@@ -455,6 +482,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
         socket =
           socket
+          |> refresh_editor_after_switch(old_form_key, old_scope)
           |> Collaborative.setup_collaborative_editing(form_key,
             old_form_key: old_form_key,
             old_post_slug: old_post_slug
@@ -533,6 +561,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         requested_lang = Map.get(params, "lang")
 
         old_form_key = socket.assigns[:form_key]
+        old_scope = editor_scope(socket)
 
         old_post_slug =
           socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
@@ -560,6 +589,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
         socket =
           socket
+          |> refresh_editor_after_switch(old_form_key, old_scope)
           |> Collaborative.setup_collaborative_editing(form_key,
             old_form_key: old_form_key,
             old_post_slug: old_post_slug
@@ -2283,7 +2313,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     # becomes editable. There is no caret to disturb — this session has been
     # watching, not typing — and the client applies it without echoing a
     # change back, so it cannot start a broadcast loop.
-    |> push_event("set-content", %{content: socket.assigns.content})
+    |> Helpers.set_editor_content(socket.assigns.content)
     |> schedule_autosave()
     |> Collaborative.maybe_start_lock_expiration_timer()
     |> put_flash(
@@ -2300,10 +2330,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
         socket
         |> assign(:post, %{post | group: socket.assigns.group_slug})
         |> Forms.assign_form_with_tracking(form)
-        |> assign(:content, post.content)
         |> Helpers.mark_clean()
         |> push_event("changes-status", %{has_changes: false})
-        |> push_event("set-content", %{content: post.content})
+        |> Helpers.set_editor_content(post.content)
         |> Collaborative.maybe_start_lock_expiration_timer()
 
       {:error, _} ->
@@ -2594,13 +2623,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       socket
       |> assign(:post, virtual_post)
       |> Forms.assign_form_with_tracking(form, slug_manually_set: false)
-      |> assign(:content, "")
       |> Helpers.assign_current_language(new_language)
       |> assign(
         :viewing_older_version,
         Versions.viewing_older_version?(current_version, available_versions, new_language)
       )
       |> Helpers.mark_clean()
+      |> Helpers.set_editor_content("")
       |> assign(:is_new_translation, true)
       |> assign(:form_key, new_form_key)
       |> push_event("changes-status", %{has_changes: false})

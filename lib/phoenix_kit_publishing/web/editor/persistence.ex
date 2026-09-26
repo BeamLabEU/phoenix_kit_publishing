@@ -1036,11 +1036,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         socket
         |> Phoenix.Component.assign(:post, %{updated_post | group: group_slug})
         |> Forms.assign_form_with_tracking(form)
-        |> Phoenix.Component.assign(:content, updated_post.content)
         |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
         |> Helpers.mark_clean()
         |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-        |> Phoenix.LiveView.push_event("set-content", %{content: updated_post.content})
+        |> Helpers.set_editor_content(updated_post.content)
         |> Phoenix.LiveView.put_flash(flash_level, flash_msg)
 
       {:error, _reason} ->
@@ -1108,14 +1107,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         |> Phoenix.Component.assign(:post, %{updated_post | group: group_slug})
         |> Editor.assign_page_trail(updated_post)
         |> Forms.assign_form_with_tracking(form)
-        |> Phoenix.Component.assign(:content, updated_post.content)
         |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
         |> Helpers.mark_clean()
         # This socket now matches the row again, so a later promotion should
         # take the saved copy rather than re-adopting what it mirrored before.
         |> Collaborative.clear_synced_from_owner()
         |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-        |> Phoenix.LiveView.push_event("set-content", %{content: updated_post.content})
+        |> Helpers.set_editor_content(updated_post.content)
         |> Phoenix.LiveView.put_flash(:info, gettext("Post updated by another user"))
 
       {:error, _reason} ->

@@ -632,10 +632,13 @@ layout), `web/settings_live_test.exs` (LV smoke),
 (host-integration boundary), `errors_test.exs`, `group_settings_test.exs`,
 `core_pin_conformance_test.exs`, `schema_prefix_conformance_test.exs`.
 
-Known noise on a green run: the editor's deferred language switch logs a
-`GenServer terminating … cannot push_patch/2 … does not point to the current root
-view` report while the test itself passes. The suite has also flaked on
-sandbox/activity-log timing; the repeat loop in Commands is the stability check.
+The test router declares the admin LV routes in both the bare and the
+`/:locale/admin/…` shape inside one `live_session`, as production does: with
+languages enabled `Routes.path/1` emits `/en/admin/…`, and an editor
+`push_patch` (a language or version switch) that lands outside the current
+root view is refused by the LiveViewTest proxy instead of reaching
+`handle_params`. The suite has flaked on sandbox/activity-log timing; the
+repeat loop in Commands is the stability check.
 
 ## Feature notes
 

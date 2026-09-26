@@ -61,7 +61,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
       socket
       |> Phoenix.Component.assign(:post, %{version_post | group: group_slug})
       |> Phoenix.Component.assign(:form, form)
-      |> Phoenix.Component.assign(:content, version_post.content)
       |> Phoenix.Component.assign(:current_version, version)
       |> Phoenix.Component.assign(:available_versions, version_post.available_versions)
       |> Phoenix.Component.assign(:version_statuses, version_post.version_statuses)
@@ -73,7 +72,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
       |> Phoenix.Component.assign(:form_key, new_form_key)
       |> Phoenix.Component.assign(:saved_status, form["status"])
       |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-      |> Phoenix.LiveView.push_event("set-content", %{content: version_post.content})
+      |> Helpers.set_editor_content(version_post.content)
 
     # Return socket with cleanup info for the caller to handle collaborative editing
     {socket, old_form_key, old_post_slug, new_form_key, actual_language}
@@ -231,12 +230,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
     |> Phoenix.Component.assign(:form_key, new_form_key)
     |> Phoenix.Component.assign(:available_versions, updated_versions)
     |> Phoenix.Component.assign(:current_version, surviving_version)
-    |> Phoenix.Component.assign(:content, fresh_post.content)
     |> Phoenix.Component.assign(:saved_status, form["status"])
     |> Phoenix.Component.assign(:editing_published_version, Constants.published?(form["status"]))
     |> Helpers.mark_clean()
     |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-    |> Phoenix.LiveView.push_event("set-content", %{content: fresh_post.content})
+    |> Helpers.set_editor_content(fresh_post.content)
     |> Phoenix.LiveView.push_patch(
       to:
         Helpers.build_edit_url(group_slug, fresh_post,

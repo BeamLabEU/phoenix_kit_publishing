@@ -219,6 +219,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   end
 
   @doc """
+  Replaces the text in the editor — ours AND Leaf's.
+
+  `@content` reaches Leaf once, on its first render: the surface is
+  `phx-update="ignore"`, so assigning a new value afterwards changes nothing
+  on screen. A new document reaches the client through `action: :set_content`
+  alone. Every place that swapped the buffer — a language or version switch,
+  a lock takeover, a reload after someone else saved, a spectator sync — used
+  to push a `"set-content"` event instead, which core's MarkdownEditor hook
+  listened for and Leaf never did; so since the move to Leaf each of them
+  left the previous text in the editor until the page was reloaded.
+
+  `mark_saved` follows `has_pending_changes` as it stands when this is
+  called, so the two clean-state trackers (`mark_clean/1`) keep agreeing:
+  a buffer adopted with pending work stays dirty, a reload reads clean.
+  """
+  def set_editor_content(socket, content) do
+    content = content || ""
+
+    Phoenix.LiveView.send_update(Leaf,
+      id: "content-editor",
+      action: :set_content,
+      content: content,
+      mark_saved: !socket.assigns[:has_pending_changes]
+    )
+
+    Phoenix.Component.assign(socket, :content, content)
+  end
+
+  @doc """
   A `<Gallery>` block wrapping one `<Image>` line per chosen file.
 
   Uuids rather than signed URLs: the URL is then resolved at render time, so

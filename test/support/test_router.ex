@@ -36,12 +36,21 @@ defmodule PhoenixKitPublishing.Test.Router do
   # The `layout:` option mirrors core's admin live_session, whose layout
   # renders the flash — core's own default LV layout is a passthrough, so
   # without it `put_flash/3` output would be invisible to LV tests.
-  scope "/admin/publishing", PhoenixKit.Modules.Publishing.Web do
-    pipe_through(:browser)
+  #
+  # Both the bare and the locale-prefixed shape sit in ONE live_session, the
+  # way production's `admin_routes/0` + `admin_locale_routes/0` register
+  # them. `Routes.path/1` emits `/en/admin/…` once languages are enabled, so
+  # the editor's own `push_patch` (a language or version switch) must
+  # resolve to the SAME LiveView here or the LiveViewTest proxy raises
+  # "does not point to the current root view" instead of running
+  # handle_params. Declared before the public catch-all scope below, which
+  # would otherwise claim `/:language/:group/*path` for the controller.
+  live_session :admin_publishing,
+    on_mount: [{PhoenixKitPublishing.Test.Hooks, :assign_scope}],
+    layout: {PhoenixKitPublishing.Test.Layouts, :live} do
+    scope "/admin/publishing", PhoenixKit.Modules.Publishing.Web do
+      pipe_through(:browser)
 
-    live_session :admin_publishing,
-      on_mount: [{PhoenixKitPublishing.Test.Hooks, :assign_scope}],
-      layout: {PhoenixKitPublishing.Test.Layouts, :live} do
       live("/", Index, :index, as: :publishing_index)
       live("/new-group", New, :new, as: :publishing_new)
       live("/edit-group/:group", Edit, :edit, as: :publishing_edit_group)
@@ -53,6 +62,25 @@ defmodule PhoenixKitPublishing.Test.Router do
       live("/:group/:post_uuid", PostShow, :show, as: :publishing_post_show)
       live("/:group/:post_uuid/edit", Editor, :edit, as: :publishing_editor)
       live("/:group/:post_uuid/preview", Preview, :preview, as: :publishing_preview)
+    end
+
+    scope "/:locale/admin/publishing", PhoenixKit.Modules.Publishing.Web do
+      pipe_through(:browser)
+
+      live("/", Index, :index, as: :publishing_index_localized)
+      live("/new-group", New, :new, as: :publishing_new_localized)
+      live("/edit-group/:group", Edit, :edit, as: :publishing_edit_group_localized)
+
+      live("/categories/:group", CategoriesLive, :index, as: :publishing_categories_localized)
+
+      live("/:group", Listing, :group, as: :publishing_listing_localized)
+      live("/:group/edit", Editor, :edit, as: :publishing_editor_root_localized)
+      live("/:group/new", Editor, :new, as: :publishing_editor_new_localized)
+      live("/:group/preview", Preview, :preview, as: :publishing_preview_root_localized)
+      live("/:group/:post_uuid", PostShow, :show, as: :publishing_post_show_localized)
+      live("/:group/:post_uuid/edit", Editor, :edit, as: :publishing_editor_localized)
+
+      live("/:group/:post_uuid/preview", Preview, :preview, as: :publishing_preview_localized)
     end
   end
 
