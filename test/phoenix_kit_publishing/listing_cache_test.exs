@@ -223,21 +223,82 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheRegenerateTest do
       assert :ok = ListingCache.regenerate(group_slug, broadcast: false)
       assert ListingCache.exists?(group_slug)
 
-      started_before = System.monotonic_time(:microsecond)
+      started_before = ListingCache.next_sequence()
       :ok = ListingCache.invalidate(group_slug)
       refute ListingCache.exists?(group_slug)
 
       assert :ok =
-               ListingCache.regenerate(group_slug, broadcast: false, started_at: started_before)
+               ListingCache.regenerate(group_slug, broadcast: false, started_seq: started_before)
 
       refute ListingCache.exists?(group_slug)
       assert ListingCache.cache_generated_at(group_slug) == nil
 
       # A regeneration that starts after the erase installs as usual.
-      Process.sleep(2)
       assert :ok = ListingCache.regenerate(group_slug, broadcast: false)
       assert ListingCache.exists?(group_slug)
       assert is_binary(ListingCache.cache_generated_at(group_slug))
+    end
+
+    # The check and the install used to be two steps: a regeneration that
+    # passed the tombstone check, then paused while a mutation erased the
+    # group, resumed and installed its pre-mutation listing — overwriting the
+    # tombstone with its own marker on the way. The install step is one
+    # serialised compare-and-install now, so the check cannot go stale
+    # between itself and the write.
+    test "an install whose sequence predates the erase leaves the tombstone in place",
+         %{group_slug: group_slug} do
+      assert :ok = ListingCache.regenerate(group_slug, broadcast: false)
+      assert ListingCache.exists?(group_slug)
+
+      # The regeneration took its sequence and read the DB...
+      stale_seq = ListingCache.next_sequence()
+      # ...a mutation committed and erased the group while it was paused...
+      :ok = ListingCache.erase_local(group_slug)
+      refute ListingCache.exists?(group_slug)
+
+      # ...and its install step arrives with the pre-erase sequence.
+      assert :refused =
+               ListingCache.install_snapshot(
+                 group_slug,
+                 [%{slug: "trashed-meanwhile"}],
+                 "2026-04-27T00:00:00Z",
+                 stale_seq
+               )
+
+      refute ListingCache.exists?(group_slug)
+      assert ListingCache.cache_generated_at(group_slug) == nil
+
+      # The tombstone survived: an even older install is still refused, and a
+      # newer one lands.
+      assert :refused =
+               ListingCache.install_snapshot(group_slug, [:older], "2026-04-27T00:00:00Z", 1)
+
+      refute ListingCache.exists?(group_slug)
+
+      assert :installed =
+               ListingCache.install_snapshot(
+                 group_slug,
+                 [:fresh],
+                 "2026-04-27T00:00:00Z",
+                 ListingCache.next_sequence()
+               )
+
+      assert :persistent_term.get(ListingCache.persistent_term_key(group_slug)) == [:fresh]
+    end
+
+    # Ordering by a clock refused an erase-then-regenerate that fell into the
+    # same tick: `System.monotonic_time(:microsecond)` returns equal adjacent
+    # readings, and the tombstone compared inclusively. A strictly increasing
+    # sequence has no ties.
+    test "an erase followed immediately by a regeneration installs, 200 times over",
+         %{group_slug: group_slug} do
+      for i <- 1..200 do
+        :ok = ListingCache.erase_local(group_slug)
+        assert :ok = ListingCache.regenerate(group_slug, broadcast: false)
+
+        assert ListingCache.exists?(group_slug),
+               "regeneration #{i} right after an erase was refused"
+      end
     end
   end
 
@@ -326,18 +387,18 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheRegenerateTest do
   describe "snapshot ordering" do
     test "a regeneration that started earlier does not overwrite a newer one",
          %{group_slug: group_slug} do
-      # Stand in for a regeneration that has already landed, carrying a
-      # monotonic reading from the future so anything starting now looks older.
-      ahead = System.monotonic_time(:millisecond) + 60_000
+      # A regeneration that took its sequence earlier, then a newer one that
+      # has already landed with a later sequence.
+      older = ListingCache.next_sequence()
 
       :persistent_term.put(
         ListingCache.cache_generated_at_key(group_slug),
-        {"2126-04-27T00:00:00Z", ahead}
+        {"2126-04-27T00:00:00Z", ListingCache.next_sequence()}
       )
 
       :persistent_term.put(ListingCache.persistent_term_key(group_slug), [:fresh])
 
-      assert ListingCache.regenerate(group_slug, broadcast: false) == :ok
+      assert ListingCache.regenerate(group_slug, broadcast: false, started_seq: older) == :ok
 
       assert :persistent_term.get(ListingCache.persistent_term_key(group_slug)) == [:fresh],
              "a read that began before the newer one committed put its stale posts back"
