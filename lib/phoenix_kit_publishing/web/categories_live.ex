@@ -11,6 +11,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   use PhoenixKitWeb, :live_view
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  import PhoenixKitWeb.Components.Core.EmptyState
+
   require Logger
 
   alias PhoenixKit.Modules.Publishing
@@ -444,37 +446,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     <div class="container flex flex-col mx-auto px-4 py-6">
       <.admin_page_header>
         <:actions>
-          <button type="button" class="btn btn-primary btn-sm" phx-click="new">
+          <.button type="button" size="sm" phx-click="new">
             <.icon name="hero-plus" class="w-4 h-4" />
             {gettext("New category")}
-          </button>
+          </.button>
         </:actions>
       </.admin_page_header>
 
       <div class="card bg-base-100 shadow-sm border border-base-200">
         <div class="card-body p-4">
           <%= if @tree == [] do %>
-            <div class="text-center py-8 text-base-content/60">
-              <.icon name="hero-tag" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p class="text-sm">
-                {gettext("No categories yet — create the first one.")}
-              </p>
-              <button type="button" class="btn btn-primary btn-sm mt-4" phx-click="new">
+            <.empty_state
+              icon="hero-tag"
+              title={gettext("No categories yet — create the first one.")}
+              class="py-8"
+            >
+              <.button type="button" size="sm" phx-click="new">
                 <.icon name="hero-plus" class="w-4 h-4" />
                 {gettext("New category")}
-              </button>
-            </div>
+              </.button>
+            </.empty_state>
           <% else %>
-            <table class="table table-sm">
-              <thead>
+            <.table_default variant="zebra" size="sm" wrapper_class="">
+              <.table_default_header>
                 <tr>
                   <.drag_handle_header_cell />
-                  <th>{gettext("Name")}</th>
-                  <th>{gettext("Slug")}</th>
-                  <th class="text-right">{gettext("Posts")}</th>
-                  <th class="w-px"></th>
+                  <.table_default_header_cell>{gettext("Name")}</.table_default_header_cell>
+                  <.table_default_header_cell>{gettext("Slug")}</.table_default_header_cell>
+                  <.table_default_header_cell class="text-right">
+                    {gettext("Posts")}
+                  </.table_default_header_cell>
+                  <.table_default_header_cell class="w-px" />
                 </tr>
-              </thead>
+              </.table_default_header>
               <.sortable_tbody
                 id="categories-tree"
                 event="reorder_categories"
@@ -486,7 +490,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
                   <% else %>
                     <td class="w-8"></td>
                   <% end %>
-                  <td>
+                  <.table_default_cell>
                     <div
                       class="flex items-center gap-2"
                       style={depth > 0 && "padding-left: #{depth * 1.25}rem"}
@@ -498,10 +502,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
                       <% end %>
                       <span class="font-medium">{category.name}</span>
                     </div>
-                  </td>
-                  <td class="font-mono text-xs text-base-content/60">{category.slug}</td>
-                  <td class="text-right tabular-nums">{Map.get(@counts, category.uuid, 0)}</td>
-                  <td class="text-right">
+                  </.table_default_cell>
+                  <.table_default_cell class="font-mono text-xs text-base-content/60">
+                    {category.slug}
+                  </.table_default_cell>
+                  <.table_default_cell class="text-right tabular-nums">
+                    {Map.get(@counts, category.uuid, 0)}
+                  </.table_default_cell>
+                  <.table_default_cell class="text-right">
                     <.table_row_menu mode="auto" id={"cat-menu-#{category.uuid}"}>
                       <.table_row_menu_button
                         phx-click="edit"
@@ -538,10 +546,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
                         }
                       />
                     </.table_row_menu>
-                  </td>
+                  </.table_default_cell>
                 </.sortable_row>
               </.sortable_tbody>
-            </table>
+            </.table_default>
           <% end %>
         </div>
       </div>
@@ -582,20 +590,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           <.input field={@form[:position]} type="number" label={gettext("Position")} />
           <.textarea field={@form[:description]} label={gettext("Description")} rows="2" />
           <div class="flex items-center justify-end gap-2 pt-2">
-            <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
+            <.button type="button" variant="ghost" size="sm" phx-click="cancel_form">
               {gettext("Cancel")}
-            </button>
-            <button
-              type="submit"
-              class="btn btn-primary btn-sm"
-              phx-disable-with={gettext("Saving…")}
-            >
+            </.button>
+            <.button type="submit" size="sm" phx-disable-with={gettext("Saving…")}>
               <%= if @editing do %>
                 {gettext("Save")}
               <% else %>
                 {gettext("Create")}
               <% end %>
-            </button>
+            </.button>
           </div>
         </.form>
       </.modal>
@@ -619,16 +623,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
             />
           </div>
           <div class="flex items-center justify-end gap-2 pt-4">
-            <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_move">
+            <.button type="button" variant="ghost" size="sm" phx-click="cancel_move">
               {gettext("Cancel")}
-            </button>
-            <button
-              type="submit"
-              class="btn btn-primary btn-sm"
-              phx-disable-with={gettext("Moving…")}
-            >
+            </.button>
+            <.button type="submit" size="sm" phx-disable-with={gettext("Moving…")}>
               {gettext("Move")}
-            </button>
+            </.button>
           </div>
         </.form>
       </.modal>

@@ -29,6 +29,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
   use Phoenix.Component
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  import PhoenixKitWeb.Components.Core.StatusDot, only: [status_dot: 1]
+
   @doc """
   Renders a compact inline version switcher.
 
@@ -145,7 +147,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
   defp version_content(assigns) do
     ~H"""
     <span class="inline-flex items-center gap-1">
-      <span class={status_dot_classes(@status, @is_live, @size)}></span>
+      <.status_dot variant={status_dot_variant(@status, @is_live)} size={@size} />
       <span class={code_classes(@is_current, @size)}>
         v{@version}
       </span>
@@ -156,20 +158,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
     """
   end
 
-  # Status dot styling - live = green, published (not live) = blue, draft = yellow, archived = gray
-  defp status_dot_classes(status, is_live, size) do
-    base = ["rounded-full", "inline-block", dot_size_class(size)]
-
-    color =
-      cond do
-        is_live -> "bg-success"
-        Constants.published?(status) -> "bg-info"
-        status == "draft" -> "bg-warning"
-        status == "archived" -> "bg-base-content/40"
-        true -> "bg-base-content/20"
-      end
-
-    base ++ [color]
+  # Status dot variant - live = green, published (not live) = blue, draft = yellow,
+  # archived/unknown = neutral gray
+  defp status_dot_variant(status, is_live) do
+    cond do
+      is_live -> :success
+      Constants.published?(status) -> :info
+      status == "draft" -> :warning
+      true -> :neutral
+    end
   end
 
   # Item container classes
@@ -197,10 +194,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
   end
 
   # Size-based classes
-  defp dot_size_class(:xs), do: "w-1.5 h-1.5"
-  defp dot_size_class(:sm), do: "w-2 h-2"
-  defp dot_size_class(:md), do: "w-2.5 h-2.5"
-
   defp size_text_class(:xs), do: "text-xs"
   defp size_text_class(:sm), do: "text-sm"
   defp size_text_class(:md), do: "text-base"

@@ -62,21 +62,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShowTest do
     end
   end
 
-  describe "language_status_color/1" do
-    test "maps published → bg-success" do
-      assert PostShow.language_status_color("published") == "bg-success"
+  describe "language_status_variant/1" do
+    test "maps published → :success" do
+      assert PostShow.language_status_variant("published") == :success
     end
 
-    test "maps draft → bg-warning" do
-      assert PostShow.language_status_color("draft") == "bg-warning"
+    test "maps draft → :warning" do
+      assert PostShow.language_status_variant("draft") == :warning
     end
 
-    test "maps archived → bg-base-content/20" do
-      assert PostShow.language_status_color("archived") == "bg-base-content/20"
+    test "maps archived → :neutral" do
+      assert PostShow.language_status_variant("archived") == :neutral
     end
 
-    test "maps unknown → bg-base-content/20 (catch-all)" do
-      assert PostShow.language_status_color(nil) == "bg-base-content/20"
+    test "maps unknown → :neutral (catch-all)" do
+      assert PostShow.language_status_variant(nil) == :neutral
     end
   end
 end

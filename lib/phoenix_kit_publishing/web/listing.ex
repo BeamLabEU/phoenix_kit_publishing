@@ -22,6 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   alias PhoenixKit.Utils.Date, as: UtilsDate
   alias PhoenixKit.Utils.Routes
 
+  import PhoenixKitWeb.Components.Core.EmptyState
   import PhoenixKitWeb.Components.LanguageSwitcher
 
   @impl true
@@ -140,6 +141,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   @status_published Constants.status_published()
   @status_archived Constants.status_archived()
   @valid_post_views Constants.post_statuses()
+
+  # `<.nav_tabs>` dispatches `phx-value-tab`; the `"mode"` shape stays for
+  # existing callers.
+  def handle_event("switch_post_view", %{"tab" => mode}, socket) do
+    handle_event("switch_post_view", %{"mode" => mode}, socket)
+  end
 
   def handle_event("switch_post_view", %{"mode" => mode}, socket)
       when mode in @valid_post_views do
@@ -1021,7 +1028,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     |> Enum.filter(fn lang -> lang.exists end)
   end
 
-  defp extract_endpoint_url(uri) when is_binary(uri) do
+  # The public origin first (site_url setting, else the endpoint's configured
+  # URL): the connect URI's scheme is what the proxy handed the app, http on
+  # a TLS-terminated host, so the "public URL" copy said http://.
+  defp extract_endpoint_url(uri) do
+    PublishingHTML.public_origin() || origin_from_uri(uri)
+  end
+
+  defp origin_from_uri(uri) when is_binary(uri) do
     case URI.parse(uri) do
       %URI{scheme: scheme, host: host, port: port} when not is_nil(scheme) and not is_nil(host) ->
         port_string = if port in [80, 443], do: "", else: ":#{port}"
@@ -1032,7 +1046,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
-  defp extract_endpoint_url(_), do: ""
+  defp origin_from_uri(_), do: ""
 
   defp do_update_post_status(socket, post_uuid, new_status) do
     group_slug = socket.assigns.group_slug
@@ -1143,34 +1157,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         </div>
       <% end %>
       <:actions>
-        <button
+        <.button
           type="button"
-          class="btn btn-outline btn-sm shadow-none"
+          variant="outline"
+          size="sm"
+          class="shadow-none"
           phx-click="refresh"
           phx-disable-with={gettext("Refreshing…")}
         >
           <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" /> {gettext("Refresh")}
-        </button>
-        <.link
+        </.button>
+        <.button
           navigate={Routes.path("/admin/publishing/categories/#{group_slug}")}
-          class="btn btn-outline btn-sm shadow-none"
+          variant="outline"
+          size="sm"
+          class="shadow-none"
         >
           <.icon name="hero-tag" class="w-4 h-4 mr-1" /> {gettext("Categories")}
-        </.link>
-        <.link
+        </.button>
+        <.button
           navigate={Routes.path("/admin/publishing/edit-group/#{group_slug}")}
-          class="btn btn-outline btn-sm shadow-none"
+          variant="outline"
+          size="sm"
+          class="shadow-none"
         >
           <.icon name="hero-cog-6-tooth" class="w-4 h-4 mr-1" /> {gettext("Settings")}
-        </.link>
-        <button
+        </.button>
+        <.button
           type="button"
-          class="btn btn-primary btn-sm"
+          size="sm"
           phx-click="create_post"
           phx-disable-with={gettext("Creating…")}
         >
           <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Create Post")}
-        </button>
+        </.button>
       </:actions>
     </.admin_page_header>
 
@@ -1178,51 +1198,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       <div class="flex-1">
         <%!-- Status Tabs — only show tabs that have posts, hide if only 1 tab --%>
         <% all_tabs = [
-          {"published", gettext("Published"), nil},
-          {"draft", gettext("Draft"), nil},
-          {"archived", gettext("Archived"), nil},
-          {"trashed", gettext("Trash"), "error"}
+          {"published", gettext("Published")},
+          {"draft", gettext("Draft")},
+          {"archived", gettext("Archived")},
+          {"trashed", gettext("Trash")}
         ] %>
         <% visible_tabs =
-          Enum.filter(all_tabs, fn {mode, _label, _color} ->
-            Map.get(@post_status_counts, mode, 0) > 0 or @post_view_mode == mode
-          end) %>
+          for {mode, label} <- all_tabs,
+              count = Map.get(@post_status_counts, mode, 0),
+              count > 0 or @post_view_mode == mode do
+            %{id: mode, label: label, badge: if(count > 0, do: count)}
+          end %>
         <%= if length(visible_tabs) > 1 do %>
-          <div class="flex items-center gap-0.5 border-b border-base-200 mb-3 overflow-x-auto">
-            <%= for {mode, label, color} <- visible_tabs do %>
-              <button
-                type="button"
-                phx-click="switch_post_view"
-                phx-value-mode={mode}
-                class={"px-3 py-1 text-xs font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer #{cond do
-                  @post_view_mode == mode and color == "error" -> "border-error text-error"
-                  @post_view_mode == mode -> "border-primary text-primary"
-                  true -> "border-transparent text-base-content/50 hover:text-base-content"
-                end}"}
-              >
-                {label}
-              </button>
-            <% end %>
-          </div>
+          <.nav_tabs
+            variant={:border}
+            active_tab={@post_view_mode}
+            on_change="switch_post_view"
+            tabs={visible_tabs}
+            class="mb-3"
+          />
         <% end %>
 
         <%!-- Admin post filter — in-memory over the already-loaded set (all
           posts live in assigns; visible_count only truncates display), so it
           matches across every language title + slug instantly. --%>
-        <form :if={not @loading} phx-change="search_posts" class="mb-3" onsubmit="return false">
-          <label class="input input-sm flex w-full max-w-xs items-center gap-2">
-            <.icon name="hero-magnifying-glass" class="w-4 h-4 opacity-50" />
-            <input
-              type="search"
-              name="q"
-              value={@post_search}
-              placeholder={gettext("Filter posts…")}
-              phx-debounce="200"
-              maxlength="100"
-              class="grow"
-            />
-          </label>
-        </form>
+        <.search_toolbar
+          :if={not @loading}
+          value={@post_search}
+          on_change="search_posts"
+          name="q"
+          placeholder={gettext("Filter posts…")}
+          debounce={200}
+          loading_indicator
+          class="mb-3 max-w-xs"
+        />
 
         <%= if @loading do %>
           <%!-- Skeleton placeholders matching post card layout.
@@ -1253,19 +1262,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         <% else %>
           <% filtered_posts = filter_posts_by_search(@posts, @post_search) %>
           <%= if filtered_posts == [] do %>
-            <div class="text-center py-8 text-base-content/60">
-              <%= cond do %>
-                <% @post_search != "" and @posts != [] -> %>
-                  <.icon name="hero-magnifying-glass" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p class="text-sm">{gettext("No posts match your filter")}</p>
-                <% @post_view_mode == "trashed" -> %>
-                  <.icon name="hero-trash" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p class="text-sm">{gettext("Trash is empty")}</p>
-                <% true -> %>
-                  <.icon name="hero-document-text" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p class="text-sm">{gettext("No posts found")}</p>
-              <% end %>
-            </div>
+            <%= cond do %>
+              <% @post_search != "" and @posts != [] -> %>
+                <.empty_state
+                  icon="hero-magnifying-glass"
+                  title={gettext("No posts match your filter")}
+                  class="py-8"
+                />
+              <% @post_view_mode == "trashed" -> %>
+                <.empty_state icon="hero-trash" title={gettext("Trash is empty")} class="py-8" />
+              <% true -> %>
+                <.empty_state
+                  icon="hero-document-text"
+                  title={gettext("No posts found")}
+                  class="py-8"
+                />
+            <% end %>
           <% else %>
             <% date_counts = PublishingHTML.build_date_counts(@posts) %>
             <% visible_posts = Enum.take(filtered_posts, @visible_count) %>
@@ -1487,17 +1499,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                 </div>
               <% end %>
             </div>
-            <%= if length(filtered_posts) > @visible_count do %>
-              <div class="flex justify-center mt-4">
-                <button
-                  type="button"
-                  phx-click="load_more"
-                  class="btn btn-outline btn-sm"
-                >
-                  {gettext("Load more")}
-                </button>
-              </div>
-            <% end %>
+            <.load_more
+              loaded={length(visible_posts)}
+              total={length(filtered_posts)}
+              on_load_more="load_more"
+              noun_plural={gettext("posts")}
+            />
           <% end %>
         <% end %>
       </div>

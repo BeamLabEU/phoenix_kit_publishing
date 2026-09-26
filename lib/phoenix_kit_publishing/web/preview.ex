@@ -226,10 +226,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
           </span>
         </div>
         <div class="flex gap-2">
-          <button type="button" class="btn btn-sm btn-ghost" phx-click="back_to_editor">
+          <.button type="button" variant="ghost" size="sm" phx-click="back_to_editor">
             <.icon name="hero-pencil-square" class="w-4 h-4 mr-1" />
             {gettext("Back to Editor")}
-          </button>
+          </.button>
         </div>
       </div>
     </div>

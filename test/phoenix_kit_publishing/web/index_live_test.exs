@@ -65,10 +65,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
     # — covered by the visual baseline diff in C0/C15).
     html_after = render_click(view, "switch_view", %{"mode" => "trashed"})
 
-    # `view_mode` flipped → the trash tab is now styled active. Use the
-    # underline-color class as the structural marker.
+    # `view_mode` flipped → the trash tab is now styled active. Use
+    # nav_tabs' `tab-active` class as the structural marker.
     assert html_after =~
-             ~s|phx-value-mode="trashed" class="px-3 py-1 text-xs font-medium border-b-2 transition-colors cursor-pointer border-error|
+             ~s|phx-value-tab="trashed" class="tab gap-2 tab-active|
   end
 
   # The three destructive-group tests pin the DB outcome AND the activity
@@ -239,7 +239,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
       # which hid the Trash tab and made the groups unreachable on a fresh
       # mount (and after trashing the last active group).
       refute html =~ "No publishing groups yet"
-      assert html =~ ~s|phx-value-mode="trashed"|
+      assert html =~ ~s|phx-value-tab="trashed"|
       assert html =~ ~s|/admin/publishing/new-group"|
       assert html =~ "border-dashed border-base-content/25"
     end
@@ -256,7 +256,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
       html = render_click(view, "trash_group", %{"slug" => group["slug"]})
 
       refute html =~ "No publishing groups yet"
-      assert html =~ ~s|phx-value-mode="trashed"|
+      assert html =~ ~s|phx-value-tab="trashed"|
       assert html =~ "border-dashed border-base-content/25"
     end
 
@@ -269,7 +269,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
 
       assert html =~ "No publishing groups yet"
       assert html =~ ~s|/admin/publishing/new-group"|
-      refute html =~ ~s|phx-value-mode="trashed"|
+      refute html =~ ~s|phx-value-tab="trashed"|
     end
   end
 end

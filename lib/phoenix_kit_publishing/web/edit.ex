@@ -743,25 +743,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
               <div class="flex flex-wrap gap-3 justify-end">
                 <%!-- Two submits, entities-form pattern: the exit button rides a
                   name/value pair into the params; plain Save stays on the page. --%>
-                <button
+                <.button
                   type="submit"
-                  class="btn btn-primary btn-outline btn-sm"
+                  variant="outline"
+                  size="sm"
+                  class="btn-primary"
                   phx-disable-with={gettext("Saving…")}
                 >
                   <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save")}
-                </button>
-                <button
+                </.button>
+                <.button
                   type="submit"
                   name="exit"
                   value="true"
-                  class="btn btn-primary btn-sm"
+                  size="sm"
                   phx-disable-with={gettext("Saving…")}
                 >
                   <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save and exit")}
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel">
+                </.button>
+                <.button type="button" variant="ghost" size="sm" phx-click="cancel">
                   <.icon name="hero-x-mark" class="w-4 h-4 mr-1" /> {gettext("Cancel")}
-                </button>
+                </.button>
               </div>
             </.form>
             <%!-- Outside the group form — the modal carries its own selector

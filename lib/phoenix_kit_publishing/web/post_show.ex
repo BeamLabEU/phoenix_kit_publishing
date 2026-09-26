@@ -137,10 +137,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   def version_status_badge_class("archived"), do: "badge-ghost"
   def version_status_badge_class(_), do: "badge-ghost"
 
-  def language_status_color(@status_published), do: "bg-success"
-  def language_status_color("draft"), do: "bg-warning"
-  def language_status_color("archived"), do: "bg-base-content/20"
-  def language_status_color(_), do: "bg-base-content/20"
+  # `<.status_dot>` variants — the neutral dot stands in for the old
+  # `bg-base-content/20` for archived and unknown alike.
+  def language_status_variant(@status_published), do: :success
+  def language_status_variant("draft"), do: :warning
+  def language_status_variant("archived"), do: :neutral
+  def language_status_variant(_), do: :neutral
 
   # Translated status labels — literal-arg gettext clauses so the extractor
   # can pick them up. Variable args (e.g. `gettext(status)`) would be invisible
@@ -171,33 +173,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
       </div>
 
       <%!-- Header with title and actions --%>
-      <div class="flex items-start justify-between gap-4 mb-6">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <span class={"badge #{version_status_badge_class(@post.metadata[:status] || "draft")}"}>
-              {status_label(@post.metadata[:status] || "draft")}
-            </span>
-            <span class="text-sm text-base-content/60">
-              {gettext("Slug")}: <code class="font-mono">{@post.slug}</code>
-            </span>
-          </div>
+      <.admin_page_header>
+        <div class="flex items-center gap-2">
+          <span class={"badge #{version_status_badge_class(@post.metadata[:status] || "draft")}"}>
+            {status_label(@post.metadata[:status] || "draft")}
+          </span>
+          <span class="text-sm text-base-content/60">
+            {gettext("Slug")}: <code class="font-mono">{@post.slug}</code>
+          </span>
         </div>
-
-        <div class="flex gap-2 shrink-0">
-          <.pk_link
+        <:actions>
+          <.pk_link_button
+            variant="primary"
             navigate={"/admin/publishing/#{@group_slug}/#{@post_uuid}/edit"}
-            class="btn btn-primary btn-sm"
+            class="btn-sm"
           >
             <span class="hero-pencil-square w-4 h-4" />{gettext("Edit")}
-          </.pk_link>
-          <.pk_link
+          </.pk_link_button>
+          <.pk_link_button
+            variant="ghost"
             navigate={"/admin/publishing/#{@group_slug}/#{@post_uuid}/preview"}
-            class="btn btn-ghost btn-sm"
+            class="btn-sm"
           >
             <span class="hero-eye w-4 h-4" />{gettext("Preview")}
-          </.pk_link>
-        </div>
-      </div>
+          </.pk_link_button>
+        </:actions>
+      </.admin_page_header>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <%!-- Versions card --%>
@@ -238,7 +239,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
                   navigate={"/admin/publishing/#{@group_slug}/#{@post_uuid}/edit?lang=#{lang}"}
                   class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors bg-base-200 hover:bg-base-300"
                 >
-                  <span class={"rounded-full inline-block w-2 h-2 #{language_status_color(status)}"} />
+                  <.status_dot variant={language_status_variant(status)} size={:sm} />
                   <span class="text-sm font-medium">{lang}</span>
                 </.pk_link>
               <% end %>
