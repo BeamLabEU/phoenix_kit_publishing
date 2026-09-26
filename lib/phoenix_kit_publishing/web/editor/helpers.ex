@@ -208,10 +208,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   One function rather than a line at each of the dozen places that go clean,
   because that is exactly the shape that drifted the first time.
 
-  Ordering is deliberate: `send_update` is processed after the current
-  handler returns, so Leaf's re-baseline lands after any `set-content` this
-  same pipeline pushed. Reversed, it would snapshot the content being
-  replaced and read dirty immediately.
+  `send_update` messages are processed after the current handler returns,
+  in order, so a `set_editor_content/2` in the same pipeline — which carries
+  its own `mark_saved` — never races this one.
   """
   def mark_clean(socket) do
     Phoenix.LiveView.send_update(Leaf, id: "content-editor", action: :mark_saved)

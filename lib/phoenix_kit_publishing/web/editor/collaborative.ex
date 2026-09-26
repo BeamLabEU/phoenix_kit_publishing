@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
   alias PhoenixKit.Modules.Publishing.PresenceHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
   require Logger
@@ -398,7 +399,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
       end
     end)
     |> Helpers.set_editor_content(content)
-    |> Phoenix.LiveView.push_event("form-updated", %{form: form})
   end
 
   @doc """
@@ -419,15 +419,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     |> Phoenix.Component.assign(:form, new_form)
     |> Phoenix.Component.assign(:post, updated_post)
     |> mark_synced_from_owner()
-    |> Phoenix.LiveView.push_event("form-updated", %{form: new_form})
   end
 
   def apply_remote_form_change(socket, %{type: :content, data: %{content: content, form: form}}) do
+    # The owner just typed. Unless this exactly matches the saved row, the
+    # copy here is unsaved work, and Leaf must not baseline it as saved — a
+    # spectator promoted later would then leave the page without a prompt.
+    ahead? =
+      case socket.assigns[:post] do
+        nil -> true
+        post -> Forms.dirty?(post, form, content)
+      end
+
     socket
     |> Phoenix.Component.assign(:form, form)
+    |> Phoenix.Component.assign(:has_pending_changes, ahead?)
     |> mark_synced_from_owner()
     |> Helpers.set_editor_content(content)
-    |> Phoenix.LiveView.push_event("form-updated", %{form: form})
   end
 
   def apply_remote_form_change(socket, _payload) do

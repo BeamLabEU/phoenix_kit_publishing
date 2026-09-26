@@ -496,7 +496,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           )
           |> Phoenix.Component.assign(:editing_published_version, false)
           |> Helpers.mark_clean()
-          |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
           |> Phoenix.LiveView.put_flash(
             :info,
             gettext("Created new version %{version} (draft)",
@@ -643,7 +642,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         {:noreply,
          socket
          |> Helpers.mark_clean()
-         |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
          |> Phoenix.LiveView.put_flash(:warning, message)}
     end
   end
@@ -751,7 +749,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       |> Phoenix.Component.assign(:language_statuses, refreshed_post.language_statuses)
       |> Phoenix.Component.assign(:version_statuses, refreshed_post.version_statuses)
       |> Phoenix.Component.assign(:version_dates, Map.get(refreshed_post, :version_dates, %{}))
-      |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
 
     {:noreply,
      if(flash_message, do: Phoenix.LiveView.put_flash(socket, :info, flash_message), else: socket)}
@@ -834,7 +831,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
           |> Helpers.mark_clean()
           |> Phoenix.Component.assign(extra_assigns)
-          |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
           |> maybe_patch_edit_url(updated_post)
 
         {:noreply,
@@ -1038,7 +1034,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         |> Forms.assign_form_with_tracking(form)
         |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
         |> Helpers.mark_clean()
-        |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
         |> Helpers.set_editor_content(updated_post.content)
         |> Phoenix.LiveView.put_flash(flash_level, flash_msg)
 
@@ -1081,7 +1076,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   pending still reloads, which is what makes a reference tab follow along.
   """
   def reload_post(socket) do
-    if socket.assigns[:has_pending_changes] do
+    # A spectator's "pending" copy is the owner's own work mirrored here; the
+    # owner just saved it, so the spectator follows instead of being warned.
+    if socket.assigns[:has_pending_changes] && !socket.assigns[:readonly?] do
       Phoenix.LiveView.put_flash(
         socket,
         :warning,
@@ -1112,7 +1109,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         # This socket now matches the row again, so a later promotion should
         # take the saved copy rather than re-adopting what it mirrored before.
         |> Collaborative.clear_synced_from_owner()
-        |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
         |> Helpers.set_editor_content(updated_post.content)
         |> Phoenix.LiveView.put_flash(:info, gettext("Post updated by another user"))
 

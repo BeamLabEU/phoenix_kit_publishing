@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
   alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
@@ -71,7 +72,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
       |> Helpers.mark_clean()
       |> Phoenix.Component.assign(:form_key, new_form_key)
       |> Phoenix.Component.assign(:saved_status, form["status"])
-      |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
       |> Helpers.set_editor_content(version_post.content)
 
     # Return socket with cleanup info for the caller to handle collaborative editing
@@ -134,6 +134,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
         socket =
           socket
           |> Phoenix.Component.assign(:show_new_version_modal, false)
+          # Set before the attempt (see above); left true here it swallowed
+          # the next colleague's :post_version_created.
+          |> Phoenix.Component.assign(:just_created_version, false)
           |> Phoenix.LiveView.put_flash(
             :error,
             gettext("Couldn't create a new version.") <> " " <> Errors.message(reason)
@@ -223,17 +226,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
     # move (it is version-scoped), and the URL must stop claiming ?v=<gone>.
     form = Forms.post_form_with_primary_status(group_slug, fresh_post, surviving_version)
     new_form_key = PublishingPubSub.generate_form_key(group_slug, fresh_post, :edit)
+    # The deleted version's presence and topics go with it — handle_params
+    # sees the new key already assigned and would leave them registered.
+    old_form_key = socket.assigns[:form_key]
+    old_post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
 
     socket
     |> Phoenix.Component.assign(:post, %{fresh_post | group: group_slug})
     |> Phoenix.Component.assign(:form, form)
     |> Phoenix.Component.assign(:form_key, new_form_key)
+    |> Collaborative.cleanup_and_setup_collaborative_editing(old_form_key, new_form_key,
+      old_post_slug: old_post_slug
+    )
     |> Phoenix.Component.assign(:available_versions, updated_versions)
     |> Phoenix.Component.assign(:current_version, surviving_version)
     |> Phoenix.Component.assign(:saved_status, form["status"])
     |> Phoenix.Component.assign(:editing_published_version, Constants.published?(form["status"]))
     |> Helpers.mark_clean()
-    |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
     |> Helpers.set_editor_content(fresh_post.content)
     |> Phoenix.LiveView.push_patch(
       to:

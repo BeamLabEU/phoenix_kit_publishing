@@ -107,7 +107,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       %{post: post}
     end
 
-    test "body edits from the markdown editor reach the LiveView", %{
+    test "body edits from the Leaf editor reach the LiveView", %{
       conn: conn,
       group: group,
       post: post
@@ -656,14 +656,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(render_click(view, "select_ai_prompt", %{"prompt_uuid" => "fake-prompt"}))
     end
 
-    test "toolbar inserts route through the markdown editor component",
+    test "toolbar inserts route through the Leaf component",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =
         conn
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      # The MarkdownEditor toolbar sends these; there is no phx event for them.
+      # Leaf's toolbar sends these; there is no phx event for them.
       send(view.pid, {:leaf_insert_request, %{type: :video}})
       send(view.pid, {:leaf_insert_request, %{type: :image}})
       assert is_binary(render(view))
