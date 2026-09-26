@@ -233,9 +233,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   `mark_saved` follows `has_pending_changes` as it stands when this is
   called, so the two clean-state trackers (`mark_clean/1`) keep agreeing:
   a buffer adopted with pending work stays dirty, a reload reads clean.
+
+  The document is also asked straight back, through a flush with a
+  correlation ref. Leaf runs its commands in order, so the `{:leaf_flushed,
+  ref}` reply can only arrive once the surface holds `content`; anything
+  the surface says before it — Leaf flushes on blur, and the click that
+  switches language or version blurs the editor first — was typed into or
+  flushed out of the document just replaced. The editor drops those until
+  the ref is back (`awaiting_buffer_ref`), which is what stopped a switch
+  from autosaving the English body into the Russian row.
   """
   def set_editor_content(socket, content) do
     content = content || ""
+    ref = "buffer-#{System.unique_integer([:positive])}"
 
     Phoenix.LiveView.send_update(Leaf,
       id: "content-editor",
@@ -244,7 +254,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
       mark_saved: !socket.assigns[:has_pending_changes]
     )
 
-    Phoenix.Component.assign(socket, :content, content)
+    Phoenix.LiveView.send_update(Leaf, id: "content-editor", action: :flush, ref: ref)
+
+    socket
+    |> Phoenix.Component.assign(:content, content)
+    |> Phoenix.Component.assign(:awaiting_buffer_ref, ref)
   end
 
   @doc """

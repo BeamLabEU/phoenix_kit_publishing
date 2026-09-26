@@ -130,6 +130,74 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     assert_push_event(view, @leaf, %{action: "set_content", content: "Second version body."})
   end
 
+  test "a change flushed out of the previous language never lands in the new one", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
+
+    render_click(view, "switch_language", %{"language" => "de-DE"})
+    assert_patch(view)
+    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
+    assert_push_event(view, @leaf, %{action: "flush", ref: ref})
+
+    # Leaf flushes on blur, and the click that switched the language blurred
+    # the editor, so the English text arrives after the German post is loaded.
+    send(view.pid, {:leaf_changed, leaf_payload("English body.")})
+    refute render(view) =~ "Unsaved changes"
+
+    # The flush's own reply carries whatever the surface holds now.
+    send(view.pid, {:leaf_flushed, Map.put(leaf_payload("Deutscher Text."), :ref, ref)})
+    refute render(view) =~ "Unsaved changes"
+
+    assert buffer(view) == "Deutscher Text."
+
+    # From here on the surface speaks for the German document.
+    send(view.pid, {:leaf_changed, leaf_payload("Deutscher Text. Mehr.")})
+    assert render(view) =~ "Unsaved changes"
+    assert buffer(view) == "Deutscher Text. Mehr."
+  end
+
+  test "a flush answered for a document replaced since is ignored", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
+
+    render_click(view, "switch_language", %{"language" => "de-DE"})
+    assert_patch(view)
+    assert_push_event(view, @leaf, %{action: "flush", ref: german_ref})
+
+    render_click(view, "switch_language", %{"language" => "fr-FR"})
+    assert_patch(view)
+    assert_push_event(view, @leaf, %{action: "flush", ref: french_ref})
+    assert german_ref != french_ref
+
+    send(view.pid, {:leaf_flushed, Map.put(leaf_payload("Deutscher Text."), :ref, german_ref)})
+    send(view.pid, {:leaf_changed, leaf_payload("Deutscher Text.")})
+    refute render(view) =~ "Unsaved changes"
+
+    send(view.pid, {:leaf_flushed, Map.put(leaf_payload(""), :ref, french_ref)})
+    send(view.pid, {:leaf_changed, leaf_payload("Texte.")})
+    assert render(view) =~ "Unsaved changes"
+  end
+
+  test "a surface that mounts after a switch holds the current document", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
+
+    render_click(view, "switch_language", %{"language" => "de-DE"})
+    assert_patch(view)
+    assert_push_event(view, @leaf, %{action: "flush", ref: _ref})
+
+    # Leaf's script finished loading only now: the commands above never
+    # reached it, but it rendered the German document itself.
+    send(view.pid, {:leaf_ready, %{editor_id: "content-editor", markdown: "Deutscher Text."}})
+    send(view.pid, {:leaf_changed, leaf_payload("Deutscher Text. Mehr.")})
+    assert render(view) =~ "Unsaved changes"
+    assert buffer(view) == "Deutscher Text. Mehr."
+  end
+
+  # What the editor would save: the content assign behind autosave.
+  defp buffer(view), do: :sys.get_state(view.pid).socket.assigns.content
+
+  defp leaf_payload(markdown) do
+    %{editor_id: "content-editor", markdown: markdown, html: "", dirty: true}
+  end
+
   test "no editor source pushes the event that only core's old hook listened for" do
     for file <- ~w(editor.ex editor/persistence.ex editor/versions.ex editor/collaborative.ex) do
       source = File.read!("lib/phoenix_kit_publishing/web/#{file}")

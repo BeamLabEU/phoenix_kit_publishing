@@ -237,6 +237,12 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   new-post keys also carry `socket.id` (two admins composing separate drafts have
   nothing to collaborate on). Anything comparing form keys by string must handle
   every shape — `same_post_and_version?/2` in `web/editor.ex` is the reference.
+- **The editor's text is replaced only through
+  `Web.Editor.Helpers.set_editor_content/2`.** Leaf's surface is
+  `phx-update="ignore"`, so assigning `@content` changes nothing on screen;
+  the helper sends Leaf the document and asks it straight back with a flush
+  ref, and the editor ignores `leaf_changed` until that ref returns — Leaf
+  flushes on blur, so the old document's text arrives after a switch.
 - **Admin LiveView assigns available on every admin page:**
   `@phoenix_kit_current_scope`, `@current_locale`, `@url_path`.
 

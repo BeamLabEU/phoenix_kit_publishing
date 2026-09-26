@@ -196,6 +196,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:slug_truncated, false)
       |> assign(:live_source, live_source)
       |> assign(:form_key, nil)
+      |> assign(:awaiting_buffer_ref, nil)
       |> assign(:lock_owner?, true)
       |> assign(:readonly?, false)
       |> assign(:lock_owner_user, nil)
@@ -1598,43 +1599,42 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
      |> assign(:media_selector_target, "featured_image_uuid")}
   end
 
+  # A change from the document that was just replaced — see
+  # `Helpers.set_editor_content/2`. Leaf flushes on blur, and the click that
+  # switches language or version blurs the editor first, so the old text
+  # reached this mailbox AFTER handle_params had loaded the new one; applied,
+  # it read as an edit of the new document, and autosave then wrote the
+  # English body into the Russian row. Until the flush ref comes back,
+  # nothing the surface says is about the document the editor now holds.
+  def handle_info({:leaf_changed, _}, %{assigns: %{awaiting_buffer_ref: ref}} = socket)
+      when is_binary(ref),
+      do: {:noreply, socket}
+
   def handle_info({:leaf_changed, %{markdown: content}}, socket) do
-    # Ignore local editor changes for read-only spectators: their content arrives
-    # via remote sync, and marking pending / scheduling autosave here is a write
-    # path that would let a spectator's stale buffer overwrite the lock owner.
-    #
-    # Typing body text is EDITING, so this has to do the same lock work
-    # `update_meta` does. It previously did none of it, which meant a writer
-    # working only in the body never refreshed `last_activity_at`: the lock
-    # lapsed under them mid-sentence, `readonly?` flipped, and from then on
-    # every keystroke was dropped here while "Save" persisted the stale
-    # pre-lapse buffer. The lapsed banner even says "Start typing … to resume
-    # editing" — the reclaim it promises lives in `maybe_reclaim_lock/1`.
-    socket = maybe_reclaim_lock(socket)
-
-    if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
-      {:noreply, socket}
-    else
-      has_changes = Forms.dirty?(socket.assigns.post, socket.assigns.form, content)
-
-      socket =
-        socket
-        |> assign(:content, content)
-        |> assign(:has_pending_changes, has_changes)
-        |> push_event("changes-status", %{has_changes: has_changes})
-
-      socket = if has_changes, do: schedule_autosave(socket), else: socket
-
-      Collaborative.broadcast_form_change(socket, :content, %{
-        content: content,
-        form: socket.assigns.form
-      })
-
-      socket = Collaborative.touch_activity(socket)
-
-      {:noreply, socket}
-    end
+    apply_leaf_change(socket, content)
   end
+
+  # The flush that `set_editor_content/2` asked for: the surface now holds the
+  # new document, and this carries it back, keystrokes typed in the window
+  # included. From here on `leaf_changed` speaks for the current document.
+  def handle_info(
+        {:leaf_flushed, %{ref: ref, markdown: content}},
+        %{assigns: %{awaiting_buffer_ref: ref}} = socket
+      ) do
+    socket
+    |> assign(:awaiting_buffer_ref, nil)
+    |> apply_leaf_change(content)
+  end
+
+  # A flush answered for a document that has since been replaced again.
+  def handle_info({:leaf_flushed, _}, socket), do: {:noreply, socket}
+
+  # A surface that has just mounted rendered `@content` itself, so it holds
+  # the current document whatever was in flight: commands pushed before the
+  # hook existed (a switch made while Leaf's script was still loading, a
+  # reconnect) never reached it, and their ack would never come.
+  def handle_info({:leaf_ready, _}, socket),
+    do: {:noreply, assign(socket, :awaiting_buffer_ref, nil)}
 
   def handle_info({:leaf_insert_request, %{type: :image}}, socket)
       when socket.assigns.readonly? == true,
@@ -2149,6 +2149,45 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     require Logger
     Logger.debug("[Publishing.Editor] unhandled handle_info: #{inspect(msg)}")
     {:noreply, socket}
+  end
+
+  # The body of a `leaf_changed`, shared with the flush that ends a switch.
+  defp apply_leaf_change(socket, content) do
+    # Ignore local editor changes for read-only spectators: their content arrives
+    # via remote sync, and marking pending / scheduling autosave here is a write
+    # path that would let a spectator's stale buffer overwrite the lock owner.
+    #
+    # Typing body text is EDITING, so this has to do the same lock work
+    # `update_meta` does. It previously did none of it, which meant a writer
+    # working only in the body never refreshed `last_activity_at`: the lock
+    # lapsed under them mid-sentence, `readonly?` flipped, and from then on
+    # every keystroke was dropped here while "Save" persisted the stale
+    # pre-lapse buffer. The lapsed banner even says "Start typing … to resume
+    # editing" — the reclaim it promises lives in `maybe_reclaim_lock/1`.
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns[:readonly?] or socket.assigns[:translation_locked?] do
+      {:noreply, socket}
+    else
+      has_changes = Forms.dirty?(socket.assigns.post, socket.assigns.form, content)
+
+      socket =
+        socket
+        |> assign(:content, content)
+        |> assign(:has_pending_changes, has_changes)
+        |> push_event("changes-status", %{has_changes: has_changes})
+
+      socket = if has_changes, do: schedule_autosave(socket), else: socket
+
+      Collaborative.broadcast_form_change(socket, :content, %{
+        content: content,
+        form: socket.assigns.form
+      })
+
+      socket = Collaborative.touch_activity(socket)
+
+      {:noreply, socket}
+    end
   end
 
   # ============================================================================
