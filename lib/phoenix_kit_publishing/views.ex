@@ -15,7 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   - under `publishing_unique_views` (default on) the visitor hasn't opened
     this post today: a session carrying the dedup marker IS the visitor, a
     cookieless request (a curl loop, a fresh session) is a hash of its
-    address — the first `x-forwarded-for` hop when present — held for the
+    address — the last `x-forwarded-for` hop when present — held for the
     day in `Views.VisitorTable`. The raw address is never stored. With the
     setting off every page open counts, for a site that wants to see how
     often a page was opened at all.

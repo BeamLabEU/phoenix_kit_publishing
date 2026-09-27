@@ -1289,18 +1289,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   def handle_event("create_version_from_source", _params, socket) do
-    # Creating a version reads PERSISTED state and navigates away, so pending
-    # edits would be both excluded from the new version and lost.
-    case flush_before_switch(socket) do
-      {:blocked, socket} ->
-        {:noreply, socket}
-
-      {:ok, socket} ->
-        case Versions.create_version_from_source(socket) do
-          {:ok, socket} -> {:noreply, socket}
-          {:error, socket} -> {:noreply, socket}
-        end
-    end
+    after_flush(socket, &create_version_after_flush/1)
   end
 
   # ============================================================================
@@ -2718,6 +2707,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     case flush_before_switch(socket) do
       {:blocked, socket} -> {:noreply, socket}
       {:ok, socket} -> do_switch_version(socket, version)
+    end
+  end
+
+  defp create_version_after_flush(%{assigns: %{readonly?: true}} = socket),
+    do: {:noreply, socket}
+
+  defp create_version_after_flush(socket) do
+    # Copy only after Leaf's buffer has arrived and the source row is saved.
+    case flush_before_switch(socket) do
+      {:blocked, socket} ->
+        {:noreply, socket}
+
+      {:ok, socket} ->
+        {_result, socket} = Versions.create_version_from_source(socket)
+        {:noreply, socket}
     end
   end
 

@@ -189,6 +189,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
   end
 
+  test "creating a version saves and copies the last client keystrokes", ctx do
+    {:ok, view, _} = open_editor(ctx.slug, ctx.uuid, user_uuid: with_real_user())
+    render_click(view, "open_new_version_modal", %{})
+    render_click(view, "set_new_version_source", %{"source" => "1"})
+    render_click(view, "create_version_from_source", %{})
+
+    assert {:ok, original} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
+    assert original.content == "English body."
+    assert original.available_versions == [1]
+
+    answer_flush(view, "Last keystrokes before copying.", dirty: true)
+    assert_redirect(view)
+
+    assert {:ok, original} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
+    assert {:ok, copy} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 2)
+    assert original.content == "Last keystrokes before copying."
+    assert copy.content == original.content
+  end
+
   test "a surface that never answers the flush is told, then the click is given up", ctx do
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
 

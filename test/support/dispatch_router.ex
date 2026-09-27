@@ -24,6 +24,11 @@ defmodule PhoenixKitPublishing.Test.DispatchRouter do
   import Phoenix.LiveView.Router
   import PhoenixKitWeb.Integration
 
+  # Core detects this optional dependency with ensure_loaded?/1. In this
+  # package's own cold build it is a sibling compile job, not a precompiled
+  # dependency, so wait for it before expanding the routing macro.
+  require PhoenixKitPublishing.RouterDispatch
+
   pipeline :browser do
     plug(:accepts, ["html"])
     plug(:fetch_session)

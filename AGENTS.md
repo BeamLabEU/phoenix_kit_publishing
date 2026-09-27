@@ -255,9 +255,10 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   document and asks it straight back with a flush ref, and the editor
   ignores `leaf_changed` until that ref returns — Leaf flushes on blur, so
   the old document's text arrives after a switch. A language or version
-  switch, Preview and the translation buttons go through `after_flush/2`
+  switch, Create Version, Preview and the translation buttons go through `after_flush/2`
   in `Web.Editor`: Leaf keeps up to a debounce of keystrokes, and the
-  action runs once its reply is back (1.5 s fallback). Leaf's `dirty` flag
+  action runs once its reply is back (a waiting indicator after 1.5 s;
+  the action is cancelled after 6 s without a reply). Leaf's `dirty` flag
   decides whether a flush reply is an edit: in hybrid mode the reply is the
   surface re-serialised, which differs from an untouched row. Every event
   pushed with `push_event/3` must have a listener on the page —
@@ -783,30 +784,11 @@ newest-created release as Latest and demotes the current one.
   old hook's beforeunload guard covered the form too. Closing it means a
   guard fed by `has_pending_changes`, which is this module's first JS
   (`js_sources/0`), or a core hook.
-- **The browsable-version path still 301s a missing translation.**
-  `Web.Controller.PostRendering.respond_with_browsable_version/…` keeps the
-  permanent redirect that `render_published_post/4` no longer issues;
-  `language_sweep_test.exs` pins it, so changing it is a decision, not a fix.
 - **Core still carries a "publishing pushes changes-status" back-compat
   listener** inside its MarkdownEditor hook (`phoenix_kit.js`); nothing
   produces that event any more. A core follow-up.
-- **Two canonical 301s never fire for a segment owner's full-code URL.**
-  With `en-US` owning `/en/` and `en-GB` enabled, `/en-US/blog/post` serves
-  200 instead of redirecting to `/en/blog/post`, because
-  `canonical_redirect?/3` only compares URLs when the language changed;
-  `/de-DE/blog/feed.xml` serves the feed instead of redirecting to
-  `/de/blog/feed.xml` for the same reason (`Web.Controller.feed/2` checks
-  only the prefixed-default case). Both need a loop test before the fix.
-- **A switch whose flush reply is later than 1.5 s acts without it.**
-  `after_flush/2` falls back to what the server holds; the late reply is
-  then dropped as the old document's. A background tab's throttled timers
-  are the realistic case, where nobody is typing. Raising the fallback or
-  blocking the switch behind a "syncing…" state is the alternative.
 - **Drop the deprecated `get_group/1` delegate** (`Groups` and the facade)
   once `phoenix_kit_legal` calls `fetch_group/1`; its tests go with it.
-- **The public view counter has no per-IP cap** (`Views.record_async/1`):
-  cookieless requests dedupe only by user agent, so a loop of curl requests
-  inflates a count and costs a pool checkout each.
 - **Translation button immediate-disable** in the editor. `phx-disable-with`
   covers most cases; the gap is a double-enqueue on slow networks before the
   server's `ai_translation_status` assign returns. Closing it means this module's

@@ -38,7 +38,7 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
 
   @spec first_view_today?(String.t(), binary(), String.t()) :: boolean()
   def first_view_today?(post_uuid, visitor_hash, day \\ today()) do
-    :ets.info(@table, :size) < @max_rows and
+    :ets.info(@table, :size) >= @max_rows or
       :ets.insert_new(@table, {{day, post_uuid, visitor_hash}, true})
   rescue
     ArgumentError -> true
