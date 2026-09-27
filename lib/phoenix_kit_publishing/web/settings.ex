@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @render_og_tags_key "publishing_render_og_tags"
   @feeds_enabled_key "publishing_feeds_enabled"
   @render_jsonld_key "publishing_render_jsonld"
+  @unique_views_key "publishing_unique_views"
   @slug_style_key "publishing_slug_style"
   @valid_slug_styles ~w(transliterate unicode ascii)
 
@@ -79,6 +80,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       )
       |> assign(:feeds_enabled, Settings.get_boolean_setting(@feeds_enabled_key, true))
       |> assign(:render_jsonld, Settings.get_boolean_setting(@render_jsonld_key, true))
+      |> assign(:unique_views, Settings.get_boolean_setting(@unique_views_key, true))
       |> assign(:slug_style, Settings.get_setting(@slug_style_key, "transliterate"))
       |> assign_numbers()
       |> assign(
@@ -236,6 +238,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
        if(new_value,
          do: gettext("JSON-LD structured data enabled on post pages"),
          else: gettext("JSON-LD structured data disabled")
+       )
+     )}
+  end
+
+  def handle_event("toggle_unique_views", _params, socket) do
+    new_value = !socket.assigns.unique_views
+    Settings.update_boolean_setting(@unique_views_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:unique_views, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do: gettext("Unique views enabled — one view per visitor per post per day"),
+         else: gettext("Unique views disabled — every page open counts")
        )
      )}
   end
@@ -628,6 +646,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               class="toggle toggle-primary"
               checked={@render_jsonld}
               phx-click="toggle_render_jsonld"
+            />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-eye" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("Unique Views")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "On: count each visitor once per post per day (by session, else a hashed address). Off: count every time the page is opened."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@unique_views}
+              phx-click="toggle_unique_views"
             />
           </div>
 

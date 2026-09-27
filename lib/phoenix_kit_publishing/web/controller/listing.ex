@@ -43,7 +43,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
         canonical_url =
           PublishingHTML.group_listing_path(canonical_language, group_slug, pagination_params)
 
-        if canonical_redirect?(conn, language, canonical_language, canonical_url) do
+        if Language.canonical_redirect?(conn, language, canonical_language, canonical_url) do
           {:redirect_301, canonical_url}
         else
           page = get_page_param(params)
@@ -162,12 +162,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     end
   end
 
-  defp canonical_redirect?(conn, language, canonical_language, canonical_url) do
-    (canonical_language != language or
-       Language.prefixed_default_language_request?(conn, canonical_language)) and
-      not Language.request_matches_canonical_url?(conn, canonical_url)
-  end
-
   # ============================================================================
   # Group Index Rendering
   # ============================================================================
@@ -282,7 +276,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     canonical_language = Language.get_canonical_url_language(language)
     canonical_url = PublishingHTML.group_listing_path(canonical_language, group_slug)
 
-    if canonical_redirect?(conn, language, canonical_language, canonical_url) do
+    if Language.canonical_redirect?(conn, language, canonical_language, canonical_url) do
       {:redirect_301, canonical_url}
     else
       do_render_search(group, group_slug, language, query)
@@ -456,7 +450,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
         canonical_language = Language.get_canonical_url_language(language)
         canonical_url = PublishingHTML.term_archive_path(canonical_language, group_slug, term)
 
-        if canonical_redirect?(conn, language, canonical_language, canonical_url) do
+        if Language.canonical_redirect?(conn, language, canonical_language, canonical_url) do
           {:redirect_301, canonical_url}
         else
           do_render_term_archive(group, group_slug, canonical_language, term)

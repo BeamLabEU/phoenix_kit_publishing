@@ -85,17 +85,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     end
   end
 
-  # Same canonical-language check the live path runs: without it,
+  # The same two checks the live path runs, in the same order. Without them
   # /de/.../v/1 for a version with no German content silently served the
-  # fallback language's body at 200 under the German URL.
+  # fallback language's body at 200 under the German URL; with only the
+  # canonical check it issued a cacheable 301 for what is a CONTENT state —
+  # Fallback answers :post_not_found with the 302 + "closest match" flash
+  # onto the same version in a language that has it.
   defp respond_with_browsable_version(conn, group_slug, post, version, language) do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
     canonical_url = build_version_url(group_slug, post, canonical_language, version)
 
-    if canonical_redirect?(conn, language, canonical_language, canonical_url) do
-      {:redirect_301, canonical_url}
-    else
-      build_versioned_post_response(group_slug, post, version)
+    cond do
+      served_by_fallback_language?(post, language) ->
+        log_404(conn, group_slug, {:slug, post[:slug], version}, language, :post_not_found)
+        {:error, :post_not_found}
+
+      Language.canonical_redirect?(conn, language, canonical_language, canonical_url) ->
+        {:redirect_301, canonical_url}
+
+      true ->
+        build_versioned_post_response(group_slug, post, version)
     end
   end
 
@@ -124,7 +133,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
         log_404(conn, group_slug, post[:slug], language, :post_not_found)
         {:error, :post_not_found}
 
-      canonical_redirect?(conn, language, canonical_language, canonical_url) ->
+      Language.canonical_redirect?(conn, language, canonical_language, canonical_url) ->
         {:redirect_301, canonical_url}
 
       true ->
@@ -132,11 +141,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     end
   end
 
+  @doc false
   # The requested language names the served row when the codes match, or
   # when a base-code request ("en") matches the row's base ("en-US") — that
   # shape belongs to the display-code canonicalisation, not the fallback.
-  defp served_by_fallback_language?(%{language: served}, requested)
-       when is_binary(served) and is_binary(requested) do
+  # Public for Fallback, which must pick a version that serves in ITS
+  # language (a fallback-resolved read would 302 straight back).
+  def served_by_fallback_language?(%{language: served}, requested)
+      when is_binary(served) and is_binary(requested) do
     served_down = String.downcase(served)
     requested_down = String.downcase(requested)
 
@@ -145,7 +157,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
              String.downcase(LanguageHelpers.url_language_code(served)) == requested_down)
   end
 
-  defp served_by_fallback_language?(_post, _requested), do: false
+  def served_by_fallback_language?(_post, _requested), do: false
 
   defp build_post_page(group_slug, post, canonical_language) do
     group = fetch_group(group_slug)
@@ -226,7 +238,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   # history behind), and the requested version must be at or before it. A
   # genuinely superseded version is always older than the one that replaced
   # it; a draft waiting to go out is always newer.
-  defp publicly_browsable_version?(group_slug, post, version) do
+  @doc false
+  def publicly_browsable_version?(group_slug, post, version) do
     {_allow_access, live_version} = get_cached_version_info(group_slug, post)
 
     is_integer(live_version) and is_integer(version) and version <= live_version and
@@ -545,11 +558,5 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
       user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
       path: conn.request_path
     )
-  end
-
-  defp canonical_redirect?(conn, language, canonical_language, canonical_url) do
-    (canonical_language != language or
-       Language.prefixed_default_language_request?(conn, canonical_language)) and
-      not Language.request_matches_canonical_url?(conn, canonical_url)
   end
 end

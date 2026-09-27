@@ -659,6 +659,9 @@ defmodule PhoenixKit.Modules.Publishing do
       # group — without it, multi-node deploys served stale listings on peer
       # nodes after a rename/trash/delete until an unrelated local mutation.
       PhoenixKit.Modules.Publishing.ListingCache.CacheSync,
+      # Owns the per-day visitor table behind publishing_unique_views, swept
+      # once a day; without it the counter counts every open.
+      PhoenixKit.Modules.Publishing.Views.VisitorTable,
       # Per-post render cache (Renderer.render_post_cached/1). Without this the
       # cache GenServer never starts, so every published view re-renders markdown
       # and logs a per-request warning. max_size bounds growth — the cache key
@@ -723,13 +726,18 @@ defmodule PhoenixKit.Modules.Publishing do
 
   @doc """
   Returns true when the slug matches the allowed lowercase letters, numbers, and hyphen pattern,
-  and is not a reserved language code.
+  and is neither a reserved language code nor a reserved route word.
 
-  Group slugs cannot be language codes (like 'en', 'es', 'fr') to prevent routing ambiguity.
+  Group slugs cannot be language codes (like 'en', 'es', 'fr') to prevent routing ambiguity,
+  and cannot be route words the host serves itself (`admin`, `api`, `assets`, …, see
+  `SlugHelpers.reserved_route_word?/1`): a group slugged `admin` is shadowed by the host's
+  own routes and never reachable. `Groups.add_group/2` suffixes a derived slug past a
+  reserved word (`Admin` → `admin-2`) and refuses an explicit one (`{:error, :invalid_slug}`).
   """
   @spec valid_slug?(any()) :: boolean()
   def valid_slug?(slug) when is_binary(slug) do
-    slug != "" and SlugHelpers.matches_shape?(slug) and not reserved_language_code?(slug)
+    slug != "" and SlugHelpers.matches_shape?(slug) and
+      not SlugHelpers.reserved_route_word?(slug) and not reserved_language_code?(slug)
   end
 
   def valid_slug?(_), do: false

@@ -10,10 +10,15 @@ defmodule PhoenixKit.Modules.Publishing.Views do
 
   - the visitor's User-Agent doesn't look like a bot/CLI (`bot_ua?/1`), and
   - the visitor's session hasn't already viewed this post today — dedup
-    rides the Phoenix session cookie (`mark_viewed/2`), so there is **no
-    server-side visitor state and no reader PII**: the DB only ever stores
-    accepted counts. A cookieless client (most bots) still passes the
-    session check every time, which is why the UA filter runs first.
+    rides the Phoenix session cookie (`mark_viewed/2`); the DB only ever
+    stores accepted counts, never a reader, and
+  - under `publishing_unique_views` (default on) the visitor hasn't opened
+    this post today: a session carrying the dedup marker IS the visitor, a
+    cookieless request (a curl loop, a fresh session) is a hash of its
+    address — the first `x-forwarded-for` hop when present — held for the
+    day in `Views.VisitorTable`. The raw address is never stored. With the
+    setting off every page open counts, for a site that wants to see how
+    often a page was opened at all.
 
   Recording is fire-and-forget (`Task.Supervisor` under core's
   `PhoenixKit.TaskSupervisor`) — a slow or failing insert never delays or
@@ -26,8 +31,11 @@ defmodule PhoenixKit.Modules.Publishing.Views do
 
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PublishingPost
+  alias PhoenixKit.Modules.Publishing.Views.VisitorTable
+  alias PhoenixKit.Settings
 
   @session_key "pk_publishing_viewed"
+  @unique_views_key "publishing_unique_views"
   # Session-map cap: one browser session rarely reads more than this many
   # distinct posts per day; beyond it we stop deduping (never grow the cookie
   # unboundedly).
@@ -52,6 +60,9 @@ defmodule PhoenixKit.Modules.Publishing.Views do
         conn
 
       viewed_or_capped?(conn, post_uuid) ->
+        conn
+
+      repeat_visitor?(conn, post_uuid) ->
         conn
 
       true ->
@@ -103,6 +114,34 @@ defmodule PhoenixKit.Modules.Publishing.Views do
     error ->
       Logger.warning("[Publishing.Views] record_view failed: #{Exception.message(error)}")
       :error
+  end
+
+  @doc "The `publishing_unique_views` setting: one view per visitor per post per day."
+  def unique_views?, do: Settings.get_boolean_setting(@unique_views_key, true)
+
+  # Unique views on, and this visitor already opened the post today. A
+  # session that carries the marker was answered by viewed_or_capped?/2 —
+  # it is the visitor, and it has not seen this post today. Everything else
+  # is identified by its hashed address for the day.
+  defp repeat_visitor?(conn, post_uuid) do
+    unique_views?() and not session_marked?(conn) and
+      not VisitorTable.first_view_today?(post_uuid, visitor_hash(conn))
+  end
+
+  defp session_marked?(conn), do: is_map(Plug.Conn.get_session(conn, @session_key))
+
+  # Never the address itself: a truncated SHA-256 of the first forwarded hop
+  # (the client behind a proxy) or, without one, of the socket address.
+  defp visitor_hash(conn) do
+    address =
+      case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
+        [forwarded | _] -> forwarded |> String.split(",", parts: 2) |> hd() |> String.trim()
+        [] -> ""
+      end
+
+    address = if address == "", do: inspect(conn.remote_ip), else: address
+
+    :crypto.hash(:sha256, address) |> binary_part(0, 16)
   end
 
   @doc "True when the User-Agent looks like a bot/CLI (or is absent)."

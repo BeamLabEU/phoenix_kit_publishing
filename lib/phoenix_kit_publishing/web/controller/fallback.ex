@@ -22,6 +22,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   - `:not_found` (post trashed/deleted) → group listing
   - `:post_not_found | :unpublished | :version_access_disabled` on a slug
     path → other languages → group listing
+  - same on a `/v/N` path → the same version in another language that
+    serves it → the slug chain above
   - same on a timestamp path → other languages → other times on the date →
     group listing
   - any other reason with a known group → group listing
@@ -33,6 +35,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
+  alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
+  alias PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
 
   # ============================================================================
@@ -94,6 +98,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   defp handle_fallback_case(reason, [group_slug, date, time], language)
        when reason in [:post_not_found, :unpublished, :version_access_disabled] do
     fallback_timestamp_to_other_language(group_slug, date, time, language)
+  end
+
+  # Version browsing (/<group>/<slug>/v/N): a version the requested language
+  # has no row for lands on the SAME version in a language that serves it —
+  # the reader asked for history, not the live post. When no language can
+  # browse that version, the slug chain above takes over.
+  defp handle_fallback_case(reason, [group_slug, post_slug, "v", version_str], language)
+       when reason in [:post_not_found, :unpublished, :version_access_disabled] do
+    with true <- group_exists?(group_slug),
+         {version, ""} <- Integer.parse(version_str),
+         {:ok, url} <- find_version_in_other_language(group_slug, post_slug, version, language) do
+      {:ok, url}
+    else
+      false -> :no_fallback
+      _ -> fallback_to_default_language(group_slug, post_slug, language)
+    end
   end
 
   # Group itself doesn't exist — render 404. Don't redirect to "the first
@@ -158,6 +178,44 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
     end
   end
 
+  # Cap on how many languages to try in fallback chain to prevent excessive DB queries
+  @max_fallback_languages 5
+
+  # The same version in the default language first, then the post's other
+  # languages — accepted only when the read serves in that language and the
+  # version is publicly browsable there, so the target renders instead of
+  # bouncing back here.
+  defp find_version_in_other_language(group_slug, post_slug, version, requested_language) do
+    default_lang = Language.get_default_language()
+
+    internal_slug =
+      SlugResolution.resolve_url_slug_to_internal(group_slug, post_slug, requested_language)
+
+    case find_post_by_slug(group_slug, internal_slug) do
+      {:ok, post} ->
+        ([default_lang | post.available_languages] -- [requested_language])
+        |> Enum.uniq()
+        |> Enum.take(@max_fallback_languages)
+        |> Enum.find_value(
+          :not_found,
+          &browsable_version_url(group_slug, internal_slug, version, &1)
+        )
+
+      :not_found ->
+        :not_found
+    end
+  end
+
+  defp browsable_version_url(group_slug, internal_slug, version, language) do
+    with {:ok, post} <- Publishing.read_post(group_slug, internal_slug, language, version),
+         false <- PostRendering.served_by_fallback_language?(post, language),
+         true <- PostRendering.publicly_browsable_version?(group_slug, post, version) do
+      {:ok, PostRendering.build_version_url(group_slug, post, language, version)}
+    else
+      _ -> nil
+    end
+  end
+
   # Finds the latest published version for a specific language
   defp find_published_version_for_language(group_slug, post_slug, language) do
     versions = Publishing.list_versions(group_slug, post_slug)
@@ -178,9 +236,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   end
 
   # Tries other languages when requested language has no published versions
-  # Cap on how many languages to try in fallback chain to prevent excessive DB queries
-  @max_fallback_languages 5
-
   defp try_other_languages(group_slug, post_slug, post, requested_language, default_lang) do
     available = post.available_languages
 

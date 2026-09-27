@@ -50,7 +50,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ViewsTest do
     assert drain(post.uuid) == 0
   end
 
-  test "counts a browser view once per session-day; second session counts again", %{
+  test "counts a browser view once per session-day; another visitor counts again", %{
     conn: conn,
     slug: slug,
     post: post
@@ -65,9 +65,77 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ViewsTest do
     first |> recycle() |> browse("/#{slug}/counted") |> html_response(200)
     assert drain(post.uuid) == 1
 
-    # A fresh session counts again.
-    Phoenix.ConnTest.build_conn() |> browse("/#{slug}/counted") |> html_response(200)
+    # A fresh session from ANOTHER address counts again (same-address
+    # cookieless repeats are the unique-views case below).
+    from_ip({10, 0, 0, 2}) |> browse("/#{slug}/counted") |> html_response(200)
     assert drain(post.uuid) == 2
+  end
+
+  describe "publishing_unique_views" do
+    setup %{slug: slug} do
+      {:ok, _} = Groups.update_group(slug, %{"views_enabled" => "true"})
+
+      on_exit(fn ->
+        {:ok, _} = Settings.update_boolean_setting("publishing_unique_views", true)
+      end)
+
+      :ok
+    end
+
+    test "on (the default): a cookieless address counts once per post per day", %{
+      slug: slug,
+      post: post
+    } do
+      assert Settings.get_boolean_setting("publishing_unique_views", true)
+
+      from_ip({10, 1, 1, 1}) |> browse("/#{slug}/counted") |> html_response(200)
+      from_ip({10, 1, 1, 1}) |> browse("/#{slug}/counted") |> html_response(200)
+      assert drain(post.uuid) == 1
+
+      # A different post is a different visit.
+      {:ok, other} = Posts.create_post(slug, %{title: "Other", slug: "other", content: "x"})
+      :ok = Versions.publish_version(slug, other.uuid, 1)
+      from_ip({10, 1, 1, 1}) |> browse("/#{slug}/other") |> html_response(200)
+      assert drain(other.uuid) == 1
+    end
+
+    test "off: every page open counts", %{slug: slug, post: post} do
+      {:ok, _} = Settings.update_boolean_setting("publishing_unique_views", false)
+
+      from_ip({10, 1, 1, 2}) |> browse("/#{slug}/counted") |> html_response(200)
+      from_ip({10, 1, 1, 2}) |> browse("/#{slug}/counted") |> html_response(200)
+      assert drain(post.uuid) == 2
+    end
+
+    test "the first x-forwarded-for address is the visitor behind a proxy", %{
+      slug: slug,
+      post: post
+    } do
+      # Same socket address, two forwarded clients: two visitors.
+      forwarded("203.0.113.5, 10.0.0.1") |> browse("/#{slug}/counted") |> html_response(200)
+      forwarded("203.0.113.5, 10.0.0.9") |> browse("/#{slug}/counted") |> html_response(200)
+      assert drain(post.uuid) == 1
+
+      forwarded("203.0.113.6, 10.0.0.1") |> browse("/#{slug}/counted") |> html_response(200)
+      assert drain(post.uuid) == 2
+    end
+
+    test "the visitor table never holds a raw address", %{slug: slug} do
+      from_ip({192, 0, 2, 77}) |> browse("/#{slug}/counted") |> html_response(200)
+      forwarded("198.51.100.42, 10.0.0.1") |> browse("/#{slug}/counted") |> html_response(200)
+
+      dump = inspect(Views.VisitorTable.entries(), limit: :infinity)
+      assert dump =~ "counted" or dump != "[]"
+      refute dump =~ "192.0.2.77"
+      refute dump =~ "198.51.100.42"
+      refute dump =~ "{192, 0, 2, 77}"
+    end
+  end
+
+  defp from_ip(ip), do: %{Phoenix.ConnTest.build_conn() | remote_ip: ip}
+
+  defp forwarded(header) do
+    Phoenix.ConnTest.build_conn() |> put_req_header("x-forwarded-for", header)
   end
 
   test "bots never count", %{conn: conn, slug: slug, post: post} do

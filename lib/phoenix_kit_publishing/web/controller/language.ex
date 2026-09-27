@@ -265,6 +265,46 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   defp decode_query(_), do: %{}
 
   @doc """
+  Whether a request must 301 onto `canonical_url` — the one rule for post,
+  listing, term-archive and feed URLs.
+
+  Three shapes are non-canonical: the language resolved to another code
+  (`/en-US/…` when one English dialect is enabled and the display code is
+  `en`), the prefix is redundant for a prefixless default, or the URL's
+  language SEGMENT is not the display segment while the language itself is
+  already canonical (`/en-US/…` when `en-US` owns `/en/` beside `en-GB`).
+  None of them redirects when the request already IS the canonical URL
+  (`request_matches_canonical_url?/2`), which is what keeps `?utm=` requests
+  and the canonical URLs themselves from looping.
+  """
+  def canonical_redirect?(conn, language, canonical_language, canonical_url) do
+    (canonical_language != language or
+       prefixed_default_language_request?(conn, canonical_language) or
+       non_canonical_language_segment?(conn, language, canonical_language)) and
+      not request_matches_canonical_url?(conn, canonical_url)
+  end
+
+  # The URL's language segment, only when it IS one: after a language→group
+  # shift `conn.params["language"]` still holds the group slug, so the
+  # segment counts only when it names the language the request resolved to.
+  # Case-insensitive on both sides — `/en-GB/…` is the sibling's own URL.
+  defp non_canonical_language_segment?(conn, language, canonical_language)
+       when is_binary(language) and is_binary(canonical_language) do
+    case conn.params["language"] do
+      segment when is_binary(segment) ->
+        down = String.downcase(segment)
+
+        down == String.downcase(language) and
+          down != String.downcase(LanguageHelpers.public_url_segment(canonical_language))
+
+      _ ->
+        false
+    end
+  end
+
+  defp non_canonical_language_segment?(_conn, _language, _canonical_language), do: false
+
+  @doc """
   Returns true when the request is using an explicit prefix for the default language
   even though the default language should be prefixless.
   """

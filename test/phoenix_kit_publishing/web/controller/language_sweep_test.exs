@@ -310,10 +310,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSweepTest do
     end
   end
 
-  describe "versioned URLs honor the canonical-language redirect" do
-    test "a wrong-language /v/N URL 301s instead of crashing or serving the fallback", %{
-      conn: conn
-    } do
+  describe "versioned URLs use the smart fallback for a missing translation" do
+    test "a /v/N URL for a language the version lacks 302s to the served language with the flash",
+         %{conn: conn} do
       enable_languages(["en-US", "de-DE"], "en-US")
       {:ok, group} = Groups.add_group(unique_name("vlang"), mode: "slug")
       slug = group["slug"]
@@ -327,11 +326,43 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSweepTest do
 
       conn = get(conn, "/de/#{slug}/versioned/v/1")
 
-      # No German content: the versioned view must canonical-redirect to the
-      # content's language, never 500 (missing consumer clause) and never
-      # serve the English body at 200 under the German URL.
+      # No German content: a translation the version does not have is a
+      # CONTENT state — the same 302 + "closest match" the live post path
+      # sends, landing on that version in the served language. Never a
+      # cacheable 301 (it kept bouncing readers after the translation was
+      # added), never 500, never the English body at 200 under /de/.
+      assert conn.status == 302
+      assert redirected_to(conn) == "/en/#{slug}/versioned/v/1"
+
+      expected =
+        Gettext.with_locale(PhoenixKitPublishing.Gettext, "de", fn ->
+          Gettext.gettext(
+            PhoenixKitPublishing.Gettext,
+            "The page you requested was not found. Showing closest match."
+          )
+        end)
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) == expected
+      assert build_conn() |> get("/en/#{slug}/versioned/v/1") |> html_response(200) =~ "Body."
+    end
+
+    test "the display-code canonicalisation of a /v/N URL stays a 301", %{conn: conn} do
+      enable_languages(["en-US", "de-DE"], "en-US")
+      {:ok, group} = Groups.add_group(unique_name("vcanon"), mode: "slug")
+      slug = group["slug"]
+
+      {:ok, post} =
+        Posts.create_post(slug, %{title: "Versioned", slug: "versioned", content: "Body."})
+
+      {:ok, read} = Posts.read_post_by_uuid(post.uuid, "en-US", 1)
+      {:ok, _} = Posts.update_post(slug, read, %{"allow_version_access" => "true"}, %{})
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+
+      # The requested language IS served; only its URL form is non-canonical.
+      conn = get(conn, "/en-US/#{slug}/versioned/v/1")
+
       assert conn.status == 301
-      assert redirected_to(conn, 301) =~ "/en/#{slug}/versioned"
+      assert redirected_to(conn, 301) == "/en/#{slug}/versioned/v/1"
     end
   end
 
