@@ -325,6 +325,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # Source of truth for the settings keys `merge_group_config/2` persists —
   # exposed (undocumented) so the GroupSettings spec test can assert parity
   # against the real write path instead of a hardcoded list.
+  @spec config_setting_keys() :: [String.t()]
   def config_setting_keys do
     @bool_setting_keys ++ Enum.map(@enum_settings, &elem(&1, 0))
   end

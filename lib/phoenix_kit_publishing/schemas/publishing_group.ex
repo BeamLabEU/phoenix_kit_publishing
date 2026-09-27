@@ -105,12 +105,14 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
 
   @type t :: %__MODULE__{
           uuid: UUIDv7.t() | nil,
-          name: String.t(),
-          slug: String.t(),
+          name: String.t() | nil,
+          slug: String.t() | nil,
           mode: String.t(),
           status: String.t(),
           position: integer(),
           data: map(),
+          title_i18n: map(),
+          description_i18n: map(),
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -133,6 +135,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc """
   Changeset for creating or updating a publishing group.
   """
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(group, attrs) do
     group
     |> cast(attrs, [:name, :slug, :mode, :status, :position, :data])
@@ -166,68 +169,87 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   # Data JSONB accessors
 
   @doc "Returns the group type from data (blog/faq/legal/custom)."
+  @spec get_type(t()) :: String.t()
   def get_type(%__MODULE__{data: data}), do: Map.get(data, "type", "blog")
 
   @doc "Returns the singular item name (e.g., 'Post')."
+  @spec get_item_singular(t()) :: String.t()
   def get_item_singular(%__MODULE__{data: data}), do: Map.get(data, "item_singular", "Post")
 
   @doc "Returns the plural item name (e.g., 'Posts')."
+  @spec get_item_plural(t()) :: String.t()
   def get_item_plural(%__MODULE__{data: data}), do: Map.get(data, "item_plural", "Posts")
 
   @doc "Returns the group description."
+  @spec get_description(t()) :: String.t() | nil
   def get_description(%__MODULE__{data: data}), do: Map.get(data, "description")
 
   @doc "Returns the group icon name."
+  @spec get_icon(t()) :: String.t() | nil
   def get_icon(%__MODULE__{data: data}), do: Map.get(data, "icon")
 
   @doc "Returns whether comments are enabled for this group."
+  @spec comments_enabled?(t()) :: boolean()
   def comments_enabled?(%__MODULE__{data: data}), do: Map.get(data, "comments_enabled", false)
 
   @doc "Returns whether likes are enabled for this group."
+  @spec likes_enabled?(t()) :: boolean()
   def likes_enabled?(%__MODULE__{data: data}), do: Map.get(data, "likes_enabled", false)
 
   @doc "Returns whether view tracking is enabled for this group."
+  @spec views_enabled?(t()) :: boolean()
   def views_enabled?(%__MODULE__{data: data}), do: Map.get(data, "views_enabled", false)
 
   @doc "Returns whether featured posts are surfaced on this group's listing (default true)."
+  @spec featured_enabled?(t()) :: boolean()
   def featured_enabled?(%__MODULE__{data: data}), do: Map.get(data, "featured_enabled", true)
 
   @doc ~S|Returns the featured-post layout for this group ("hero" or "card"; default "hero").|
+  @spec featured_layout(t()) :: String.t()
   def featured_layout(%__MODULE__{data: data}),
     do: Map.get(data, "featured_layout", Publishing.Constants.default_featured_layout())
 
   @doc "Returns whether the latest post is surfaced in its own listing band (default false)."
+  @spec newest_enabled?(t()) :: boolean()
   def newest_enabled?(%__MODULE__{data: data}), do: Map.get(data, "newest_enabled", false)
 
   @doc ~S|Returns the latest-post layout for this group ("hero" or "card"; default "hero").|
+  @spec newest_layout(t()) :: String.t()
   def newest_layout(%__MODULE__{data: data}),
     do: Map.get(data, "newest_layout", Publishing.Constants.default_newest_layout())
 
   @doc ~S|Returns the featured-band style ("classic"/"cover"/"cover_panel"/"minimal"/"top"; default "classic").|
+  @spec featured_style(t()) :: String.t()
   def featured_style(%__MODULE__{data: data}),
     do: Map.get(data, "featured_style", Publishing.Constants.default_band_style())
 
   @doc ~S|Returns the Latest-band style (same vocabulary as featured_style; default "classic").|
+  @spec newest_style(t()) :: String.t()
   def newest_style(%__MODULE__{data: data}),
     do: Map.get(data, "newest_style", Publishing.Constants.default_band_style())
 
   @doc ~S|Returns the scrollbar style for this group's public pages ("default"/"branded"/"thin").|
+  @spec scrollbar_style(t()) :: String.t()
   def scrollbar_style(%__MODULE__{data: data}),
     do: Map.get(data, "scrollbar_style", Publishing.Constants.default_scrollbar_style())
 
   @doc "Returns whether the reading-progress bar shows on this group's post pages (default false)."
+  @spec scroll_progress_enabled?(t()) :: boolean()
   def scroll_progress_enabled?(%__MODULE__{data: data}),
     do: Map.get(data, "scroll_progress_enabled", false)
 
   @doc "Returns whether the heading-anchor rail shows on this group's post pages (default false)."
+  @spec scroll_headings_enabled?(t()) :: boolean()
   def scroll_headings_enabled?(%__MODULE__{data: data}),
     do: Map.get(data, "scroll_headings_enabled", false)
 
   @doc "Returns whether the date-timeline rail shows on this group's listing page (default false)."
+  @spec scroll_timeline_enabled?(t()) :: boolean()
   def scroll_timeline_enabled?(%__MODULE__{data: data}),
     do: Map.get(data, "scroll_timeline_enabled", false)
 
   @doc ~S|Returns the date-timeline granularity ("auto"/"year"/"month"/"day"; default "auto").|
+  @spec scroll_timeline_granularity(t()) :: String.t()
   def scroll_timeline_granularity(%__MODULE__{data: data}),
     do:
       Map.get(
@@ -237,66 +259,84 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
       )
 
   @doc ~S|Returns the public-listing sort order for this group ("newest"/"oldest"; default "newest").|
+  @spec listing_sort(t()) :: String.t()
   def listing_sort(%__MODULE__{data: data}),
     do: Map.get(data, "listing_sort", Publishing.Constants.default_listing_sort())
 
   @doc ~S|Returns the public-listing layout ("grid"/"list"/"minimal"; default "grid").|
+  @spec listing_layout(t()) :: String.t()
   def listing_layout(%__MODULE__{data: data}),
     do: Map.get(data, "listing_layout", Publishing.Constants.default_listing_layout())
 
   @doc "Returns whether the breadcrumb trail shows on this group's public pages (default false)."
+  @spec show_breadcrumbs?(t()) :: boolean()
   def show_breadcrumbs?(%__MODULE__{data: data}), do: Map.get(data, "show_breadcrumbs", false)
 
   @doc ~S|Returns where a post's date renders relative to the title ("above"/"below"/"hidden"; default "below").|
+  @spec post_date_position(t()) :: String.t()
   def post_date_position(%__MODULE__{data: data}),
     do: Map.get(data, "post_date_position", Publishing.Constants.default_post_date_position())
 
   @doc ~S|Returns the post-page content width ("narrow"/"normal"/"wide"; default "normal").|
+  @spec post_width(t()) :: String.t()
   def post_width(%__MODULE__{data: data}),
     do: Map.get(data, "post_width", Publishing.Constants.default_post_width())
 
   @doc ~S|Returns the author-note display style ("footnotes"/"panel"; default "footnotes").|
+  @spec notes_style(t()) :: String.t()
   def notes_style(%__MODULE__{data: data}),
     do: Map.get(data, "notes_style", Publishing.Constants.default_notes_style())
 
   @doc "Returns whether a post's featured image shows at the top of the post page (default false)."
+  @spec show_featured_image?(t()) :: boolean()
   def show_featured_image?(%__MODULE__{data: data}),
     do: Map.get(data, "show_featured_image", false)
 
   @doc "Returns whether an estimated reading time shows on the post page (default false)."
+  @spec show_reading_time?(t()) :: boolean()
   def show_reading_time?(%__MODULE__{data: data}), do: Map.get(data, "show_reading_time", false)
 
   @doc "Returns whether the post count shows on the group's public listing (default false)."
+  @spec show_post_count?(t()) :: boolean()
   def show_post_count?(%__MODULE__{data: data}), do: Map.get(data, "show_post_count", false)
 
   @doc "Returns whether the top back link shows on the post page (default true)."
+  @spec show_top_back_link?(t()) :: boolean()
   def show_top_back_link?(%__MODULE__{data: data}),
     do: Map.get(data, "show_top_back_link", true)
 
   @doc "Returns whether listing card images click through to the post (default true)."
+  @spec listing_image_links?(t()) :: boolean()
   def listing_image_links?(%__MODULE__{data: data}),
     do: Map.get(data, "listing_image_links", true)
 
   @doc "Returns whether listing cards animate on hover (default true)."
+  @spec listing_animations?(t()) :: boolean()
   def listing_animations?(%__MODULE__{data: data}),
     do: Map.get(data, "listing_animations", true)
 
   @doc "Returns whether the post page shows chronological prev/next links (default false)."
+  @spec show_prev_next?(t()) :: boolean()
   def show_prev_next?(%__MODULE__{data: data}), do: Map.get(data, "show_prev_next", false)
 
   @doc "Returns whether the post page shows linked category chips (default false)."
+  @spec show_categories?(t()) :: boolean()
   def show_categories?(%__MODULE__{data: data}), do: Map.get(data, "show_categories", false)
 
   @doc ~S|Returns whether the post page shows the "N views" line (default false).|
+  @spec show_view_counts?(t()) :: boolean()
   def show_view_counts?(%__MODULE__{data: data}), do: Map.get(data, "show_view_counts", false)
 
   @doc "Returns whether the public listing shows a search box (default false)."
+  @spec search_enabled?(t()) :: boolean()
   def search_enabled?(%__MODULE__{data: data}), do: Map.get(data, "search_enabled", false)
 
   @doc "Returns whether the group and its posts are left out of the sitemap (default false)."
+  @spec sitemap_exclude?(t()) :: boolean()
   def sitemap_exclude?(%__MODULE__{data: data}), do: Map.get(data, "sitemap_exclude", false)
 
   @doc "Returns the per-language display-name overrides map (language code => name)."
+  @spec name_translations(t()) :: map()
   def name_translations(%__MODULE__{data: data}) do
     case Map.get(data, "name_i18n") do
       map when is_map(map) -> map
@@ -313,6 +353,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   code (`"fr"`), so a lookup succeeds when either side uses the full or short form
   (as long as the base is unambiguous).
   """
+  @spec translated_name(t(), String.t() | atom()) :: String.t()
   def translated_name(%__MODULE__{name: name} = group, lang) do
     resolve_name_translation(name_translations(group), lang) || name
   end
@@ -320,6 +361,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc false
   # Shared by the struct accessor above and the public map resolver in
   # `PhoenixKit.Modules.Publishing.Groups.translated_group_name/2`.
+  @spec resolve_name_translation(map(), String.t() | atom()) :: String.t() | nil
   def resolve_name_translation(translations, lang) when is_map(translations) do
     lang = to_string(lang)
     base = lang |> String.split("-") |> List.first()

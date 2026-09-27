@@ -401,6 +401,7 @@ defmodule PhoenixKit.Modules.Publishing.LanguageHelpers do
   Builds language data for a post's language switcher.
   Returns a list of language maps with status, enabled flag, known flag, and metadata.
   """
+  @spec build_post_languages(map(), [String.t()], String.t() | nil) :: [map()]
   def build_post_languages(post, enabled_languages, primary_language \\ nil) do
     primary_lang =
       primary_language || get_primary_language()

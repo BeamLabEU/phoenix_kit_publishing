@@ -24,6 +24,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
 
+  @typedoc "A term archive scope: a category (and its subtree) or a tag."
+  @type term_scope :: {:category, String.t()} | {:tag, String.t()}
+
+  @typedoc "What a listing render hands the controller to respond with."
+  @type listing_result ::
+          {:ok, map()}
+          | {:redirect_301, String.t()}
+          | {:redirect_with_flash, String.t(), String.t()}
+          | {:error, :group_not_found}
+
   # ============================================================================
   # Group Listing Rendering
   # ============================================================================
@@ -31,6 +41,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Renders a group listing page.
   """
+  @spec render_group_listing(Plug.Conn.t(), String.t(), String.t(), map()) :: listing_result()
   def render_group_listing(conn, group_slug, language, params) do
     case fetch_group(group_slug) do
       {:ok, group} ->
@@ -81,6 +92,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Resolves posts for the requested language, handling exact match vs fallback.
   """
+  @spec resolve_listing_posts_for_language(Plug.Conn.t(), map()) ::
+          {:ok, map()} | {:redirect_with_flash, String.t(), String.t()}
   def resolve_listing_posts_for_language(conn, ctx) do
     exact_language_posts =
       filter_by_exact_language(ctx.published_posts, ctx.group_slug, ctx.language)
@@ -169,6 +182,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Renders the group index page with resolved posts.
   """
+  @spec render_group_index(Plug.Conn.t(), map(), [map()]) :: {:ok, map()}
   def render_group_index(_conn, ctx, all_posts) do
     all_posts = sort_listing(all_posts, Map.get(ctx.group, "listing_sort", "newest"))
     featured_enabled = Map.get(ctx.group, "featured_enabled", true)
@@ -254,6 +268,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   Featured/Latest bands suppressed and a single results page (capped at 50
   matches, newest first).
   """
+  @spec render_search_results(Plug.Conn.t(), String.t(), String.t(), String.t(), map()) ::
+          listing_result()
   def render_search_results(conn, group_slug, language, query, params) do
     case fetch_group(group_slug) do
       {:ok, group} ->
@@ -335,6 +351,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   # surface — same horizon the listing itself has.
   @db_match_cap 2000
 
+  @spec search_posts(String.t(), String.t(), String.t()) :: {[map()], map()}
   def search_posts(group_slug, language, query) do
     uuids =
       group_slug
@@ -363,6 +380,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   would emit a date-only URL whenever the same-day sibling merely lacks the
   viewer's translation, and that URL resolves to a different post.
   """
+  @spec group_date_counts(String.t()) :: map()
   def group_date_counts(group_slug) do
     group_slug
     |> PostFetching.list_posts_with_cache()
@@ -400,6 +418,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   for the whole group, the raw tag for tags), or `{:error, :not_found}` for
   an unknown category / a tag no published post carries.
   """
+  @spec scoped_chronological_posts(String.t(), String.t(), term_scope() | nil) ::
+          {:ok, [map()], String.t() | nil} | {:error, :not_found}
   def scoped_chronological_posts(group_slug, language, nil) do
     {:ok, chronological_posts(group_slug, language), nil}
   end
@@ -441,6 +461,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   map (`%{type:, label:, count:}`) for the heading. Single results page,
   newest first, capped like search.
   """
+  @spec render_term_archive(Plug.Conn.t(), String.t(), String.t(), term_scope()) ::
+          listing_result() | {:error, :not_found}
   def render_term_archive(conn, group_slug, language, term) do
     case fetch_group(group_slug) do
       {:ok, group} ->
@@ -509,6 +531,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   page's prev/next navigation. Deliberately independent of the group's
   `listing_sort`: feeds and chronological neighbors always mean "newest first".
   """
+  @spec chronological_posts(String.t(), String.t(), pos_integer() | nil) :: [map()]
   def chronological_posts(group_slug, language, limit \\ nil) do
     posts =
       group_slug
@@ -532,6 +555,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   `date_counts` covers the WHOLE published set, so a timestamp neighbor's URL
   correctly includes its time segment when the date has same-day siblings.
   """
+  @spec neighbor_posts(String.t(), String.t(), String.t()) ::
+          %{newer: map() | nil, older: map() | nil, date_counts: map()}
   def neighbor_posts(group_slug, language, post_uuid) do
     posts = chronological_posts(group_slug, language)
     date_counts = group_date_counts(group_slug)
@@ -645,6 +670,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   Filters posts to only include published ones.
   Excludes timestamp-mode posts with a future post_date.
   """
+  @spec filter_published([map()]) :: [map()]
   def filter_published(posts) do
     # One settings read for the whole pass — this runs over the listing cache
     # (up to 5,000 entries) on every public request.
@@ -667,6 +693,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   empty preview on that language's listing. Real = a non-default title OR a
   non-empty excerpt (a title-only translation still lists).
   """
+  @spec filter_by_exact_language([map()], term(), String.t()) :: [map()]
   def filter_by_exact_language(posts, _group_slug, language) do
     Enum.filter(posts, fn post ->
       available = post[:available_languages] || []
@@ -697,6 +724,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Strict version - only matches exact language, no fallback to base code.
   """
+  @spec filter_by_exact_language_strict([map()], String.t()) :: [map()]
   def filter_by_exact_language_strict(posts, language) do
     Enum.filter(posts, fn post ->
       available = post[:available_languages] || []
@@ -713,6 +741,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   row (`"en"`). Base-code requests and non-enabled dialect requests keep the
   historical tolerant matching.
   """
+  @spec find_matching_language(String.t(), [String.t()]) :: String.t() | nil
   def find_matching_language(language, available_languages) do
     cond do
       # Direct match
@@ -756,6 +785,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Paginates a list of posts.
   """
+  @spec paginate(list(), pos_integer(), pos_integer()) :: list()
   def paginate(posts, page, per_page) do
     posts
     |> Enum.drop((page - 1) * per_page)
@@ -765,6 +795,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Gets the page number from params.
   """
+  @spec get_page_param(map()) :: pos_integer()
   def get_page_param(params) do
     case Map.get(params, "page", "1") do
       page when is_binary(page) ->
@@ -784,6 +815,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Gets the posts per page setting.
   """
+  @spec get_per_page_setting() :: pos_integer()
   def get_per_page_setting do
     value = Settings.get_setting_cached("publishing_posts_per_page")
 
@@ -812,6 +844,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   @doc """
   Fetches group configuration by slug.
   """
+  @spec fetch_group(term()) :: {:ok, map()} | {:error, :group_not_found}
   def fetch_group(group_slug) do
     group_slug = group_slug |> to_string() |> String.trim()
 

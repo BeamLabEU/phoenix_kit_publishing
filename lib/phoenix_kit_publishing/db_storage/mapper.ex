@@ -23,6 +23,14 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   Converts a full post read (post + version + content + all contents + all versions)
   into the map format expected by the web layer.
   """
+  @spec to_post_map(
+          PublishingPost.t(),
+          PublishingVersion.t(),
+          PublishingContent.t(),
+          [PublishingContent.t()],
+          [PublishingVersion.t()],
+          keyword()
+        ) :: map()
   def to_post_map(
         %PublishingPost{} = post,
         %PublishingVersion{} = version,
@@ -88,6 +96,13 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   Converts a post to a listing-format map (no content body, just metadata).
   Used for listing pages where full content isn't needed.
   """
+  @spec to_listing_map(
+          PublishingPost.t(),
+          PublishingVersion.t() | nil,
+          [PublishingContent.t()],
+          [PublishingVersion.t()],
+          keyword()
+        ) :: map()
   def to_listing_map(%PublishingPost{} = post, version, all_contents, all_versions, opts \\ []) do
     available_languages = Enum.map(all_contents, & &1.language) |> Enum.sort()
 

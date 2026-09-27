@@ -25,6 +25,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   @doc """
   Reads a specific version of a post.
   """
+  @spec read_version_post(Phoenix.LiveView.Socket.t(), integer() | nil) ::
+          {:ok, map()} | {:error, term()}
   def read_version_post(socket, version) do
     post = socket.assigns.post
     language = socket.assigns.current_language
@@ -47,6 +49,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   @doc """
   Applies a version switch to the socket.
   """
+  @spec apply_version_switch(
+          Phoenix.LiveView.Socket.t(),
+          integer(),
+          map(),
+          (String.t(), map(), integer() -> map())
+        ) ::
+          {Phoenix.LiveView.Socket.t(), String.t() | nil, String.t() | nil, String.t(),
+           String.t()}
   def apply_version_switch(socket, version, version_post, form_builder_fn) do
     group_slug = socket.assigns.group_slug
     form = form_builder_fn.(group_slug, version_post, version)
@@ -86,6 +96,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   Creates a new version from a source version.
   Returns {:ok, socket} or {:error, socket} for use in handle_event.
   """
+  @spec create_version_from_source(Phoenix.LiveView.Socket.t()) ::
+          {:ok, Phoenix.LiveView.Socket.t()} | {:error, Phoenix.LiveView.Socket.t()}
   def create_version_from_source(socket) do
     group_slug = socket.assigns.group_slug
     post = socket.assigns.post
@@ -157,6 +169,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   @doc """
   Handles when a version is deleted by another editor.
   """
+  @spec handle_version_deleted(Phoenix.LiveView.Socket.t(), integer()) ::
+          Phoenix.LiveView.Socket.t()
   def handle_version_deleted(socket, deleted_version) do
     available_versions = socket.assigns[:available_versions] || []
     updated_versions = Enum.reject(available_versions, &(&1 == deleted_version))
@@ -267,6 +281,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   With variant versioning, all versions are editable since they're independent attempts.
   This function always returns false - no version locking.
   """
+  @spec viewing_older_version?(term(), term(), term()) :: false
   def viewing_older_version?(_current_version, _available_versions, _current_language), do: false
 
   defp editor_language(assigns), do: Helpers.editor_language(assigns)

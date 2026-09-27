@@ -600,13 +600,12 @@ name, then re-stamps or clears the marker. See
 writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL` safety-net
 section here.
 
-V2 carries the Phase 1 dependency: core's `ExpectedSchema` manifest must
-declare both indexes (two `class: :index` objects, `keys:
-["lower(data ->> 'media_folder_uuid'::text)"]`, `predicate: nil`) and this
-package's `:phoenix_kit` floor must rise to the release that ships them
-BEFORE a host runs V2 — otherwise `mix phoenix_kit.repair` treats them as
-drift and silently removes them after every run. Every later shape change
-repeats those two steps, core side first. Phase 2 (a future core baseline
+V2 needs nothing from core's `ExpectedSchema` manifest: `mix
+phoenix_kit.repair` reports drift and never drops an object, and no
+module's own chain registers its objects there. The one core-side step a
+shape change here can need is excluding, from core's baseline generator,
+an object that core created and this chain alters — V2 alters none. Phase
+2 (a future core baseline
 squash that drops these tables from core) is already covered: the chain
 alone builds the complete shape of all 7 tables from nothing, so a fresh
 install still gets a working schema even without core's chain
@@ -752,8 +751,8 @@ newest-created release as Latest and demotes the current one.
   `phoenix_kit_publishing_contents (version_uuid/group, language, url_slug)` for
   non-trashed rows, so a duplicate becomes impossible at the source instead of
   something the read path's auto-renamer cleans up. This is a shape change, so it
-  is V3 of `PhoenixKitPublishing.Migrations` plus the core-side `ExpectedSchema`
-  declaration and floor bump that Phase 1 requires (see Database & migrations).
+  is V3 of `PhoenixKitPublishing.Migrations`; core needs nothing for a new
+  index (see Database & migrations).
 - **Unify the two base→dialect resolvers.** `new_translation_request?/2` (against
   `post.available_languages`) and `Posts.resolve_language_to_dialect/1` (against
   `enabled_language_codes/0`) answer the same question with different tie-breaks;

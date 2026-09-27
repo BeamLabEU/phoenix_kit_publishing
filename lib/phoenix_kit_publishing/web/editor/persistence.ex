@@ -32,6 +32,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   Performs save operation with validation and routing.
   Returns {:noreply, socket}.
   """
+  @spec perform_save(Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   def perform_save(socket) do
     is_autosaving = Map.get(socket.assigns, :is_autosaving, false)
     title = (socket.assigns.form["title"] || "") |> String.trim()
@@ -1014,6 +1015,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   @doc """
   Reload content after AI translation completes for the current language.
   """
+  @spec reload_translated_content(Phoenix.LiveView.Socket.t(), String.t(), atom()) ::
+          Phoenix.LiveView.Socket.t()
   def reload_translated_content(socket, flash_msg, flash_level) do
     group_slug = socket.assigns.group_slug
     current_language = socket.assigns[:current_language]
@@ -1039,6 +1042,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   @doc """
   Refresh available_languages and language_statuses (for language switcher updates).
   """
+  @spec refresh_available_languages(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def refresh_available_languages(socket) do
     case re_read_post(socket) do
       {:ok, updated_post} ->
@@ -1069,6 +1073,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   it, which is a conflict a person can resolve; the tab that has nothing
   pending still reloads, which is what makes a reference tab follow along.
   """
+  @spec reload_post(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def reload_post(socket) do
     # A spectator's "pending" copy is the owner's own work mirrored here; the
     # owner just saved it, so the spectator follows instead of being warned.
@@ -1118,6 +1123,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   @doc """
   Regenerates the listing cache for a group.
   """
+  @spec regenerate_listing_cache(String.t()) :: :ok | {:error, term()}
   def regenerate_listing_cache(group_slug) do
     ListingCache.regenerate(group_slug)
   end

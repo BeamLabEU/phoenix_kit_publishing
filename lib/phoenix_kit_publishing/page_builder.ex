@@ -15,7 +15,8 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder do
 
   @type assigns :: map()
   @type ast :: map()
-  @type render_result :: {:ok, Phoenix.LiveView.Rendered.t()} | {:error, term()}
+  @type render_result ::
+          {:ok, Phoenix.HTML.safe() | Phoenix.LiveView.Rendered.t()} | {:error, term()}
 
   @doc """
   Renders PHK content directly from a string.

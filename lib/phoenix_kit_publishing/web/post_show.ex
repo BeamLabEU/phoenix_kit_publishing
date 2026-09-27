@@ -118,6 +118,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   end
 
   # Helper functions available to template
+  @spec format_datetime(map()) :: String.t()
   def format_datetime(post) do
     case {post[:date], post[:time]} do
       {%Date{} = date, %Time{} = time} ->
@@ -132,6 +133,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
     end
   end
 
+  @spec version_status_badge_class(term()) :: String.t()
   def version_status_badge_class(@status_published), do: "badge-success"
   def version_status_badge_class("draft"), do: "badge-warning"
   def version_status_badge_class("archived"), do: "badge-ghost"
@@ -139,6 +141,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
 
   # `<.status_dot>` variants — the neutral dot stands in for the old
   # `bg-base-content/20` for archived and unknown alike.
+  @spec language_status_variant(term()) :: :success | :warning | :neutral
   def language_status_variant(@status_published), do: :success
   def language_status_variant("draft"), do: :warning
   def language_status_variant("archived"), do: :neutral
@@ -147,6 +150,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   # Translated status labels — literal-arg gettext clauses so the extractor
   # can pick them up. Variable args (e.g. `gettext(status)`) would be invisible
   # to `mix gettext.extract`.
+  @spec status_label(term()) :: String.t()
   def status_label("published"), do: gettext("Published")
   def status_label("draft"), do: gettext("Draft")
   def status_label("archived"), do: gettext("Archived")

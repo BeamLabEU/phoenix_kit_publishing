@@ -26,6 +26,8 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
       track_editing_session("blog:my-post:en", socket, user)
       # => {:ok, ref}
   """
+  @spec track_editing_session(String.t(), Phoenix.LiveView.Socket.t(), map()) ::
+          {:ok, binary()} | {:error, term()}
   def track_editing_session(form_key, socket, user) do
     topic = editing_topic(form_key)
 
@@ -60,6 +62,7 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
       untrack_editing_session("blog:my-post:en", socket)
       # => :ok
   """
+  @spec untrack_editing_session(String.t(), Phoenix.LiveView.Socket.t()) :: :ok
   def untrack_editing_session(form_key, socket) do
     topic = editing_topic(form_key)
     Presence.untrack(self(), topic, socket.id)
@@ -70,6 +73,7 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
 
   Call this when switching languages or versions to clean up subscriptions.
   """
+  @spec unsubscribe_from_editing(String.t()) :: :ok
   def unsubscribe_from_editing(form_key) do
     topic = editing_topic(form_key)
     Phoenix.PubSub.unsubscribe(:phoenix_kit_internal_pubsub, topic)
@@ -91,6 +95,8 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
           # I'm read-only, sync with owner's state
       end
   """
+  @spec get_editing_role(String.t(), String.t(), String.t()) ::
+          {:owner, [{String.t(), map()}]} | {:spectator, map(), [{String.t(), map()}]}
   def get_editing_role(form_key, socket_id, current_user_uuid) do
     presences = get_sorted_presences(form_key)
 
@@ -121,6 +127,7 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
 
   Returns a list of tuples: `[{socket_id, metadata}, ...]`
   """
+  @spec get_sorted_presences(String.t()) :: [{String.t(), map()}]
   def get_sorted_presences(form_key) do
     topic = editing_topic(form_key)
     raw_presences = Presence.list(topic)
@@ -151,6 +158,7 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
   @doc """
   Gets the lock owner's metadata, or nil if no one is editing.
   """
+  @spec get_lock_owner(String.t()) :: map() | nil
   def get_lock_owner(form_key) do
     case get_sorted_presences(form_key) do
       [{_socket_id, meta} | _] -> meta
@@ -163,6 +171,7 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
 
   Returns a list of metadata for spectators only.
   """
+  @spec get_spectators(String.t()) :: [map()]
   def get_spectators(form_key) do
     case get_sorted_presences(form_key) do
       [] -> []
@@ -173,6 +182,7 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
   @doc """
   Counts total number of people editing (owner + spectators).
   """
+  @spec count_editors(String.t()) :: non_neg_integer()
   def count_editors(form_key) do
     get_sorted_presences(form_key) |> length()
   end
@@ -183,6 +193,7 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
   After subscribing, the process will receive:
   - `%Phoenix.Socket.Broadcast{event: "presence_diff", ...}` when users join/leave
   """
+  @spec subscribe_to_editing(String.t()) :: :ok | {:error, term()}
   def subscribe_to_editing(form_key) do
     topic = editing_topic(form_key)
     Phoenix.PubSub.subscribe(:phoenix_kit_internal_pubsub, topic)
@@ -196,5 +207,6 @@ defmodule PhoenixKit.Modules.Publishing.PresenceHelpers do
       editing_topic("docs:my-post:en")
       # => "publishing_edit:docs:my-post:en"
   """
+  @spec editing_topic(String.t()) :: String.t()
   def editing_topic(form_key), do: "#{@editing_topic_prefix}:#{form_key}"
 end

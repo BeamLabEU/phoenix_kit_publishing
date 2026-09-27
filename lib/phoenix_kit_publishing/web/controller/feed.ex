@@ -34,6 +34,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
     would make a timestamp item link a date-only URL that resolves to the
     wrong post).
   """
+  @spec render_rss(map(), [map()], keyword()) :: iodata()
   def render_rss(group, posts, opts) do
     base_url = Keyword.fetch!(opts, :base_url)
     language = Keyword.fetch!(opts, :language)

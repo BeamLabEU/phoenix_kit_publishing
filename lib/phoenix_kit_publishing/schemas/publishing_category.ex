@@ -69,6 +69,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
   category never moves between groups); the context layer validates the
   parent (same group, no cycles) before the DB sees it.
   """
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(category, attrs) do
     category
     |> cast(attrs, [:name, :slug, :name_i18n, :description, :position, :parent_uuid])
@@ -89,6 +90,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
   end
 
   @doc "Create changeset — additionally casts and requires the owning group."
+  @spec create_changeset(t(), map()) :: Ecto.Changeset.t()
   def create_changeset(category, attrs) do
     category
     |> cast(attrs, [:group_uuid])
@@ -112,6 +114,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
   `PublishingGroup.translated_name/2` is: exact code, then any stored code
   sharing the base, then the primary `name`.
   """
+  @spec translated_name(t(), term()) :: String.t() | nil
   def translated_name(%__MODULE__{} = category, language) when is_binary(language) do
     overrides = category.name_i18n || %{}
 

@@ -25,6 +25,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution do
   - `{:ok, identifier}` for resolved internal slug
   - `:passthrough` for direct use
   """
+  @spec resolve_url_slug(String.t(), tuple(), String.t()) ::
+          {:redirect, String.t()} | {:ok, {:slug, String.t()}} | :passthrough
   def resolve_url_slug(group_slug, {:slug, url_slug}, language) do
     # Resolve base language codes (de, en) to stored dialect codes (de-DE, en-US)
     # before DB queries, since content rows store full BCP-47 dialect codes
@@ -77,6 +79,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution do
   Resolves a URL slug to the internal post slug.
   Used by versioned URL handler and other places that need the internal slug.
   """
+  @spec resolve_url_slug_to_internal(String.t(), String.t(), String.t()) :: String.t()
   def resolve_url_slug_to_internal(group_slug, url_slug, language) do
     db_language = resolve_language_for_db(language)
 
@@ -101,6 +104,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution do
   and the DB-shaped map from `db_content_to_post_map/1` (only :slug/:url_slug/
   :language/:metadata), reading the cache-only fields defensively.
   """
+  @spec build_post_redirect_url(String.t(), map(), String.t(), String.t()) :: String.t()
   def build_post_redirect_url(group_slug, cached_post, language, url_slug) do
     # Build post struct with minimal fields needed for URL generation. Both the
     # cache shape and the DB shape (db_content_to_post_map/1) now carry

@@ -6,6 +6,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
   to determine the type of request (listing, slug post, timestamp post, etc.).
   """
 
+  @typedoc "The request shape `parse_path/1` recognises from the path segments."
+  @type parsed_path ::
+          {:listing, String.t()}
+          | {:feed, String.t(), nil | {:category, String.t()} | {:tag, String.t()}}
+          | {:category, String.t(), String.t()}
+          | {:tag, String.t(), String.t()}
+          | {:slug_post, String.t(), String.t()}
+          | {:timestamp_post, String.t(), String.t(), String.t()}
+          | {:date_only_post, String.t(), String.t()}
+          | {:versioned_post, String.t(), String.t(), pos_integer()}
+          | {:error, :invalid_path | :invalid_version}
+
   # ============================================================================
   # Segment Building
   # ============================================================================
@@ -16,6 +28,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
   Returns a list of path segments starting with the group slug,
   followed by any additional path segments.
   """
+  @spec build_segments(term()) :: [String.t()]
   def build_segments(%{"group" => group} = params) when is_binary(group) do
     case Map.get(params, "path") do
       nil -> [group]
@@ -45,6 +58,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
   - `{:versioned_post, group_slug, post_slug, version}`
   - `{:error, reason}`
   """
+  @spec parse_path([String.t()]) :: parsed_path()
   def parse_path([]), do: {:error, :invalid_path}
   def parse_path([group_slug]), do: {:listing, group_slug}
 
@@ -112,6 +126,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
   @doc """
   Validates a date string (YYYY-MM-DD format).
   """
+  @spec date?(term()) :: boolean()
   def date?(str) when is_binary(str) do
     String.match?(str, ~r/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/)
   end
@@ -121,6 +136,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
   @doc """
   Validates a time string (HH:MM 24-hour format).
   """
+  @spec time?(term()) :: boolean()
   def time?(str) when is_binary(str) do
     String.match?(str, ~r/^([01]\d|2[0-3]):[0-5]\d$/)
   end

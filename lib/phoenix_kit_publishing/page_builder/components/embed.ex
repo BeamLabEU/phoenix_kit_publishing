@@ -28,6 +28,7 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Embed do
   @min_height 160
   @max_height 1200
 
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     attributes = assigns[:attributes] || %{}
 

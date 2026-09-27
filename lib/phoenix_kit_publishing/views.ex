@@ -54,6 +54,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   already viewed the post today. Returns the (possibly updated) conn —
   callers thread it so the dedup marker lands in the session cookie.
   """
+  @spec maybe_record_view(Plug.Conn.t(), term()) :: Plug.Conn.t()
   def maybe_record_view(conn, post_uuid) when is_binary(post_uuid) do
     cond do
       bot_ua?(List.first(Plug.Conn.get_req_header(conn, "user-agent"))) ->
@@ -93,6 +94,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   the conflict target is the primary key and the update is an atomic
   `count = count + 1`.
   """
+  @spec record_view(String.t(), Date.t() | nil) :: :ok | :error
   def record_view(post_uuid, date \\ nil) do
     date = date || Date.utc_today()
 
@@ -117,6 +119,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   end
 
   @doc "The `publishing_unique_views` setting: one view per visitor per post per day."
+  @spec unique_views?() :: boolean()
   def unique_views?, do: Settings.get_boolean_setting(@unique_views_key, true)
 
   # Unique views on, and this visitor already opened the post today. A
@@ -145,6 +148,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   end
 
   @doc "True when the User-Agent looks like a bot/CLI (or is absent)."
+  @spec bot_ua?(String.t() | nil) :: boolean()
   def bot_ua?(nil), do: true
   def bot_ua?(ua) when is_binary(ua), do: Regex.match?(@bot_ua, ua)
 
@@ -185,6 +189,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   # ===========================================================================
 
   @doc "All-time view totals for a list of post uuids: `%{post_uuid => total}`."
+  @spec totals([String.t()]) :: %{optional(String.t()) => non_neg_integer()}
   def totals(post_uuids) when is_list(post_uuids) do
     from(v in "phoenix_kit_publishing_post_views",
       where: v.post_uuid in ^Enum.map(post_uuids, &Ecto.UUID.dump!/1),
@@ -199,12 +204,14 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   end
 
   @doc "All-time view total for one post."
+  @spec total(String.t()) :: non_neg_integer()
   def total(post_uuid), do: totals([post_uuid]) |> Map.get(post_uuid, 0)
 
   @doc """
   A group's top posts by views in the trailing `days` window:
   `[{post_uuid, views}]`, most-viewed first, capped at `limit`.
   """
+  @spec top_posts(String.t(), pos_integer(), pos_integer()) :: [{String.t(), non_neg_integer()}]
   def top_posts(group_slug, days, limit) when days > 0 do
     since = Date.add(Date.utc_today(), -days + 1)
 

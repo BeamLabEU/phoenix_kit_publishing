@@ -701,6 +701,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   panels in "panel" notes style; a `<Note>` inside a code fence is ignored
   (same mask as rendering).
   """
+  @spec list_notes(term()) :: [%{number: pos_integer(), id: String.t(), body: String.t()}]
   def list_notes(content) when is_binary(content) do
     @note_regex
     |> Regex.scan(mask_scanned_code(content), capture: :all_but_first)
@@ -723,6 +724,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   panel DOM ids stay unique; the first occurrence keeps the plain digest,
   so existing comments never detach when a duplicate appears later.
   """
+  @spec note_dom_id(String.t(), pos_integer()) :: String.t()
   def note_dom_id(body, occurrence \\ 1)
 
   def note_dom_id(body, 1) when is_binary(body), do: digest_note(body)

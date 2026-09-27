@@ -53,6 +53,7 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   alias PhoenixKit.Modules.Publishing.ListingCache
 
   @doc "All hashtags in a document, first-spelling-wins, order-preserving."
+  @spec extract(term()) :: [String.t()]
   def extract(content) when is_binary(content) do
     stripped = Regex.replace(@masked_regions, content, @mask_sentinel)
 
@@ -71,6 +72,7 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   renderer runs this before the Markdown pass so the links pick up the
   prose link styling.
   """
+  @spec linkify(String.t(), (String.t() -> String.t())) :: String.t()
   def linkify(content, url_fun) when is_binary(content) and is_function(url_fun, 1) do
     # Only link what extract/1 would actually STORE. Otherwise the 21st tag in
     # a body (past the cap) renders as a link to an archive that can't find the
@@ -108,6 +110,7 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   a `#` costs no database round trip. Returns
   `[%{tag: "elixir", count: 12}]`, capped by `:limit`.
   """
+  @spec suggest(String.t(), term(), keyword()) :: [%{tag: String.t(), count: pos_integer()}]
   def suggest(group_slug, query, opts \\ []) do
     limit = Keyword.get(opts, :limit, 10)
     needle = query |> to_string() |> String.trim() |> String.downcase()
@@ -175,6 +178,7 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   language's content (per-language bodies may tag differently; the version
   carries one combined list, same storage as before).
   """
+  @spec extract_all([map()]) :: [String.t()]
   def extract_all(contents) when is_list(contents) do
     contents
     |> Enum.flat_map(fn

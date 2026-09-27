@@ -159,6 +159,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
   defdelegate format_post_date(post, group_slug), to: PublishingHTML
 
   @doc false
+  @spec build_preview_translations([map()], map(), String.t()) :: [map()]
   def build_preview_translations(translations, post, group_slug) do
     post_uuid = post[:uuid]
     version = post[:version]

@@ -422,7 +422,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp extract_group_slug(_), do: nil
 
   defp group_trashed?(nil), do: false
-  defp group_trashed?(group_slug) when not is_binary(group_slug), do: false
 
   defp group_trashed?(group_slug) do
     case Publishing.fetch_group(group_slug) do
@@ -827,6 +826,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   @doc false
   # Public only so the merge rules can be unit-tested without staging a
   # canonical redirect; takes anything with a :query_string.
+  @spec with_query_string(Plug.Conn.t() | map(), String.t()) :: String.t()
   def with_query_string(%{query_string: qs}, url) when is_binary(qs) and qs != "" do
     # Whatever the canonical URL already decided stays decided. The listing's
     # canonical carries its own `?page=`, built from this same request, so

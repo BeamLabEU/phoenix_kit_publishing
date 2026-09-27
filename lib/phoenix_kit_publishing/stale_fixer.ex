@@ -460,6 +460,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   @doc false
   # Exposed (with @doc false) for the slug-conflict-retry test. Production
   # callers always go through `fix_stale_post/1` / `fix_stale_group/1`.
+  @spec apply_stale_fix(struct(), map(), (struct(), map() -> {:ok, struct()} | {:error, term()})) ::
+          struct()
   def apply_stale_fix(record, attrs, update_fn \\ &DBStorage.update_post/2)
 
   def apply_stale_fix(record, attrs, _update_fn) when attrs == %{}, do: record
@@ -573,6 +575,10 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     :ok
   end
 
+  @spec fix_stale_version(PhoenixKit.Modules.Publishing.PublishingVersion.t()) ::
+          {:ok, PhoenixKit.Modules.Publishing.PublishingVersion.t()}
+          | {:error, Ecto.Changeset.t()}
+          | nil
   def fix_stale_version(version) do
     if version.status not in @valid_version_statuses do
       Logger.info(
@@ -590,6 +596,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
+  @spec fix_stale_content(PublishingContent.t()) ::
+          :ok | nil | {:ok, PublishingContent.t()} | {:error, Ecto.Changeset.t()}
   def fix_stale_content(content) do
     case normalize_content_language(content) do
       {:deleted, _target_language} ->
@@ -902,6 +910,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   If multiple versions have status "published", keeps the highest version
   number as published and archives the rest.
   """
+  @spec fix_multiple_published_versions(PublishingPost.t()) ::
+          {:ok, term()} | {:error, term()} | nil
   def fix_multiple_published_versions(%PublishingPost{} = post) do
     ctx = build_post_context(post)
     fix_multiple_published_versions(post, ctx)

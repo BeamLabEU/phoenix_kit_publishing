@@ -66,9 +66,11 @@ defmodule PhoenixKitPublishing.AITranslatable do
   @impl true
   # Required arity — delegates with a nil scope, i.e. the post's active version
   # (the historical fetch/2 behavior).
+  @spec fetch(String.t(), String.t()) :: {:ok, t()} | {:error, term()}
   def fetch(resource_type, post_uuid), do: fetch(resource_type, post_uuid, nil)
 
   @impl true
+  @spec fetch(String.t(), String.t(), term() | nil) :: {:ok, t()} | {:error, term()}
   def fetch(@resource_type, post_uuid, scope) when is_binary(post_uuid) do
     # `scope` is the version number (as a string from the Oban args) the editor
     # was on; nil → active version. Pin the resolved version and thread it
@@ -108,6 +110,7 @@ defmodule PhoenixKitPublishing.AITranslatable do
   defp parse_scope(_), do: nil
 
   @impl true
+  @spec source_fields(t(), String.t()) :: %{optional(String.t()) => String.t()}
   def source_fields(%__MODULE__{} = resource, source_lang) do
     case Publishing.read_post_by_uuid(resource.post_uuid, source_lang, resource.version) do
       {:ok, %{language: resolved} = post}
@@ -148,6 +151,7 @@ defmodule PhoenixKitPublishing.AITranslatable do
   end
 
   @impl true
+  @spec put_translation(t(), String.t(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   def put_translation(%__MODULE__{} = resource, target_lang, fields, opts) do
     scope = build_scope(Keyword.get(opts, :actor_uuid))
 
@@ -162,6 +166,7 @@ defmodule PhoenixKitPublishing.AITranslatable do
   end
 
   @impl true
+  @spec pubsub_topics(t()) :: [String.t()]
   def pubsub_topics(%__MODULE__{} = resource) do
     [PublishingPubSub.post_translations_topic(resource.group_slug, resource.post_uuid)]
   end

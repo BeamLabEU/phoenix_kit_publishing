@@ -200,9 +200,11 @@ defmodule PhoenixKitPublishing.RouterDispatch do
 
   # Plug interface so the module can be `plug ...`-ed from a pipeline.
   @doc false
+  @spec init(term()) :: term()
   def init(opts), do: opts
 
   @doc false
+  @spec call(Plug.Conn.t(), term()) :: Plug.Conn.t()
   def call(conn, :restore_path), do: restore_path(conn, [])
   def call(conn, _opts), do: conn
 

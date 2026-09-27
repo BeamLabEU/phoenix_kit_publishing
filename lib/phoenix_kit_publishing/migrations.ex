@@ -188,20 +188,18 @@ defmodule PhoenixKitPublishing.Migrations do
   given a duplicate — and `down/1` below V2 removes exactly these two, by
   name, and nothing else.
 
-  The manifest dependency is real: core's `ExpectedSchema` does not know
-  these two indexes, and `mix phoenix_kit.repair` treats an index it does
-  not declare on a table it audits as drift. Core must carry them as two
-  `class: :index` objects (`index:idx_publishing_groups_media_folder`,
-  `index:idx_publishing_versions_media_folder`, `keys:
-  ["lower(data ->> 'media_folder_uuid'::text)"]`, `predicate: nil`,
-  `method: "btree"`, `unique: false`), and this package's `:phoenix_kit`
-  floor must rise to the release that ships them, BEFORE a host runs V2.
-  Any later shape change repeats the same two steps: declare (or, for an
-  object core created, exclude via the generator's `@excluded_exact` in
-  `dev_docs/squash/generate_baseline.exs` and regenerate) on core's side
-  first, then raise the floor here. Skipping the core side means
-  `mix phoenix_kit.repair` restores the old shape after every run,
-  silently undoing the new version.
+  Core's `ExpectedSchema` manifest does not know these two indexes, and it
+  does not need to: `mix phoenix_kit.repair` reports drift, it never drops
+  anything — its only "extra" finding is an info-level one for a column on
+  a manifest table — and no module's own chain registers its objects in
+  core's manifest (the catalogue's do not either). Declaring them there
+  with a `since` beyond core's head would instead mark every host that ran
+  V2 as carrying a stale marker until core ships that version. What a shape
+  change here DOES need on core's side is the opposite case: an object core
+  itself created and this chain then alters must be excluded from core's
+  baseline generator (`@excluded_exact` in
+  `dev_docs/squash/generate_baseline.exs`), or the next squash recreates
+  the old shape. V2 alters nothing core created.
 
   ### Phase 2 — creation leaves core's baseline at the next squash cycle
 

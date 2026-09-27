@@ -25,6 +25,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Assigns current language with enabled/known status.
   """
+  @spec assign_current_language(Phoenix.LiveView.Socket.t(), String.t()) ::
+          Phoenix.LiveView.Socket.t()
   def assign_current_language(socket, language_code) do
     enabled_languages = socket.assigns[:all_enabled_languages] || []
     lang_info = Publishing.get_language_info(language_code)
@@ -51,6 +53,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Gets the language name for a language code.
   """
+  @spec get_language_name(String.t()) :: String.t()
   def get_language_name(language_code) do
     case Publishing.get_language_info(language_code) do
       %{name: name} -> name
@@ -61,6 +64,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Formats a list of language codes for display.
   """
+  @spec format_language_list(term()) :: String.t()
   def format_language_list(language_codes) when is_list(language_codes) do
     count = length(language_codes)
 
@@ -81,6 +85,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Gets the editor language from assigns.
   """
+  @spec editor_language(map()) :: String.t()
   def editor_language(assigns) do
     assigns[:current_language] ||
       assigns |> Map.get(:post, %{}) |> Map.get(:language) ||
@@ -90,6 +95,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Builds language data for the publishing_language_switcher component.
   """
+  @spec build_editor_languages(map(), [String.t()], String.t()) :: [map()]
   def build_editor_languages(post, enabled_languages, current_language) do
     post_primary = LanguageHelpers.get_primary_language()
 
@@ -135,6 +141,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Builds the public URL for a post.
   """
+  @spec build_public_url(map(), String.t() | nil) :: String.t() | nil
   def build_public_url(post, language) do
     if Constants.published?(Map.get(post.metadata, :status)) do
       build_url_for_mode(post, language)
@@ -187,6 +194,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   Alt text is derived from the file's original name (falling back to `"Image"`),
   sanitised so it can't break out of the XML attribute.
   """
+  @spec image_component_markup(String.t()) :: String.t()
   def image_component_markup(file_uuid) when is_binary(file_uuid) do
     # The uuid comes from the server-side media picker, so it's a real UUID in
     # practice — but strip anything outside the UUID charset before interpolating
@@ -214,6 +222,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   in order, so a `set_editor_content/2` in the same pipeline — which carries
   its own `mark_saved` — never races this one.
   """
+  @spec mark_clean(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def mark_clean(socket) do
     Phoenix.LiveView.send_update(Leaf, id: "content-editor", action: :mark_saved)
     Phoenix.Component.assign(socket, :has_pending_changes, false)
@@ -244,6 +253,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   the ref is back (`awaiting_buffer_ref`), which is what stopped a switch
   from autosaving the English body into the Russian row.
   """
+  @spec set_editor_content(Phoenix.LiveView.Socket.t(), String.t() | nil, keyword()) ::
+          Phoenix.LiveView.Socket.t()
   def set_editor_content(socket, content, opts \\ []) do
     content = content || ""
     ref = "buffer-#{System.unique_integer([:positive])}"
@@ -276,6 +287,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   the post survives a change of storage prefix or signing secret instead of
   carrying a frozen link that quietly rots.
   """
+  @spec gallery_markup(list()) :: String.t()
   def gallery_markup(file_uuids) when is_list(file_uuids) do
     lines =
       file_uuids
@@ -293,6 +305,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   "Audio version", which is the whole post read aloud — this one drops a
   player at the cursor.
   """
+  @spec audio_component_markup(String.t()) :: String.t()
   def audio_component_markup(file_uuid) when is_binary(file_uuid) do
     safe = String.replace(file_uuid, ~r/[^0-9a-fA-F-]/, "")
     ~s(\n<Audio file_uuid="#{safe}" title="#{alt_from_file(file_uuid)}"/>\n)
@@ -345,6 +358,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Builds a virtual post for new post creation.
   """
+  @spec build_virtual_post(String.t(), term(), String.t(), DateTime.t()) :: map()
   def build_virtual_post(group_slug, "slug", primary_language, now) do
     %{
       group: group_slug,
@@ -389,6 +403,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Builds a virtual translation for a new language.
   """
+  @spec build_virtual_translation(
+          map(),
+          String.t() | nil,
+          String.t(),
+          Phoenix.LiveView.Socket.t()
+        ) :: map()
   def build_virtual_translation(post, group_slug, new_language, socket) do
     post
     |> Map.put(:language, new_language)
@@ -406,6 +426,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Gets the preview URL for a featured image.
   """
+  @spec featured_image_preview_url(term()) :: String.t() | nil
   def featured_image_preview_url(value) do
     case sanitize_featured_image_uuid(value) do
       nil ->
@@ -422,6 +443,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Sanitizes a featured image ID value.
   """
+  @spec sanitize_featured_image_uuid(term()) :: String.t() | nil
   def sanitize_featured_image_uuid(value) when is_binary(value) do
     value
     |> String.trim()
@@ -440,6 +462,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Builds the URL for a post overview page.
   """
+  @spec build_post_url(String.t(), map()) :: String.t()
   def build_post_url(group_slug, post) do
     Routes.path("/admin/publishing/#{group_slug}/#{require_uuid!(post)}")
   end
@@ -449,6 +472,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
 
   Options: `:version`, `:lang`
   """
+  @spec build_edit_url(String.t(), map(), keyword()) :: String.t()
   def build_edit_url(group_slug, post, opts \\ []) do
     uuid = require_uuid!(post)
     base = "/admin/publishing/#{group_slug}/#{uuid}/edit"
@@ -464,6 +488,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Builds the URL for the post preview.
   """
+  @spec build_preview_url(String.t(), map()) :: String.t()
   def build_preview_url(group_slug, post) do
     Routes.path("/admin/publishing/#{group_slug}/#{require_uuid!(post)}/preview")
   end
@@ -471,6 +496,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   @doc """
   Builds the URL for creating a new post.
   """
+  @spec build_new_post_url(String.t()) :: String.t()
   def build_new_post_url(group_slug) do
     Routes.path("/admin/publishing/#{group_slug}/new")
   end

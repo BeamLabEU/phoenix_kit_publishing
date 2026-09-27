@@ -25,6 +25,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
   Build translation links for group listing page.
   Accepts posts to avoid redundant list_posts calls.
   """
+  @spec build_listing_translations(String.t(), String.t(), [map()]) :: [map()]
   def build_listing_translations(group_slug, current_language, posts) do
     # Get enabled languages - these are the ONLY languages that should show
     enabled_languages = Language.get_enabled_languages()
@@ -113,6 +114,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
   @doc """
   Build translation links for a post page.
   """
+  @spec build_translation_links(String.t(), map(), String.t(), keyword()) :: [map()]
   def build_translation_links(group_slug, post, current_language, opts \\ []) do
     version = Keyword.get(opts, :version)
 

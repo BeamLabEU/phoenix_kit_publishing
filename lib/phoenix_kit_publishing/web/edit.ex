@@ -76,6 +76,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   # The AITranslate.Embed hook re-syncs the form after a translation merges.
   # This form is a plain params map behind `to_form(as: :group)` (no Ecto
   # changeset), so override the default changeset-shaped re-assign.
+  @spec ai_translate_assign_form(Phoenix.LiveView.Socket.t(), map()) ::
+          Phoenix.LiveView.Socket.t()
   def ai_translate_assign_form(socket, params) when is_map(params) do
     Component.assign(socket, :form, Component.to_form(params, as: :group))
   end

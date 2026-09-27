@@ -28,6 +28,7 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   @resource_type "publishing_post"
 
   @doc "True when the comments module is installed AND enabled."
+  @spec available?() :: boolean()
   def available? do
     Code.ensure_loaded?(@comments_mod) and
       function_exported?(@comments_mod, :enabled?, 0) and
@@ -37,6 +38,7 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   end
 
   @doc "Published comments for a post, oldest first, with authors preloaded."
+  @spec list(String.t()) :: [map()]
   def list(post_uuid) do
     if available?() do
       @comments_mod.list_comments(@resource_type, post_uuid,
@@ -63,6 +65,11 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
     comments excluded — the "N comments" header describes the thread the
     reader is looking at).
   """
+  @spec for_post_page(String.t(), Enumerable.t() | nil) :: %{
+          thread: [map()],
+          note_comments: %{optional(String.t()) => [map()]},
+          count: non_neg_integer()
+        }
   def for_post_page(post_uuid, known_note_ids \\ nil) do
     comments = list(post_uuid)
 
@@ -99,6 +106,7 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   end
 
   @doc "Total node count of a comment tree (a panel's thread size)."
+  @spec tree_size(term()) :: non_neg_integer()
   def tree_size(comments) when is_list(comments) do
     Enum.reduce(comments, 0, fn comment, acc ->
       # `|| []`: an unpopulated :children (nil) must not crash the count.
@@ -130,6 +138,7 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   end
 
   @doc "Published-comment count for a post."
+  @spec count(String.t()) :: non_neg_integer()
   def count(post_uuid) do
     if available?() do
       @comments_mod.count_comments(@resource_type, post_uuid, status: "published")
@@ -156,6 +165,7 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   - `:note_id` — anchors the comment to an author note (posted from the
     note's slide-out panel). Stored in `metadata["note_id"]`.
   """
+  @spec create(String.t(), String.t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def create(post_uuid, user_uuid, content, opts \\ []) when is_binary(content) do
     if available?() do
       case resolve_threading(post_uuid, opts) do
@@ -301,6 +311,7 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   `comment_markdown/1` component when available, escaped plain text with
   line breaks otherwise.
   """
+  @spec render_content(term()) :: Phoenix.HTML.safe() | Phoenix.LiveView.Rendered.t()
   def render_content(content) when is_binary(content) do
     markdown_mod = PhoenixKitComments.Web.Markdown
 
@@ -329,6 +340,7 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
   def render_content(_), do: Phoenix.HTML.raw("")
 
   @doc "The comments module's one-per-page markdown styles, or nothing."
+  @spec content_styles() :: Phoenix.HTML.safe() | Phoenix.LiveView.Rendered.t()
   def content_styles do
     markdown_mod = PhoenixKitComments.Web.Markdown
 

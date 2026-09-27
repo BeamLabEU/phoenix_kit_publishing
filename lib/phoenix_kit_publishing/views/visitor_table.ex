@@ -19,6 +19,7 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
   @table :phoenix_kit_publishing_view_visitors
   @sweep_every :timer.hours(24)
 
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts) do
     GenServer.start_link(__MODULE__, :ok, name: Keyword.get(opts, :name, __MODULE__))
   end
@@ -47,6 +48,7 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
 
   @doc false
   # Test-only: the raw rows, so a test can prove no address is stored.
+  @spec entries() :: [{{String.t(), String.t(), binary()}, true}]
   def entries do
     :ets.tab2list(@table)
   rescue

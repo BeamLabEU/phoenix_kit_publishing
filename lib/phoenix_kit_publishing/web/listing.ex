@@ -771,6 +771,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   defp redirect_if_missing(socket), do: socket
 
+  @spec format_datetime(map(), map() | nil, map()) :: String.t()
   def format_datetime(
         %{date: %Date{} = date, time: %Time{} = time},
         current_user,
@@ -821,6 +822,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   Gets the published version number from a post's version_statuses map.
   Returns nil if no version is published.
   """
+  @spec get_published_version(map()) :: integer() | nil
   def get_published_version(post) do
     version_statuses = Map.get(post, :version_statuses, %{})
 
@@ -840,6 +842,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   Returns `{version_number, status, label}` where label is :live, :draft, or :latest
   """
+  @spec get_display_version(map()) :: {integer(), String.t(), :live | :draft | :latest}
   def get_display_version(post) do
     version_statuses = Map.get(post, :version_statuses, %{})
     available_versions = Map.get(post, :available_versions, [])
@@ -967,6 +970,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   The `known` field indicates if the language code is recognized.
   The `is_default` field indicates if this is the site default language (used for ordering only).
   """
+  @spec build_post_languages(map(), term(), [String.t()], term(), String.t() | nil) :: [map()]
   def build_post_languages(
         post,
         _group_slug,

@@ -22,6 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.LockTableOwner do
 
   alias PhoenixKit.Modules.Publishing.ListingCache
 
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts) do
     GenServer.start_link(__MODULE__, :ok, name: Keyword.get(opts, :name, __MODULE__))
   end

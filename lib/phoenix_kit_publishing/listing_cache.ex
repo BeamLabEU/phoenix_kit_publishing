@@ -402,6 +402,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   # ArgumentError on the vanished table and 500 a public read (M8). The lazy path
   # stays as a fallback for the brief window before/around an owner restart.
   @doc false
+  @spec ensure_lock_table_exists() :: :ok | :ets.table()
   def ensure_lock_table_exists do
     case :ets.whereis(@lock_table) do
       :undefined ->

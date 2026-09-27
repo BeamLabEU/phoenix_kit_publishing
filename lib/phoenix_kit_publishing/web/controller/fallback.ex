@@ -46,6 +46,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   @doc """
   Handles 404 not found responses with smart fallback.
   """
+  @spec handle_not_found(Plug.Conn.t(), term()) ::
+          {:redirect_with_flash, String.t(), String.t()} | {:render_404}
   def handle_not_found(conn, reason) do
     # Try to fall back to nearest valid parent in the breadcrumb chain
     case attempt_breadcrumb_fallback(conn, reason) do
@@ -162,6 +164,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   Note: fetch_post now handles finding the latest published version automatically,
   so we can just use base URLs here (no version-specific URLs needed)
   """
+  @spec find_any_available_language_version(String.t(), String.t(), String.t()) ::
+          {:ok, String.t()}
   def find_any_available_language_version(group_slug, post_slug, requested_language) do
     default_lang = Language.get_default_language()
 
@@ -288,6 +292,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   2. If time doesn't exist, try other times on the same date
   3. If date has no posts, fall back to group listing
   """
+  @spec fallback_timestamp_to_other_language(
+          String.t(),
+          String.t() | Date.t(),
+          String.t() | Time.t(),
+          String.t()
+        ) :: {:ok, String.t()} | :no_fallback
   def fallback_timestamp_to_other_language(group_slug, date, time, requested_language) do
     default_lang = Language.get_default_language()
 
@@ -382,6 +392,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   @doc """
   Tries each language for timestamp mode until finding a published version.
   """
+  @spec find_first_published_timestamp_version(
+          String.t(),
+          String.t() | Date.t(),
+          String.t() | Time.t(),
+          [String.t()]
+        ) :: {:ok, String.t()} | :not_found
   def find_first_published_timestamp_version(group_slug, date, time, languages) do
     identifier = "#{date}/#{time}"
 

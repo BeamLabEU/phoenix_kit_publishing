@@ -269,6 +269,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # re-derives it (`Persistence`): a rename saved on the same URL skips
   # `handle_params`, and the crumb would keep the old title.
   @doc false
+  @spec assign_page_trail(Phoenix.LiveView.Socket.t(), map() | nil) :: Phoenix.LiveView.Socket.t()
   def assign_page_trail(socket, post) do
     group_slug = socket.assigns.group_slug
 
@@ -395,6 +396,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # Whether the version these params are switching TO has a translation
   # running. Public so the rule can be pinned without standing up the AI
   # pipeline.
+  @spec translation_running_for?(MapSet.t() | nil, map()) :: boolean()
   def translation_running_for?(in_flight, params) do
     scope = params["v"] |> parse_version_param() |> version_scope()
 
@@ -554,6 +556,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # components only. So a body carrying raw HTML opens in :markdown — the
   # one surface that edits it losslessly — and everything else follows the
   # admin's chosen mode. Public only so the guard can be pinned by a test.
+  @spec __effective_editor_mode__(atom(), term()) :: atom()
   def __effective_editor_mode__(mode, content) when mode in [:hybrid, :visual, :html] do
     if __raw_html_content__?(content), do: :markdown, else: mode
   end
@@ -565,6 +568,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # so documentation ABOUT HTML doesn't trip the guard; PHK component tags
   # are capitalized and miss the lowercase requirement; autolinks
   # (`<https://…>`) fail the `[\s/>]` terminator after the tag name.
+  @spec __raw_html_content__?(term()) :: boolean()
   def __raw_html_content__?(content) when is_binary(content) do
     content
     |> String.replace(~r/```.*?```/s, " ")
@@ -1439,7 +1443,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     default_tracking? = form_url_slug in [nil, ""] or form_url_slug == db_post_slug
     effective = if default_tracking?, do: form_slug, else: form_url_slug
 
-    if is_nil(language) or effective in [nil, ""] do
+    if effective in [nil, ""] do
       post
     else
       slugs = Map.get(post, :language_slugs) || %{}

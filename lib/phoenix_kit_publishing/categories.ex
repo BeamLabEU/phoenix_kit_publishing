@@ -63,6 +63,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   `%PublishingCategory{}` structs with a virtual-ish `:depth` in the
   returned tuples: `[{category, depth}]`.
   """
+  @spec list_tree(String.t()) :: [{PublishingCategory.t(), non_neg_integer()}]
   def list_tree(group_slug) do
     categories = list_categories(group_slug)
     by_parent = Enum.group_by(categories, & &1.parent_uuid)
@@ -109,6 +110,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   `[]` when the backing table is missing (host core < V159) — every public
   read path must survive the release-gated window.
   """
+  @spec list_categories(String.t()) :: [PublishingCategory.t()]
   def list_categories(group_slug) do
     from(c in PublishingCategory,
       join: g in PublishingGroup,
@@ -124,6 +126,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   end
 
   @doc "A group's category by slug."
+  @spec by_slug(String.t(), String.t()) :: {:ok, PublishingCategory.t()} | {:error, :not_found}
   def by_slug(group_slug, category_slug) do
     from(c in PublishingCategory,
       join: g in PublishingGroup,
@@ -160,6 +163,9 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   (auto-derived from the name when blank), `"parent_uuid"`, `"description"`,
   `"position"`, `"name_i18n"`.
   """
+  @spec create_category(String.t(), map(), keyword()) ::
+          {:ok, PublishingCategory.t()}
+          | {:error, Ecto.Changeset.t() | PhoenixKit.Modules.Publishing.Errors.error_atom()}
   def create_category(group_slug, attrs, opts \\ []) do
     result =
       with {:ok, group_uuid} <- group_uuid(group_slug),
@@ -199,6 +205,9 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   the new parent must be same-group and not the category itself or any of
   its descendants.
   """
+  @spec update_category(String.t(), map(), keyword()) ::
+          {:ok, PublishingCategory.t()}
+          | {:error, Ecto.Changeset.t() | PhoenixKit.Modules.Publishing.Errors.error_atom()}
   def update_category(uuid, attrs, opts \\ []) do
     repo().transaction(fn ->
       with {:ok, category} <- fetch_category(uuid),
@@ -281,6 +290,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   Deletes a category. The DB lifts its children to the root
   (`ON DELETE SET NULL`) and cascades the post assignments.
   """
+  @spec delete_category(String.t(), keyword()) ::
+          {:ok, PublishingCategory.t()} | {:error, Ecto.Changeset.t() | :not_found}
   def delete_category(uuid, opts \\ []) do
     result =
       with {:ok, category} <- fetch_category(uuid) do
@@ -355,6 +366,9 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   Capped at 500 rows (client-misbehavior guard, same convention as the
   assignment cap). Returns `{:ok, changed_count}`.
   """
+  @spec reorder_categories(String.t(), term(), keyword()) ::
+          {:ok, non_neg_integer()}
+          | {:error, Ecto.Changeset.t() | PhoenixKit.Modules.Publishing.Errors.error_atom()}
   def reorder_categories(group_slug, ordered_uuids, opts \\ [])
 
   def reorder_categories(group_slug, ordered_uuids, opts)
@@ -432,6 +446,9 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   drop it mid-group unpredictably. Cycle/scope rules are
   `update_category/3`'s.
   """
+  @spec move_category(String.t(), String.t() | nil, keyword()) ::
+          {:ok, PublishingCategory.t()}
+          | {:error, Ecto.Changeset.t() | PhoenixKit.Modules.Publishing.Errors.error_atom()}
   def move_category(uuid, new_parent_uuid, opts \\ []) do
     case move_parent(new_parent_uuid) do
       # The position is resolved inside `update_category/3`, under the
@@ -506,6 +523,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
 
   Returns the number of versions written.
   """
+  @spec backfill_version_categories(String.t()) :: non_neg_integer()
   def backfill_version_categories(group_slug) do
     legacy =
       from(pc in PublishingPostCategory,
@@ -596,6 +614,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   open, through the form — but it stays as the way to file a post when you
   have a post uuid and mean "the live one": seeds, imports, bulk tools.
   """
+  @spec replace_post_categories(String.t(), [term()], keyword()) ::
+          {:ok, [String.t()]} | {:error, atom()}
   def replace_post_categories(post_uuid, category_uuids, opts \\ [])
       when is_list(category_uuids) and length(category_uuids) <= 100 do
     result = do_replace_post_categories(post_uuid, category_uuids, opts)
@@ -663,6 +683,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   back — a version filed under a category somebody later deleted renders with
   one fewer chip instead of erroring.
   """
+  @spec categories_by_uuids(String.t(), term()) :: [PublishingCategory.t()]
   def categories_by_uuids(_group_slug, []), do: []
 
   def categories_by_uuids(group_slug, uuids) when is_list(uuids) do
@@ -689,6 +710,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   have and resolve with `categories_by_uuids/2` — the public post page does
   that, so `?v=2` shows how v2 was filed.
   """
+  @spec categories_of_post(String.t()) :: [PublishingCategory.t()]
   def categories_of_post(post_uuid) do
     with {:ok, post} <- fetch_post(post_uuid),
          {:ok, version} <- target_version(post) do
@@ -745,6 +767,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   end
 
   @doc "Category uuids on a post's ACTIVE version."
+  @spec category_uuids_for_post(String.t()) :: [String.t()]
   def category_uuids_for_post(post_uuid) do
     with {:ok, post} <- fetch_post(post_uuid),
          {:ok, version} <- target_version(post) do
@@ -763,6 +786,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   The listing cache no longer needs this (it has the version in hand while
   building each entry), but bulk callers that only hold post uuids still do.
   """
+  @spec categories_for_posts([String.t()]) :: %{optional(String.t()) => [String.t()]}
   def categories_for_posts(post_uuids) when is_list(post_uuids) do
     from(p in PublishingPost,
       join: v in PublishingVersion,
@@ -785,6 +809,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   under its children). One query for the group's categories, then an
   in-memory walk; cycle-safe via the seen set.
   """
+  @spec subtree_uuids(String.t(), String.t()) :: MapSet.t(String.t())
   def subtree_uuids(group_slug, root_uuid) do
     by_parent =
       group_slug
@@ -810,6 +835,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   archive headers): `%{category_uuid => count}`. Counts posts with an
   active published version, not trashed.
   """
+  @spec published_post_counts(String.t()) :: %{optional(String.t()) => pos_integer()}
   def published_post_counts(group_slug) do
     # Counted off each post's ACTIVE version, because that is the filing the
     # public sees. A draft version refiled into a different category doesn't
