@@ -199,6 +199,17 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
       %{post: post}
     end
 
+    test "replace_post_categories broadcasts the group's categories change", %{
+      slug: slug,
+      post: post
+    } do
+      {:ok, cat} = Categories.create_category(slug, %{"name" => "Moved into"})
+      PublishingPubSub.subscribe_to_categories(slug)
+
+      {:ok, _} = Categories.replace_post_categories(post.uuid, [cat.uuid])
+      assert_receive {:categories_changed, ^slug}
+    end
+
     test "replace_post_categories drops foreign-group uuids", %{slug: slug, post: post} do
       {:ok, mine} = Categories.create_category(slug, %{"name" => "Mine"})
       {:ok, other} = Groups.add_group(unique_name(), mode: "slug")

@@ -60,6 +60,12 @@ defmodule PhoenixKit.Modules.Publishing.Views do
       bot_ua?(List.first(Plug.Conn.get_req_header(conn, "user-agent"))) ->
         conn
 
+      # Off means every page open counts — the session marker is a dedup
+      # too, so it is neither consulted nor written.
+      not unique_views?() ->
+        record_async(post_uuid)
+        conn
+
       viewed_or_capped?(conn, post_uuid) ->
         conn
 
@@ -127,7 +133,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   # it is the visitor, and it has not seen this post today. Everything else
   # is identified by its hashed address for the day.
   defp repeat_visitor?(conn, post_uuid) do
-    unique_views?() and not session_marked?(conn) and
+    not session_marked?(conn) and
       not VisitorTable.first_view_today?(post_uuid, visitor_hash(conn))
   end
 
@@ -139,6 +145,18 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   # mint a new visitor per request. Without a forwarded header, the socket
   # address. The digest is an HMAC under the table owner's per-boot pepper,
   # truncated — a plain hash of an IPv4 address is a 2^32 dictionary.
+  # One spelling per address, or "2001:db8::1" and "2001:0db8:0:0:0:0:0:1"
+  # would be two visitors. A value that is not an address (a forged header)
+  # is kept as written — it still hashes to one visitor per spelling.
+  defp canonical_address(nil), do: nil
+
+  defp canonical_address(address) do
+    case :inet.parse_address(String.to_charlist(address)) do
+      {:ok, ip} -> ip |> :inet.ntoa() |> to_string()
+      _ -> address
+    end
+  end
+
   defp visitor_hash(conn) do
     address =
       conn
@@ -149,7 +167,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
       |> Enum.reject(&(&1 == ""))
       |> List.last()
 
-    address = address || inspect(conn.remote_ip)
+    address = canonical_address(address) || inspect(conn.remote_ip)
 
     case VisitorTable.pepper() do
       nil -> :crypto.hash(:sha256, address) |> binary_part(0, 16)

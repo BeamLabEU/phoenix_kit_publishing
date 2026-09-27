@@ -671,6 +671,13 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       )
 
       invalidate_group_cache(post.group_uuid)
+
+      # Membership moves the per-category counts the categories page shows.
+      case group_slug_of(post) do
+        nil -> :ok
+        slug -> PublishingPubSub.broadcast_categories_changed(slug)
+      end
+
       {:ok, valid_uuids}
     end
   end

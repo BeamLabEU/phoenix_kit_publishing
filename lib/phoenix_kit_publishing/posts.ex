@@ -51,7 +51,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc "Lists time values for posts on a specific date."
-  @spec list_times_on_date(String.t(), Date.t() | String.t()) :: [Time.t()]
+  @spec list_times_on_date(String.t(), Date.t() | String.t()) :: [String.t()]
   def list_times_on_date(group_slug, date) do
     date = if is_binary(date), do: Date.from_iso8601!(date), else: date
 

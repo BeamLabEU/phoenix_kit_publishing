@@ -107,6 +107,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ViewsTest do
       assert drain(post.uuid) == 2
     end
 
+    test "off: the same browser session counts on every open too", %{slug: slug, post: post} do
+      {:ok, _} = Settings.update_boolean_setting("publishing_unique_views", false)
+
+      # The session marker is a dedup as well; off means it is not consulted.
+      first = from_ip({10, 1, 1, 3}) |> browse("/#{slug}/counted")
+      assert first.status == 200
+      first |> Phoenix.ConnTest.recycle() |> browse("/#{slug}/counted") |> html_response(200)
+      assert drain(post.uuid) == 2
+    end
+
+    test "two spellings of one IPv6 address are one visitor", %{slug: slug, post: post} do
+      forwarded("2001:db8::1") |> browse("/#{slug}/counted") |> html_response(200)
+      forwarded("2001:0db8:0:0:0:0:0:1") |> browse("/#{slug}/counted") |> html_response(200)
+      assert drain(post.uuid) == 1
+    end
+
     test "the last forwarded hop — the proxy's own word — is the visitor", %{
       slug: slug,
       post: post
