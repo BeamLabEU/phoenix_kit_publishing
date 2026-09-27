@@ -3748,11 +3748,6 @@ msgstr "Né l’elenco né alcun articolo di questo gruppo compare nella sitemap
 msgid "The editor did not answer, so nothing was switched. Your last edits may not be saved yet — please try again."
 msgstr "L’editor non ha risposto, quindi non è stato cambiato nulla. Le tue ultime modifiche potrebbero non essere ancora salvate — riprova."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:658
-#, elixir-autogen, elixir-format
-msgid "On: count each visitor once per post per day (by session, else a hashed address). Off: count every time the page is opened."
-msgstr "Attivo: ogni visitatore viene contato una volta per articolo al giorno (per sessione, altrimenti per indirizzo con hash). Disattivo: viene contata ogni apertura della pagina."
-
 #: lib/phoenix_kit_publishing/web/settings.ex:656
 #, elixir-autogen, elixir-format
 msgid "Unique Views"
@@ -3767,3 +3762,8 @@ msgstr "Visualizzazioni uniche disattivate — conta ogni apertura della pagina"
 #, elixir-autogen, elixir-format
 msgid "Unique views enabled — one view per visitor per post per day"
 msgstr "Visualizzazioni uniche attivate — una visualizzazione per visitatore, articolo e giorno"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:658
+#, elixir-autogen, elixir-format
+msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
+msgstr "Attivo: ogni visitatore viene contato una volta per articolo al giorno — per sessione, altrimenti per un hash con chiave dell’indirizzo; i lettori che condividono un indirizzo contano una volta finché il browser non conserva il marcatore. Disattivo: viene contata ogni apertura della pagina."

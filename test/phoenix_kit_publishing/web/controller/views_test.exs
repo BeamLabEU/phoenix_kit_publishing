@@ -135,12 +135,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ViewsTest do
       assert is_binary(Views.VisitorTable.pepper())
     end
 
-    test "the visitor table never holds a raw address", %{slug: slug} do
+    test "the visitor table never holds a raw address", %{slug: slug, post: post} do
       from_ip({192, 0, 2, 77}) |> browse("/#{slug}/counted") |> html_response(200)
       forwarded("198.51.100.42, 10.0.0.1") |> browse("/#{slug}/counted") |> html_response(200)
 
       dump = inspect(Views.VisitorTable.entries(), limit: :infinity)
-      assert dump =~ "counted" or dump != "[]"
+      assert dump =~ post.uuid
       refute dump =~ "192.0.2.77"
       refute dump =~ "198.51.100.42"
       refute dump =~ "{192, 0, 2, 77}"

@@ -656,7 +656,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                 <p class="font-medium">{gettext("Unique Views")}</p>
                 <p class="text-xs text-base-content/60">
                   {gettext(
-                    "On: count each visitor once per post per day (by session, else a hashed address). Off: count every time the page is opened."
+                    "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
                   )}
                 </p>
               </div>

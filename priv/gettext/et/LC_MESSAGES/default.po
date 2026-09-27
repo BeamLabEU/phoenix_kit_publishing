@@ -3748,11 +3748,6 @@ msgstr "Ei loend ega ükski selle rühma postitus ei ole saidikaardis."
 msgid "The editor did not answer, so nothing was switched. Your last edits may not be saved yet — please try again."
 msgstr "Redaktor ei vastanud, seega midagi ei vahetatud. Sinu viimased muudatused ei pruugi veel salvestatud olla — palun proovi uuesti."
 
-#: lib/phoenix_kit_publishing/web/settings.ex:658
-#, elixir-autogen, elixir-format
-msgid "On: count each visitor once per post per day (by session, else a hashed address). Off: count every time the page is opened."
-msgstr "Sees: iga külastaja loetakse postituse kohta päevas üks kord (seansi, selle puudumisel räsitud aadressi järgi). Väljas: loetakse iga lehe avamine."
-
 #: lib/phoenix_kit_publishing/web/settings.ex:656
 #, elixir-autogen, elixir-format
 msgid "Unique Views"
@@ -3767,3 +3762,8 @@ msgstr "Unikaalsed vaatamised väljas — loetakse iga lehe avamine"
 #, elixir-autogen, elixir-format
 msgid "Unique views enabled — one view per visitor per post per day"
 msgstr "Unikaalsed vaatamised sees — üks vaatamine külastaja, postituse ja päeva kohta"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:658
+#, elixir-autogen, elixir-format
+msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
+msgstr "Sees: iga külastaja loetakse postituse kohta päevas üks kord — seansi, selle puudumisel aadressi võtmega räsi järgi; ühte aadressi jagavad lugejad loetakse üks kord, kuni brauser markeri alles hoiab. Väljas: loetakse iga lehe avamine."

@@ -31,9 +31,15 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
   `%Date{}` struct compares field by field in key order (day before month)
   and would sweep the wrong keys.
   """
+  # Past this many rows in a day the table stops remembering and every view
+  # counts: a flood of distinct addresses must not turn a 16-byte row each
+  # into unbounded memory, and over-counting under attack beats a crash.
+  @max_rows 500_000
+
   @spec first_view_today?(String.t(), binary(), String.t()) :: boolean()
   def first_view_today?(post_uuid, visitor_hash, day \\ today()) do
-    :ets.insert_new(@table, {{day, post_uuid, visitor_hash}, true})
+    :ets.info(@table, :size) < @max_rows and
+      :ets.insert_new(@table, {{day, post_uuid, visitor_hash}, true})
   rescue
     ArgumentError -> true
   end
