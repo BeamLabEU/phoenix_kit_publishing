@@ -10,6 +10,7 @@ defmodule PhoenixKitPublishing.Routes do
   No-op — public routes are provided via `public_routes/1` instead, which
   is placed later in the route order to avoid catch-all conflicts.
   """
+  @spec generate(String.t()) :: Macro.t()
   def generate(_url_prefix) do
     quote do
     end

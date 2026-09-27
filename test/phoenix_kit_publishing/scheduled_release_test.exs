@@ -157,12 +157,10 @@ defmodule PhoenixKit.Modules.Publishing.ScheduledReleaseTest do
     end
   end
 
-  describe "site_now/0" do
-    test "is now on the site's wall clock, never raising" do
-      before_call = DateTime.utc_now()
-      now = Constants.site_now()
-      expected = Constants.to_site_wall(before_call, Constants.site_tz())
-      assert DateTime.diff(now, expected, :second) in 0..5
-    end
+  # `Constants.site_now/0` is gone: it had no production caller (the
+  # listing filter that once hoisted it moved to `effective_datetime/1`),
+  # so a module that reached for it would be reviving a dead API.
+  test "site_now/0 is not part of Constants" do
+    refute function_exported?(Constants, :site_now, 0)
   end
 end

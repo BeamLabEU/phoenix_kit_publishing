@@ -22,6 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   alias PhoenixKit.Utils.Date, as: UtilsDate
   alias PhoenixKit.Utils.Routes
 
+  import PhoenixKitWeb.Components.Core.EmptyState
   import PhoenixKitWeb.Components.LanguageSwitcher
 
   @impl true
@@ -37,32 +38,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
         }
       )
 
-    # Subscribe to the global groups topic BEFORE the first read, so a
-    # group created/deleted between the snapshot and the subscription
-    # still reaches this LV (per-group post topics follow the read — a
-    # group arriving via the global topic gets its topic in refresh).
-    if connected?(socket) do
-      PublishingPubSub.subscribe_to_groups()
-    end
-
-    {groups, insights} =
-      dashboard_snapshot(
-        socket.assigns.current_locale_base,
-        socket.assigns[:phoenix_kit_current_user],
-        date_time_settings
-      )
+    # Subscribe BEFORE the first read — the global groups topic, then every
+    # existing group's posts topic — so a group or post event landing between
+    # the snapshot and the subscription still reaches this LV. A group
+    # created later arrives on the global topic and gets its posts topic in
+    # refresh_dashboard/1.
+    groups = Publishing.list_groups("active")
 
     subscribed_slugs =
       if connected?(socket) do
-        # Subscribe to all groups' post updates
-        Enum.each(groups, fn group ->
-          PublishingPubSub.subscribe_to_posts(group["slug"])
-        end)
-
+        PublishingPubSub.subscribe_to_groups()
+        Enum.each(groups, &PublishingPubSub.subscribe_to_posts(&1["slug"]))
         MapSet.new(groups, & &1["slug"])
       else
         MapSet.new()
       end
+
+    insights =
+      dashboard_insights(
+        groups,
+        socket.assigns[:phoenix_kit_current_user],
+        date_time_settings
+      )
 
     socket = assign(socket, :subscribed_group_slugs, subscribed_slugs)
 
@@ -168,6 +165,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   end
 
   @impl true
+  # `<.nav_tabs>` dispatches `phx-value-tab`; the `"mode"` shape stays for
+  # existing callers.
+  def handle_event("switch_view", %{"tab" => mode}, socket) do
+    handle_event("switch_view", %{"mode" => mode}, socket)
+  end
+
   def handle_event("switch_view", %{"mode" => mode}, socket) when mode in @group_statuses do
     send(self(), {:deferred_view_switch, mode})
 
@@ -297,16 +300,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   defp empty_dashboard?([], "active", 0), do: true
   defp empty_dashboard?(_groups, _view_mode, _trashed_count), do: false
 
-  defp dashboard_snapshot(_locale, current_user, date_time_settings, view_mode \\ "active") do
+  defp dashboard_snapshot(_locale, current_user, date_time_settings, view_mode) do
     # Admin side reads from database only
-    db_groups = Publishing.list_groups(view_mode)
+    groups = Publishing.list_groups(view_mode)
+    {groups, dashboard_insights(groups, current_user, date_time_settings)}
+  end
 
-    groups = db_groups
-
-    insights =
-      Enum.map(db_groups, &build_group_insight(&1, current_user, date_time_settings))
-
-    {groups, insights}
+  defp dashboard_insights(groups, current_user, date_time_settings) do
+    Enum.map(groups, &build_group_insight(&1, current_user, date_time_settings))
   end
 
   defp build_group_insight(db_group, current_user, date_time_settings) do
@@ -327,20 +328,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       |> Enum.uniq()
       |> Enum.sort()
 
-    latest_published_at = find_latest_published_at(posts)
-
     %{
       name: db_group["name"],
       slug: group_slug,
       mode: db_group["mode"],
       posts_count: length(posts),
       published_count: Map.get(status_counts, Constants.status_published(), 0),
-      draft_count: Map.get(status_counts, "draft", 0),
-      archived_count: Map.get(status_counts, "archived", 0),
       languages: languages,
-      last_published_at: latest_published_at,
       last_published_at_text:
-        format_datetime(latest_published_at, current_user, date_time_settings)
+        format_datetime(find_latest_published_at(posts), current_user, date_time_settings)
     }
   end
 
@@ -392,7 +388,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     _ -> nil
   end
 
-  defp extract_endpoint_url(uri) when is_binary(uri) do
+  # The public origin first (site_url setting, else the endpoint's configured
+  # URL): the connect URI's scheme is what the proxy handed the app, http on
+  # a TLS-terminated host, so the "public URL" copy said http://.
+  defp extract_endpoint_url(uri) do
+    PublishingHTML.public_origin() || origin_from_uri(uri)
+  end
+
+  defp origin_from_uri(uri) when is_binary(uri) do
     case URI.parse(uri) do
       %URI{scheme: scheme, host: host, port: port} when not is_nil(scheme) and not is_nil(host) ->
         port_string = if port in [80, 443], do: "", else: ":#{port}"
@@ -403,7 +406,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     end
   end
 
-  defp extract_endpoint_url(_), do: ""
+  defp origin_from_uri(_), do: ""
 
   defp build_language_pills(language_codes) when is_list(language_codes) do
     Enum.map(language_codes, fn lang ->
@@ -424,50 +427,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     <div class="container flex-col mx-auto px-4 py-6">
     <div class="space-y-2 sm:space-y-3">
       <%= if @empty_state? do %>
-        <div class="card bg-base-100 border border-dashed border-base-300 shadow-sm">
-          <div class="card-body p-4 sm:p-8 items-center text-center space-y-3 sm:space-y-4">
-            <div class="rounded-full bg-base-200 p-3 text-primary">
-              <.icon name="hero-document-text" class="w-8 h-8" />
-            </div>
-            <h2 class="text-xl sm:text-2xl font-semibold text-base-content">
-              {gettext("No publishing groups yet")}
-            </h2>
-            <p class="text-sm sm:text-base text-base-content/70 max-w-xl">
-              {gettext("Create your first publishing group to start drafting posts.")}
-            </p>
-            <div class="flex flex-wrap justify-center gap-3">
-              <.link
-                navigate={Routes.path("/admin/publishing/new-group")}
-                class="btn btn-primary btn-sm"
-              >
-                <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext(
-                  "Create Publishing Group"
-                )}
-              </.link>
-            </div>
-          </div>
-        </div>
+        <.empty_state
+          variant="featured"
+          icon="hero-document-text"
+          title={gettext("No publishing groups yet")}
+          description={gettext("Create your first publishing group to start drafting posts.")}
+        >
+          <.button navigate={Routes.path("/admin/publishing/new-group")} size="sm">
+            <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Create Publishing Group")}
+          </.button>
+        </.empty_state>
       <% else %>
         <%!-- Active / Trashed Tabs — only show if there are trashed groups --%>
         <%= if @trashed_count > 0 or @view_mode == "trashed" do %>
-          <div class="flex items-center gap-0.5 border-b border-base-200">
-            <button
-              type="button"
-              phx-click="switch_view"
-              phx-value-mode="active"
-              class={"px-3 py-1 text-xs font-medium border-b-2 transition-colors cursor-pointer #{if @view_mode == "active", do: "border-primary text-primary", else: "border-transparent text-base-content/50 hover:text-base-content"}"}
-            >
-              {gettext("Active")}
-            </button>
-            <button
-              type="button"
-              phx-click="switch_view"
-              phx-value-mode="trashed"
-              class={"px-3 py-1 text-xs font-medium border-b-2 transition-colors cursor-pointer #{if @view_mode == "trashed", do: "border-error text-error", else: "border-transparent text-base-content/50 hover:text-base-content"}"}
-            >
-              {gettext("Trash")}
-            </button>
-          </div>
+          <.nav_tabs
+            variant={:border}
+            active_tab={@view_mode}
+            on_change="switch_view"
+            tabs={[
+              %{id: "active", label: gettext("Active")},
+              %{id: "trashed", label: gettext("Trash")}
+            ]}
+          />
         <% end %>
 
         <%= if @loading do %>
@@ -552,90 +533,101 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                   </div>
 
                   <div class="hidden sm:block">
-                    <details class="group">
-                      <summary class="text-xs font-medium uppercase text-base-content/60 cursor-pointer select-none list-none flex items-center gap-1 hover:text-base-content transition-colors">
-                        <.icon
-                          name="hero-chevron-right"
-                          class="w-3 h-3 transition-transform group-open:rotate-90"
-                        />
+                    <.accordion
+                      id={"languages-#{insight.slug}"}
+                      title_class="text-xs font-medium uppercase text-base-content/60"
+                    >
+                      <:title>
                         {gettext("Languages used")}:
                         <span class="font-semibold text-base-content/80">
                           {length(insight.languages)}
                         </span>
-                      </summary>
-                      <%= if insight.languages != [] do %>
-                        <div class="pl-4">
+                      </:title>
+                      <:content>
+                        <%= if insight.languages != [] do %>
                           <.language_switcher
                             languages={build_language_pills(insight.languages)}
                             show_status={false}
                             variant={:pills}
                             size={:xs}
                           />
-                        </div>
-                      <% else %>
-                        <p class="text-xs text-base-content/50 mt-1 pl-4">{gettext("None")}</p>
-                      <% end %>
-                    </details>
+                        <% else %>
+                          <p class="text-xs text-base-content/50">{gettext("None")}</p>
+                        <% end %>
+                      </:content>
+                    </.accordion>
                   </div>
 
                   <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-auto">
                     <%= if @view_mode == "active" do %>
-                      <.link
+                      <.button
                         navigate={Routes.path("/admin/publishing/#{insight.slug}")}
-                        class="btn btn-outline btn-sm btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
+                        variant="outline"
+                        size="sm"
+                        class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
                       >
                         <.icon name="hero-arrow-right" class="w-4 h-4 sm:mr-1" />
                         <span class="hidden sm:inline">{gettext("Open")}</span>
-                      </.link>
-                      <.link
+                      </.button>
+                      <.button
                         navigate={Routes.path("/admin/publishing/edit-group/#{insight.slug}")}
-                        class="btn btn-outline btn-sm btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
+                        variant="outline"
+                        size="sm"
+                        class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
                       >
                         <.icon name="hero-cog-6-tooth" class="w-4 h-4 sm:mr-1" />
                         <span class="hidden sm:inline">{gettext("Settings")}</span>
-                      </.link>
+                      </.button>
                       <%= if insight.published_count > 0 do %>
                         <% public_url =
                           @endpoint_url <>
                             PublishingHTML.group_listing_path(@default_url_language, insight.slug) %>
-                        <a
+                        <.button
                           href={public_url}
                           target="_blank"
                           rel="noopener"
-                          class="btn btn-outline btn-sm btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
+                          variant="outline"
+                          size="sm"
+                          class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
                           aria-label={gettext("View public site")}
                         >
                           <.icon name="hero-eye" class="w-4 h-4 sm:mr-1" />
                           <span class="hidden sm:inline">{gettext("Public")}</span>
-                        </a>
+                        </.button>
                       <% end %>
-                      <button
+                      <.button
                         type="button"
                         phx-click="trash_group"
                         phx-value-slug={insight.slug}
                         phx-disable-with={gettext("Trashing…")}
-                        class="btn btn-outline btn-sm btn-xs sm:btn-sm min-w-0 text-error hover:bg-error hover:text-error-content"
+                        variant="outline"
+                        size="sm"
+                        class="btn-xs sm:btn-sm min-w-0 text-error hover:bg-error hover:text-error-content"
                         data-confirm={gettext("Move this group to trash?")}
                       >
                         <.icon name="hero-trash" class="w-4 h-4" />
-                      </button>
+                      </.button>
                     <% else %>
-                      <button
+                      <.button
                         type="button"
                         phx-click="restore_group"
                         phx-value-slug={insight.slug}
                         phx-disable-with={gettext("Restoring…")}
-                        class="btn btn-outline btn-sm btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0 text-success"
+                        variant="outline"
+                        size="sm"
+                        class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0 text-success"
                       >
                         <.icon name="hero-arrow-uturn-left" class="w-4 h-4 sm:mr-1" />
                         <span class="hidden sm:inline">{gettext("Restore")}</span>
-                      </button>
-                      <button
+                      </.button>
+                      <.button
                         type="button"
                         phx-click="delete_group"
                         phx-value-slug={insight.slug}
                         phx-disable-with={gettext("Deleting…")}
-                        class="btn btn-outline btn-sm btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0 text-error hover:bg-error hover:text-error-content"
+                        variant="outline"
+                        size="sm"
+                        class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0 text-error hover:bg-error hover:text-error-content"
                         data-confirm={
                           gettext(
                             "Permanently delete this group and all its posts? This cannot be undone."
@@ -644,7 +636,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                       >
                         <.icon name="hero-trash" class="w-4 h-4 sm:mr-1" />
                         <span class="hidden sm:inline">{gettext("Delete Forever")}</span>
-                      </button>
+                      </.button>
                     <% end %>
                   </div>
                 </div>
@@ -672,10 +664,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
         <% end %>
 
         <%= if not @loading and @dashboard_insights == [] and @view_mode == "trashed" do %>
-          <div class="text-center py-8 text-base-content/60">
-            <.icon name="hero-trash" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p class="text-sm">{gettext("Trash is empty")}</p>
-          </div>
+          <.empty_state icon="hero-trash" title={gettext("Trash is empty")} class="py-8" />
         <% end %>
       <% end %>
     </div>

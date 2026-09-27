@@ -26,8 +26,14 @@ defmodule PhoenixKitPublishing.MigrationsRuntimeTest do
 
   test "reads the version parsed out of the pkpub_schema marker" do
     Repo.query!("COMMENT ON TABLE #{@anchor} IS 'pkpub_schema:1'")
-
     assert Migrations.migrated_version_runtime(prefix: "public") == 1
+
+    Repo.query!("COMMENT ON TABLE #{@anchor} IS 'pkpub_schema:2'")
+    assert Migrations.migrated_version_runtime(prefix: "public") == 2
+  end
+
+  test "the test database starts at current_version/0" do
+    assert Migrations.migrated_version_runtime(prefix: "public") == Migrations.current_version()
   end
 
   test "reads 0 again once a stamped marker is cleared" do

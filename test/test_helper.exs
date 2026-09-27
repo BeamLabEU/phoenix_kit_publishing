@@ -107,6 +107,15 @@ Application.put_env(:phoenix_kit_publishing, :test_repo_available, repo_availabl
 # via rescue clauses without exercising the actual cache logic.
 {:ok, _pid} = PhoenixKit.Cache.Registry.start_link()
 
+# ListingCache installs and erases its `:persistent_term` snapshots through
+# this owner (one writer at a time). Without it every regeneration would be
+# refused as `:unavailable` and `exists?/1` would stay false after `regenerate/2`.
+{:ok, _pid} = PhoenixKit.Modules.Publishing.ListingCache.LockTableOwner.start_link([])
+
+# Views dedups cookieless visitors per day through this table's owner; without
+# it `publishing_unique_views` silently degrades to counting every open.
+{:ok, _pid} = PhoenixKit.Modules.Publishing.Views.VisitorTable.start_link([])
+
 # Web.Listing's `handle_params/3` spawns a stale-fixer task via
 # Task.Supervisor.start_child(PhoenixKit.TaskSupervisor, …) — start that
 # supervisor under a tiny task supervisor so LV mount tests don't crash

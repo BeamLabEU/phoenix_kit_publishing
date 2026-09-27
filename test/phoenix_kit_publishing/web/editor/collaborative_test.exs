@@ -142,8 +142,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.CollaborativeTest do
 
       assert info.role == :owner
       assert info.id == "u-1"
-      assert info.email == "a@b.com"
       assert info.socket_id == socket.id
+    end
+
+    # The payload rides PubSub to every subscriber of the group's editors
+    # topic; no receiver reads the address, so it does not travel.
+    test "carries no email" do
+      socket =
+        fake_socket(%{
+          lock_owner?: true,
+          phoenix_kit_current_user: %{uuid: "u-1", email: "a@b.com"}
+        })
+
+      refute Map.has_key?(Collaborative.build_user_info(socket, nil), :email)
     end
 
     test "spectator role with current user" do
@@ -168,7 +179,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.CollaborativeTest do
       info = Collaborative.build_user_info(socket, override)
 
       assert info.id == "override"
-      assert info.email == "o@o.com"
+      refute Map.has_key?(info, :email)
     end
 
     test "returns minimal info when no user is available" do
@@ -179,6 +190,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.CollaborativeTest do
       refute Map.has_key?(info, :email)
       assert info.socket_id == socket.id
       assert info.role == :spectator
+    end
+  end
+
+  describe "current_post_id/1" do
+    test "is the post's broadcast id (its uuid)" do
+      socket = fake_socket(%{post: %{uuid: "post-uuid", slug: "hello"}})
+      assert Collaborative.current_post_id(socket) == "post-uuid"
+    end
+
+    test "is nil before a post is assigned" do
+      assert Collaborative.current_post_id(fake_socket(%{})) == nil
+      assert Collaborative.current_post_id(fake_socket(%{post: nil})) == nil
     end
   end
 

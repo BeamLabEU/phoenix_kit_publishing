@@ -62,11 +62,14 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   end
 
   @doc """
-  Broadcasts a group created event.
+  Broadcasts a group created event with a minimal payload (uuid + slug).
+
+  Every receiver reloads the groups from the DB; the name, description
+  and settings never need to cross PubSub. See `broadcast_post_created/2`.
   """
   @spec broadcast_group_created(map()) :: broadcast_result
   def broadcast_group_created(group) do
-    Manager.broadcast(groups_topic(), {:group_created, group})
+    Manager.broadcast(groups_topic(), {:group_created, minimal_payload(group)})
   end
 
   @doc """
@@ -78,11 +81,50 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   end
 
   @doc """
-  Broadcasts a group updated event.
+  Broadcasts a group updated event with a minimal payload (uuid + slug).
   """
   @spec broadcast_group_updated(map()) :: broadcast_result
   def broadcast_group_updated(group) do
-    Manager.broadcast(groups_topic(), {:group_updated, group})
+    Manager.broadcast(groups_topic(), {:group_updated, minimal_payload(group)})
+  end
+
+  # ============================================================================
+  # Category Tree Updates (one topic per group)
+  # ============================================================================
+
+  @doc """
+  Returns the topic for a group's category tree.
+  """
+  @spec categories_topic(String.t()) :: String.t()
+  def categories_topic(group_slug) do
+    "#{@topic_prefix}:#{group_slug}:categories"
+  end
+
+  @doc """
+  Subscribes the current process to `{:categories_changed, group_slug}`.
+  """
+  @spec subscribe_to_categories(String.t()) :: subscription_result
+  def subscribe_to_categories(group_slug) do
+    Manager.subscribe(categories_topic(group_slug))
+  end
+
+  @doc """
+  Unsubscribes the current process from a group's category tree updates.
+  """
+  @spec unsubscribe_from_categories(String.t()) :: :ok
+  def unsubscribe_from_categories(group_slug) do
+    Manager.unsubscribe(categories_topic(group_slug))
+  end
+
+  @doc """
+  Broadcasts that a group's category tree changed (create, update, delete,
+  reorder, move). The payload is only the group slug: receivers reload the
+  tree, which is one query, and a per-row payload would have to describe a
+  re-parent, a renumbering and a delete-with-lifted-children alike.
+  """
+  @spec broadcast_categories_changed(String.t()) :: broadcast_result
+  def broadcast_categories_changed(group_slug) do
+    Manager.broadcast(categories_topic(group_slug), {:categories_changed, group_slug})
   end
 
   # ============================================================================
@@ -134,10 +176,11 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
     Manager.broadcast(posts_topic(group_slug), {:post_updated, minimal_payload(post)})
   end
 
-  # Strips a post map to the only fields receivers actually use, so
-  # broadcasts don't leak title/body/version metadata into PubSub traces.
-  defp minimal_payload(post) when is_map(post) do
-    %{uuid: post[:uuid] || post["uuid"], slug: post[:slug] || post["slug"]}
+  # Strips a post or group map to the only fields receivers actually use, so
+  # broadcasts don't leak title/body/settings into PubSub traces. Accepts
+  # atom or string keys (group maps are string-keyed).
+  defp minimal_payload(record) when is_map(record) do
+    %{uuid: record[:uuid] || record["uuid"], slug: record[:slug] || record["slug"]}
   end
 
   defp minimal_payload(other), do: other
@@ -496,68 +539,19 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   # ============================================================================
 
   @doc """
-  Broadcasts that AI translation has started.
-  Sent to both posts_topic (for group listing) and post_translations_topic (for editor).
+  Broadcasts that AI translation has started, to the post's translations topic.
+
+  `scope` (the version the jobs target) rides the payload so an editor viewing
+  a different version ignores this start event — versions translate
+  independently. Progress and completion arrive through core's
+  `{:ai_translation, …}` events, not through this module.
   """
   @spec broadcast_translation_started(String.t(), String.t(), [String.t()], String.t() | nil) ::
           broadcast_result
   def broadcast_translation_started(group_slug, post_slug, target_languages, scope \\ nil) do
-    # `scope` (the version the jobs target) rides the editor payload so an editor
-    # viewing a different version ignores this start event — versions translate
-    # independently. The group-listing payload stays version-agnostic.
-    payload = {:translation_started, group_slug, post_slug, target_languages, scope}
-
-    # Broadcast to group listing
-    Manager.broadcast(
-      posts_topic(group_slug),
-      {:translation_started, post_slug, length(target_languages)}
-    )
-
-    # Broadcast to editor (more detailed info)
-    Manager.broadcast(post_translations_topic(group_slug, post_slug), payload)
-  end
-
-  @doc """
-  Broadcasts AI translation progress (after each language completes).
-  Sent to both posts_topic (for group listing) and post_translations_topic (for editor).
-  """
-  @spec broadcast_translation_progress(
-          String.t(),
-          String.t(),
-          non_neg_integer(),
-          non_neg_integer(),
-          String.t()
-        ) :: broadcast_result
-  def broadcast_translation_progress(group_slug, post_slug, completed, total, last_language) do
-    # Broadcast to group listing
-    Manager.broadcast(
-      posts_topic(group_slug),
-      {:translation_progress, post_slug, completed, total}
-    )
-
-    # Broadcast to editor (more detailed info)
     Manager.broadcast(
       post_translations_topic(group_slug, post_slug),
-      {:translation_progress, group_slug, post_slug, completed, total, last_language}
-    )
-  end
-
-  @doc """
-  Broadcasts that AI translation has completed (success or partial failure).
-  Sent to both posts_topic (for group listing) and post_translations_topic (for editor).
-  """
-  @spec broadcast_translation_completed(String.t(), String.t(), map()) :: broadcast_result
-  def broadcast_translation_completed(group_slug, post_slug, results) do
-    # Broadcast to group listing
-    Manager.broadcast(
-      posts_topic(group_slug),
-      {:translation_completed, post_slug, results}
-    )
-
-    # Broadcast to editor
-    Manager.broadcast(
-      post_translations_topic(group_slug, post_slug),
-      {:translation_completed, group_slug, post_slug, results}
+      {:translation_started, group_slug, post_slug, target_languages, scope}
     )
   end
 
@@ -566,28 +560,14 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   # ============================================================================
 
   @doc """
-  Returns the global topic for editor activity across a group.
-  Used by group listing to show who's editing what.
+  Returns the topic for editor activity across a group.
+
+  The editor broadcasts `:editor_joined` / `:editor_left` here; nothing in this
+  module subscribes to it (a host may).
   """
   @spec group_editors_topic(String.t()) :: String.t()
   def group_editors_topic(group_slug) do
     "#{@topic_prefix}:#{group_slug}:editors"
-  end
-
-  @doc """
-  Subscribes to editor activity for a group (used by group listing).
-  """
-  @spec subscribe_to_group_editors(String.t()) :: subscription_result
-  def subscribe_to_group_editors(group_slug) do
-    Manager.subscribe(group_editors_topic(group_slug))
-  end
-
-  @doc """
-  Unsubscribes from editor activity for a group.
-  """
-  @spec unsubscribe_from_group_editors(String.t()) :: :ok
-  def unsubscribe_from_group_editors(group_slug) do
-    Manager.unsubscribe(group_editors_topic(group_slug))
   end
 
   @doc """

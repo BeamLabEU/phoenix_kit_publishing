@@ -391,6 +391,22 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
       assert off_result.metadata.allow_version_access == false
     end
 
+    test "listing metadata carries sitemap_exclude (core's Sitemap source reads it)" do
+      group = build_group()
+      post = build_post(group)
+      on_version = build_version(post, %{data: %{"sitemap_exclude" => true}})
+      off_version = build_version(post, %{data: %{}})
+
+      on_result =
+        Mapper.to_listing_map(post, on_version, [build_content(on_version)], [on_version])
+
+      off_result =
+        Mapper.to_listing_map(post, off_version, [build_content(off_version)], [off_version])
+
+      assert on_result.metadata.sitemap_exclude == true
+      assert off_result.metadata.sitemap_exclude == false
+    end
+
     test "listing metadata carries the featured flag (drives the hero band / pinning)" do
       group = build_group()
       post = build_post(group)

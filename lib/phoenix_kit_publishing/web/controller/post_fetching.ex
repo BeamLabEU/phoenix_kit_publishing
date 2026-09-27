@@ -22,6 +22,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostFetching do
   Fetches a slug-mode post - iterates from highest version down, returns first published.
   Falls back to primary language or first available if requested language isn't found.
   """
+  @spec fetch_post(
+          String.t(),
+          {:slug, String.t()} | {:timestamp, String.t() | Date.t(), String.t() | Time.t()},
+          String.t()
+        ) :: {:ok, map()} | {:error, term()}
   def fetch_post(group_slug, {:slug, post_slug}, language) do
     Publishing.read_post(group_slug, post_slug, language)
   end
@@ -36,16 +41,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostFetching do
   # ============================================================================
 
   @doc """
-  Fetches posts using cache when available, falls back to direct DB read.
+  Lists a group's posts from the listing cache when available, falling back to a direct DB read.
 
   Tries ListingCache (persistent_term) first for sub-microsecond reads.
   On cache miss, regenerates from the database.
   """
-  def fetch_posts_with_cache(group_slug) do
-    fetch_posts_with_listing_cache(group_slug)
+  @spec list_posts_with_cache(String.t()) :: [map()]
+  def list_posts_with_cache(group_slug) do
+    list_posts_with_listing_cache(group_slug)
   end
 
-  defp fetch_posts_with_listing_cache(group_slug) do
+  defp list_posts_with_listing_cache(group_slug) do
     start_time = System.monotonic_time(:microsecond)
 
     case ListingCache.read(group_slug) do

@@ -55,6 +55,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.FeedTest do
     assert body =~ ~s(rel="self")
   end
 
+  # Behind a TLS-terminating proxy `conn.scheme` is http, so every absolute
+  # link in the feed said http://. The `site_url` setting is the public origin.
+  test "the site_url setting is the origin of every feed link", %{conn: conn, group_slug: slug} do
+    {:ok, _} = Settings.update_setting("site_url", "https://example.test/")
+    on_exit(fn -> {:ok, _} = Settings.update_setting("site_url", "") end)
+
+    body = get(conn, "/#{slug}/feed.xml") |> response(200)
+
+    assert body =~ ~s(<atom:link href="https://example.test/#{slug}/feed.xml" rel="self")
+    assert body =~ "<link>https://example.test/#{slug}</link>"
+    assert body =~ "<link>https://example.test/#{slug}/feed-post-one</link>"
+    refute body =~ "http://www.example.com"
+  end
+
   test "unpublished posts are absent", %{conn: conn, group_slug: slug} do
     {:ok, _draft} =
       Posts.create_post(slug, %{

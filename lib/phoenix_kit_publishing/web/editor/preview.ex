@@ -21,6 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Preview do
   @doc """
   Builds the preview payload from the current socket state.
   """
+  @spec build_preview_payload(Phoenix.LiveView.Socket.t()) :: map()
   def build_preview_payload(socket) do
     form = socket.assigns.form || %{}
     post = socket.assigns.post
@@ -121,6 +122,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Preview do
   @doc """
   Builds the preview URL query params.
   """
+  @spec build_preview_query_params(term(), String.t()) :: map()
   def build_preview_query_params(_preview_payload, token) do
     %{"preview_token" => token}
   end
@@ -128,6 +130,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Preview do
   @doc """
   Builds the editor path for preview mode.
   """
+  @spec preview_editor_path(Phoenix.LiveView.Socket.t(), map(), String.t(), term()) :: String.t()
   def preview_editor_path(socket, data, token, _params) do
     group_slug = data[:group_slug] || socket.assigns.group_slug
 
@@ -154,6 +157,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Preview do
   @doc """
   Applies preview payload data to the socket.
   """
+  @spec apply_preview_payload(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
   def apply_preview_payload(socket, data) do
     group_slug = data[:group_slug] || socket.assigns.group_slug
     mode = data[:mode] || :timestamp

@@ -1,3 +1,5 @@
+> **Partly superseded.** Items about the `MarkdownEditor` textarea, `phx-keyup` and the old hook protocol predate the move to Leaf (2026-07-31); the editor talks to Leaf through `send_update` only.
+
 # Publishing improvements roadmap — 2026-07 brainstorm
 
 Planning record for the post-0.4.3 improvement wave. Sources: the boss's

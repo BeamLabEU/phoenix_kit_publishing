@@ -92,7 +92,9 @@ defmodule PhoenixKit.Modules.Publishing do
 
   defdelegate list_groups(), to: Groups
   defdelegate list_groups(status), to: Groups
-  defdelegate get_group(slug), to: Groups
+  defdelegate fetch_group(slug), to: Groups
+  @deprecated "Use fetch_group/1"
+  defdelegate get_group(slug), to: Groups, as: :fetch_group
   defdelegate add_group(name, opts \\ []), to: Groups
   defdelegate remove_group(slug), to: Groups
   defdelegate remove_group(slug, opts), to: Groups
@@ -153,7 +155,7 @@ defmodule PhoenixKit.Modules.Publishing do
   alias PhoenixKit.Modules.Publishing.Versions
 
   defdelegate list_versions(group_slug, post_slug), to: Versions
-  defdelegate get_published_version(group_slug, post_slug), to: Versions
+  defdelegate fetch_published_version(group_slug, post_slug), to: Versions
   defdelegate get_version_status(group_slug, post_slug, version_number, language), to: Versions
   defdelegate get_version_metadata(group_slug, post_slug, version_number, language), to: Versions
 
@@ -174,8 +176,6 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate unpublish_post(group_slug, post_uuid, opts \\ []), to: Versions
   defdelegate delete_version(group_slug, post_uuid, version), to: Versions
   defdelegate delete_version(group_slug, post_uuid, version, opts), to: Versions
-  @doc false
-  defdelegate broadcast_version_created(group_slug, broadcast_id, new_version), to: Versions
 
   # ============================================================================
   # Translation Delegates
@@ -250,14 +250,20 @@ defmodule PhoenixKit.Modules.Publishing do
   def enable_system do
     result = settings_call(:update_boolean_setting, [@publishing_enabled_key, true])
 
-    with {:ok, _} <- result do
-      ActivityLog.log_manual(
-        "publishing.module.enabled",
-        nil,
-        "publishing_module",
-        nil,
-        %{}
-      )
+    case result do
+      {:ok, _} ->
+        ActivityLog.log_manual("publishing.module.enabled", nil, "publishing_module", nil, %{})
+
+      {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.module.enabled",
+          nil,
+          "publishing_module",
+          nil,
+          %{
+            "reason" => ActivityLog.reason_string(reason)
+          }
+        )
     end
 
     result
@@ -268,23 +274,31 @@ defmodule PhoenixKit.Modules.Publishing do
   def disable_system do
     result = settings_call(:update_boolean_setting, [@publishing_enabled_key, false])
 
-    with {:ok, _} <- result do
-      ActivityLog.log_manual(
-        "publishing.module.disabled",
-        nil,
-        "publishing_module",
-        nil,
-        %{}
-      )
+    case result do
+      {:ok, _} ->
+        ActivityLog.log_manual("publishing.module.disabled", nil, "publishing_module", nil, %{})
+
+      {:error, reason} ->
+        ActivityLog.log_failed_mutation(
+          "publishing.module.disabled",
+          nil,
+          "publishing_module",
+          nil,
+          %{
+            "reason" => ActivityLog.reason_string(reason)
+          }
+        )
     end
 
     result
   end
 
   @impl PhoenixKit.Module
+  @spec module_key() :: String.t()
   def module_key, do: "publishing"
 
   @impl PhoenixKit.Module
+  @spec module_name() :: String.t()
   def module_name, do: "Publishing"
 
   # Project-extension catalog entry for the `phoenix_kit_projects` hub —
@@ -295,6 +309,7 @@ defmodule PhoenixKit.Modules.Publishing do
   # scans modules, not file paths, so discovery works the same. The Docs
   # tab config-links ONE publishing group per project (groups are
   # slug-keyed everywhere in this package, so the config stores the SLUG).
+  @spec phoenix_kit_project_extensions() :: [map()]
   def phoenix_kit_project_extensions do
     [
       %{
@@ -331,6 +346,7 @@ defmodule PhoenixKit.Modules.Publishing do
   entry declares its `type` (`:text` / `:image`), which lets the OG
   assignment UI show only compatible variables for a given slot.
   """
+  @spec og_variables() :: [map()]
   def og_variables do
     [
       %{
@@ -389,6 +405,7 @@ defmodule PhoenixKit.Modules.Publishing do
   post supplied in `context.resource`. Falls back to `nil` for unknown
   names so unwired slots stay visible rather than blowing up.
   """
+  @spec og_resolve(String.t(), map()) :: String.t() | nil
   def og_resolve("post_title", %{resource: post}),
     do: og_override(post, "title") || og_get_meta(post, :title)
 
@@ -478,15 +495,18 @@ defmodule PhoenixKit.Modules.Publishing do
 
   defp og_get_meta(_, _), do: nil
 
+  # The public origin, not the request's scheme — behind a TLS-terminating
+  # proxy conn.scheme is http (see PublishingHTML.public_origin/0).
   defp absolute_post_url(%Plug.Conn{} = conn, path) when is_binary(path) do
-    port_suffix = if conn.port in [80, 443], do: "", else: ":#{conn.port}"
-    "#{conn.scheme}://#{conn.host}#{port_suffix}#{path}"
+    PublishingHTML.public_origin(conn) <> path
   end
 
   @impl PhoenixKit.Module
+  @spec version() :: String.t()
   def version, do: @version
 
   @impl PhoenixKit.Module
+  @spec get_config() :: %{enabled: boolean(), groups_count: non_neg_integer()}
   def get_config do
     %{
       enabled: enabled?(),
@@ -507,6 +527,7 @@ defmodule PhoenixKit.Modules.Publishing do
   ambient traffic and is the one a busy author mutes first.
   """
   @impl PhoenixKit.Module
+  @spec notification_types() :: [map()]
   def notification_types do
     [
       %{
@@ -536,6 +557,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @impl PhoenixKit.Module
+  @spec permission_metadata() :: PhoenixKit.Module.permission_meta()
   def permission_metadata do
     %{
       key: "publishing",
@@ -546,6 +568,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @impl PhoenixKit.Module
+  @spec admin_tabs() :: [Tab.t()]
   def admin_tabs do
     [
       Tab.new!(
@@ -567,6 +590,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @doc "Dynamic children function for Publishing sidebar tabs."
+  @spec publishing_children(term()) :: [Tab.t()]
   def publishing_children(_scope) do
     groups = load_publishing_groups_for_tabs()
 
@@ -621,6 +645,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @impl PhoenixKit.Module
+  @spec settings_tabs() :: [Tab.t()]
   def settings_tabs do
     [
       Tab.new!(
@@ -638,6 +663,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @impl PhoenixKit.Module
+  @spec children() :: [Supervisor.child_spec() | module()]
   def children do
     [
       PhoenixKit.Modules.Publishing.Presence,
@@ -648,6 +674,9 @@ defmodule PhoenixKit.Modules.Publishing do
       # group — without it, multi-node deploys served stale listings on peer
       # nodes after a rename/trash/delete until an unrelated local mutation.
       PhoenixKit.Modules.Publishing.ListingCache.CacheSync,
+      # Owns the per-day visitor table behind publishing_unique_views, swept
+      # once a day; without it the counter counts every open.
+      PhoenixKit.Modules.Publishing.Views.VisitorTable,
       # Per-post render cache (Renderer.render_post_cached/1). Without this the
       # cache GenServer never starts, so every published view re-renders markdown
       # and logs a per-request warning. max_size bounds growth — the cache key
@@ -660,9 +689,11 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @impl PhoenixKit.Module
+  @spec route_module() :: module()
   def route_module, do: PhoenixKitPublishing.Routes
 
   @impl PhoenixKit.Module
+  @spec css_sources() :: [atom()]
   def css_sources, do: [:phoenix_kit_publishing]
 
   # Decentralized-migrations protocol (see PhoenixKitPublishing.Migrations'
@@ -670,11 +701,13 @@ defmodule PhoenixKit.Modules.Publishing do
   # though core's chain still creates them (V135 baseline + V159) on every
   # install.
   @impl PhoenixKit.Module
+  @spec migration_module() :: module()
   def migration_module, do: PhoenixKitPublishing.Migrations
 
   # The group media folders' plan source for `mix phoenix_kit.media.reorganize`
   # (see `MediaFolders` for the host config that turns the folders on).
   @impl PhoenixKit.Module
+  @spec media_reorganizer() :: module()
   def media_reorganizer, do: PhoenixKit.Modules.Publishing.MediaReorganizer
 
   # ============================================================================
@@ -712,13 +745,18 @@ defmodule PhoenixKit.Modules.Publishing do
 
   @doc """
   Returns true when the slug matches the allowed lowercase letters, numbers, and hyphen pattern,
-  and is not a reserved language code.
+  and is neither a reserved language code nor a reserved route word.
 
-  Group slugs cannot be language codes (like 'en', 'es', 'fr') to prevent routing ambiguity.
+  Group slugs cannot be language codes (like 'en', 'es', 'fr') to prevent routing ambiguity,
+  and cannot be route words the host serves itself (`admin`, `api`, `assets`, …, see
+  `SlugHelpers.reserved_route_word?/1`): a group slugged `admin` is shadowed by the host's
+  own routes and never reachable. `Groups.add_group/2` suffixes a derived slug past a
+  reserved word (`Admin` → `admin-2`) and refuses an explicit one (`{:error, :invalid_slug}`).
   """
   @spec valid_slug?(any()) :: boolean()
   def valid_slug?(slug) when is_binary(slug) do
-    slug != "" and SlugHelpers.matches_shape?(slug) and not reserved_language_code?(slug)
+    slug != "" and SlugHelpers.matches_shape?(slug) and
+      not SlugHelpers.reserved_route_word?(slug) and not reserved_language_code?(slug)
   end
 
   def valid_slug?(_), do: false
@@ -740,7 +778,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @doc false
-  defdelegate fetch_option(opts, key), to: Shared
+  defdelegate get_option(opts, key), to: Shared
 
   @doc false
   defdelegate audit_metadata(scope, action), to: Shared

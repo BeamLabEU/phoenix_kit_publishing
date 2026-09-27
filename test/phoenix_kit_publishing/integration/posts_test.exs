@@ -598,7 +598,7 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
 
       # Create two posts
       {:ok, published_post} = Posts.create_post(group["slug"], %{title: "Published"})
-      {:ok, draft_post} = Posts.create_post(group["slug"], %{title: "Draft Only"})
+      {:ok, _draft_post} = Posts.create_post(group["slug"], %{title: "Draft Only"})
 
       # Publish only the first one
       :ok = Versions.publish_version(group["slug"], published_post[:uuid], 1)

@@ -51,7 +51,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc "Lists time values for posts on a specific date."
-  @spec list_times_on_date(String.t(), Date.t() | String.t()) :: [Time.t()]
+  @spec list_times_on_date(String.t(), Date.t() | String.t()) :: [String.t()]
   def list_times_on_date(group_slug, date) do
     date = if is_binary(date), do: Date.from_iso8601!(date), else: date
 
@@ -331,7 +331,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
     audit_meta =
       opts_map
-      |> Shared.fetch_option(:scope)
+      |> Shared.get_option(:scope)
       |> Shared.audit_metadata(:update)
 
     result = update_post_in_db(group_slug, post, params, audit_meta)
@@ -572,7 +572,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   defp do_create_post_in_db(group_slug, group, opts) do
-    scope = Shared.fetch_option(opts, :scope)
+    scope = Shared.get_option(opts, :scope)
     mode = Publishing.get_group_mode(group_slug)
     primary_language = LanguageHelpers.get_primary_language()
     now = UtilsDate.utc_now()
@@ -584,8 +584,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     slug_result =
       case mode do
         "slug" ->
-          title = Shared.fetch_option(opts, :title)
-          preferred_slug = Shared.fetch_option(opts, :slug)
+          title = Shared.get_option(opts, :title)
+          preferred_slug = Shared.get_option(opts, :slug)
           SlugHelpers.generate_unique_slug(group_slug, title || "", preferred_slug)
 
         _ ->
@@ -716,7 +716,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
          post_slug
        ) do
     final_attrs = resolve_timestamp_in_transaction(post_attrs, mode, group_slug)
-    content = Shared.fetch_option(opts, :content) || ""
+    content = Shared.get_option(opts, :content) || ""
 
     with {:ok, db_post} <- DBStorage.create_post(final_attrs),
          {:ok, db_version} <-
@@ -731,7 +731,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
            DBStorage.create_content(%{
              version_uuid: db_version.uuid,
              language: primary_language,
-             title: Shared.fetch_option(opts, :title) || "",
+             title: Shared.get_option(opts, :title) || "",
              content: content,
              url_slug: post_slug
            }) do
@@ -1434,6 +1434,11 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       |> maybe_put_version_field(
         "allow_version_access",
         normalize_featured(Map.get(params, "allow_version_access"))
+      )
+      # Core's Sitemap source reads `metadata.sitemap_exclude` off the post map.
+      |> maybe_put_version_field(
+        "sitemap_exclude",
+        normalize_featured(Map.get(params, "sitemap_exclude"))
       )
       |> put_audio_uuid(Map.get(params, "audio_uuid"))
 

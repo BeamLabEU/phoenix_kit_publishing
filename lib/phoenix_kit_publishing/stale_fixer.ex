@@ -238,13 +238,14 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       {:ok, _} ->
         mark_listing_dirty()
 
-        ActivityLog.log_manual(
-          "publishing.post.auto_trashed",
-          nil,
-          "publishing_post",
-          post.uuid,
-          %{"reason" => "empty_post", "group_uuid" => post.group_uuid}
-        )
+        # Self-healing, not a person's action: AGENTS.md lists it as `auto`.
+        ActivityLog.log(%{
+          action: "publishing.post.auto_trashed",
+          mode: "auto",
+          resource_type: "publishing_post",
+          resource_uuid: post.uuid,
+          metadata: %{"reason" => "empty_post", "group_uuid" => post.group_uuid}
+        })
 
       {:error, _reason} ->
         :ok
@@ -459,6 +460,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   @doc false
   # Exposed (with @doc false) for the slug-conflict-retry test. Production
   # callers always go through `fix_stale_post/1` / `fix_stale_group/1`.
+  @spec apply_stale_fix(struct(), map(), (struct(), map() -> {:ok, struct()} | {:error, term()})) ::
+          struct()
   def apply_stale_fix(record, attrs, update_fn \\ &DBStorage.update_post/2)
 
   def apply_stale_fix(record, attrs, _update_fn) when attrs == %{}, do: record
@@ -572,6 +575,10 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     :ok
   end
 
+  @spec fix_stale_version(PhoenixKit.Modules.Publishing.PublishingVersion.t()) ::
+          {:ok, PhoenixKit.Modules.Publishing.PublishingVersion.t()}
+          | {:error, Ecto.Changeset.t()}
+          | nil
   def fix_stale_version(version) do
     if version.status not in @valid_version_statuses do
       Logger.info(
@@ -589,6 +596,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
+  @spec fix_stale_content(PublishingContent.t()) ::
+          :ok | nil | {:ok, PublishingContent.t()} | {:error, Ecto.Changeset.t()}
   def fix_stale_content(content) do
     case normalize_content_language(content) do
       {:deleted, _target_language} ->
@@ -901,6 +910,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   If multiple versions have status "published", keeps the highest version
   number as published and archives the rest.
   """
+  @spec fix_multiple_published_versions(PublishingPost.t()) ::
+          {:ok, term()} | {:error, term()} | nil
   def fix_multiple_published_versions(%PublishingPost{} = post) do
     ctx = build_post_context(post)
     fix_multiple_published_versions(post, ctx)
@@ -915,37 +926,63 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     orphans = Enum.filter(ctx.versions, &Constants.published?(&1.status))
 
     for v <- orphans do
-      Logger.info(
-        "[Publishing] Demoting orphaned published v#{v.version_number} of post " <>
-          "#{post.uuid} to draft (post has no active version)"
-      )
+      # Compare-and-set: the demotion only lands while the post STILL has no
+      # active version and the row is STILL published — a publish that
+      # committed between the read above and this write keeps its version.
+      case DBStorage.demote_version_if_orphaned(v.uuid, post.uuid) do
+        1 ->
+          Logger.info(
+            "[Publishing] Demoting orphaned published v#{v.version_number} of post " <>
+              "#{post.uuid} to draft (post has no active version)"
+          )
 
-      DBStorage.update_version(v, %{status: "draft"})
-      DBStorage.update_content_status(v.uuid, "draft")
-      mark_listing_dirty()
+          DBStorage.update_content_status(v.uuid, "draft")
+          mark_listing_dirty()
+
+        _ ->
+          :ok
+      end
     end
   end
 
   defp demote_orphaned_published_versions(_post, _ctx), do: :ok
 
+  # Runs under the post row lock on versions read inside it. Keeps the
+  # highest version number published and archives the rest.
+  defp archive_extra_published(post, versions) do
+    case Enum.filter(versions, &Constants.published?(&1.status)) do
+      [_, _ | _] = fresh ->
+        [keep | demote] = Enum.sort_by(fresh, & &1.version_number, :desc)
+
+        Logger.info(
+          "[Publishing] Post #{post.uuid} has #{length(fresh)} published versions, " <>
+            "keeping v#{keep.version_number}, archiving #{length(demote)} others"
+        )
+
+        for v <- demote do
+          DBStorage.update_version(v, %{status: "archived"})
+          DBStorage.update_content_status(v.uuid, "archived")
+          mark_listing_dirty()
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
   defp fix_multiple_published_versions(post, ctx) do
     published = Enum.filter(ctx.versions, &Constants.published?(&1.status))
 
     if length(published) > 1 do
-      # Keep the highest version number, archive the rest
-      sorted = Enum.sort_by(published, & &1.version_number, :desc)
-      [keep | demote] = sorted
+      # Decide and write under the post's row lock — the one the publish
+      # machinery takes — on versions re-read inside it, so a publish landing
+      # between the snapshot above and this write is not archived by it.
+      repo = RepoHelper.repo()
 
-      Logger.info(
-        "[Publishing] Post #{post.uuid} has #{length(published)} published versions, " <>
-          "keeping v#{keep.version_number}, archiving #{length(demote)} others"
-      )
-
-      for v <- demote do
-        DBStorage.update_version(v, %{status: "archived"})
-        DBStorage.update_content_status(v.uuid, "archived")
-        mark_listing_dirty()
-      end
+      repo.transaction(fn ->
+        DBStorage.lock_post_row!(repo, post.uuid)
+        archive_extra_published(post, DBStorage.list_versions(post.uuid))
+      end)
     end
   end
 

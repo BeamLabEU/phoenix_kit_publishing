@@ -44,6 +44,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.VersionAccessGateTest do
 
   defp get_version(ctx, n), do: build_conn() |> get("/#{ctx.slug}/gate/v/#{n}")
 
+  # The version segment used to reach the int4 column unbounded and 500 with
+  # DBConnection.EncodeError; it is the same invalid-version outcome as "v/0".
+  test "a version number beyond int4 is the invalid-version fallback, not a 500", ctx do
+    conn = get_version(ctx, 99_999_999_999)
+
+    assert conn.status == 302
+    assert redirected_to(conn) =~ "/#{ctx.slug}"
+  end
+
   test "a superseded version stays readable behind the live one", ctx do
     {:ok, _} = Versions.create_version_from(ctx.slug, ctx.post.uuid, 1)
     {:ok, v2} = Publishing.read_post_by_uuid(ctx.post.uuid, "en", 2)

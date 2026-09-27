@@ -81,7 +81,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.ClickFeedbackTest do
 
     for event <- ~w(generate_default_translation_prompt regenerate_default_translation_prompt) do
       [_, after_event] = String.split(source, ~s(phx-click="#{event}"), parts: 2)
-      button_tail = after_event |> String.split("</button>") |> List.first()
+      button_tail = after_event |> String.split(~r{</\.?button>}) |> List.first()
 
       assert button_tail =~ "loading-spinner", "#{event} must acknowledge the click"
     end

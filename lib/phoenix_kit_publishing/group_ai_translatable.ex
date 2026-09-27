@@ -44,9 +44,12 @@ defmodule PhoenixKitPublishing.GroupAITranslatable do
   @resource_type "publishing_group"
 
   @doc "The resource-type key this adapter registers under."
+  @spec resource_type() :: String.t()
   def resource_type, do: @resource_type
 
   @impl true
+  @spec fetch(String.t(), String.t()) ::
+          {:ok, PublishingGroup.t()} | {:error, :resource_not_found}
   def fetch(@resource_type, group_uuid) when is_binary(group_uuid) do
     case RepoHelper.repo().get(PublishingGroup, group_uuid) do
       nil -> {:error, :resource_not_found}
@@ -57,11 +60,14 @@ defmodule PhoenixKitPublishing.GroupAITranslatable do
   def fetch(_resource_type, _uuid), do: {:error, :resource_not_found}
 
   @impl true
+  @spec source_fields(PublishingGroup.t(), String.t()) :: %{optional(String.t()) => String.t()}
   def source_fields(%PublishingGroup{name: name}, _source_lang) do
     %{"name" => name || ""}
   end
 
   @impl true
+  @spec put_translation(PublishingGroup.t(), String.t(), map(), keyword()) ::
+          {:ok, PublishingGroup.t()} | {:error, term()}
   def put_translation(%PublishingGroup{uuid: uuid}, target_lang, fields, opts)
       when is_binary(target_lang) do
     case translated_name(fields) do

@@ -14,6 +14,7 @@ defmodule PhoenixKitPublishing.GroupAITranslateBinding do
   alias PhoenixKit.Modules.Publishing.Shared
 
   @doc "Languages whose name override is already non-blank in the live form."
+  @spec existing_translation_langs(String.t(), map()) :: [String.t()]
   def existing_translation_langs(_resource_type, assigns) do
     case assigns.form.source do
       %{"name_i18n" => %{} = map} ->
@@ -27,6 +28,7 @@ defmodule PhoenixKitPublishing.GroupAITranslateBinding do
   end
 
   @doc "Merge a completed name translation into the form's params map."
+  @spec apply_translation(String.t(), map(), String.t(), map()) :: map()
   def apply_translation(_resource_type, params, lang, fields) when is_map(params) do
     case fields do
       %{"name" => name} when is_binary(name) and name != "" ->
@@ -47,5 +49,6 @@ defmodule PhoenixKitPublishing.GroupAITranslateBinding do
   end
 
   @doc "The acting user's UUID for the translation audit trail."
+  @spec actor_uuid(Phoenix.LiveView.Socket.t() | map() | nil) :: String.t() | nil
   def actor_uuid(socket), do: Shared.actor_uuid_from_socket(socket)
 end

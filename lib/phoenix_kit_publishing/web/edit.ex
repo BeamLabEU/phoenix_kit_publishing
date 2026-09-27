@@ -76,6 +76,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   # The AITranslate.Embed hook re-syncs the form after a translation merges.
   # This form is a plain params map behind `to_form(as: :group)` (no Ecto
   # changeset), so override the default changeset-shaped re-assign.
+  @spec ai_translate_assign_form(Phoenix.LiveView.Socket.t(), map()) ::
+          Phoenix.LiveView.Socket.t()
   def ai_translate_assign_form(socket, params) when is_map(params) do
     Component.assign(socket, :form, Component.to_form(params, as: :group))
   end
@@ -238,6 +240,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "listing_animations" => group["listing_animations"],
       "show_prev_next" => group["show_prev_next"],
       "search_enabled" => group["search_enabled"],
+      "sitemap_exclude" => group["sitemap_exclude"],
       "show_categories" => group["show_categories"],
       "views_enabled" => group["views_enabled"],
       "comments_enabled" => group["comments_enabled"],
@@ -597,6 +600,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                     options={timeline_granularity_options()}
                   />
                 </div>
+
+                <.checkbox field={@form[:sitemap_exclude]}>
+                  {gettext("Exclude this group from the sitemap")}
+                  <:description>
+                    {gettext("Neither the listing nor any post in this group is listed in the sitemap.")}
+                  </:description>
+                </.checkbox>
               </div>
 
               <%!-- Post page: an individual article --%>
@@ -743,25 +753,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
               <div class="flex flex-wrap gap-3 justify-end">
                 <%!-- Two submits, entities-form pattern: the exit button rides a
                   name/value pair into the params; plain Save stays on the page. --%>
-                <button
+                <.button
                   type="submit"
-                  class="btn btn-primary btn-outline btn-sm"
+                  variant="outline"
+                  size="sm"
+                  class="btn-primary"
                   phx-disable-with={gettext("Saving…")}
                 >
                   <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save")}
-                </button>
-                <button
+                </.button>
+                <.button
                   type="submit"
                   name="exit"
                   value="true"
-                  class="btn btn-primary btn-sm"
+                  size="sm"
                   phx-disable-with={gettext("Saving…")}
                 >
                   <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save and exit")}
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel">
+                </.button>
+                <.button type="button" variant="ghost" size="sm" phx-click="cancel">
                   <.icon name="hero-x-mark" class="w-4 h-4 mr-1" /> {gettext("Cancel")}
-                </button>
+                </.button>
               </div>
             </.form>
             <%!-- Outside the group form — the modal carries its own selector

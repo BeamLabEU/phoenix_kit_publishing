@@ -23,18 +23,23 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @valid_modes ["timestamp", "slug"]
 
   @doc "Atom and string variants for timestamp mode — use in guards/pattern matches."
+  @spec timestamp_modes() :: [atom() | String.t()]
   def timestamp_modes, do: @timestamp_modes
 
   @doc "Atom and string variants for slug mode — use in guards/pattern matches."
+  @spec slug_modes() :: [atom() | String.t()]
   def slug_modes, do: @slug_modes
 
   @doc "Valid mode strings for schema validation."
+  @spec valid_modes() :: [String.t()]
   def valid_modes, do: @valid_modes
 
   @doc "Returns true if mode is a timestamp mode (atom or string)."
+  @spec timestamp_mode?(term()) :: boolean()
   def timestamp_mode?(mode), do: mode in @timestamp_modes
 
   @doc "Returns true if mode is a slug mode (atom or string)."
+  @spec slug_mode?(term()) :: boolean()
   def slug_mode?(mode), do: mode in @slug_modes
 
   @doc """
@@ -87,16 +92,6 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
       _ -> DateTime.compare(from_site_wall(date, time, tz), now) == :gt
     end
   end
-
-  @doc """
-  Now, on the site's wall clock — the clock timestamp-mode posts are written
-  and displayed on. A UTC-tagged carrier for that wall clock, the same shape
-  `to_site_wall/2` hands the stamping path.
-
-  Hoist this out of a loop; every call is a settings read.
-  """
-  @spec site_now() :: DateTime.t()
-  def site_now, do: to_site_wall(DateTime.utc_now())
 
   @doc """
   The site's `time_zone` setting — an IANA id such as `Europe/Tallinn`, or a
@@ -161,15 +156,19 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @group_statuses ["active", @status_trashed]
 
   @doc ~S|The `"draft"` status.|
+  @spec status_draft() :: String.t()
   def status_draft, do: @status_draft
 
   @doc ~S|The `"published"` status.|
+  @spec status_published() :: String.t()
   def status_published, do: @status_published
 
   @doc ~S|The `"archived"` status.|
+  @spec status_archived() :: String.t()
   def status_archived, do: @status_archived
 
   @doc ~S|The `"trashed"` status.|
+  @spec status_trashed() :: String.t()
   def status_trashed, do: @status_trashed
 
   @doc """
@@ -184,12 +183,15 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   def published?(status), do: status == @status_published
 
   @doc "Valid post statuses: draft, published, archived, trashed."
+  @spec post_statuses() :: [String.t()]
   def post_statuses, do: @post_statuses
 
   @doc "Valid version and content statuses: draft, published, archived."
+  @spec content_statuses() :: [String.t()]
   def content_statuses, do: @content_statuses
 
   @doc "Valid group statuses: active, trashed."
+  @spec group_statuses() :: [String.t()]
   def group_statuses, do: @group_statuses
 
   # ---------------------------------------------------------------------------
@@ -200,9 +202,11 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @valid_types ["blog", "faq", "legal", "custom"]
 
   @doc "Preset group types (shown as radio buttons in UI)."
+  @spec preset_types() :: [String.t()]
   def preset_types, do: @preset_types
 
   @doc "All valid group types including custom."
+  @spec valid_types() :: [String.t()]
   def valid_types, do: @valid_types
 
   # ---------------------------------------------------------------------------
@@ -213,9 +217,11 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @default_featured_layout "hero"
 
   @doc ~S|Valid featured-post layouts: "hero" (band above the grid) or "card" (larger card in the grid).|
+  @spec featured_layouts() :: [String.t()]
   def featured_layouts, do: @featured_layouts
 
   @doc ~S|Default featured-post layout ("hero").|
+  @spec default_featured_layout() :: String.t()
   def default_featured_layout, do: @default_featured_layout
 
   # ---------------------------------------------------------------------------
@@ -226,9 +232,11 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @default_newest_layout "hero"
 
   @doc ~S|Valid latest-post layouts: "hero" (band above the grid) or "card" (larger card in the grid).|
+  @spec newest_layouts() :: [String.t()]
   def newest_layouts, do: @newest_layouts
 
   @doc ~S|Default latest-post layout ("hero").|
+  @spec default_newest_layout() :: String.t()
   def default_newest_layout, do: @default_newest_layout
 
   # ---------------------------------------------------------------------------
@@ -247,9 +255,11 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   "minimal" (text-only editorial band, image ignored), "top" (16:9 image
   banner stacked above the text).
   """
+  @spec band_styles() :: [String.t()]
   def band_styles, do: @band_styles
 
   @doc ~S|Default band style ("classic" — the pre-styles rendering, unchanged).|
+  @spec default_band_style() :: String.t()
   def default_band_style, do: @default_band_style
 
   # ---------------------------------------------------------------------------
@@ -260,18 +270,22 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @default_scrollbar_style "default"
 
   @doc ~S|Valid scrollbar styles: "default" (native, unstyled), "branded" (theme-colored), "thin" (theme-colored + thin).|
+  @spec scrollbar_styles() :: [String.t()]
   def scrollbar_styles, do: @scrollbar_styles
 
   @doc ~S|Default scrollbar style ("default" — the browser's native bar, untouched).|
+  @spec default_scrollbar_style() :: String.t()
   def default_scrollbar_style, do: @default_scrollbar_style
 
   @timeline_granularities ["auto", "year", "month", "day"]
   @default_timeline_granularity "auto"
 
   @doc ~S|Valid date-timeline granularities: "auto" (fit to the posts' date span), "year", "month", or "day".|
+  @spec timeline_granularities() :: [String.t()]
   def timeline_granularities, do: @timeline_granularities
 
   @doc ~S|Default date-timeline granularity ("auto").|
+  @spec default_timeline_granularity() :: String.t()
   def default_timeline_granularity, do: @default_timeline_granularity
 
   # ---------------------------------------------------------------------------
@@ -282,45 +296,55 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @default_listing_sort "newest"
 
   @doc ~S|Valid public-listing sort orders: "newest" or "oldest", by effective publish date.|
+  @spec listing_sorts() :: [String.t()]
   def listing_sorts, do: @listing_sorts
 
   @doc ~S|Default public-listing sort order ("newest" first).|
+  @spec default_listing_sort() :: String.t()
   def default_listing_sort, do: @default_listing_sort
 
   @listing_layouts ["grid", "list", "minimal"]
   @default_listing_layout "grid"
 
   @doc ~S|Valid public-listing layouts: "grid" (card grid), "list" (thumbnail rows), or "minimal" (date — title lines, no images).|
+  @spec listing_layouts() :: [String.t()]
   def listing_layouts, do: @listing_layouts
 
   @doc ~S|Default public-listing layout ("grid").|
+  @spec default_listing_layout() :: String.t()
   def default_listing_layout, do: @default_listing_layout
 
   @notes_styles ["footnotes", "panel"]
   @default_notes_style "footnotes"
 
   @doc ~S|Valid author-note display styles: "footnotes" (numbered refs + a collected bottom section + hover popovers) or "panel" (clicking the phrase slides a right-side panel out with the note and its comments).|
+  @spec notes_styles() :: [String.t()]
   def notes_styles, do: @notes_styles
 
   @doc ~S|Default author-note display style ("footnotes" — the original layout).|
+  @spec default_notes_style() :: String.t()
   def default_notes_style, do: @default_notes_style
 
   @post_date_positions ["above", "below", "hidden"]
   @default_post_date_position "below"
 
   @doc ~S|Valid post-date positions relative to the title: "above", "below", or "hidden".|
+  @spec post_date_positions() :: [String.t()]
   def post_date_positions, do: @post_date_positions
 
   @doc ~S|Default post-date position ("below" the title).|
+  @spec default_post_date_position() :: String.t()
   def default_post_date_position, do: @default_post_date_position
 
   @post_widths ["narrow", "normal", "wide"]
   @default_post_width "normal"
 
   @doc ~S|Valid post-page content widths: "narrow", "normal", or "wide".|
+  @spec post_widths() :: [String.t()]
   def post_widths, do: @post_widths
 
   @doc ~S|Default post-page content width ("normal").|
+  @spec default_post_width() :: String.t()
   def default_post_width, do: @default_post_width
 
   # ---------------------------------------------------------------------------
@@ -332,12 +356,15 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @default_title "Untitled"
 
   @doc "Default group mode."
+  @spec default_mode() :: String.t()
   def default_mode, do: @default_mode
 
   @doc "Default group type."
+  @spec default_type() :: String.t()
   def default_type, do: @default_type
 
   @doc "Default title for posts without a title."
+  @spec default_title() :: String.t()
   def default_title, do: @default_title
 
   # ---------------------------------------------------------------------------
@@ -351,17 +378,22 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @max_group_slug_length 255
 
   @doc "Max length for post/content slugs."
+  @spec max_slug_length() :: pos_integer()
   def max_slug_length, do: @max_slug_length
 
   @doc "Max length for content titles."
+  @spec max_title_length() :: pos_integer()
   def max_title_length, do: @max_title_length
 
   @doc "Max length for language codes."
+  @spec max_language_code_length() :: pos_integer()
   def max_language_code_length, do: @max_language_code_length
 
   @doc "Max length for group names."
+  @spec max_group_name_length() :: pos_integer()
   def max_group_name_length, do: @max_group_name_length
 
   @doc "Max length for group slugs."
+  @spec max_group_slug_length() :: pos_integer()
   def max_group_slug_length, do: @max_group_slug_length
 end

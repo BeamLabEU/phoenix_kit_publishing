@@ -325,6 +325,43 @@ defmodule PhoenixKit.Modules.Publishing.MediaFoldersTest do
       assert reload(trashed).folder_uuid == nil
     end
 
+    # The picker browses Media only, so another library's file can only
+    # arrive as a forged pick — refused like any other, but not an
+    # operator's problem: debug, not warning (the one-time adoption skips
+    # the same case silently).
+    test "refuses another library's file quietly — a forged pick is reported, not warned about" do
+      configure_default_hooks()
+      group = group!("News")
+      theirs = file!(%{library_uuid: library!().uuid})
+
+      warnings =
+        ExUnit.CaptureLog.capture_log([level: :warning], fn ->
+          assert {:error, [{uuid, :other_library}]} =
+                   MediaFolders.file_for_group(group.slug, [theirs.uuid], nil)
+
+          assert uuid == theirs.uuid
+        end)
+
+      refute warnings =~ "not filed into"
+      assert reload(theirs).folder_uuid == nil
+
+      # Still said, at debug — a downgrade, not a deletion. The suite runs
+      # at :warning, so the level is lowered for this one call and put back.
+      previous = Logger.level()
+      Logger.configure(level: :debug)
+      on_exit(fn -> Logger.configure(level: previous) end)
+
+      debug =
+        ExUnit.CaptureLog.capture_log([level: :debug], fn ->
+          MediaFolders.file_for_group(group.slug, [theirs.uuid], nil)
+        end)
+
+      Logger.configure(level: previous)
+
+      assert debug =~ "#{inspect(theirs.uuid)} not filed into"
+      assert debug =~ "another library"
+    end
+
     test "files nothing for a trashed group" do
       configure_default_hooks()
       group = group!("Old", %{status: "trashed"})

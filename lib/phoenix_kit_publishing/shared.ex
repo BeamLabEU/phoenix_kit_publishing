@@ -52,16 +52,16 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   # ============================================================================
 
   @doc false
-  @spec fetch_option(map() | keyword() | nil, atom()) :: term()
-  def fetch_option(opts, key) when is_map(opts) do
+  @spec get_option(map() | keyword() | nil, atom()) :: term()
+  def get_option(opts, key) when is_map(opts) do
     Map.get(opts, key) || Map.get(opts, Atom.to_string(key))
   end
 
-  def fetch_option(opts, key) when is_list(opts) do
+  def get_option(opts, key) when is_list(opts) do
     Keyword.get(opts, key)
   end
 
-  def fetch_option(_, _), do: nil
+  def get_option(_, _), do: nil
 
   @doc false
   @spec audit_metadata(term() | nil, :create | :update) :: map()

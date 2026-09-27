@@ -37,9 +37,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingContent do
 
   @type t :: %__MODULE__{
           uuid: UUIDv7.t() | nil,
-          version_uuid: UUIDv7.t(),
-          language: String.t(),
-          title: String.t(),
+          version_uuid: UUIDv7.t() | nil,
+          language: String.t() | nil,
+          title: String.t() | nil,
           content: String.t() | nil,
           status: String.t(),
           url_slug: String.t() | nil,
@@ -67,6 +67,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingContent do
   @doc """
   Changeset for creating or updating publishing content.
   """
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(content, attrs) do
     content
     |> cast(attrs, [:version_uuid, :language, :title, :content, :status, :url_slug, :data],
@@ -116,22 +117,28 @@ defmodule PhoenixKit.Modules.Publishing.PublishingContent do
   # Data JSONB accessors
 
   @doc "Returns the SEO description."
+  @spec get_description(t()) :: String.t() | nil
   def get_description(%__MODULE__{data: data}), do: Map.get(data, "description")
 
   @doc "Returns previous URL slugs for 301 redirects."
+  @spec get_previous_url_slugs(t()) :: [String.t()]
   def get_previous_url_slugs(%__MODULE__{data: data}),
     do: Map.get(data, "previous_url_slugs", [])
 
   @doc "Returns the per-language featured image UUID."
+  @spec get_featured_image_uuid(t()) :: String.t() | nil
   def get_featured_image_uuid(%__MODULE__{data: data}), do: Map.get(data, "featured_image_uuid")
 
   @doc "Returns the custom SEO title."
+  @spec get_seo_title(t()) :: String.t() | nil
   def get_seo_title(%__MODULE__{data: data}), do: Map.get(data, "seo_title")
 
   @doc "Returns the custom excerpt."
+  @spec get_excerpt(t()) :: String.t() | nil
   def get_excerpt(%__MODULE__{data: data}), do: Map.get(data, "excerpt")
 
   @doc "Returns the UUID of the last editor for this language."
+  @spec get_updated_by_uuid(t()) :: String.t() | nil
   def get_updated_by_uuid(%__MODULE__{data: data}), do: Map.get(data, "updated_by_uuid")
 
   @doc """
@@ -140,6 +147,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingContent do
   Shape: `%{"title" => ..., "description" => ..., "image_uuid" => ...}` — any
   subset of keys may be present. Callers fall back to derived defaults per field.
   """
+  @spec get_og(t()) :: map() | nil
   def get_og(%__MODULE__{data: data}) do
     case Map.get(data, "og") do
       og when is_map(og) and map_size(og) > 0 -> og

@@ -25,6 +25,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.NewLiveTest do
     assert html =~ ~s|phx-disable-with="Creating…"|
   end
 
+  # Behind a TLS-terminating proxy the LiveView's connect URI is http, so the
+  # sample URLs said http://. The `site_url` setting is the public origin.
+  test "the site_url setting is the origin of the sample URLs", %{conn: conn} do
+    {:ok, _} = Settings.update_setting("site_url", "https://example.test/")
+    on_exit(fn -> {:ok, _} = Settings.update_setting("site_url", "") end)
+
+    {:ok, _view, html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/new-group")
+
+    assert html =~ "https://example.test/"
+    refute html =~ "http://www.example.com"
+  end
+
   test "handle_info catch-all swallows unexpected messages without crashing",
        %{conn: conn} do
     {:ok, view, _html} =

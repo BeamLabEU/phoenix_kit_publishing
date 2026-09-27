@@ -332,6 +332,7 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       version = %PublishingVersion{data: %{}}
 
       assert PublishingVersion.get_allow_version_access(version) == false
+      assert PublishingVersion.get_sitemap_exclude(version) == false
       assert PublishingVersion.get_featured_image_uuid(version) == nil
       assert PublishingVersion.get_tags(version) == []
       assert PublishingVersion.get_description(version) == nil
@@ -341,6 +342,7 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       version = %PublishingVersion{
         data: %{
           "allow_version_access" => true,
+          "sitemap_exclude" => true,
           "featured_image_uuid" => "img-uuid-123",
           "tags" => ["elixir", "phoenix"],
           "description" => "A test description"
@@ -348,6 +350,7 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       }
 
       assert PublishingVersion.get_allow_version_access(version) == true
+      assert PublishingVersion.get_sitemap_exclude(version) == true
       assert PublishingVersion.get_featured_image_uuid(version) == "img-uuid-123"
       assert PublishingVersion.get_tags(version) == ["elixir", "phoenix"]
       assert PublishingVersion.get_description(version) == "A test description"

@@ -404,11 +404,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     if Constants.published?(post.metadata.status) and render_cache_enabled?(post.group) do
       cache_key = build_cache_key(post, opts)
 
-      case get_cached(cache_key) do
+      case fetch_cached(cache_key) do
         {:ok, html} ->
           {:ok, html}
 
-        :miss ->
+        {:error, :miss} ->
           render_and_cache(post, cache_key, opts)
       end
     else
@@ -702,6 +702,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   panels in "panel" notes style; a `<Note>` inside a code fence is ignored
   (same mask as rendering).
   """
+  @spec list_notes(term()) :: [%{number: pos_integer(), id: String.t(), body: String.t()}]
   def list_notes(content) when is_binary(content) do
     @note_regex
     |> Regex.scan(mask_scanned_code(content), capture: :all_but_first)
@@ -724,6 +725,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   panel DOM ids stay unique; the first occurrence keeps the plain digest,
   so existing comments never detach when a duplicate appears later.
   """
+  @spec note_dom_id(String.t(), pos_integer()) :: String.t()
   def note_dom_id(body, occurrence \\ 1)
 
   def note_dom_id(body, 1) when is_binary(body), do: digest_note(body)
@@ -1905,15 +1907,15 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     _ -> ""
   end
 
-  defp get_cached(key) do
+  defp fetch_cached(key) do
     case PhoenixKit.Cache.get(@cache_name, key) do
-      nil -> :miss
+      nil -> {:error, :miss}
       html -> {:ok, html}
     end
   rescue
     _ ->
       # Cache not available (tests, compilation)
-      :miss
+      {:error, :miss}
   end
 
   defp put_cached(key, value) do

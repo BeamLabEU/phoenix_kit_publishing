@@ -22,9 +22,11 @@ controller (dead views); the admin side is LiveView.
   seam), plus `leaf`, `phoenix_live_view`, `mdex`, `saxy`, `oban`, `gettext`.
 - **Consumed by:** core's Sitemap module, which calls
   `PhoenixKit.Modules.Publishing.{enabled?/0, list_groups/0, list_posts/2}`
-  behind `Code.ensure_loaded?/1`; `phoenix_kit_projects`, whose extension
-  registry duck-types `phoenix_kit_project_extensions/0` for its Docs project
-  tab.
+  behind `Code.ensure_loaded?/1`; core's Languages admin page, which calls
+  `enabled?/0`, `list_groups/0` and `ListingCache.regenerate/1` (guarded and
+  rescued on core's side) when a language is added or removed;
+  `phoenix_kit_projects`, whose extension registry duck-types
+  `phoenix_kit_project_extensions/0` for its Docs project tab.
 - **Admin surface:** one top-level tab `Publishing` at `/admin/publishing`
   (dynamic children, one per group, at `/admin/publishing/<slug>`), plus a
   settings subtab at `/admin/settings/publishing`. Public routes are served
@@ -76,15 +78,15 @@ Deliberate non-features, so nobody adds them assuming they were missed.
 - **No frontend bundle and no LiveView JS hooks.** Tailwind/daisyUI classes are
   emitted by the renderer; the host's `app.css` gets an `@source` for
   `phoenix_kit_publishing` from `css_sources/0`.
-- **No migrations of its own that change shape.** This module owns its 7
+- **No migrations that create or reshape its tables.** This module owns its 7
   tables' *future* shape through its own versioned chain,
   `PhoenixKitPublishing.Migrations` (`migration_module/0`) — but core's chain
   still *creates* all 7 on every install (V135 baseline for
   groups/posts/versions/contents, V159 for categories/post_categories/
   post_views, V164 rebuilds one index). V1 of this chain is a pure adoption
-  of that current shape (see "Database & migrations" below and the chain's
-  own moduledoc) — it changes nothing on an existing install beyond stamping
-  a version marker.
+  of that current shape and V2 only adds two expression indexes (see
+  "Database & migrations" below and the chain's own moduledoc) — no column,
+  constraint or table has ever changed through it.
 - **No all-groups public overview.** If one returns it returns as an opt-in
   reserved route, not as a catch-all sibling.
 - **No guest commenting.** The comments seam requires a logged-in user because
@@ -215,6 +217,15 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   `load_publishing_groups_for_tabs/0` catch only `Ecto.QueryError`,
   `DBConnection.ConnectionError` and `Postgrex.Error`: tabs render on every admin
   mount, but a `MatchError` there is a real bug and must still surface.
+- **Lookup shapes: `get_*` returns the record or `nil`; `fetch_*` returns
+  `{:ok, record} | {:error, atom}`** (an atom from `Errors`) — two layers
+  used to answer "get" with different shapes (`DBStorage.get_group/1` a
+  struct or nil, the context's a tuple), so every caller had to read the
+  spec. Holds for private helpers too. A `get_` that always answers with a
+  computed value (`get_config/0`, `get_primary_language/0`) is not a lookup
+  and is outside the rule. `get_group/1` on `Groups` and the facade is the
+  one deprecated delegate (`fetch_group/1` under its old name, kept for
+  `phoenix_kit_legal`).
 - **Soft delete:** posts use `trashed_at` (nil = active), groups use
   `status` (`"active"` / `"trashed"`). There is no post status column — status is
   version-level.
@@ -237,6 +248,21 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   new-post keys also carry `socket.id` (two admins composing separate drafts have
   nothing to collaborate on). Anything comparing form keys by string must handle
   every shape — `same_post_and_version?/2` in `web/editor.ex` is the reference.
+- **The editor's text is replaced only through
+  `Web.Editor.Helpers.set_editor_content/2`, and a click that replaces the
+  buffer flushes first.** Leaf's surface is `phx-update="ignore"`, so
+  assigning `@content` changes nothing on screen; the helper sends Leaf the
+  document and asks it straight back with a flush ref, and the editor
+  ignores `leaf_changed` until that ref returns — Leaf flushes on blur, so
+  the old document's text arrives after a switch. A language or version
+  switch, Preview and the translation buttons go through `after_flush/2`
+  in `Web.Editor`: Leaf keeps up to a debounce of keystrokes, and the
+  action runs once its reply is back (1.5 s fallback). Leaf's `dirty` flag
+  decides whether a flush reply is an edit: in hybrid mode the reply is the
+  surface re-serialised, which differs from an untouched row. Every event
+  pushed with `push_event/3` must have a listener on the page —
+  `client_events_test.exs` pins the list; talk to Leaf through
+  `send_update` only.
 - **Admin LiveView assigns available on every admin page:**
   `@phoenix_kit_current_scope`, `@current_locale`, `@url_path`.
 
@@ -375,7 +401,12 @@ lib/phoenix_kit_publishing/
   most recent 5,000 posts per group. `invalidate/1` erases locally AND
   broadcasts; `erase_local/1` is the receive-side variant.
   `ListingCache.LockTableOwner` owns the regeneration-lock ETS table so it
-  outlives request processes; `ListingCache.CacheSync` erases on peer
+  outlives request processes, and is the single writer of the listing terms:
+  an install checks the erase tombstone and writes in one step inside it,
+  ordered by `next_sequence/0` (strictly increasing, never a tie), so a
+  regeneration that started before an invalidation can neither reinstall the
+  old listing nor overwrite the tombstone. Reads stay lock-free
+  `:persistent_term` lookups. `ListingCache.CacheSync` erases on peer
   invalidation.
 - `Publishing.Renderer` — Markdown → HTML via MDEx/comrak, cached in
   `PhoenixKit.Cache` under `:publishing_posts` (24h TTL, max 2000, FIFO). The key
@@ -427,8 +458,10 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 
 - **`..._groups`** — content containers. `name`, `slug` (unique), `mode`
   (`"timestamp"` / `"slug"`), `status` (`"active"` / `"trashed"`), `position`;
-  `data` JSONB holds type, item names, icon, feature flags, the ~22 display
-  settings and `name_i18n`; `title_i18n` / `description_i18n` are reserved.
+  `data` JSONB holds type, item names, icon, feature flags, the ~23 display
+  settings (including `sitemap_exclude`, read by core's Sitemap source off
+  the `list_groups/0` map) and `name_i18n`; `title_i18n` / `description_i18n`
+  are reserved.
 - **`..._posts`** — routing shell only: `slug`, `mode`, `post_date`, `post_time`
   (URL identity), `active_version_uuid` FK (null = unpublished), `trashed_at`
   (null = active), `created_by_uuid` / `updated_by_uuid`. No content, status or
@@ -436,8 +469,8 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **`..._versions`** — source of truth for published state: `post_uuid`,
   `version_number` (unique per post), `status` (draft/published/archived),
   `published_at`, `data` JSONB (`featured_image_uuid`, tags, seo, description,
-  `allow_version_access`, notes, `created_from`). Status is version-level: every
-  language in a version shares it.
+  `allow_version_access`, `sitemap_exclude`, notes, `created_from`). Status is
+  version-level: every language in a version shares it.
 - **`..._contents`** — per-language title and body: `version_uuid`, `language`
   (unique per version), `title`, `content` (markdown), `url_slug` (per-language
   routing), plus reserved `status` / `data`. Read fallback: requested language →
@@ -460,13 +493,14 @@ raw `Phoenix.PubSub` call.
 
 | Topic | Built by | Payloads |
 |-------|----------|----------|
-| `publishing:groups` | `PubSub.groups_topic/0` | `{:group_created, group}`, `{:group_updated, group}`, `{:group_deleted, slug}` |
+| `publishing:groups` | `PubSub.groups_topic/0` | `{:group_created, %{uuid, slug}}`, `{:group_updated, %{uuid, slug}}`, `{:group_deleted, slug}` — receivers reload the group from the DB |
+| `publishing:<group>:categories` | `categories_topic/1` | `{:categories_changed, group_slug}` after every committed create/update/delete/reorder/move; `CategoriesLive` reloads its tree |
 | `publishing:<group>:posts` | `posts_topic/1` | `:post_created`, `:post_updated`, `:post_deleted`, `:post_status_changed`, `:version_created`, `:version_live_changed`, `:version_deleted` |
 | `publishing:<group>:post:<slug>:versions` | `post_versions_topic/2` | version lifecycle for one post |
 | `publishing:<group>:post:<slug>:translations` | `post_translations_topic/2` | `:translation_created` / `:translation_deleted`, version scope as a STRING |
 | `publishing:editor_forms` + per-key topics | `editor_form_topic/1` | collaborative form sync |
 | per-group cache topics | `cache_topic/1`, `cache_invalidation_topic/0` | `{:cache_invalidated, slug}` |
-| `publishing:<group>:editors` | `group_editors_topic/1` | editor presence for a group |
+| `publishing:<group>:editors` | `group_editors_topic/1` | `{:editor_joined, uuid, user_info}` / `{:editor_left, uuid, user_info}` from the editor; nothing in this module subscribes |
 
 ### Settings keys
 
@@ -487,6 +521,7 @@ Site-wide keys, all read through `PhoenixKit.Settings`.
 | `publishing_render_og_tags` | `true` | Render og/twitter meta tags **in-page** (inside the public body), so previews work even when the host root layout ignores the forwarded `:og`. Turn off when the host renders `:og` in `<head>`, to avoid duplicates |
 | `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD in-page on post pages, from the same refined `:og` map. `escape: :html_safe` on the encode so no value can close the script tag early |
 | `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → 404, never the smart fallback (a feed URL must not redirect to HTML). Canonical-prefix 301s ARE emitted feed-to-feed, matching `rel="self"` |
+| `publishing_unique_views` | `true` | One view per visitor per post per day: a session carrying the dedup marker is the visitor, a cookieless request is a keyed hash of its address (the LAST `x-forwarded-for` hop, the one the site's proxy appended — the first is the client's to forge — else `remote_ip`) held for the day in `Views.VisitorTable`, capped at 500k rows a day, never the raw address; readers behind one address count once until their browser keeps the marker. Off → every page open counts |
 | `publishing_translation_endpoint_uuid` | unset | Admin override for the AI endpoint used by translation |
 | `publishing_translation_prompt_uuid` | unset | Admin override for the AI prompt used by translation |
 
@@ -512,7 +547,7 @@ branches (`index/1`, `show/1` in `Web.HTML`).
 
 | Assign | Shape | Notes |
 |--------|-------|-------|
-| `:phoenix_kit_publishing_translations` | list of `%{code, name, flag, url, current}` | Always set on listing + post conns, regardless of `publishing_show_language_switcher`. Exactly those five fields on both route types — the controller normalises at the boundary, stripping internal-only fields (`display_code`; on post routes also `enabled`/`known`) so external consumers get one uniform shape |
+| `:phoenix_kit_publishing_translations` | list of `%{code, name, flag, url, current, enabled}` | Always set on listing + post conns, regardless of `publishing_show_language_switcher`. Exactly those six fields on both route types — the controller normalises at the boundary, stripping internal-only fields (`display_code`; on post routes also `known`) so external consumers get one uniform shape. `enabled` is `false` only for the current entry when it is a legacy/disabled language (every other disabled entry is dropped, since it is not publicly routable) — hosts use it to keep that entry out of hreflang |
 | `:og` | listing: `%{title, url, locale, type: "website"}`; post: `%{title, description, image, url, locale, type: "article"}` plus up to three `og:image:*` hints (`image_width`, `image_height`, `image_type`) | 4 fields on listings, 6–9 on posts. `description` and `image` may be `nil` |
 
 **Function-component layouts only see declared attrs.** Both assigns reach
@@ -551,16 +586,35 @@ every `CREATE TABLE`/PK/UNIQUE-constraint/index/FK statement is
 `IF NOT EXISTS`/DO-guarded and semantic (matches by shape via
 `pg_constraint`/`pg_index`, never by object name alone — a renamed host must
 never get a duplicate), so on every existing install it is a no-op against
-tables core already built. `down/1` never drops any of the 7 tables, for any
-target — see `PhoenixKitPublishing.Migrations`' moduledoc for the full
-ownership writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL`
-safety-net section here.
+tables core already built. V2 is the chain's first **shape change** (Phase
+1): two non-unique btree expression indexes over the media-folder pointer,
+`lower(data->>'media_folder_uuid')` — `idx_publishing_groups_media_folder`
+on `phoenix_kit_publishing_groups` and `idx_publishing_versions_media_folder`
+on `phoenix_kit_publishing_versions` — which `MediaReorganizer` joins
+through and nothing in V1 served. It changes nothing else: no column,
+constraint, table or row; both guards match on `pg_get_expr(indexprs)`, so a
+renamed host is recognised, not duplicated, and the canonical name is only
+the first candidate — a host whose `idx_publishing_*_media_folder` name is
+already taken by ANOTHER expression gets the shape under `<name>_v2`,
+`_v3`, … (the first free name), never a silent `IF NOT EXISTS` no-op that
+stamps V2 over a missing index. `down/1` never drops any of the 7 tables,
+for any target — below V2 it removes exactly those two indexes by the same
+shape match, whatever name they landed under, leaving a same-named index on
+a different expression alone, then re-stamps or clears the marker. See
+`PhoenixKitPublishing.Migrations`' moduledoc for the full ownership
+writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL` safety-net
+section here.
 
-Phase 1 (a future shape change) needs a core-side `ExpectedSchema` manifest
-update first, or `mix phoenix_kit.repair` silently reverts it. Phase 2 (a
-future core baseline squash that drops these tables from core) is already
-covered: V1 alone can build the complete shape of all 7 tables from nothing,
-so a fresh install still gets a working schema even without core's chain.
+V2 needs nothing from core's `ExpectedSchema` manifest: `mix
+phoenix_kit.repair` reports drift and never drops an object, and no
+module's own chain registers its objects there. The one core-side step a
+shape change here can need is excluding, from core's baseline generator,
+an object that core created and this chain alters — V2 alters none. Phase
+2 (a future core baseline
+squash that drops these tables from core) is already covered: the chain
+alone builds the complete shape of all 7 tables from nothing, so a fresh
+install still gets a working schema even without core's chain
+(`migrations_catalog_parity_test.exs` proves it, catalog row for row).
 
 All tables use UUIDv7 primary keys, and every table-backed schema declares
 `use PhoenixKit.SchemaPrefix`.
@@ -630,12 +684,17 @@ layout), `web/settings_live_test.exs` (LV smoke),
 `integration/activity_logging_test.exs`, `web/controller/public_routes_test.exs`
 (smart-fallback contract), `web/controller/language_switcher_exposure_test.exs`
 (host-integration boundary), `errors_test.exs`, `group_settings_test.exs`,
-`core_pin_conformance_test.exs`, `schema_prefix_conformance_test.exs`.
+`core_pin_conformance_test.exs`, `schema_prefix_conformance_test.exs`,
+`web/editor_switch_content_test.exs` (the Leaf hand-over and flush protocol),
+`web/client_events_test.exs` (every pushed event has a listener).
 
-Known noise on a green run: the editor's deferred language switch logs a
-`GenServer terminating … cannot push_patch/2 … does not point to the current root
-view` report while the test itself passes. The suite has also flaked on
-sandbox/activity-log timing; the repeat loop in Commands is the stability check.
+The test router declares the admin LV routes in both the bare and the
+`/:locale/admin/…` shape inside one `live_session`, as production does: with
+languages enabled `Routes.path/1` emits `/en/admin/…`, and an editor
+`push_patch` (a language or version switch) that lands outside the current
+root view is refused by the LiveViewTest proxy instead of reaching
+`handle_params`. The suite has flaked on sandbox/activity-log timing; the
+repeat loop in Commands is the stability check.
 
 ## Feature notes
 
@@ -643,6 +702,7 @@ sandbox/activity-log timing; the repeat loop in Commands is the stability check.
 |---------|-------------------------------|-------|
 | Public dispatch (`RouterDispatch`) | The host router's `call/2` override and `restore_path/2` are a pair: without the restore, the canonical-URL redirect emits the internal prefix and loops forever. Never add a second `call/2` override. | [dev_docs/guides/router-dispatch.md](dev_docs/guides/router-dispatch.md) |
 | Smart fallback / 404 policy | A missing GROUP renders 404; only a missing child of an existing group redirects. Under `url_prefix: "/"` the alternative hijacks host paths. | [dev_docs/guides/router-dispatch.md](dev_docs/guides/router-dispatch.md) |
+| Sitemap exclusion | The sitemap knobs live where core's Sitemap source reads them: `sitemap_exclude` is a top-level key on the `list_groups/0` group map and `metadata.sitemap_exclude` on the `list_posts/2` post map (version `data`, mapped from the latest version like `allow_version_access`). Publishing never filters for the sitemap itself; `integration/sitemap_source_test.exs` runs core's real source against both. | — |
 | Per-group display settings | A new setting must be added in all five places (`Constants` → schema accessor → `merge_group_config`/`db_group_to_map` → edit form → `GroupSettings` spec) or the spec test fails; `update_group/3` stays lenient, `validate_group_settings/1` stays strict. | [dev_docs/guides/group-display-settings.md](dev_docs/guides/group-display-settings.md) |
 | Translatable group name | Overrides live in an isolated `data["name_i18n"]` map, never in the multilang helper's `data`-owning convention, which would clobber the display settings. The slug is never translated. | [dev_docs/guides/group-display-settings.md](dev_docs/guides/group-display-settings.md) |
 | Activity logging | An audit failure never crashes its mutation, and a changeset never reaches metadata. | [dev_docs/guides/activity-logging.md](dev_docs/guides/activity-logging.md) |
@@ -696,8 +756,8 @@ newest-created release as Latest and demotes the current one.
   `phoenix_kit_publishing_contents (version_uuid/group, language, url_slug)` for
   non-trashed rows, so a duplicate becomes impossible at the source instead of
   something the read path's auto-renamer cleans up. This is a shape change, so it
-  is V2 of `PhoenixKitPublishing.Migrations` plus the core-side `ExpectedSchema`
-  exclusion and floor bump that Phase 1 requires (see Database & migrations).
+  is V3 of `PhoenixKitPublishing.Migrations`; core needs nothing for a new
+  index (see Database & migrations).
 - **Unify the two base→dialect resolvers.** `new_translation_request?/2` (against
   `post.available_languages`) and `Posts.resolve_language_to_dialect/1` (against
   `enabled_language_codes/0`) answer the same question with different tie-breaks;
@@ -718,6 +778,35 @@ newest-created release as Latest and demotes the current one.
 - **Preview-tab loading indicator** (`web/preview.ex`): a `phx-update="ignore"`
   skeleton before `render_markdown_content/1` returns would smooth the hang on
   large PHK XML. Trigger: a benchmark showing it matters.
+- **A metadata-only edit made inside the autosave window leaves without a
+  prompt.** Leaf's `protect_navigation` compares its own buffer only; the
+  old hook's beforeunload guard covered the form too. Closing it means a
+  guard fed by `has_pending_changes`, which is this module's first JS
+  (`js_sources/0`), or a core hook.
+- **The browsable-version path still 301s a missing translation.**
+  `Web.Controller.PostRendering.respond_with_browsable_version/…` keeps the
+  permanent redirect that `render_published_post/4` no longer issues;
+  `language_sweep_test.exs` pins it, so changing it is a decision, not a fix.
+- **Core still carries a "publishing pushes changes-status" back-compat
+  listener** inside its MarkdownEditor hook (`phoenix_kit.js`); nothing
+  produces that event any more. A core follow-up.
+- **Two canonical 301s never fire for a segment owner's full-code URL.**
+  With `en-US` owning `/en/` and `en-GB` enabled, `/en-US/blog/post` serves
+  200 instead of redirecting to `/en/blog/post`, because
+  `canonical_redirect?/3` only compares URLs when the language changed;
+  `/de-DE/blog/feed.xml` serves the feed instead of redirecting to
+  `/de/blog/feed.xml` for the same reason (`Web.Controller.feed/2` checks
+  only the prefixed-default case). Both need a loop test before the fix.
+- **A switch whose flush reply is later than 1.5 s acts without it.**
+  `after_flush/2` falls back to what the server holds; the late reply is
+  then dropped as the old document's. A background tab's throttled timers
+  are the realistic case, where nobody is typing. Raising the fallback or
+  blocking the switch behind a "syncing…" state is the alternative.
+- **Drop the deprecated `get_group/1` delegate** (`Groups` and the facade)
+  once `phoenix_kit_legal` calls `fetch_group/1`; its tests go with it.
+- **The public view counter has no per-IP cap** (`Views.record_async/1`):
+  cookieless requests dedupe only by user agent, so a loop of curl requests
+  inflates a count and costs a pool checkout each.
 - **Translation button immediate-disable** in the editor. `phx-disable-with`
   covers most cases; the gap is a double-enqueue on slow networks before the
   server's `ai_translation_status` assign returns. Closing it means this module's

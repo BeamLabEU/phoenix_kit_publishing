@@ -73,7 +73,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLockConsistencyTest do
     source = File.read!("lib/phoenix_kit_publishing/web/editor.ex")
     [before, rest] = String.split(source, ~s(phx-click="#{event}"), parts: 2)
 
-    opening = before |> String.split("<button") |> List.last()
+    opening = before |> String.split(~r{<\.?button}) |> List.last()
     closing = rest |> String.split(">") |> List.first()
 
     opening <> closing

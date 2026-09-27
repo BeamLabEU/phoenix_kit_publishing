@@ -36,8 +36,8 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
 
   @type t :: %__MODULE__{
           uuid: UUIDv7.t() | nil,
-          group_uuid: UUIDv7.t(),
-          slug: String.t(),
+          group_uuid: UUIDv7.t() | nil,
+          slug: String.t() | nil,
           mode: String.t(),
           post_date: Date.t() | nil,
           post_time: Time.t() | nil,
@@ -84,6 +84,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
   @doc """
   Changeset for creating or updating a publishing post.
   """
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(post, attrs) do
     post
     |> cast(attrs, [
@@ -125,14 +126,17 @@ defmodule PhoenixKit.Modules.Publishing.PublishingPost do
   def column_widths, do: @column_widths
 
   @doc "Check if post is published (has an active version)."
+  @spec published?(t()) :: boolean()
   def published?(%__MODULE__{active_version_uuid: uuid}) when not is_nil(uuid), do: true
   def published?(_), do: false
 
   @doc "Check if post is trashed."
+  @spec trashed?(t()) :: boolean()
   def trashed?(%__MODULE__{trashed_at: t}) when not is_nil(t), do: true
   def trashed?(_), do: false
 
   @doc "Check if post is a draft (not published and not trashed)."
+  @spec draft?(t()) :: boolean()
   def draft?(%__MODULE__{} = post), do: not published?(post) and not trashed?(post)
 
   defp maybe_require_slug(changeset) do

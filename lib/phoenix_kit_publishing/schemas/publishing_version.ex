@@ -19,6 +19,8 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   - `tags` - List of tag strings
   - `description` - SEO meta description
   - `allow_version_access` - Whether older versions are publicly accessible
+  - `sitemap_exclude` - Leave this post out of the site's sitemap (core's
+    Sitemap source reads it as `metadata.sitemap_exclude` on the post map)
   - `featured` - Whether this post is featured (pinned to the top of the group
     listing and rendered larger). Per-group display is gated by the group's
     own `featured_enabled`/`featured_layout` config.
@@ -45,8 +47,8 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
 
   @type t :: %__MODULE__{
           uuid: UUIDv7.t() | nil,
-          post_uuid: UUIDv7.t(),
-          version_number: integer(),
+          post_uuid: UUIDv7.t() | nil,
+          version_number: pos_integer() | nil,
           status: String.t(),
           published_at: DateTime.t() | nil,
           created_by_uuid: UUIDv7.t() | nil,
@@ -80,6 +82,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   @doc """
   Changeset for creating or updating a publishing version.
   """
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(version, attrs) do
     version
     |> cast(attrs, [
@@ -114,6 +117,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   # ── Data JSONB accessors (version-level defaults) ──────────────
 
   @doc "Returns the featured image UUID."
+  @spec get_featured_image_uuid(t()) :: String.t() | nil
   def get_featured_image_uuid(%__MODULE__{data: data}),
     do: Map.get(data, "featured_image_uuid")
 
@@ -126,6 +130,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   rendered a player whose src had an empty uuid segment
   (`/file//original/<token>` — a dead request).
   """
+  @spec get_audio_uuid(t()) :: String.t() | nil
   def get_audio_uuid(%__MODULE__{data: data}) do
     case Map.get(data, "audio_uuid") do
       uuid when is_binary(uuid) -> if String.trim(uuid) == "", do: nil, else: uuid
@@ -134,6 +139,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   end
 
   @doc "Returns the post tags."
+  @spec get_tags(t()) :: [String.t()]
   def get_tags(%__MODULE__{data: data}), do: Map.get(data, "tags", [])
 
   @doc """
@@ -146,6 +152,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   the one it was created from, so this carries forward by default and only
   differs where somebody changed it.
   """
+  @spec get_category_uuids(t()) :: [String.t()]
   def get_category_uuids(%__MODULE__{data: data}) do
     case Map.get(data, "category_uuids") do
       list when is_list(list) -> Enum.filter(list, &is_binary/1)
@@ -154,20 +161,30 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   end
 
   @doc "Returns the SEO description."
+  @spec get_description(t()) :: String.t() | nil
   def get_description(%__MODULE__{data: data}), do: Map.get(data, "description")
 
   @doc "Returns whether older versions are publicly accessible."
+  @spec get_allow_version_access(t()) :: boolean()
   def get_allow_version_access(%__MODULE__{data: data}),
     do: Map.get(data, "allow_version_access", false)
 
+  @doc "Returns whether this post is left out of the sitemap."
+  @spec get_sitemap_exclude(t()) :: boolean()
+  def get_sitemap_exclude(%__MODULE__{data: data}),
+    do: Map.get(data, "sitemap_exclude", false)
+
   @doc "Returns whether this post is featured (pinned + shown larger on the group listing)."
+  @spec get_featured(t()) :: boolean()
   def get_featured(%__MODULE__{data: data}), do: Map.get(data, "featured", false)
 
   # ── Version history accessors ──────────────────────────────────
 
   @doc "Returns the source version number this was created from."
+  @spec get_created_from(t()) :: pos_integer() | nil
   def get_created_from(%__MODULE__{data: data}), do: Map.get(data, "created_from")
 
   @doc "Returns version notes."
+  @spec get_notes(t()) :: String.t() | nil
   def get_notes(%__MODULE__{data: data}), do: Map.get(data, "notes")
 end

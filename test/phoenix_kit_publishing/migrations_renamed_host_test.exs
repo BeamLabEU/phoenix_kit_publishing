@@ -19,20 +19,22 @@ defmodule PhoenixKitPublishing.MigrationsRenamedHostTest do
   `PhoenixKitNewsletters.Migrations` crashed outright on a renamed host with
   `42P16 multiple primary keys`).
 
-  The fixture is built from this chain's OWN `up_statements(@prefix, 1)`
-  output (gets the correct, canonical shape for free), then every
-  constraint and index is renamed to something else, and the marker is
-  cleared — so the starting point is "the right shape, wrong names,
-  never stamped by this chain".
+  The fixture is built from this chain's OWN `up_statements/2` output at
+  `current_version/0` (gets the correct, canonical shape for free — V1's
+  adoption and V2's two expression indexes), then every constraint and
+  index is renamed to something else, and the marker is cleared — so the
+  starting point is "the right shape, wrong names, never stamped by this
+  chain".
 
   One wrinkle verified empirically against this environment's Postgres
   before writing the rename step: `ALTER TABLE ... RENAME CONSTRAINT`
   RENAMES A PK/UNIQUE CONSTRAINT'S OWN BACKING INDEX TOO (confirmed live —
   a constraint backed by an index is not a separate rename target). Only
-  the 12 FKs (which have no backing index) and the 22 free-standing
-  `idx_publishing_*` indexes need a SEPARATE `ALTER INDEX ... RENAME TO`
-  pass, queried fresh AFTER the constraint renames so it never touches an
-  index that renaming its constraint already renamed.
+  the 12 FKs (which have no backing index) and the 24 free-standing
+  `idx_publishing_*` indexes (V1's 22 plus V2's 2) need a SEPARATE
+  `ALTER INDEX ... RENAME TO` pass, queried fresh AFTER the constraint
+  renames so it never touches an index that renaming its constraint
+  already renamed.
 
   Everything here runs against an isolated `pkpubrenamed_host` prefix schema
   inside the sandboxed test transaction (Postgres DDL is transactional, so
@@ -56,13 +58,24 @@ defmodule PhoenixKitPublishing.MigrationsRenamedHostTest do
     phoenix_kit_publishing_post_views
   )
 
-  defmodule RunUpToOneRenamedHost do
+  defmodule RunUpToCurrentRenamedHost do
     @moduledoc false
     use Ecto.Migration
 
-    def up, do: PhoenixKitPublishing.Migrations.up(prefix: "pkpubrenamed_host", version: 1)
+    def up do
+      PhoenixKitPublishing.Migrations.up(
+        prefix: "pkpubrenamed_host",
+        version: PhoenixKitPublishing.Migrations.current_version()
+      )
+    end
+
     def down, do: :ok
   end
+
+  @current PhoenixKitPublishing.Migrations.current_version()
+  # V1's 22 free-standing + 7 pkey-backing + 1 unique-constraint-backing,
+  # then V2's 2 expression indexes.
+  @total_indexes 32
 
   setup do
     Repo.query!("CREATE SCHEMA IF NOT EXISTS #{@prefix}")
@@ -82,7 +95,7 @@ defmodule PhoenixKitPublishing.MigrationsRenamedHostTest do
     # canonical names — built from the builder itself, not hand-typed, so
     # this fixture can never silently drift from what up_statements/2
     # actually emits.
-    Migrations.up_statements(@prefix, 1)
+    Migrations.up_statements(@prefix, @current)
     |> Enum.each(&Repo.query!(&1))
 
     rename_every_constraint()
@@ -102,7 +115,7 @@ defmodule PhoenixKitPublishing.MigrationsRenamedHostTest do
          "names does not error, does not duplicate any object, and still stamps the marker" do
     # This is the regression itself: a name-based PK guard raises
     # "multiple primary keys for table ... are not allowed" here.
-    run_migration(RunUpToOneRenamedHost)
+    run_migration(RunUpToCurrentRenamedHost)
 
     # Every table still has exactly ONE primary key, under its renamed name
     # — no second, canonically-named PK was added alongside it.
@@ -136,8 +149,10 @@ defmodule PhoenixKitPublishing.MigrationsRenamedHostTest do
       assert Enum.all?(fks, fn {name, _target} -> String.starts_with?(name, "z_") end)
     end
 
-    # All 22 free-standing indexes are untouched under their renamed names —
-    # no duplicate, canonically-named index was added.
+    # All 24 free-standing indexes (V2's two expression indexes included —
+    # `expression_index_guard/3` matches on the expression, not the name)
+    # are untouched under their renamed names — no duplicate,
+    # canonically-named index was added.
     for table <- @tables do
       free_standing = free_standing_index_names(table)
 
@@ -145,16 +160,16 @@ defmodule PhoenixKitPublishing.MigrationsRenamedHostTest do
              "#{table}: at least one free-standing index is not under its renamed name: #{inspect(free_standing)}"
     end
 
-    assert total_index_count() == 30,
-           "expected exactly 30 indexes across all 7 tables (22 free-standing + 7 pkey-backing " <>
-             "+ 1 unique-constraint-backing) — a different count means something was duplicated " <>
-             "or never created"
+    assert total_index_count() == @total_indexes,
+           "expected exactly #{@total_indexes} indexes across all 7 tables (24 free-standing + 7 " <>
+             "pkey-backing + 1 unique-constraint-backing) — a different count means something " <>
+             "was duplicated or never created"
 
-    assert Migrations.migrated_version_runtime(prefix: @prefix) == 1
+    assert Migrations.migrated_version_runtime(prefix: @prefix) == @current
   end
 
   test "a second up/1 run against the same renamed-host shape is idempotent" do
-    run_migration(RunUpToOneRenamedHost)
+    run_migration(RunUpToCurrentRenamedHost)
 
     # up/1 short-circuits on `migrated_version(opts) < opts.version` — without
     # clearing the marker here, this second call would be a version-gate
@@ -163,19 +178,20 @@ defmodule PhoenixKitPublishing.MigrationsRenamedHostTest do
     # run again against the now-canonically-shaped (post-1st-run) table, the
     # real idempotence claim this test makes.
     Repo.query!("COMMENT ON TABLE #{@prefix}.phoenix_kit_publishing_groups IS NULL")
-    run_migration(RunUpToOneRenamedHost)
+    run_migration(RunUpToCurrentRenamedHost)
 
-    # Still exactly one PK per table, 20 constraints, 30 indexes, still
-    # version 1 — a second run must not add a THIRD copy of anything.
+    # Still exactly one PK per table, 20 constraints, 32 indexes, still
+    # the current version — a second run must not add a THIRD copy of
+    # anything.
     for {table, _} <- pkey_tables() do
       assert length(pkey_rows(table)) == 1
     end
 
     assert length(constraint_rows("phoenix_kit_publishing_categories", "u")) == 1
     assert total_fk_count() == 12
-    assert total_index_count() == 30
+    assert total_index_count() == @total_indexes
 
-    assert Migrations.migrated_version_runtime(prefix: @prefix) == 1
+    assert Migrations.migrated_version_runtime(prefix: @prefix) == @current
   end
 
   # ── fixture setup helpers ───────────────────────────────────────────────

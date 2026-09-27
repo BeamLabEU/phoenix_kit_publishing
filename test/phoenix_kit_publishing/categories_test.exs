@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Versions
 
   defp unique_name, do: "cat-#{System.unique_integer([:positive])}"
@@ -83,7 +84,7 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
 
       {:ok, _} = Categories.delete_category(a.uuid)
 
-      {:ok, reloaded} = Categories.get_category(b.uuid)
+      {:ok, reloaded} = Categories.fetch_category(b.uuid)
       assert reloaded.parent_uuid == nil
     end
   end
@@ -111,7 +112,7 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
 
       {:ok, _} = Categories.reorder_categories(slug, [child.uuid, a.uuid])
 
-      {:ok, reloaded} = Categories.get_category(child.uuid)
+      {:ok, reloaded} = Categories.fetch_category(child.uuid)
       assert reloaded.parent_uuid == a.uuid
     end
 
@@ -128,7 +129,7 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
           "not-a-uuid"
         ])
 
-      {:ok, foreign_reloaded} = Categories.get_category(foreign.uuid)
+      {:ok, foreign_reloaded} = Categories.fetch_category(foreign.uuid)
       assert foreign_reloaded.position == 0
     end
 
@@ -198,6 +199,17 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
       %{post: post}
     end
 
+    test "replace_post_categories broadcasts the group's categories change", %{
+      slug: slug,
+      post: post
+    } do
+      {:ok, cat} = Categories.create_category(slug, %{"name" => "Moved into"})
+      PublishingPubSub.subscribe_to_categories(slug)
+
+      {:ok, _} = Categories.replace_post_categories(post.uuid, [cat.uuid])
+      assert_receive {:categories_changed, ^slug}
+    end
+
     test "replace_post_categories drops foreign-group uuids", %{slug: slug, post: post} do
       {:ok, mine} = Categories.create_category(slug, %{"name" => "Mine"})
       {:ok, other} = Groups.add_group(unique_name(), mode: "slug")
@@ -234,6 +246,90 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
       {:ok, _} = Categories.replace_post_categories(post.uuid, [cat.uuid])
       {:ok, _} = Categories.delete_category(cat.uuid)
       assert Categories.category_uuids_for_post(post.uuid) == []
+    end
+  end
+
+  describe "broadcasts" do
+    # Two admins on one group's categories page: without these the second
+    # one is stale until a reload. One event per mutation, slug only.
+    setup %{slug: slug} do
+      :ok = PublishingPubSub.subscribe_to_categories(slug)
+      on_exit(fn -> PublishingPubSub.unsubscribe_from_categories(slug) end)
+      :ok
+    end
+
+    test "create_category broadcasts :categories_changed for the group", %{slug: slug} do
+      {:ok, _} = Categories.create_category(slug, %{"name" => "News"})
+      assert_receive {:categories_changed, ^slug}, 500
+      refute_receive {:categories_changed, _}, 50
+    end
+
+    test "a failed create broadcasts nothing", %{slug: slug} do
+      {:ok, _} = Categories.create_category(slug, %{"name" => "News"})
+      assert_receive {:categories_changed, ^slug}, 500
+
+      assert {:error, %Ecto.Changeset{}} = Categories.create_category(slug, %{"name" => "News"})
+      refute_receive {:categories_changed, _}, 50
+    end
+
+    test "update_category broadcasts once, after the transaction", %{slug: slug} do
+      {:ok, cat} = Categories.create_category(slug, %{"name" => "Old"})
+      assert_receive {:categories_changed, ^slug}, 500
+
+      {:ok, _} = Categories.update_category(cat.uuid, %{"name" => "Renamed"})
+      assert_receive {:categories_changed, ^slug}, 500
+      refute_receive {:categories_changed, _}, 50
+
+      # The receiver's reload must see the committed row.
+      {:ok, reloaded} = Categories.fetch_category(cat.uuid)
+      assert reloaded.name == "Renamed"
+    end
+
+    test "a refused re-parent broadcasts nothing", %{slug: slug} do
+      {:ok, a} = Categories.create_category(slug, %{"name" => "A"})
+      {:ok, b} = Categories.create_category(slug, %{"name" => "B", "parent_uuid" => a.uuid})
+      assert_receive {:categories_changed, ^slug}, 500
+      assert_receive {:categories_changed, ^slug}, 500
+
+      assert {:error, :category_cycle} =
+               Categories.update_category(a.uuid, %{"parent_uuid" => b.uuid})
+
+      refute_receive {:categories_changed, _}, 50
+    end
+
+    test "delete_category broadcasts once", %{slug: slug} do
+      {:ok, cat} = Categories.create_category(slug, %{"name" => "Gone"})
+      assert_receive {:categories_changed, ^slug}, 500
+
+      {:ok, _} = Categories.delete_category(cat.uuid)
+      assert_receive {:categories_changed, ^slug}, 500
+      refute_receive {:categories_changed, _}, 50
+    end
+
+    test "move_category broadcasts once", %{slug: slug} do
+      {:ok, a} = Categories.create_category(slug, %{"name" => "A"})
+      {:ok, b} = Categories.create_category(slug, %{"name" => "B"})
+      assert_receive {:categories_changed, ^slug}, 500
+      assert_receive {:categories_changed, ^slug}, 500
+
+      {:ok, _} = Categories.move_category(b.uuid, a.uuid)
+      assert_receive {:categories_changed, ^slug}, 500
+      refute_receive {:categories_changed, _}, 50
+    end
+
+    test "reorder_categories broadcasts once when rows moved, never for a no-op", %{slug: slug} do
+      {:ok, a} = Categories.create_category(slug, %{"name" => "A", "position" => 0})
+      {:ok, b} = Categories.create_category(slug, %{"name" => "B", "position" => 1})
+      assert_receive {:categories_changed, ^slug}, 500
+      assert_receive {:categories_changed, ^slug}, 500
+
+      assert {:ok, 2} = Categories.reorder_categories(slug, [b.uuid, a.uuid])
+      assert_receive {:categories_changed, ^slug}, 500
+      refute_receive {:categories_changed, _}, 50
+
+      # Dropped back where it already was: nothing changed, nothing to reload.
+      assert {:ok, 0} = Categories.reorder_categories(slug, [b.uuid, a.uuid])
+      refute_receive {:categories_changed, _}, 50
     end
   end
 end

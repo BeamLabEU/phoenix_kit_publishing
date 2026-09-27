@@ -44,16 +44,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   @doc """
   Checks if AI translation is available (AI module installed + enabled + endpoints configured).
   """
+  @spec ai_translation_available?() :: boolean()
   def ai_translation_available?, do: Translations.available?()
 
   @doc """
   Lists available AI endpoints for translation as `[{uuid, name}]`.
   """
+  @spec list_ai_endpoints() :: [{String.t(), String.t()}]
   def list_ai_endpoints, do: Translations.list_endpoints()
 
   @doc """
   Lists available AI prompts for translation as `[{uuid, name}]`.
   """
+  @spec list_ai_prompts() :: [{String.t(), String.t()}]
   def list_ai_prompts, do: Translations.list_prompts()
 
   # Default endpoint/prompt resolution is domain logic shared with the
@@ -64,16 +67,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Gets the default AI endpoint UUID — admin setting, else core's smart default
   (last-used endpoint from AI history, else a non-reasoning chat endpoint).
   """
+  @spec get_default_ai_endpoint_uuid() :: String.t() | nil
   def get_default_ai_endpoint_uuid, do: TranslationManager.default_endpoint_uuid()
 
   @doc """
   Gets the default AI prompt UUID for translation (setting, then slug fallback).
   """
+  @spec get_default_ai_prompt_uuid() :: String.t() | nil
   def get_default_ai_prompt_uuid, do: TranslationManager.default_prompt_uuid()
 
   @doc """
   Checks if the default translation prompt already exists.
   """
+  @spec default_translation_prompt_exists?() :: boolean()
   def default_translation_prompt_exists?, do: TranslationManager.default_prompt_exists?()
 
   @doc """
@@ -83,6 +89,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   model would hallucinate). Drives a "Regenerate default prompt" affordance so a
   stale row isn't a dead end (the "Generate" button hides once a prompt exists).
   """
+  @spec default_translation_prompt_stale?() :: boolean()
   def default_translation_prompt_stale? do
     case persisted_default_prompt() do
       %{content: content} when is_binary(content) ->
@@ -98,6 +105,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   template **in place** (preserving its uuid + any endpoint wiring), or creates
   it if absent. Returns `{:ok, prompt}` or `{:error, reason}`.
   """
+  @spec regenerate_default_translation_prompt() ::
+          {:ok, struct()} | {:error, Ecto.Changeset.t()}
   def regenerate_default_translation_prompt do
     case persisted_default_prompt() do
       nil -> generate_default_translation_prompt()
@@ -117,6 +126,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Generates the default translation prompt in the AI prompts system.
   Returns {:ok, prompt} or {:error, changeset}.
   """
+  @spec generate_default_translation_prompt() ::
+          {:ok, struct()} | {:error, Ecto.Changeset.t()}
   def generate_default_translation_prompt do
     AI.create_prompt(%{
       name: "Translate Publishing Posts",
@@ -190,6 +201,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   @doc """
   Gets target languages for translation (missing languages only).
   """
+  @spec get_target_languages_for_translation(Phoenix.LiveView.Socket.t()) :: [String.t()]
   def get_target_languages_for_translation(socket) do
     # Core owns the "enabled minus primary minus already-translated" rule
     # (same helper catalogue/projects use) — don't re-derive it here.
@@ -203,6 +215,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   @doc """
   Gets all target languages for translation (all except primary).
   """
+  @spec get_all_target_languages(term()) :: [String.t()]
   def get_all_target_languages(_socket) do
     # "All enabled except primary" is the missing-languages rule with an empty
     # existing-set.
@@ -221,6 +234,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Enqueues translation job with validation and warnings.
   Returns {:noreply, socket} for use in handle_event.
   """
+  @spec enqueue_translation(Phoenix.LiveView.Socket.t(), [String.t()], {atom(), String.t() | nil}) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def enqueue_translation(socket, target_languages, {empty_level, empty_message}) do
     cond do
       socket.assigns.is_new_post ->
@@ -263,6 +278,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   @doc """
   Actually enqueues the translation job (after confirmation if needed).
   """
+  @spec do_enqueue_translation(Phoenix.LiveView.Socket.t(), [String.t()]) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def do_enqueue_translation(socket, target_languages) do
     # Flush pending source edits FIRST. The worker reads the source text back
     # out of the DB, and enqueueing also locks this editor — so unsaved prose
@@ -369,6 +386,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   @doc """
   Builds warnings for the translation confirmation modal.
   """
+  @spec build_translation_warnings(Phoenix.LiveView.Socket.t(), [String.t()]) :: [
+          {:warning, String.t()}
+        ]
   def build_translation_warnings(socket, target_languages) do
     warnings = []
 
@@ -467,6 +487,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Returns the source language for translation based on the post's primary language
   or the system default.
   """
+  @spec source_language_for_translation(term()) :: String.t()
   def source_language_for_translation(_socket) do
     LanguageHelpers.get_primary_language()
   end
@@ -574,6 +595,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Checks if the source body content is blank. Kept for callers that only care
   about the body; `source_blank_state/1` is the richer title+content variant.
   """
+  @spec source_content_blank?(Phoenix.LiveView.Socket.t()) :: boolean()
   def source_content_blank?(socket) do
     {_title_blank, content_blank} = source_blank_state(socket)
     content_blank
@@ -588,6 +610,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   mirrors the adapter's `extract_title/1`: the first `# heading` of the body,
   else the stored/typed title (the default `"Untitled"` counts as no title).
   """
+  @spec source_blank_state(Phoenix.LiveView.Socket.t()) :: {boolean(), boolean()}
   def source_blank_state(socket) do
     {title, content} = source_title_and_content(socket)
     {blank_title?(title, content), String.trim(content) == ""}
@@ -644,6 +667,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   @doc """
   Starts translation to the current (non-primary) language.
   """
+  @spec start_translation_to_current(Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def start_translation_to_current(socket) do
     cond do
       socket.assigns.is_new_post ->
@@ -676,6 +701,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   @doc """
   Clears completed translation status when switching languages.
   """
+  @spec maybe_clear_completed_translation_status(Phoenix.LiveView.Socket.t()) ::
+          Phoenix.LiveView.Socket.t()
   def maybe_clear_completed_translation_status(socket) do
     if socket.assigns[:ai_translation_status] == :completed do
       socket
@@ -692,6 +719,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   Restores translation status from an active Oban job if one exists for this post.
   Call on mount to survive page refreshes.
   """
+  @spec maybe_restore_translation_status(Phoenix.LiveView.Socket.t()) ::
+          Phoenix.LiveView.Socket.t()
   def maybe_restore_translation_status(socket) do
     post = socket.assigns[:post]
 

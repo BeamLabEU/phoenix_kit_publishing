@@ -72,23 +72,23 @@ defmodule PhoenixKit.Modules.Publishing.GroupsTest do
 
   describe "fetch_option/2" do
     test "fetches atom key from map" do
-      assert Groups.fetch_option(%{mode: "slug"}, :mode) == "slug"
+      assert Groups.get_option(%{mode: "slug"}, :mode) == "slug"
     end
 
     test "fetches string key from map as fallback" do
-      assert Groups.fetch_option(%{"mode" => "slug"}, :mode) == "slug"
+      assert Groups.get_option(%{"mode" => "slug"}, :mode) == "slug"
     end
 
     test "fetches from keyword list" do
-      assert Groups.fetch_option([mode: "slug"], :mode) == "slug"
+      assert Groups.get_option([mode: "slug"], :mode) == "slug"
     end
 
     test "returns nil for missing key" do
-      assert Groups.fetch_option(%{}, :mode) == nil
+      assert Groups.get_option(%{}, :mode) == nil
     end
 
     test "returns nil for non-container" do
-      assert Groups.fetch_option(nil, :mode) == nil
+      assert Groups.get_option(nil, :mode) == nil
     end
   end
 end

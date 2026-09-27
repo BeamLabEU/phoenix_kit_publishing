@@ -32,6 +32,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   Performs save operation with validation and routing.
   Returns {:noreply, socket}.
   """
+  @spec perform_save(Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   def perform_save(socket) do
     is_autosaving = Map.get(socket.assigns, :is_autosaving, false)
     title = (socket.assigns.form["title"] || "") |> String.trim()
@@ -85,6 +86,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         "category_uuids",
         "audio_uuid",
         "allow_version_access",
+        "sitemap_exclude",
         "url_slug",
         "title",
         "og_title",
@@ -496,7 +498,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           )
           |> Phoenix.Component.assign(:editing_published_version, false)
           |> Helpers.mark_clean()
-          |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
           |> Phoenix.LiveView.put_flash(
             :info,
             gettext("Created new version %{version} (draft)",
@@ -643,7 +644,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         {:noreply,
          socket
          |> Helpers.mark_clean()
-         |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
          |> Phoenix.LiveView.put_flash(:warning, message)}
     end
   end
@@ -676,15 +676,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     end
   end
 
-  defp handle_post_save_success(socket, post) do
-    group_slug = socket.assigns.group_slug
+  # A successful write: drop the listing cache for the group and tell the other
+  # tabs/users on this form key to reload.
+  defp broadcast_saved(socket, post) do
+    invalidate_post_cache(socket.assigns.group_slug, post)
 
-    invalidate_post_cache(group_slug, post)
-
-    # Broadcast save to other tabs/users
     if socket.assigns[:form_key] do
       Logger.debug(
-        "BROADCASTING editor_saved from update_existing_post: " <>
+        "BROADCASTING editor_saved: " <>
           "form_key=#{inspect(socket.assigns.form_key)}, source=#{inspect(socket.id)}"
       )
 
@@ -694,6 +693,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         {socket.assigns.group_slug, get_in(socket.assigns, [:post, :uuid])}
       )
     end
+
+    :ok
+  end
+
+  defp handle_post_save_success(socket, post) do
+    group_slug = socket.assigns.group_slug
+    broadcast_saved(socket, post)
 
     # A save that WORKS must retract a previous failure. update_meta now
     # deliberately preserves :error across keystrokes (so an autosave failure
@@ -751,7 +757,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       |> Phoenix.Component.assign(:language_statuses, refreshed_post.language_statuses)
       |> Phoenix.Component.assign(:version_statuses, refreshed_post.version_statuses)
       |> Phoenix.Component.assign(:version_dates, Map.get(refreshed_post, :version_dates, %{}))
-      |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
 
     {:noreply,
      if(flash_message, do: Phoenix.LiveView.put_flash(socket, :info, flash_message), else: socket)}
@@ -798,20 +803,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   defp handle_post_update_result(socket, update_result, success_message, extra_assigns) do
     case update_result do
       {:ok, updated_post} ->
-        invalidate_post_cache(socket.assigns.group_slug, updated_post)
-
-        if socket.assigns[:form_key] do
-          Logger.debug(
-            "BROADCASTING editor_saved: " <>
-              "form_key=#{inspect(socket.assigns.form_key)}, source=#{inspect(socket.id)}"
-          )
-
-          PublishingPubSub.broadcast_editor_saved(
-            socket.assigns.form_key,
-            socket.id,
-            {socket.assigns.group_slug, get_in(socket.assigns, [:post, :uuid])}
-          )
-        end
+        broadcast_saved(socket, updated_post)
 
         flash_message =
           if socket.assigns.is_autosaving,
@@ -834,7 +826,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
           |> Helpers.mark_clean()
           |> Phoenix.Component.assign(extra_assigns)
-          |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
           |> maybe_patch_edit_url(updated_post)
 
         {:noreply,
@@ -1027,6 +1018,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   @doc """
   Reload content after AI translation completes for the current language.
   """
+  @spec reload_translated_content(Phoenix.LiveView.Socket.t(), String.t(), atom()) ::
+          Phoenix.LiveView.Socket.t()
   def reload_translated_content(socket, flash_msg, flash_level) do
     group_slug = socket.assigns.group_slug
     current_language = socket.assigns[:current_language]
@@ -1039,11 +1032,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         socket
         |> Phoenix.Component.assign(:post, %{updated_post | group: group_slug})
         |> Forms.assign_form_with_tracking(form)
-        |> Phoenix.Component.assign(:content, updated_post.content)
         |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
         |> Helpers.mark_clean()
-        |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-        |> Phoenix.LiveView.push_event("set-content", %{content: updated_post.content})
+        |> Helpers.set_editor_content(updated_post.content)
         |> Phoenix.LiveView.put_flash(flash_level, flash_msg)
 
       {:error, _reason} ->
@@ -1054,6 +1045,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   @doc """
   Refresh available_languages and language_statuses (for language switcher updates).
   """
+  @spec refresh_available_languages(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def refresh_available_languages(socket) do
     case re_read_post(socket) do
       {:ok, updated_post} ->
@@ -1084,8 +1076,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   it, which is a conflict a person can resolve; the tab that has nothing
   pending still reloads, which is what makes a reference tab follow along.
   """
+  @spec reload_post(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def reload_post(socket) do
-    if socket.assigns[:has_pending_changes] do
+    # A spectator's "pending" copy is the owner's own work mirrored here; the
+    # owner just saved it, so the spectator follows instead of being warned.
+    if socket.assigns[:has_pending_changes] && !socket.assigns[:readonly?] do
       Phoenix.LiveView.put_flash(
         socket,
         :warning,
@@ -1111,14 +1106,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         |> Phoenix.Component.assign(:post, %{updated_post | group: group_slug})
         |> Editor.assign_page_trail(updated_post)
         |> Forms.assign_form_with_tracking(form)
-        |> Phoenix.Component.assign(:content, updated_post.content)
         |> Phoenix.Component.assign(:available_languages, updated_post.available_languages)
         |> Helpers.mark_clean()
         # This socket now matches the row again, so a later promotion should
         # take the saved copy rather than re-adopting what it mirrored before.
         |> Collaborative.clear_synced_from_owner()
-        |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-        |> Phoenix.LiveView.push_event("set-content", %{content: updated_post.content})
+        |> Helpers.set_editor_content(updated_post.content)
         |> Phoenix.LiveView.put_flash(:info, gettext("Post updated by another user"))
 
       {:error, _reason} ->
@@ -1133,6 +1126,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   @doc """
   Regenerates the listing cache for a group.
   """
+  @spec regenerate_listing_cache(String.t()) :: :ok | {:error, term()}
   def regenerate_listing_cache(group_slug) do
     ListingCache.regenerate(group_slug)
   end

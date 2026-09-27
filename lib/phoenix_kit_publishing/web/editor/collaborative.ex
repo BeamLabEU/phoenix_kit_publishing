@@ -10,6 +10,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
   alias PhoenixKit.Modules.Publishing.PresenceHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
   require Logger
 
@@ -33,6 +35,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   Sets up collaborative editing for initial load.
   old_form_key and old_post_slug should be captured BEFORE the socket is updated.
   """
+  @spec setup_collaborative_editing(Phoenix.LiveView.Socket.t(), String.t() | nil, keyword()) ::
+          Phoenix.LiveView.Socket.t()
   def setup_collaborative_editing(socket, form_key, opts) do
     current_user = socket.assigns[:phoenix_kit_current_user]
 
@@ -49,19 +53,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
     try do
       cleanup_old_presence(old_form_key, form_key, socket, old_post_slug)
-      track_and_subscribe(form_key, socket, current_user)
-      subscribe_to_post_translations(socket)
-      subscribe_to_post_versions(socket)
-
-      # Cleared up front: switching language or version rebuilds this socket
-      # around a different row, so a marker left over from the previous one
-      # would make the next promotion adopt a buffer for the wrong content.
-      socket
-      |> clear_synced_from_owner()
-      |> assign_editing_role(form_key)
-      |> maybe_broadcast_editor_joined()
-      |> maybe_load_spectator_state(form_key)
-      |> maybe_start_lock_expiration_timer()
+      setup_new_presence(socket, form_key, current_user)
     rescue
       ArgumentError ->
         Logger.warning(
@@ -76,6 +68,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Used when we know the old form_key (e.g., when switching languages/versions).
   """
+  @spec cleanup_and_setup_collaborative_editing(
+          Phoenix.LiveView.Socket.t(),
+          String.t() | nil,
+          String.t() | nil,
+          keyword()
+        ) :: Phoenix.LiveView.Socket.t()
   def cleanup_and_setup_collaborative_editing(socket, old_form_key, new_form_key, opts) do
     current_user = socket.assigns[:phoenix_kit_current_user]
     old_post_slug = Keyword.get(opts, :old_post_slug)
@@ -127,9 +125,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     subscribe_to_post_translations(socket)
     subscribe_to_post_versions(socket)
 
-    # Same up-front clear as the context-switch path above: a leftover
-    # synced-from-owner marker from a previous form key would make the next
-    # promotion adopt a buffer that belonged to different content.
+    # Cleared up front: switching language or version rebuilds this socket
+    # around a different row, so a synced-from-owner marker left over from the
+    # previous form key would make the next promotion adopt a buffer that
+    # belonged to different content.
     socket
     |> clear_synced_from_owner()
     |> assign_editing_role(form_key)
@@ -141,6 +140,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Broadcast editor left for a specific post slug (used when we've already switched posts).
   """
+  @spec broadcast_editor_left_for_post(Phoenix.LiveView.Socket.t(), String.t() | nil) :: term()
   def broadcast_editor_left_for_post(socket, post_slug) do
     group_slug = socket.assigns[:group_slug]
 
@@ -150,12 +150,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     end
   end
 
+  @doc false
+  @spec current_post_id(Phoenix.LiveView.Socket.t()) :: String.t() | nil
+  # The broadcast id of the post this socket is editing, nil before a post is
+  # assigned. Captured BEFORE a switch assigns the new post, so the old post's
+  # presence and topics are torn down under the right id.
+  def current_post_id(socket) do
+    case socket.assigns[:post] do
+      nil -> nil
+      post -> PublishingPubSub.broadcast_id(post)
+    end
+  end
+
   @doc """
   Unsubscribe from current post's topics (used in terminate when LiveView closes).
   """
+  @spec unsubscribe_from_old_post_topics(Phoenix.LiveView.Socket.t()) :: :ok | nil
   def unsubscribe_from_old_post_topics(socket) do
     group_slug = socket.assigns[:group_slug]
-    post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+    post_slug = current_post_id(socket)
 
     if group_slug && post_slug do
       PublishingPubSub.unsubscribe_from_post_translations(group_slug, post_slug)
@@ -166,16 +179,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   # ============================================================================
   # Tracking and Subscription
   # ============================================================================
-
-  defp track_and_subscribe(form_key, socket, current_user) do
-    case PresenceHelpers.track_editing_session(form_key, socket, current_user) do
-      {:ok, _ref} -> :ok
-      {:error, {:already_tracked, _pid, _topic, _key}} -> :ok
-    end
-
-    PresenceHelpers.subscribe_to_editing(form_key)
-    PublishingPubSub.subscribe_to_editor_form(form_key)
-  end
 
   defp subscribe_to_post_translations(socket) do
     case PublishingPubSub.broadcast_id(socket.assigns[:post]) do
@@ -204,6 +207,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Assigns the editing role (owner or spectator) based on presence.
   """
+  @spec assign_editing_role(Phoenix.LiveView.Socket.t(), String.t()) ::
+          Phoenix.LiveView.Socket.t()
   def assign_editing_role(socket, form_key) do
     current_user = socket.assigns[:phoenix_kit_current_user]
 
@@ -227,6 +232,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Assigns default editing state when collaborative editing is not available.
   """
+  @spec assign_default_editing_state(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def assign_default_editing_state(socket) do
     socket
     |> Phoenix.Component.assign(:lock_owner?, true)
@@ -298,6 +304,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Only broadcast editor_joined if user is the owner (not a spectator).
   """
+  @spec maybe_broadcast_editor_joined(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def maybe_broadcast_editor_joined(socket) do
     if socket.assigns[:lock_owner?] do
       broadcast_editor_activity(socket, :joined)
@@ -309,6 +316,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Broadcast editor activity to group listing (for showing who's editing).
   """
+  @spec broadcast_editor_activity(Phoenix.LiveView.Socket.t(), :joined | :left, map() | nil) ::
+          term()
   def broadcast_editor_activity(socket, action, user \\ nil) do
     group_slug = socket.assigns[:group_slug]
     post = socket.assigns[:post]
@@ -331,6 +340,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Broadcast form changes to spectators (only owners broadcast).
   """
+  @spec broadcast_form_change(Phoenix.LiveView.Socket.t(), atom(), term()) :: term()
   def broadcast_form_change(socket, type, payload) do
     form_key = socket.assigns[:form_key]
     is_owner = socket.assigns[:lock_owner?]
@@ -347,18 +357,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Build user info for broadcasts.
   """
+  @spec build_user_info(Phoenix.LiveView.Socket.t(), map() | nil) :: map()
   def build_user_info(socket, user) do
     user = user || socket.assigns[:phoenix_kit_current_user]
     # Include role to distinguish editors from spectators
     role = if socket.assigns[:lock_owner?], do: :owner, else: :spectator
 
     if user do
-      %{
-        id: user.uuid,
-        email: user.email,
-        socket_id: socket.id,
-        role: role
-      }
+      %{id: user.uuid, socket_id: socket.id, role: role}
     else
       %{socket_id: socket.id, role: role}
     end
@@ -371,6 +377,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Apply remote form state (for spectators receiving initial sync).
   """
+  @spec apply_remote_form_state(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
   def apply_remote_form_state(socket, form_state) do
     form = Map.get(form_state, :form) || Map.get(form_state, "form") || socket.assigns.form
 
@@ -387,7 +394,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
 
     socket
     |> Phoenix.Component.assign(:form, form)
-    |> Phoenix.Component.assign(:content, content)
     |> then(fn socket ->
       if ahead? do
         socket
@@ -397,13 +403,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
         socket
       end
     end)
-    |> Phoenix.LiveView.push_event("set-content", %{content: content})
-    |> Phoenix.LiveView.push_event("form-updated", %{form: form})
+    |> Helpers.set_editor_content(content)
   end
 
   @doc """
   Apply remote form changes (for spectators receiving updates).
   """
+  @spec apply_remote_form_change(Phoenix.LiveView.Socket.t(), map()) ::
+          Phoenix.LiveView.Socket.t()
   def apply_remote_form_change(socket, %{type: :meta, data: new_form}) do
     # Status is version-level — all languages share the same status
     new_status = new_form["status"]
@@ -419,16 +426,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     |> Phoenix.Component.assign(:form, new_form)
     |> Phoenix.Component.assign(:post, updated_post)
     |> mark_synced_from_owner()
-    |> Phoenix.LiveView.push_event("form-updated", %{form: new_form})
   end
 
   def apply_remote_form_change(socket, %{type: :content, data: %{content: content, form: form}}) do
+    # The owner just typed. Unless this exactly matches the saved row, the
+    # copy here is unsaved work, and Leaf must not baseline it as saved — a
+    # spectator promoted later would then leave the page without a prompt.
+    ahead? =
+      case socket.assigns[:post] do
+        nil -> true
+        post -> Forms.dirty?(post, form, content)
+      end
+
     socket
-    |> Phoenix.Component.assign(:content, content)
     |> Phoenix.Component.assign(:form, form)
+    |> Phoenix.Component.assign(:has_pending_changes, ahead?)
     |> mark_synced_from_owner()
-    |> Phoenix.LiveView.push_event("set-content", %{content: content})
-    |> Phoenix.LiveView.push_event("form-updated", %{form: form})
+    |> Helpers.set_editor_content(content)
   end
 
   def apply_remote_form_change(socket, _payload) do
@@ -452,6 +466,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   the row clears it: a reload after someone else's save, or a promotion that
   chose the saved copy.
   """
+  @spec mark_synced_from_owner(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def mark_synced_from_owner(socket) do
     Phoenix.Component.assign(socket, :synced_from_owner?, true)
   end
@@ -459,6 +474,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Clears the ahead-of-database marker. See `mark_synced_from_owner/1`.
   """
+  @spec clear_synced_from_owner(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def clear_synced_from_owner(socket) do
     Phoenix.Component.assign(socket, :synced_from_owner?, false)
   end
@@ -470,6 +486,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Update activity timestamp on user interactions.
   """
+  @spec touch_activity(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def touch_activity(socket) do
     socket
     |> Phoenix.Component.assign(:last_activity_at, System.monotonic_time(:second))
@@ -479,6 +496,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Conditionally start lock expiration timer after role assignment.
   """
+  @spec maybe_start_lock_expiration_timer(Phoenix.LiveView.Socket.t()) ::
+          Phoenix.LiveView.Socket.t()
   def maybe_start_lock_expiration_timer(socket) do
     if socket.assigns[:lock_owner?] && !socket.assigns[:readonly?] do
       socket
@@ -492,6 +511,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Start lock expiration timer (only for owners).
   """
+  @spec start_lock_expiration_timer(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def start_lock_expiration_timer(socket) do
     if socket.assigns[:lock_owner?] do
       cancel_lock_expiration_timer(socket)
@@ -505,6 +525,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Cancel lock expiration timer.
   """
+  @spec cancel_lock_expiration_timer(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def cancel_lock_expiration_timer(socket) do
     if socket.assigns[:lock_expiration_timer] do
       Process.cancel_timer(socket.assigns.lock_expiration_timer)
@@ -516,6 +537,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Check if lock should expire or warn user.
   """
+  @spec check_lock_expiration(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def check_lock_expiration(socket) do
     if socket.assigns[:lock_owner?] do
       now = System.monotonic_time(:second)
@@ -575,6 +597,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   @doc """
   Release lock due to inactivity.
   """
+  @spec release_lock_due_to_inactivity(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def release_lock_due_to_inactivity(socket) do
     form_key = socket.assigns[:form_key]
 
@@ -608,6 +631,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
   Re-tracks presence, reclaims ownership if no other user holds the lock,
   and restarts the expiration timer.
   """
+  @spec try_reclaim_lock(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
   def try_reclaim_lock(socket) do
     form_key = socket.assigns[:form_key]
     current_user = socket.assigns[:phoenix_kit_current_user]

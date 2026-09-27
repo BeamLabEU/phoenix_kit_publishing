@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.GroupSlugTest do
   use PhoenixKitPublishing.DataCase, async: true
 
   alias Ecto.Changeset
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.PublishingGroup
 
@@ -100,6 +101,20 @@ defmodule PhoenixKit.Modules.Publishing.GroupSlugTest do
       # The old loop recursed on the SUFFIXED slug, so the third was
       # "same-name-2-3".
       assert third["slug"] == "same-name-3"
+    end
+
+    # "Admin" used to slug to "admin" — a group the host's own routes
+    # shadow. A derived slug is suffixed past the reserved word, like a
+    # taken one; an explicit reserved slug is a clean `Errors` atom, not a
+    # crash and not a silently shadowed group.
+    test "a reserved route word is suffixed past when derived and refused when explicit" do
+      {:ok, group} = Groups.add_group("Admin")
+      assert group["slug"] == "admin-2"
+
+      assert {:error, :invalid_slug} = Groups.add_group("Back office", slug: "admin")
+      assert {:error, :invalid_slug} = Groups.add_group("Back office", slug: "settings")
+
+      assert is_binary(Errors.message(:invalid_slug))
     end
   end
 end

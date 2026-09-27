@@ -20,6 +20,7 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio do
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Storage.URLSigner
 
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     attributes = assigns[:attributes] || %{}
 

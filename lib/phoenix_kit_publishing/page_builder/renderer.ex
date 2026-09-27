@@ -8,6 +8,9 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
   @doc """
   Renders an AST node to HTML.
   """
+  @spec render(map() | [map()] | String.t(), map()) ::
+          {:ok, Phoenix.HTML.safe() | Phoenix.LiveView.Rendered.t()}
+          | {:error, {:render_error, Exception.t()}}
   def render(ast, assigns) when is_map(ast) do
     case resolve_component(ast.type) do
       {:ok, component_module} ->
@@ -91,6 +94,8 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
   @doc false
   # Public for the inline (self-closing) component path in
   # Publishing.Renderer, which bypasses this module's render_component/3.
+  @spec wrap_stretch(Phoenix.HTML.safe() | Phoenix.LiveView.Rendered.t(), map()) ::
+          Phoenix.HTML.safe() | Phoenix.LiveView.Rendered.t()
   def wrap_stretch(html, attributes) do
     case stretch_style(attributes) do
       nil ->

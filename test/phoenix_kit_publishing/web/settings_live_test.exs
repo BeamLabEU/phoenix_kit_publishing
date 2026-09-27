@@ -184,6 +184,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.SettingsLiveTest do
     assert final != initial
   end
 
+  test "toggle_unique_views flips the unique-views setting", %{conn: conn} do
+    {:ok, view, html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/settings/publishing")
+
+    assert html =~ ~s|phx-click="toggle_unique_views"|
+    assert Settings.get_boolean_setting("publishing_unique_views", true)
+
+    render_click(view, "toggle_unique_views", %{})
+    refute Settings.get_boolean_setting("publishing_unique_views", true)
+
+    render_click(view, "toggle_unique_views", %{})
+    assert Settings.get_boolean_setting("publishing_unique_views", true)
+  end
+
   test "clear_render_cache clears the global cache", %{conn: conn} do
     {:ok, view, _html} =
       conn

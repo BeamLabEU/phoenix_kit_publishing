@@ -1,3 +1,5 @@
+> **Superseded.** This spec targeted core's `MarkdownEditor` textarea hook. The body editor moved to Leaf on 2026-07-31, and Leaf's own `suggestions` attribute carries the hashtag and `[[` mention popups (`web/editor.ex`, the `<.leaf_editor>` call). Kept for the reasoning; nothing here describes current code.
+
 # MarkdownEditor: inline suggestions (`#tag` autocomplete and beyond)
 
 **For:** the developer maintaining `PhoenixKitWeb.Components.Core.MarkdownEditor`

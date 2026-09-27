@@ -153,7 +153,7 @@ Public pages resolve the name via `Publishing.translated_group_name(group_map, l
 stores the full code `fr-FR`, the public side asks by the short code `fr`). Every
 public surface that shows a group name resolves through it: the listing h1 / page
 title / OG title / breadcrumb, the post page's breadcrumb + "Back to …" footer
-(via `PostRendering.fetch_group/1` + `resolve_group_name/3` — the same fetched
+(via `PostRendering.group_map/1` + `resolve_group_name/3` — the same fetched
 group map also feeds the controller's `assign_group_display_config/2`, one fetch
 per request), and the feed channel title. Admin surfaces intentionally show the
 canonical primary-language name. `display_settings_render_test.exs` pins the

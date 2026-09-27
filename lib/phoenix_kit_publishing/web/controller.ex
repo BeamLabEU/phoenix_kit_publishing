@@ -168,7 +168,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     group_slug = params["group"]
 
     with true <- Publishing.enabled?() and public_enabled?(),
-         {:ok, group} <- Publishing.get_group(group_slug),
+         {:ok, group} <- Publishing.fetch_group(group_slug),
+         # Same status the GET path's group_trashed?/1 reads — get_group
+         # returns trashed groups too, so a trashed group kept taking comments.
+         true <- group["status"] != "trashed",
          true <- Map.get(group, "comments_enabled", false),
          true <- PublishingComments.available?() do
       handle_comment_submission(conn, group, params)
@@ -419,10 +422,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp extract_group_slug(_), do: nil
 
   defp group_trashed?(nil), do: false
-  defp group_trashed?(group_slug) when not is_binary(group_slug), do: false
 
   defp group_trashed?(group_slug) do
-    case Publishing.get_group(group_slug) do
+    case Publishing.fetch_group(group_slug) do
       {:ok, group} -> group["status"] == "trashed"
       {:error, _} -> false
     end
@@ -502,7 +504,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # would ingest the listing page as a broken feed).
   defp handle_feed(conn, group_slug, language, scope) do
     with true <- PublishingHTML.feeds_enabled?(),
-         {:ok, group} <- Publishing.get_group(group_slug),
+         {:ok, group} <- Publishing.fetch_group(group_slug),
          :render <- feed_canonical_redirect(conn, group_slug, language, scope),
          {:ok, all_posts, term_label} <-
            Listing.scoped_chronological_posts(group_slug, language, scope) do
@@ -539,17 +541,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     end
   end
 
-  # Canonical-prefix parity for feeds — strictly feed-to-feed (the target is
+  # Canonical parity for feeds — strictly feed-to-feed (the target is
   # feed_path/3 by construction, never the HTML smart fallback the moduledoc
   # above forbids). Readers follow permanent redirects, and without this the
   # channel's rel="self" link (built canonical) disagreed with the URL that
-  # served it.
+  # served it. The SAME rule as the HTML pages: checking only the redundant
+  # default prefix let /de-DE/<group>/feed.xml serve the feed while every
+  # builder emits /de/<group>/feed.xml.
   defp feed_canonical_redirect(conn, group_slug, language, scope) do
     canonical_language = Language.get_canonical_url_language(language)
     canonical_url = PublishingHTML.feed_path(canonical_language, group_slug, scope)
 
-    if Language.prefixed_default_language_request?(conn, canonical_language) and
-         not Language.request_matches_canonical_url?(conn, canonical_url) do
+    if Language.canonical_redirect?(conn, language, canonical_language, canonical_url) do
       {:redirect_301, canonical_url}
     else
       :render
@@ -632,9 +635,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     end
   end
 
-  defp base_url(conn) do
-    "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
-  end
+  # The public origin (site_url setting, else the endpoint's configured URL,
+  # else the request) — never conn.scheme first: behind a TLS-terminating
+  # proxy that is http on every page. See PublishingHTML.public_origin/0.
+  defp base_url(conn), do: PublishingHTML.public_origin(conn)
 
   # ============================================================================
   # Post Handlers
@@ -822,6 +826,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   @doc false
   # Public only so the merge rules can be unit-tested without staging a
   # canonical redirect; takes anything with a :query_string.
+  @spec with_query_string(Plug.Conn.t() | map(), String.t()) :: String.t()
   def with_query_string(%{query_string: qs}, url) when is_binary(qs) and qs != "" do
     # Whatever the canonical URL already decided stays decided. The listing's
     # canonical carries its own `?page=`, built from this same request, so
@@ -856,10 +861,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # independently, so a post can override just the title and inherit the rest.
   defp build_og_data(conn, post, canonical_url, language) do
     og_override = Map.get(post.metadata, :og) || %{}
-
-    base_url =
-      "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
-
+    base_url = base_url(conn)
     image_meta = og_image_meta(post, og_override)
 
     og =
@@ -919,7 +921,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     # `original` when large isn't generated. Either way `url` (below) is
     # always set from featured_image_url/2; only width/height/mime_type
     # are absent when neither variant record exists.
-    variant = fetch_variant(uuid, "large") || fetch_variant(uuid, "original")
+    variant = get_variant(uuid, "large") || get_variant(uuid, "original")
     url = PublishingHTML.featured_image_url(%{metadata: %{featured_image_uuid: uuid}}, "large")
 
     case variant do
@@ -933,7 +935,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     _ -> %{url: nil}
   end
 
-  defp fetch_variant(uuid, variant) do
+  defp get_variant(uuid, variant) do
     Storage.get_file_instance_by_name(uuid, variant)
   rescue
     _ -> nil
@@ -973,10 +975,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp canonical_absolute_url(conn, language, relative_url) do
     case resolve_canonical_host(language) do
       nil ->
-        base_url =
-          "#{conn.scheme}://#{conn.host}#{if conn.port in [80, 443], do: "", else: ":#{conn.port}"}"
-
-        absolute_url(base_url, relative_url)
+        absolute_url(base_url(conn), relative_url)
 
       host ->
         absolute_url("https://#{host}", strip_language_prefix(relative_url, language))

@@ -79,6 +79,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Whether group RSS feeds are served (`publishing_feeds_enabled`, default on).
   Read by the controller's feed branch and by the listing's autodiscovery link.
   """
+  @spec feeds_enabled?() :: boolean()
   def feeds_enabled? do
     Settings.get_boolean_setting("publishing_feeds_enabled", true)
   rescue
@@ -2319,10 +2320,66 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   @doc """
+  The origin (`scheme://host[:port]`, no trailing slash) absolute public URLs
+  are built on — og:url, JSON-LD, feed links, the admin's public-URL copy.
+  The same source of truth as core's `PhoenixKit.Utils.Routes.base_url/0`:
+  the `site_url` setting, else the host endpoint's configured URL. `nil` when
+  neither is set, so a caller falls back to the request it holds.
+
+  Never the request's scheme first: behind a TLS-terminating proxy
+  `conn.scheme` (and a LiveView's connect URI) say `http://` on every page.
+  """
+  @spec public_origin() :: String.t() | nil
+  def public_origin do
+    case Settings.get_setting("site_url", "") do
+      url when is_binary(url) and url != "" -> String.trim_trailing(url, "/")
+      _ -> configured_endpoint_origin()
+    end
+  end
+
+  @doc "`public_origin/0`, falling back to the origin the request arrived on."
+  @spec public_origin(Plug.Conn.t()) :: String.t()
+  def public_origin(%Plug.Conn{} = conn), do: public_origin() || request_origin(conn)
+
+  @doc """
+  The origin the request arrived on — the last resort, see `public_origin/0`.
+
+  The scheme is the proxy's when it says so (`x-forwarded-proto`): behind a
+  TLS-terminating proxy `conn.scheme` is the hop's, not the visitor's.
+  """
+  @spec request_origin(Plug.Conn.t()) :: String.t()
+  def request_origin(%Plug.Conn{scheme: scheme, host: host, port: port} = conn) do
+    scheme =
+      case Plug.Conn.get_req_header(conn, "x-forwarded-proto") do
+        [forwarded | _] when forwarded in ["http", "https"] -> forwarded
+        _ -> scheme
+      end
+
+    "#{scheme}://#{host}#{if port in [80, 443], do: "", else: ":#{port}"}"
+  end
+
+  # The endpoint's `url:` config — but an endpoint that never got one answers
+  # `http://localhost:4000`, and that placeholder must not beat the request
+  # the visitor actually made (a dev box served the listing's public URL as
+  # localhost for exactly this reason).
+  @placeholder_hosts ~w(localhost 127.0.0.1 0.0.0.0 [::1] ::1)
+
+  defp configured_endpoint_origin do
+    with {:ok, url} when is_binary(url) and url != "" <- Config.get_parent_endpoint_url(),
+         %URI{host: host} when is_binary(host) and host not in @placeholder_hosts <-
+           URI.parse(url) do
+      String.trim_trailing(url, "/")
+    else
+      _ -> nil
+    end
+  end
+
+  @doc """
   Builds the public URL for a group listing page.
   Omits the locale prefix when the site is effectively single-language.
   Can also omit the default-language prefix when that setting is enabled.
   """
+  @spec group_listing_path(String.t() | nil, String.t(), keyword() | map()) :: String.t()
   def group_listing_path(language, group_slug, params \\ []) do
     # Segment ≠ identity: a non-owner sibling dialect renders as its full
     # lowercase code ("en-gb"); everything else keeps the base code. The
@@ -2353,6 +2410,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   term archive's (`…/<group>/category/<slug>/feed.xml`, `…/tag/<tag>/feed.xml`),
   with the same locale-prefix rules as `group_listing_path/3`.
   """
+  @spec feed_path(
+          String.t() | nil,
+          String.t(),
+          nil | {:category, String.t()} | {:tag, String.t()}
+        ) ::
+          String.t()
   def feed_path(language, group_slug, scope \\ nil) do
     segment = LanguageHelpers.public_url_segment(language)
 
@@ -2375,6 +2438,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Public URL for a category archive (`…/<group>/category/<slug>`) or tag
   archive (`…/<group>/tag/<tag>`).
   """
+  @spec term_archive_path(String.t() | nil, String.t(), {atom(), String.t()}) :: String.t()
   def term_archive_path(language, group_slug, {type, value}) do
     segment = LanguageHelpers.public_url_segment(language)
 
@@ -2400,6 +2464,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   - If only one post exists on the date, uses date-only URL (e.g., /group/2025-12-09)
   - If multiple posts exist on the date, includes time (e.g., /group/2025-12-09/16:26)
   """
+  @spec build_post_url(String.t(), map(), String.t() | nil, map() | nil) :: String.t()
   def build_post_url(group_slug, post, language, date_counts \\ nil) do
     # The ORIGINAL language keeps its identity for the per-language slug
     # lookup (an "en-GB" caller must get the en-GB slug) and for the prefix
@@ -2501,6 +2566,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Builds a public path with explicit date and time (always includes time).
   Used when redirecting from date-only URLs to full timestamp URLs.
   """
+  @spec build_public_path_with_time(
+          String.t() | nil,
+          String.t(),
+          String.t() | Date.t(),
+          String.t() | Time.t()
+        ) :: String.t()
   def build_public_path_with_time(language, group_slug, date, time) do
     segment = LanguageHelpers.public_url_segment(language)
 
@@ -2515,6 +2586,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Formats a date for display using locale-aware month names.
   """
+  @spec format_date(term()) :: String.t()
   def format_date(datetime) when is_struct(datetime, DateTime) do
     datetime
     |> DateTime.to_date()
@@ -2539,6 +2611,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Formats a date with time for display.
   Used when multiple posts exist on the same date.
   """
+  @spec format_date_with_time(term()) :: String.t()
   def format_date_with_time(datetime) when is_struct(datetime, DateTime) do
     date_str = locale_strftime(datetime, gettext("%B %d, %Y"))
     time_str = Calendar.strftime(datetime, "%H:%M")
@@ -2564,6 +2637,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   For timestamp mode, the date comes from the DB fields.
   For slug mode, it comes from metadata.published_at.
   """
+  @spec has_publication_date?(map()) :: boolean()
   def has_publication_date?(post) do
     case post.mode do
       mode when mode in @timestamp_modes ->
@@ -2580,6 +2654,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Formats a post's publication date, including time only when multiple posts exist on the same date.
   """
+  @spec format_post_date(map(), String.t(), map() | nil) :: String.t()
   def format_post_date(post, group_slug, date_counts \\ nil) do
     case post.mode do
       mode when mode in @timestamp_modes ->
@@ -2601,6 +2676,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Formats a date for URL.
   """
+  @spec format_date_for_url(term()) :: String.t()
   def format_date_for_url(datetime) when is_struct(datetime, DateTime) do
     datetime
     |> DateTime.to_date()
@@ -2624,6 +2700,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Formats time for URL (HH:MM).
   """
+  @spec format_time_for_url(term()) :: String.t()
   def format_time_for_url(datetime) when is_struct(datetime, DateTime) do
     datetime
     |> DateTime.to_time()
@@ -2651,6 +2728,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Pluralizes a word based on count.
   """
+  @spec pluralize(integer(), String.t(), String.t()) :: String.t()
   def pluralize(1, singular, _plural), do: "1 #{singular}"
   def pluralize(count, _singular, plural), do: "#{count} #{plural}"
 
@@ -2659,6 +2737,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Returns content before <!-- more --> tag, or first paragraph if no tag.
   Renders markdown and strips HTML tags for plain text display.
   """
+  @spec extract_excerpt(term()) :: String.t()
   def extract_excerpt(content) when is_binary(content) do
     excerpt_markdown =
       if String.contains?(content, "<!-- more -->") do
@@ -2853,6 +2932,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Returns a map of `%{date_string => count}` for use with `build_post_url/4`
   and `format_post_date/3`.
   """
+  @spec build_date_counts([map()]) :: %{optional(String.t()) => pos_integer()}
   def build_date_counts(posts) do
     posts
     |> Enum.filter(&(&1.mode in @timestamp_modes))
@@ -2872,6 +2952,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Resolves a featured image URL for a post, falling back to the original variant.
   """
+  @spec featured_image_url(map(), String.t()) :: String.t() | nil
   def featured_image_url(post, variant \\ "medium") do
     post.metadata
     |> Map.get(:featured_image_uuid)
@@ -2892,6 +2973,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   Builds language data for the publishing_language_switcher component on public pages.
   Converts the @translations assign to the format expected by the component.
   """
+  @spec build_public_translations([map()], term()) :: [map()]
   def build_public_translations(translations, _current_language) do
     translations
     # A disabled/legacy language is not publicly routable — RouterDispatch
@@ -2919,6 +3001,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Resolves the exact language-switcher code to highlight on public pages.
   """
+  @spec public_current_language([map()], String.t() | nil) :: String.t() | nil
   def public_current_language(translations, fallback) do
     Enum.find_value(translations, fallback, fn translation ->
       if translation.current do

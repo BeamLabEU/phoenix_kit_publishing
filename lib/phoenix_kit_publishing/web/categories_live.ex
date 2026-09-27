@@ -11,10 +11,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   use PhoenixKitWeb, :live_view
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  import PhoenixKitWeb.Components.Core.EmptyState
+
   require Logger
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Categories
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
@@ -23,8 +26,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
 
   @impl true
   def mount(%{"group" => group_slug}, _session, socket) do
-    case Publishing.get_group(group_slug) do
+    case Publishing.fetch_group(group_slug) do
       {:ok, group} ->
+        # Subscribed BEFORE the first read, so a change that lands between
+        # the two is delivered rather than lost.
+        if connected?(socket), do: PublishingPubSub.subscribe_to_categories(group_slug)
+
         {:ok,
          socket
          |> assign(:project_title, Settings.get_project_title())
@@ -78,7 +85,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           "slug" => category.slug,
           "parent_uuid" => category.parent_uuid || "",
           "description" => category.description || "",
-          "position" => to_string(category.position || 0)
+          "position" => to_string(category.position)
         }
 
         {:noreply, open_form(socket, to_form(params, as: :category), category.uuid)}
@@ -288,6 +295,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
       ),
       do: {:noreply, assign(socket, :move, %{move | pick: id})}
 
+  # Another admin changed this group's tree. The page reloads it; an open
+  # form or Move dialog stays open — its parent tree is re-pruned inside
+  # `reload_tree/1`, so the change shows up there too.
+  def handle_info({:categories_changed, _group_slug}, socket),
+    do: {:noreply, reload_tree(socket)}
+
   def handle_info(msg, socket) do
     Logger.debug("[Publishing.CategoriesLive] unhandled message: #{inspect(msg)}")
     {:noreply, socket}
@@ -310,7 +323,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   defp get_group_category(socket, uuid) do
     group_uuid = socket.assigns.group["uuid"]
 
-    case Categories.get_category(uuid) do
+    case Categories.fetch_category(uuid) do
       {:ok, %{group_uuid: ^group_uuid} = category} -> {:ok, category}
       {:ok, _foreign} -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
@@ -360,7 +373,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     |> assign(:sibling_counts, sibling_counts)
     |> assign(:parents_with_children, parents_with_children)
     |> refresh_parent_tree()
+    |> refresh_move_tree()
   end
+
+  # The Move dialog's target tree was a snapshot taken when it opened, so a
+  # category created or moved by another admin while it sat open was not
+  # offered. Re-prune it from the fresh tree, keeping the pick.
+  defp refresh_move_tree(%{assigns: %{move: %{uuid: uuid} = move, tree: tree}} = socket),
+    do: assign(socket, :move, %{move | tree: parent_tree(tree, uuid)})
+
+  defp refresh_move_tree(socket), do: socket
 
   # Precomputed on tree/editing changes, not per render (validate fires per
   # keystroke).
@@ -444,37 +466,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     <div class="container flex flex-col mx-auto px-4 py-6">
       <.admin_page_header>
         <:actions>
-          <button type="button" class="btn btn-primary btn-sm" phx-click="new">
+          <.button type="button" size="sm" phx-click="new">
             <.icon name="hero-plus" class="w-4 h-4" />
             {gettext("New category")}
-          </button>
+          </.button>
         </:actions>
       </.admin_page_header>
 
       <div class="card bg-base-100 shadow-sm border border-base-200">
         <div class="card-body p-4">
           <%= if @tree == [] do %>
-            <div class="text-center py-8 text-base-content/60">
-              <.icon name="hero-tag" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p class="text-sm">
-                {gettext("No categories yet — create the first one.")}
-              </p>
-              <button type="button" class="btn btn-primary btn-sm mt-4" phx-click="new">
+            <.empty_state
+              icon="hero-tag"
+              title={gettext("No categories yet — create the first one.")}
+              class="py-8"
+            >
+              <.button type="button" size="sm" phx-click="new">
                 <.icon name="hero-plus" class="w-4 h-4" />
                 {gettext("New category")}
-              </button>
-            </div>
+              </.button>
+            </.empty_state>
           <% else %>
-            <table class="table table-sm">
-              <thead>
+            <.table_default variant="zebra" size="sm" wrapper_class="">
+              <.table_default_header>
                 <tr>
                   <.drag_handle_header_cell />
-                  <th>{gettext("Name")}</th>
-                  <th>{gettext("Slug")}</th>
-                  <th class="text-right">{gettext("Posts")}</th>
-                  <th class="w-px"></th>
+                  <.table_default_header_cell>{gettext("Name")}</.table_default_header_cell>
+                  <.table_default_header_cell>{gettext("Slug")}</.table_default_header_cell>
+                  <.table_default_header_cell class="text-right">
+                    {gettext("Posts")}
+                  </.table_default_header_cell>
+                  <.table_default_header_cell class="w-px" />
                 </tr>
-              </thead>
+              </.table_default_header>
               <.sortable_tbody
                 id="categories-tree"
                 event="reorder_categories"
@@ -486,7 +510,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
                   <% else %>
                     <td class="w-8"></td>
                   <% end %>
-                  <td>
+                  <.table_default_cell>
                     <div
                       class="flex items-center gap-2"
                       style={depth > 0 && "padding-left: #{depth * 1.25}rem"}
@@ -498,10 +522,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
                       <% end %>
                       <span class="font-medium">{category.name}</span>
                     </div>
-                  </td>
-                  <td class="font-mono text-xs text-base-content/60">{category.slug}</td>
-                  <td class="text-right tabular-nums">{Map.get(@counts, category.uuid, 0)}</td>
-                  <td class="text-right">
+                  </.table_default_cell>
+                  <.table_default_cell class="font-mono text-xs text-base-content/60">
+                    {category.slug}
+                  </.table_default_cell>
+                  <.table_default_cell class="text-right tabular-nums">
+                    {Map.get(@counts, category.uuid, 0)}
+                  </.table_default_cell>
+                  <.table_default_cell class="text-right">
                     <.table_row_menu mode="auto" id={"cat-menu-#{category.uuid}"}>
                       <.table_row_menu_button
                         phx-click="edit"
@@ -538,10 +566,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
                         }
                       />
                     </.table_row_menu>
-                  </td>
+                  </.table_default_cell>
                 </.sortable_row>
               </.sortable_tbody>
-            </table>
+            </.table_default>
           <% end %>
         </div>
       </div>
@@ -582,20 +610,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           <.input field={@form[:position]} type="number" label={gettext("Position")} />
           <.textarea field={@form[:description]} label={gettext("Description")} rows="2" />
           <div class="flex items-center justify-end gap-2 pt-2">
-            <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_form">
+            <.button type="button" variant="ghost" size="sm" phx-click="cancel_form">
               {gettext("Cancel")}
-            </button>
-            <button
-              type="submit"
-              class="btn btn-primary btn-sm"
-              phx-disable-with={gettext("Saving…")}
-            >
+            </.button>
+            <.button type="submit" size="sm" phx-disable-with={gettext("Saving…")}>
               <%= if @editing do %>
                 {gettext("Save")}
               <% else %>
                 {gettext("Create")}
               <% end %>
-            </button>
+            </.button>
           </div>
         </.form>
       </.modal>
@@ -619,16 +643,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
             />
           </div>
           <div class="flex items-center justify-end gap-2 pt-4">
-            <button type="button" class="btn btn-ghost btn-sm" phx-click="cancel_move">
+            <.button type="button" variant="ghost" size="sm" phx-click="cancel_move">
               {gettext("Cancel")}
-            </button>
-            <button
-              type="submit"
-              class="btn btn-primary btn-sm"
-              phx-disable-with={gettext("Moving…")}
-            >
+            </.button>
+            <.button type="submit" size="sm" phx-disable-with={gettext("Moving…")}>
               {gettext("Move")}
-            </button>
+            </.button>
           </div>
         </.form>
       </.modal>

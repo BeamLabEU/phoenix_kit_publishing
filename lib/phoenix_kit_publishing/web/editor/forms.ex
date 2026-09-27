@@ -19,6 +19,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   @doc """
   Builds a form map from a post.
   """
+  @spec post_form(map()) :: map()
   def post_form(post) do
     base_form(post)
     |> add_slug_field_if_needed(post)
@@ -32,6 +33,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   For existing content, uses the record's own status to avoid confusion between
   what the dropdown shows and what the language switcher shows.
   """
+  @spec post_form_with_primary_status(term(), map(), integer() | nil) :: map()
   def post_form_with_primary_status(_group_slug, post, version) do
     form = post_form(post)
     primary_language = LanguageHelpers.get_primary_language()
@@ -62,6 +64,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "featured_image_uuid" => Map.get(post.metadata, :featured_image_uuid, ""),
       "featured" => Map.get(post.metadata, :featured, false),
       "allow_version_access" => Map.get(post.metadata, :allow_version_access, false),
+      "sitemap_exclude" => Map.get(post.metadata, :sitemap_exclude, false),
       # A list, unlike every other field here. It never reaches an <input>:
       # the picker edits it through its own events and the save path reads it
       # straight off the form, which is also what makes it participate in
@@ -130,6 +133,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   @doc """
   Normalizes a form map to ensure consistent values.
   """
+  @spec normalize_form(term()) :: map()
   def normalize_form(form) when is_map(form) do
     title = normalize_string(form, "title")
     featured_image_uuid = normalize_string(form, "featured_image_uuid")
@@ -143,6 +147,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
         "featured_image_uuid" => featured_image_uuid,
         "featured" => normalize_featured_flag(form),
         "allow_version_access" => Map.get(form, "allow_version_access") in [true, "true", "on"],
+        "sitemap_exclude" => Map.get(form, "sitemap_exclude") in [true, "true", "on"],
         # This rebuilds the form from a whitelist, so anything not named here
         # is dropped — and this one runs on every keystroke. Left out, a
         # category selection would survive exactly until the writer typed the
@@ -173,6 +178,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "featured_image_uuid" => "",
       "featured" => false,
       "allow_version_access" => false,
+      "sitemap_exclude" => false,
       "category_uuids" => [],
       "url_slug" => "",
       "audio_uuid" => "",
@@ -231,6 +237,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   @doc """
   Assigns form with tracking for slug auto-generation.
   """
+  @spec assign_form_with_tracking(Phoenix.LiveView.Socket.t(), map(), keyword()) ::
+          Phoenix.LiveView.Socket.t()
   def assign_form_with_tracking(socket, form, opts \\ []) do
     {slug_manually_set, last_auto_slug} = resolve_slug_tracking(socket, form, opts)
     {url_slug_manually_set, last_auto_url_slug} = resolve_url_slug_tracking(socket, form, opts)
@@ -292,6 +300,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   Updates slug from title if applicable.
   Returns {socket, new_form, slug_events}.
   """
+  @spec maybe_update_slug_from_title(Phoenix.LiveView.Socket.t(), String.t() | nil, keyword()) ::
+          {Phoenix.LiveView.Socket.t(), map(), [{String.t(), map()}]}
   def maybe_update_slug_from_title(socket, title, opts \\ []) do
     title = title || ""
 
@@ -361,16 +371,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   # shrinks back under the cap.
   defp maybe_warn_slug_truncated(socket, title) do
     if Publishing.slug_truncated?(title) do
-      socket
-      |> Phoenix.Component.assign(:slug_truncated, true)
-      |> Phoenix.LiveView.put_flash(
+      Phoenix.LiveView.put_flash(
+        socket,
         :warning,
         gettext(
           "The title was too long for a URL, so the slug was shortened. Edit it manually if you'd like a different one."
         )
       )
     else
-      Phoenix.Component.assign(socket, :slug_truncated, false)
+      socket
     end
   end
 
@@ -425,6 +434,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   @doc """
   Preserve auto-generated url_slug when browser sends empty value.
   """
+  @spec preserve_auto_url_slug(map(), Phoenix.LiveView.Socket.t()) :: map()
   def preserve_auto_url_slug(params, socket) do
     browser_url_slug = Map.get(params, "url_slug", "")
     last_auto = Map.get(socket.assigns, :last_auto_url_slug, "")
@@ -444,6 +454,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   @doc """
   Checks if the form has changes compared to the original post.
   """
+  @spec dirty?(map(), map(), String.t() | nil) :: boolean()
   def dirty?(post, form, content) do
     normalized_form = normalize_form(form)
     normalized_form != post_form(post) || content != post.content
@@ -456,6 +467,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   @doc """
   Floors a DateTime to the minute (sets seconds and microseconds to 0).
   """
+  @spec floor_datetime_to_minute(DateTime.t()) :: DateTime.t()
   def floor_datetime_to_minute(%DateTime{} = datetime) do
     %DateTime{datetime | second: 0, microsecond: {0, 0}}
   end
@@ -463,6 +475,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   @doc """
   Converts a published_at value to datetime-local input format.
   """
+  @spec datetime_local_value(String.t() | nil) :: String.t()
   def datetime_local_value(nil), do: ""
 
   def datetime_local_value(value) do
@@ -482,6 +495,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   Updates form with selected media file. The field defaults to the featured
   image; `og_image_uuid` is the other target the media picker writes to.
   """
+  @spec update_form_with_media(map(), String.t(), String.t()) :: map()
   def update_form_with_media(form, file_uuid, field \\ "featured_image_uuid") do
     Map.put(form, field, file_uuid)
   end

@@ -310,10 +310,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSweepTest do
     end
   end
 
-  describe "versioned URLs honor the canonical-language redirect" do
-    test "a wrong-language /v/N URL 301s instead of crashing or serving the fallback", %{
-      conn: conn
-    } do
+  describe "versioned URLs use the smart fallback for a missing translation" do
+    test "a /v/N URL for a language the version lacks 302s to the served language with the flash",
+         %{conn: conn} do
       enable_languages(["en-US", "de-DE"], "en-US")
       {:ok, group} = Groups.add_group(unique_name("vlang"), mode: "slug")
       slug = group["slug"]
@@ -327,11 +326,100 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageSweepTest do
 
       conn = get(conn, "/de/#{slug}/versioned/v/1")
 
-      # No German content: the versioned view must canonical-redirect to the
-      # content's language, never 500 (missing consumer clause) and never
-      # serve the English body at 200 under the German URL.
+      # No German content: a translation the version does not have is a
+      # CONTENT state — the same 302 + "closest match" the live post path
+      # sends, landing on that version in the served language. Never a
+      # cacheable 301 (it kept bouncing readers after the translation was
+      # added), never 500, never the English body at 200 under /de/.
+      assert conn.status == 302
+      assert redirected_to(conn) == "/en/#{slug}/versioned/v/1"
+
+      expected =
+        Gettext.with_locale(PhoenixKitPublishing.Gettext, "de", fn ->
+          Gettext.gettext(
+            PhoenixKitPublishing.Gettext,
+            "The page you requested was not found. Showing closest match."
+          )
+        end)
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) == expected
+      assert build_conn() |> get("/en/#{slug}/versioned/v/1") |> html_response(200) =~ "Body."
+    end
+
+    test "the display-code canonicalisation of a /v/N URL stays a 301", %{conn: conn} do
+      enable_languages(["en-US", "de-DE"], "en-US")
+      {:ok, group} = Groups.add_group(unique_name("vcanon"), mode: "slug")
+      slug = group["slug"]
+
+      {:ok, post} =
+        Posts.create_post(slug, %{title: "Versioned", slug: "versioned", content: "Body."})
+
+      {:ok, read} = Posts.read_post_by_uuid(post.uuid, "en-US", 1)
+      {:ok, _} = Posts.update_post(slug, read, %{"allow_version_access" => "true"}, %{})
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+
+      # The requested language IS served; only its URL form is non-canonical.
+      conn = get(conn, "/en-US/#{slug}/versioned/v/1")
+
       assert conn.status == 301
-      assert redirected_to(conn, 301) =~ "/en/#{slug}/versioned"
+      assert redirected_to(conn, 301) == "/en/#{slug}/versioned/v/1"
+    end
+  end
+
+  describe "versioned URLs on a post with version browsing off" do
+    test "a /v/N URL for the live version ends in one redirect to a page that answers 200",
+         %{conn: conn} do
+      enable_languages(["en-US", "de-DE"], "en-US")
+      {:ok, group} = Groups.add_group(unique_name("voff"), mode: "slug")
+      slug = group["slug"]
+
+      # Version 1 exists in BOTH languages and is live; allow_version_access
+      # stays at its default (false).
+      {:ok, post} =
+        Posts.create_post(slug, %{title: "Versioned", slug: "versioned", content: "Body."})
+
+      {:ok, _} = TranslationManager.add_language_to_post(slug, post.uuid, "de-DE", nil)
+      {:ok, de_read} = Posts.read_post_by_uuid(post.uuid, "de-DE", 1)
+
+      {:ok, _} =
+        Posts.update_post(slug, de_read, %{"title" => "Versioniert", "content" => "Körper."}, %{})
+
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+      {:ok, live} = Posts.read_post_by_uuid(post.uuid, "en-US", 1)
+      refute live.metadata.allow_version_access
+
+      conn = get(conn, "/en/#{slug}/versioned/v/1")
+
+      # Version browsing is off for the post in EVERY language, so the
+      # cross-language version fallback must not pick the German row (it
+      # fails the same gate and 302s straight back — an infinite 302 loop).
+      # The disabled case takes the pre-existing outcome: the group listing
+      # with the closest-match flash, which renders.
+      {hops, final} = follow_redirects(conn, 3)
+      assert hops == 1
+      assert final.status == 200
+
+      assert conn.status == 302
+      assert redirected_to(conn) == "/en/#{slug}"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "closest match"
+    end
+  end
+
+  # Follows 301/302 hops until a non-redirect answers, or the guard runs out
+  # (a redirect loop then fails the hop-count assertion instead of hanging).
+  defp follow_redirects(conn, max_hops), do: follow_redirects(conn, max_hops, 0)
+
+  defp follow_redirects(conn, max_hops, hops) do
+    case conn.status do
+      status when status in [301, 302] ->
+        assert hops < max_hops,
+               "still redirecting after #{hops} hops (last: #{redirected_to(conn, status)})"
+
+        location = get_resp_header(conn, "location") |> List.first()
+        follow_redirects(build_conn() |> get(location), max_hops, hops + 1)
+
+      _ ->
+        {hops, conn}
     end
   end
 

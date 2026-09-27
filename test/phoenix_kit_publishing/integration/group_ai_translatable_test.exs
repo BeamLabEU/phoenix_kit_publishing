@@ -55,7 +55,7 @@ defmodule PhoenixKitPublishing.GroupAITranslatableTest do
                actor_uuid: nil
              )
 
-    {:ok, updated} = Groups.get_group(group["slug"])
+    {:ok, updated} = Groups.fetch_group(group["slug"])
     assert updated["name_i18n"]["de-DE"] == "Deutscher Name"
     # The sibling override written before the job must survive the merge.
     assert updated["name_i18n"]["et"] == "Eesti nimi"
@@ -69,7 +69,7 @@ defmodule PhoenixKitPublishing.GroupAITranslatableTest do
     assert {:ok, _} =
              GroupAITranslatable.put_translation(fetched, "fr-FR", %{"name" => long}, [])
 
-    {:ok, updated} = Groups.get_group(group["slug"])
+    {:ok, updated} = Groups.fetch_group(group["slug"])
     assert String.length(updated["name_i18n"]["fr-FR"]) == Constants.max_group_name_length()
   end
 

@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @render_og_tags_key "publishing_render_og_tags"
   @feeds_enabled_key "publishing_feeds_enabled"
   @render_jsonld_key "publishing_render_jsonld"
+  @unique_views_key "publishing_unique_views"
   @slug_style_key "publishing_slug_style"
   @valid_slug_styles ~w(transliterate unicode ascii)
 
@@ -79,6 +80,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       )
       |> assign(:feeds_enabled, Settings.get_boolean_setting(@feeds_enabled_key, true))
       |> assign(:render_jsonld, Settings.get_boolean_setting(@render_jsonld_key, true))
+      |> assign(:unique_views, Settings.get_boolean_setting(@unique_views_key, true))
       |> assign(:slug_style, Settings.get_setting(@slug_style_key, "transliterate"))
       |> assign_numbers()
       |> assign(
@@ -236,6 +238,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
        if(new_value,
          do: gettext("JSON-LD structured data enabled on post pages"),
          else: gettext("JSON-LD structured data disabled")
+       )
+     )}
+  end
+
+  def handle_event("toggle_unique_views", _params, socket) do
+    new_value = !socket.assigns.unique_views
+    Settings.update_boolean_setting(@unique_views_key, new_value)
+
+    {:noreply,
+     socket
+     |> assign(:unique_views, new_value)
+     |> put_flash(
+       :info,
+       if(new_value,
+         do: gettext("Unique views enabled — one view per visitor per post per day"),
+         else: gettext("Unique views disabled — every page open counts")
        )
      )}
   end
@@ -540,13 +558,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                 </p>
               </div>
             </div>
-            <.link
+            <.button
               navigate={Routes.path("/admin/settings/languages")}
-              class="btn btn-sm btn-ghost gap-1"
+              variant="ghost"
+              size="sm"
+              class="gap-1"
             >
               {gettext("Manage")}
               <.icon name="hero-arrow-top-right-on-square" class="w-3 h-3" />
-            </.link>
+            </.button>
           </div>
 
           <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
@@ -631,6 +651,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
 
           <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
             <div class="flex items-center gap-3">
+              <.icon name="hero-eye" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("Unique Views")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              checked={@unique_views}
+              phx-click="toggle_unique_views"
+            />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
               <.icon name="hero-link" class="w-5 h-5 text-base-content/70" />
               <div>
                 <p class="font-medium">{gettext("Slug Style")}</p>
@@ -641,20 +681,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                 </p>
               </div>
             </div>
-            <form id="setting-slug-style" phx-change="change_slug_style">
-              <label class="select select-sm">
-                <select name="slug_style">
-                  <option value="transliterate" selected={@slug_style == "transliterate"}>
-                    {gettext("Transliterate — privet")}
-                  </option>
-                  <option value="unicode" selected={@slug_style == "unicode"}>
-                    {gettext("Unicode — привет")}
-                  </option>
-                  <option value="ascii" selected={@slug_style == "ascii"}>
-                    {gettext("ASCII only — strip")}
-                  </option>
-                </select>
-              </label>
+            <%!-- `.select` is `w-full`; the form caps it at daisyUI's own
+                  default select width so the row keeps its shape. --%>
+            <form id="setting-slug-style" phx-change="change_slug_style" class="w-full max-w-80">
+              <.select
+                name="slug_style"
+                value={@slug_style}
+                class="select-sm"
+                options={[
+                  {gettext("Transliterate — privet"), "transliterate"},
+                  {gettext("Unicode — привет"), "unicode"},
+                  {gettext("ASCII only — strip"), "ascii"}
+                ]}
+              />
             </form>
           </div>
 
@@ -729,15 +768,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             </div>
             <% any_listing_cache = @memory_cache_enabled %>
             <%= if @cache_groups != [] and any_listing_cache do %>
-              <button
+              <.button
                 type="button"
+                size="sm"
                 phx-click="regenerate_all_caches"
                 phx-disable-with={gettext("Regenerating…")}
-                class="btn btn-primary btn-sm whitespace-nowrap"
+                class="whitespace-nowrap"
               >
                 <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" />
                 {gettext("Regenerate All")}
-              </button>
+              </.button>
             <% end %>
           </div>
 
@@ -782,81 +822,87 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
           <% else %>
             <% any_cache_enabled = @memory_cache_enabled %>
             <%= if any_cache_enabled do %>
-              <div class="overflow-x-auto">
-                <table class="table table-zebra">
-                  <thead>
-                    <tr>
-                      <th>{gettext("Group")}</th>
-                      <th class="text-center">{gettext("Posts")}</th>
-                      <%= if @memory_cache_enabled do %>
-                        <th class="text-center">
-                          <span class="flex items-center justify-center gap-1">
-                            <.icon name="hero-cpu-chip" class="w-4 h-4" />
-                            {gettext("Memory")}
-                          </span>
-                        </th>
-                      <% end %>
-                      <th class="text-right">{gettext("Actions")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <%= for group <- @cache_groups do %>
-                      <% cache = @cache_status[group["slug"]] %>
-                      <tr>
-                        <td class="font-medium">{group["name"]}</td>
-                        <td class="text-center">
-                          <%= if cache.post_count do %>
-                            <span class="font-mono text-sm">{cache.post_count}</span>
-                          <% else %>
-                            <span class="text-base-content/50">—</span>
-                          <% end %>
-                        </td>
-                        <%= if @memory_cache_enabled do %>
-                          <td class="text-center">
-                            <%= if cache.in_memory do %>
-                              <.icon name="hero-check-circle" class="w-5 h-5 text-success" />
-                            <% else %>
-                              <.icon name="hero-x-circle" class="w-5 h-5 text-base-content/30" />
-                            <% end %>
-                          </td>
-                        <% end %>
-                        <td class="text-right">
-                          <div class="flex justify-end gap-2">
-                            <%= if cache.exists or cache.in_memory do %>
-                              <button
-                                type="button"
-                                phx-click="invalidate_cache"
-                                phx-value-slug={group["slug"]}
-                                phx-disable-with={gettext("Clearing…")}
-                                class="btn btn-outline btn-xs text-error tooltip tooltip-bottom"
-                                data-tip={gettext("Clear cache")}
-                              >
-                                <.icon name="hero-trash" class="w-4 h-4 hidden sm:inline" />
-                                <span class="sm:hidden whitespace-nowrap">
-                                  {gettext("Clear cache")}
-                                </span>
-                              </button>
-                            <% end %>
-                            <button
-                              type="button"
-                              phx-click="regenerate_cache"
-                              phx-value-slug={group["slug"]}
-                              phx-disable-with={gettext("Regenerating…")}
-                              class="btn btn-outline btn-xs tooltip tooltip-bottom"
-                              data-tip={gettext("Regenerate cache")}
-                            >
-                              <.icon name="hero-arrow-path" class="w-4 h-4 hidden sm:inline" />
-                              <span class="sm:hidden whitespace-nowrap">
-                                {gettext("Regenerate cache")}
-                              </span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+              <.table_default variant="zebra" size="sm" wrapper_class="overflow-x-auto">
+                <.table_default_header>
+                  <tr>
+                    <.table_default_header_cell>{gettext("Group")}</.table_default_header_cell>
+                    <.table_default_header_cell class="text-center">
+                      {gettext("Posts")}
+                    </.table_default_header_cell>
+                    <%= if @memory_cache_enabled do %>
+                      <.table_default_header_cell class="text-center">
+                        <span class="flex items-center justify-center gap-1">
+                          <.icon name="hero-cpu-chip" class="w-4 h-4" />
+                          {gettext("Memory")}
+                        </span>
+                      </.table_default_header_cell>
                     <% end %>
-                  </tbody>
-                </table>
-              </div>
+                    <.table_default_header_cell class="text-right">
+                      {gettext("Actions")}
+                    </.table_default_header_cell>
+                  </tr>
+                </.table_default_header>
+                <.table_default_body>
+                  <%= for group <- @cache_groups do %>
+                    <% cache = @cache_status[group["slug"]] %>
+                    <.table_default_row>
+                      <.table_default_cell class="font-medium">{group["name"]}</.table_default_cell>
+                      <.table_default_cell class="text-center">
+                        <%= if cache.post_count do %>
+                          <span class="font-mono text-sm">{cache.post_count}</span>
+                        <% else %>
+                          <span class="text-base-content/50">—</span>
+                        <% end %>
+                      </.table_default_cell>
+                      <%= if @memory_cache_enabled do %>
+                        <.table_default_cell class="text-center">
+                          <%= if cache.in_memory do %>
+                            <.icon name="hero-check-circle" class="w-5 h-5 text-success" />
+                          <% else %>
+                            <.icon name="hero-x-circle" class="w-5 h-5 text-base-content/30" />
+                          <% end %>
+                        </.table_default_cell>
+                      <% end %>
+                      <.table_default_cell class="text-right">
+                        <div class="flex justify-end gap-2">
+                          <%= if cache.exists or cache.in_memory do %>
+                            <.button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              phx-click="invalidate_cache"
+                              phx-value-slug={group["slug"]}
+                              phx-disable-with={gettext("Clearing…")}
+                              class="text-error tooltip tooltip-bottom"
+                              data-tip={gettext("Clear cache")}
+                            >
+                              <.icon name="hero-trash" class="w-4 h-4 hidden sm:inline" />
+                              <span class="sm:hidden whitespace-nowrap">
+                                {gettext("Clear cache")}
+                              </span>
+                            </.button>
+                          <% end %>
+                          <.button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            phx-click="regenerate_cache"
+                            phx-value-slug={group["slug"]}
+                            phx-disable-with={gettext("Regenerating…")}
+                            class="tooltip tooltip-bottom"
+                            data-tip={gettext("Regenerate cache")}
+                          >
+                            <.icon name="hero-arrow-path" class="w-4 h-4 hidden sm:inline" />
+                            <span class="sm:hidden whitespace-nowrap">
+                              {gettext("Regenerate cache")}
+                            </span>
+                          </.button>
+                        </div>
+                      </.table_default_cell>
+                    </.table_default_row>
+                  <% end %>
+                </.table_default_body>
+              </.table_default>
 
               <div class="text-xs text-base-content/50 space-y-1">
                 <p>
@@ -893,11 +939,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               </p>
             </div>
             <%= if @render_cache_enabled do %>
-              <button
+              <.button
                 type="button"
+                variant="outline"
+                size="sm"
                 phx-click="clear_render_cache"
                 phx-disable-with={gettext("Clearing…")}
-                class="btn btn-outline btn-error btn-sm whitespace-nowrap"
+                class="btn-error whitespace-nowrap"
                 data-confirm={
                   gettext(
                     "Clear all cached rendered posts? They will be re-rendered on next view."
@@ -906,7 +954,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               >
                 <.icon name="hero-trash" class="w-4 h-4 mr-1" />
                 {gettext("Clear All")}
-              </button>
+              </.button>
             <% end %>
           </div>
 
@@ -967,52 +1015,56 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
 
             <%!-- Per-Group Render Cache Table --%>
             <%= if @cache_groups != [] do %>
-              <div class="overflow-x-auto">
-                <table class="table table-zebra">
-                  <thead>
-                    <tr>
-                      <th>{gettext("Group")}</th>
-                      <th class="text-center">{gettext("Enabled")}</th>
-                      <th class="text-right">{gettext("Actions")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <%= for group <- @cache_groups do %>
-                      <% slug = group["slug"] %>
-                      <% enabled = @render_cache_per_group[slug] %>
-                      <tr>
-                        <td class="font-medium">{group["name"]}</td>
-                        <td class="text-center">
-                          <input
-                            type="checkbox"
-                            class="toggle toggle-primary toggle-sm"
-                            checked={enabled}
-                            phx-click="toggle_group_render_cache"
+              <.table_default variant="zebra" size="sm" wrapper_class="overflow-x-auto">
+                <.table_default_header>
+                  <tr>
+                    <.table_default_header_cell>{gettext("Group")}</.table_default_header_cell>
+                    <.table_default_header_cell class="text-center">
+                      {gettext("Enabled")}
+                    </.table_default_header_cell>
+                    <.table_default_header_cell class="text-right">
+                      {gettext("Actions")}
+                    </.table_default_header_cell>
+                  </tr>
+                </.table_default_header>
+                <.table_default_body>
+                  <%= for group <- @cache_groups do %>
+                    <% slug = group["slug"] %>
+                    <% enabled = @render_cache_per_group[slug] %>
+                    <.table_default_row>
+                      <.table_default_cell class="font-medium">{group["name"]}</.table_default_cell>
+                      <.table_default_cell class="text-center">
+                        <input
+                          type="checkbox"
+                          class="toggle toggle-primary toggle-sm"
+                          checked={enabled}
+                          phx-click="toggle_group_render_cache"
+                          phx-value-slug={slug}
+                        />
+                      </.table_default_cell>
+                      <.table_default_cell class="text-right">
+                        <%= if enabled do %>
+                          <.button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            phx-click="clear_group_render_cache"
                             phx-value-slug={slug}
-                          />
-                        </td>
-                        <td class="text-right">
-                          <%= if enabled do %>
-                            <button
-                              type="button"
-                              phx-click="clear_group_render_cache"
-                              phx-value-slug={slug}
-                              phx-disable-with={gettext("Clearing…")}
-                              class="btn btn-outline btn-xs text-error tooltip tooltip-bottom"
-                              data-tip={gettext("Clear cache for this group")}
-                            >
-                              <.icon name="hero-trash" class="w-4 h-4 hidden sm:inline" />
-                              <span class="sm:hidden whitespace-nowrap">
-                                {gettext("Clear cache for this group")}
-                              </span>
-                            </button>
-                          <% end %>
-                        </td>
-                      </tr>
-                    <% end %>
-                  </tbody>
-                </table>
-              </div>
+                            phx-disable-with={gettext("Clearing…")}
+                            class="text-error tooltip tooltip-bottom"
+                            data-tip={gettext("Clear cache for this group")}
+                          >
+                            <.icon name="hero-trash" class="w-4 h-4 hidden sm:inline" />
+                            <span class="sm:hidden whitespace-nowrap">
+                              {gettext("Clear cache for this group")}
+                            </span>
+                          </.button>
+                        <% end %>
+                      </.table_default_cell>
+                    </.table_default_row>
+                  <% end %>
+                </.table_default_body>
+              </.table_default>
             <% end %>
           <% end %>
 
@@ -1052,14 +1104,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             disables form recovery, so a reconnect mid-edit loses the value. --%>
       <form id={"setting-#{@field}"} phx-change="change_number_setting" class="shrink-0">
         <input type="hidden" name="field" value={@field} />
-        <input
+        <.input
           type="number"
           name="value"
           value={@value}
           min={@min}
           max={@max}
           phx-debounce="600"
-          class="input input-sm w-24"
+          class="input-sm"
+          wrapper_class="w-24"
         />
       </form>
     </div>

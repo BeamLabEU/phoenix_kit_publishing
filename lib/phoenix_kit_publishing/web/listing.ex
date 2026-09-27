@@ -22,6 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   alias PhoenixKit.Utils.Date, as: UtilsDate
   alias PhoenixKit.Utils.Routes
 
+  import PhoenixKitWeb.Components.Core.EmptyState
   import PhoenixKitWeb.Components.LanguageSwitcher
 
   @impl true
@@ -58,8 +59,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       |> assign(:loading, false)
       |> assign(:endpoint_url, "")
       |> assign(:date_time_settings, load_date_time_settings())
-      |> assign(:active_editors, %{})
-      |> assign(:translating_posts, %{})
       |> assign(:pending_post_updates, %{})
       |> assign(:visible_count, 20)
       |> assign(:post_search, "")
@@ -140,6 +139,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   @status_published Constants.status_published()
   @status_archived Constants.status_archived()
   @valid_post_views Constants.post_statuses()
+
+  # `<.nav_tabs>` dispatches `phx-value-tab`; the `"mode"` shape stays for
+  # existing callers.
+  def handle_event("switch_post_view", %{"tab" => mode}, socket) do
+    handle_event("switch_post_view", %{"mode" => mode}, socket)
+  end
 
   def handle_event("switch_post_view", %{"mode" => mode}, socket)
       when mode in @valid_post_views do
@@ -370,114 +375,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     {:noreply, refresh_posts(socket)}
   end
 
-  # Editor presence handlers - show who's currently editing posts
-  def handle_info({:editor_joined, post_slug, user_info}, socket) do
-    # Only show actual editors (owners), not spectators
-    if user_info[:role] == :owner do
-      active_editors = socket.assigns.active_editors
-      post_editors = Map.get(active_editors, post_slug, [])
-
-      # Add user if not already in the list
-      updated_editors =
-        if Enum.any?(post_editors, fn e -> e.socket_id == user_info.socket_id end) do
-          post_editors
-        else
-          [user_info | post_editors]
-        end
-
-      {:noreply,
-       assign(socket, :active_editors, Map.put(active_editors, post_slug, updated_editors))}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  def handle_info({:editor_left, post_slug, user_info}, socket) do
-    active_editors = socket.assigns.active_editors
-    post_editors = Map.get(active_editors, post_slug, [])
-
-    # Remove user from the list
-    updated_editors = Enum.reject(post_editors, fn e -> e.socket_id == user_info.socket_id end)
-
-    updated_active_editors =
-      if updated_editors == [] do
-        Map.delete(active_editors, post_slug)
-      else
-        Map.put(active_editors, post_slug, updated_editors)
-      end
-
-    {:noreply, assign(socket, :active_editors, updated_active_editors)}
-  end
-
-  # Translation progress handlers - show translation status on posts
-  def handle_info({:translation_started, post_slug, language_count}, socket) do
-    translating =
-      Map.put(socket.assigns.translating_posts, post_slug, %{
-        total: language_count,
-        completed: 0,
-        status: :in_progress
-      })
-
-    {:noreply, assign(socket, :translating_posts, translating)}
-  end
-
-  def handle_info({:translation_progress, post_slug, completed, total}, socket) do
-    # Update progress for this post
-    case Map.get(socket.assigns.translating_posts, post_slug) do
-      nil ->
-        # Post not in our tracking, add it
-        translating =
-          Map.put(socket.assigns.translating_posts, post_slug, %{
-            total: total,
-            completed: completed,
-            status: :in_progress
-          })
-
-        {:noreply, assign(socket, :translating_posts, translating)}
-
-      existing ->
-        # Update existing entry
-        translating =
-          Map.put(socket.assigns.translating_posts, post_slug, %{
-            existing
-            | completed: completed,
-              total: total
-          })
-
-        {:noreply, assign(socket, :translating_posts, translating)}
-    end
-  end
-
-  def handle_info({:translation_completed, post_slug, results}, socket) do
-    # Mark translation as complete - status stays visible
-    translating =
-      Map.put(socket.assigns.translating_posts, post_slug, %{
-        status: :completed,
-        success_count: results.success_count,
-        failure_count: results.failure_count
-      })
-
-    socket = assign(socket, :translating_posts, translating)
-
-    # Refresh posts to show new translations
-    socket = refresh_posts(socket)
-
-    {:noreply, socket}
-  end
-
   # Group change handlers - keep sidebar in sync
   def handle_info({:group_created, _group}, socket) do
     {:noreply, assign(socket, :groups, load_db_groups())}
   end
 
-  def handle_info({:group_updated, group}, socket) do
+  # The payload is `%{uuid, slug}` only; the group itself is reloaded.
+  def handle_info({:group_updated, _payload}, socket) do
     groups = load_db_groups()
     current_group = Enum.find(groups, fn b -> b["slug"] == socket.assigns.group_slug end)
 
     socket =
       socket
       |> assign(:groups, groups)
-      |> assign(:current_group, current_group || group)
+      |> assign(:current_group, current_group || socket.assigns.current_group)
       |> assign_page_title()
 
     {:noreply, socket}
@@ -572,7 +483,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     if group_slug = socket.assigns[:group_slug] do
       PublishingPubSub.unsubscribe_from_posts(group_slug)
       PublishingPubSub.unsubscribe_from_cache(group_slug)
-      PublishingPubSub.unsubscribe_from_group_editors(group_slug)
     end
 
     :ok
@@ -599,13 +509,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     can_update? = post_slug && socket.assigns[:posts] && socket.assigns[:group_slug]
 
     if can_update? do
-      fetch_and_update_post(socket, post_slug)
+      reload_post(socket, post_slug)
     else
       refresh_posts(socket)
     end
   end
 
-  defp fetch_and_update_post(socket, post_slug) do
+  defp reload_post(socket, post_slug) do
     case Publishing.read_post(
            socket.assigns.group_slug,
            post_slug,
@@ -617,7 +527,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
       {:error, reason} ->
         Logger.warning(
-          "[Publishing.Listing] fetch_and_update_post failed for #{post_slug}: #{inspect(reason)}, doing full refresh"
+          "[Publishing.Listing] reload_post failed for #{post_slug}: #{inspect(reason)}, doing full refresh"
         )
 
         refresh_posts(socket)
@@ -669,7 +579,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     if group_slug do
       PublishingPubSub.subscribe_to_posts(group_slug)
       PublishingPubSub.subscribe_to_cache(group_slug)
-      PublishingPubSub.subscribe_to_group_editors(group_slug)
     end
   end
 
@@ -678,13 +587,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       if old_slug do
         PublishingPubSub.unsubscribe_from_posts(old_slug)
         PublishingPubSub.unsubscribe_from_cache(old_slug)
-        PublishingPubSub.unsubscribe_from_group_editors(old_slug)
       end
 
       if new_slug do
         PublishingPubSub.subscribe_to_posts(new_slug)
         PublishingPubSub.subscribe_to_cache(new_slug)
-        PublishingPubSub.subscribe_to_group_editors(new_slug)
       end
 
       # Cancel any pending debounce timers before switching groups
@@ -696,8 +603,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
       socket
       |> assign(:group_slug, new_slug)
-      |> assign(:active_editors, %{})
-      |> assign(:translating_posts, %{})
       |> assign(:pending_post_updates, %{})
     else
       assign(socket, :group_slug, new_slug)
@@ -866,6 +771,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   defp redirect_if_missing(socket), do: socket
 
+  @spec format_datetime(map(), map() | nil, map()) :: String.t()
   def format_datetime(
         %{date: %Date{} = date, time: %Time{} = time},
         current_user,
@@ -916,6 +822,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   Gets the published version number from a post's version_statuses map.
   Returns nil if no version is published.
   """
+  @spec get_published_version(map()) :: integer() | nil
   def get_published_version(post) do
     version_statuses = Map.get(post, :version_statuses, %{})
 
@@ -935,6 +842,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   Returns `{version_number, status, label}` where label is :live, :draft, or :latest
   """
+  @spec get_display_version(map()) :: {integer(), String.t(), :live | :draft | :latest}
   def get_display_version(post) do
     version_statuses = Map.get(post, :version_statuses, %{})
     available_versions = Map.get(post, :available_versions, [])
@@ -971,57 +879,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
-  @doc """
-  Builds language data for the display version (live > draft > latest).
-  """
-  def build_display_version_languages(post, enabled_languages, primary_language \\ nil) do
-    {version, status, _label} = get_display_version(post)
-
-    # Get languages for this specific version
-    version_languages = Map.get(post, :version_languages, %{})
-    available_languages = Map.get(version_languages, version, post[:available_languages] || [])
-
-    # Get primary language - prefer passed param, then post's stored value, then global
-    primary_lang =
-      primary_language || Publishing.get_primary_language()
-
-    # Use shared ordering function for consistent display
-    all_languages =
-      Publishing.order_languages_for_display(
-        available_languages,
-        enabled_languages,
-        primary_lang
-      )
-
-    Enum.map(all_languages, fn lang_code ->
-      lang_info = Publishing.get_language_info(lang_code)
-      content_exists = lang_code in available_languages
-      is_enabled = Publishing.language_enabled?(lang_code, enabled_languages)
-      is_known = lang_info != nil
-      # Status matches the version's status
-      lang_status = if content_exists, do: status, else: nil
-
-      # Get display code (base or full dialect depending on enabled languages)
-      display_code = Publishing.get_display_code(lang_code, enabled_languages)
-
-      %{
-        code: lang_code,
-        display_code: display_code,
-        name: if(lang_info, do: lang_info.name, else: lang_code),
-        flag: if(lang_info, do: lang_info.flag, else: ""),
-        status: lang_status,
-        exists: content_exists,
-        enabled: is_enabled,
-        known: is_known,
-        # is_default is used for ordering only, not for special UI treatment
-        is_default: lang_code == primary_lang,
-        uuid: post[:uuid]
-      }
-    end)
-    |> Enum.filter(fn lang -> lang.exists end)
+  # The public origin first (site_url setting, else the endpoint's configured
+  # URL): the connect URI's scheme is what the proxy handed the app, http on
+  # a TLS-terminated host, so the "public URL" copy said http://.
+  defp extract_endpoint_url(uri) do
+    PublishingHTML.public_origin() || origin_from_uri(uri)
   end
 
-  defp extract_endpoint_url(uri) when is_binary(uri) do
+  defp origin_from_uri(uri) when is_binary(uri) do
     case URI.parse(uri) do
       %URI{scheme: scheme, host: host, port: port} when not is_nil(scheme) and not is_nil(host) ->
         port_string = if port in [80, 443], do: "", else: ":#{port}"
@@ -1032,7 +897,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
-  defp extract_endpoint_url(_), do: ""
+  defp origin_from_uri(_), do: ""
 
   defp do_update_post_status(socket, post_uuid, new_status) do
     group_slug = socket.assigns.group_slug
@@ -1105,6 +970,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   The `known` field indicates if the language code is recognized.
   The `is_default` field indicates if this is the site default language (used for ordering only).
   """
+  @spec build_post_languages(map(), term(), [String.t()], term(), String.t() | nil) :: [map()]
   def build_post_languages(
         post,
         _group_slug,
@@ -1143,34 +1009,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         </div>
       <% end %>
       <:actions>
-        <button
+        <.button
           type="button"
-          class="btn btn-outline btn-sm shadow-none"
+          variant="outline"
+          size="sm"
+          class="shadow-none"
           phx-click="refresh"
           phx-disable-with={gettext("Refreshing…")}
         >
           <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" /> {gettext("Refresh")}
-        </button>
-        <.link
+        </.button>
+        <.button
           navigate={Routes.path("/admin/publishing/categories/#{group_slug}")}
-          class="btn btn-outline btn-sm shadow-none"
+          variant="outline"
+          size="sm"
+          class="shadow-none"
         >
           <.icon name="hero-tag" class="w-4 h-4 mr-1" /> {gettext("Categories")}
-        </.link>
-        <.link
+        </.button>
+        <.button
           navigate={Routes.path("/admin/publishing/edit-group/#{group_slug}")}
-          class="btn btn-outline btn-sm shadow-none"
+          variant="outline"
+          size="sm"
+          class="shadow-none"
         >
           <.icon name="hero-cog-6-tooth" class="w-4 h-4 mr-1" /> {gettext("Settings")}
-        </.link>
-        <button
+        </.button>
+        <.button
           type="button"
-          class="btn btn-primary btn-sm"
+          size="sm"
           phx-click="create_post"
           phx-disable-with={gettext("Creating…")}
         >
           <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Create Post")}
-        </button>
+        </.button>
       </:actions>
     </.admin_page_header>
 
@@ -1178,51 +1050,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       <div class="flex-1">
         <%!-- Status Tabs — only show tabs that have posts, hide if only 1 tab --%>
         <% all_tabs = [
-          {"published", gettext("Published"), nil},
-          {"draft", gettext("Draft"), nil},
-          {"archived", gettext("Archived"), nil},
-          {"trashed", gettext("Trash"), "error"}
+          {"published", gettext("Published")},
+          {"draft", gettext("Draft")},
+          {"archived", gettext("Archived")},
+          {"trashed", gettext("Trash")}
         ] %>
         <% visible_tabs =
-          Enum.filter(all_tabs, fn {mode, _label, _color} ->
-            Map.get(@post_status_counts, mode, 0) > 0 or @post_view_mode == mode
-          end) %>
+          for {mode, label} <- all_tabs,
+              count = Map.get(@post_status_counts, mode, 0),
+              count > 0 or @post_view_mode == mode do
+            %{id: mode, label: label, badge: if(count > 0, do: count)}
+          end %>
         <%= if length(visible_tabs) > 1 do %>
-          <div class="flex items-center gap-0.5 border-b border-base-200 mb-3 overflow-x-auto">
-            <%= for {mode, label, color} <- visible_tabs do %>
-              <button
-                type="button"
-                phx-click="switch_post_view"
-                phx-value-mode={mode}
-                class={"px-3 py-1 text-xs font-medium border-b-2 transition-colors whitespace-nowrap cursor-pointer #{cond do
-                  @post_view_mode == mode and color == "error" -> "border-error text-error"
-                  @post_view_mode == mode -> "border-primary text-primary"
-                  true -> "border-transparent text-base-content/50 hover:text-base-content"
-                end}"}
-              >
-                {label}
-              </button>
-            <% end %>
-          </div>
+          <.nav_tabs
+            variant={:border}
+            active_tab={@post_view_mode}
+            on_change="switch_post_view"
+            tabs={visible_tabs}
+            class="mb-3"
+          />
         <% end %>
 
         <%!-- Admin post filter — in-memory over the already-loaded set (all
           posts live in assigns; visible_count only truncates display), so it
           matches across every language title + slug instantly. --%>
-        <form :if={not @loading} phx-change="search_posts" class="mb-3" onsubmit="return false">
-          <label class="input input-sm flex w-full max-w-xs items-center gap-2">
-            <.icon name="hero-magnifying-glass" class="w-4 h-4 opacity-50" />
-            <input
-              type="search"
-              name="q"
-              value={@post_search}
-              placeholder={gettext("Filter posts…")}
-              phx-debounce="200"
-              maxlength="100"
-              class="grow"
-            />
-          </label>
-        </form>
+        <.search_toolbar
+          :if={not @loading}
+          value={@post_search}
+          on_change="search_posts"
+          name="q"
+          placeholder={gettext("Filter posts…")}
+          debounce={200}
+          loading_indicator
+          class="mb-3 max-w-xs"
+        />
 
         <%= if @loading do %>
           <%!-- Skeleton placeholders matching post card layout.
@@ -1253,19 +1114,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         <% else %>
           <% filtered_posts = filter_posts_by_search(@posts, @post_search) %>
           <%= if filtered_posts == [] do %>
-            <div class="text-center py-8 text-base-content/60">
-              <%= cond do %>
-                <% @post_search != "" and @posts != [] -> %>
-                  <.icon name="hero-magnifying-glass" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p class="text-sm">{gettext("No posts match your filter")}</p>
-                <% @post_view_mode == "trashed" -> %>
-                  <.icon name="hero-trash" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p class="text-sm">{gettext("Trash is empty")}</p>
-                <% true -> %>
-                  <.icon name="hero-document-text" class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p class="text-sm">{gettext("No posts found")}</p>
-              <% end %>
-            </div>
+            <%= cond do %>
+              <% @post_search != "" and @posts != [] -> %>
+                <.empty_state
+                  icon="hero-magnifying-glass"
+                  title={gettext("No posts match your filter")}
+                  class="py-8"
+                />
+              <% @post_view_mode == "trashed" -> %>
+                <.empty_state icon="hero-trash" title={gettext("Trash is empty")} class="py-8" />
+              <% true -> %>
+                <.empty_state
+                  icon="hero-document-text"
+                  title={gettext("No posts found")}
+                  class="py-8"
+                />
+            <% end %>
           <% else %>
             <% date_counts = PublishingHTML.build_date_counts(@posts) %>
             <% visible_posts = Enum.take(filtered_posts, @visible_count) %>
@@ -1451,53 +1315,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                         />
                       <% end %>
                     </div>
-                    <%!-- Translation Progress Bar --%>
-                    <%= if translation_status = Map.get(@translating_posts, post.slug) do %>
-                      <div class="border-t border-base-200 pt-3 mt-3">
-                        <%= if translation_status.status == :in_progress do %>
-                          <div class="flex items-center justify-between text-xs mb-1">
-                            <span class="text-base-content/70 flex items-center gap-1">
-                              <span class="loading loading-spinner loading-xs"></span>
-                              {gettext("Translating...")}
-                            </span>
-                            <span class="font-medium">
-                              {translation_status.completed} / {translation_status.total}
-                            </span>
-                          </div>
-                          <progress
-                            class="progress progress-primary w-full h-2"
-                            value={translation_status.completed}
-                            max={translation_status.total}
-                          >
-                          </progress>
-                        <% else %>
-                          <div class="flex items-center gap-2 text-xs text-success">
-                            <.icon name="hero-check-circle" class="w-4 h-4" />
-                            {ngettext(
-                              "Translation complete - %{count} language",
-                              "Translation complete - %{count} languages",
-                              translation_status.success_count,
-                              count: translation_status.success_count
-                            )}
-                          </div>
-                        <% end %>
-                      </div>
-                    <% end %>
                   </div>
                 </div>
               <% end %>
             </div>
-            <%= if length(filtered_posts) > @visible_count do %>
-              <div class="flex justify-center mt-4">
-                <button
-                  type="button"
-                  phx-click="load_more"
-                  class="btn btn-outline btn-sm"
-                >
-                  {gettext("Load more")}
-                </button>
-              </div>
-            <% end %>
+            <.load_more
+              loaded={length(visible_posts)}
+              total={length(filtered_posts)}
+              on_load_more="load_more"
+              noun_plural={gettext("posts")}
+            />
           <% end %>
         <% end %>
       </div>

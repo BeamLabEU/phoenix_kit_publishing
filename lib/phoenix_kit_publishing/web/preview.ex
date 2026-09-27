@@ -159,6 +159,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
   defdelegate format_post_date(post, group_slug), to: PublishingHTML
 
   @doc false
+  @spec build_preview_translations([map()], map(), String.t()) :: [map()]
   def build_preview_translations(translations, post, group_slug) do
     post_uuid = post[:uuid]
     version = post[:version]
@@ -205,7 +206,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
   end
 
   defp preview_notes_style(group_slug) do
-    case Publishing.get_group(group_slug) do
+    case Publishing.fetch_group(group_slug) do
       {:ok, group} -> PostRendering.group_notes_style(group)
       _ -> Constants.default_notes_style()
     end
@@ -226,10 +227,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
           </span>
         </div>
         <div class="flex gap-2">
-          <button type="button" class="btn btn-sm btn-ghost" phx-click="back_to_editor">
+          <.button type="button" variant="ghost" size="sm" phx-click="back_to_editor">
             <.icon name="hero-pencil-square" class="w-4 h-4 mr-1" />
             {gettext("Back to Editor")}
-          </button>
+          </.button>
         </div>
       </div>
     </div>
@@ -316,7 +317,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
                         <span class={"flex items-center justify-between #{if v.is_current, do: "active"}"}>
                           <span>v{v.version}</span>
                           <%= if v.is_live do %>
-                            <span class="badge badge-success badge-xs h-auto">live</span>
+                            <span class="badge badge-success badge-xs h-auto">{gettext("live")}</span>
                           <% end %>
                         </span>
                       </li>

@@ -243,4 +243,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTMLHelpersTest do
       assert HTML.public_current_language([], "fallback") == "fallback"
     end
   end
+
+  describe "request_origin/1" do
+    test "takes the scheme the proxy forwards over the hop's own" do
+      conn = %Plug.Conn{scheme: :http, host: "max-dev.example", port: 80}
+
+      assert HTML.request_origin(conn) == "http://max-dev.example"
+
+      forwarded = Plug.Conn.put_req_header(conn, "x-forwarded-proto", "https")
+      assert HTML.request_origin(forwarded) == "https://max-dev.example"
+    end
+
+    test "keeps a non-standard port and ignores a junk forwarded scheme" do
+      conn = %Plug.Conn{scheme: :http, host: "localhost", port: 4000}
+      assert HTML.request_origin(conn) == "http://localhost:4000"
+
+      junk = Plug.Conn.put_req_header(conn, "x-forwarded-proto", "gopher")
+      assert HTML.request_origin(junk) == "http://localhost:4000"
+    end
+  end
+
+  describe "public_origin/1" do
+    test "an endpoint that only answers the localhost placeholder does not beat the request" do
+      # No parent endpoint in the test app and no site_url: the request wins.
+      conn = %Plug.Conn{scheme: :https, host: "max-dev.example", port: 443}
+      assert HTML.public_origin(conn) == "https://max-dev.example"
+    end
+  end
 end

@@ -39,6 +39,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Modules.Publishing.ListingCache.LockTableOwner
 
   @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -137,6 +138,14 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   @spec regenerate(String.t(), keyword()) :: :ok | {:error, any()}
   def regenerate(group_slug, opts \\ []) do
     broadcast? = Keyword.get(opts, :broadcast, true)
+    # A sequence number, not a clock: it is taken BEFORE the DB read, and the
+    # install step compares it against the sequence of the latest erase or
+    # install (see `install_snapshot/4`). `:started_seq` is a test seam only:
+    # it stages a regeneration whose DB snapshot predates an invalidation,
+    # which no sandboxed test can otherwise time. Production callers never
+    # pass it.
+    started_seq = Keyword.get(opts, :started_seq) || next_sequence()
+    started_ms = System.monotonic_time(:millisecond)
 
     # Categories moved from a post-level join table onto the versions. This is
     # where the one-time move happens, because it is the one path every group
@@ -147,7 +156,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     Categories.backfill_version_categories(group_slug)
 
     if memory_cache_enabled?() do
-      do_regenerate(group_slug, broadcast?)
+      do_regenerate(group_slug, broadcast?, started_seq, started_ms)
     else
       :ok
     end
@@ -164,9 +173,15 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   # Groups exceeding this will still work but only cache the most recent posts.
   @max_cached_posts 5000
 
-  defp do_regenerate(group_slug, broadcast?) do
-    start_time = System.monotonic_time(:millisecond)
+  @doc false
+  # The ordering every install and erase is compared by. Strictly increasing
+  # across the node, so two events never compare equal — a clock reading can
+  # (`System.monotonic_time(:microsecond)` returns equal adjacent readings),
+  # and an erase followed by a valid regeneration in the same tick was refused.
+  @spec next_sequence() :: pos_integer()
+  def next_sequence, do: :erlang.unique_integer([:monotonic, :positive])
 
+  defp do_regenerate(group_slug, broadcast?, started_seq, started_ms) do
     # Verify the group actually exists BEFORE writing anything to
     # `:persistent_term`. `Language.has_content_for_language?/2` (and
     # other callers reachable from public URL parsing) treats any URL
@@ -183,7 +198,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
         {:error, :group_not_found}
 
       _group ->
-        do_regenerate_existing_group(group_slug, start_time, broadcast?)
+        do_regenerate_existing_group(group_slug, started_seq, started_ms, broadcast?)
     end
   rescue
     error ->
@@ -194,7 +209,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
       {:error, {:regenerate_failed, error}}
   end
 
-  defp do_regenerate_existing_group(group_slug, start_time, broadcast?) do
+  defp do_regenerate_existing_group(group_slug, started_seq, started_ms, broadcast?) do
     # Posts from to_listing_map are already atom-key maps with excerpts
     all_posts = DBStorage.list_posts_for_listing(group_slug)
 
@@ -216,19 +231,22 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     # slow read that began before a trash/unpublish committed carries the post
     # as it was; writing that on top of the newer snapshot re-listed a post
     # that had just been taken down, and warm reads never regenerate, so it
-    # stayed listed until the next mutation. `start_time` is the monotonic
-    # reading taken before the query, which is exactly the ordering to compare.
-    if stale_snapshot?(group_slug, start_time) do
-      Logger.debug("[ListingCache] Discarded a slower regeneration for #{group_slug}")
-    else
-      # Two puts, not three: the loaded-at and generated-at timestamps were always
-      # written with the SAME value, and each :persistent_term.put triggers a global
-      # GC pass — wasteful under autosave traffic. Store the timestamp once (L12).
-      safe_persistent_term_put(persistent_term_key(group_slug), posts)
-      safe_persistent_term_put(cache_generated_at_key(group_slug), {generated_at, start_time})
+    # stayed listed until the next mutation. `started_seq` was taken before
+    # the query, which is exactly the ordering to compare.
+    case install_snapshot(group_slug, posts, generated_at, started_seq) do
+      :installed ->
+        :ok
+
+      :refused ->
+        Logger.debug("[ListingCache] Discarded a slower regeneration for #{group_slug}")
+
+      :unavailable ->
+        Logger.warning(
+          "[ListingCache] Not installing the listing for #{group_slug}: the cache owner is down"
+        )
     end
 
-    elapsed = System.monotonic_time(:millisecond) - start_time
+    elapsed = System.monotonic_time(:millisecond) - started_ms
 
     Logger.debug(
       "[ListingCache] Regenerated cache from DB for #{group_slug} (#{length(posts)} posts) in #{elapsed}ms"
@@ -384,6 +402,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   # ArgumentError on the vanished table and 500 a public read (M8). The lazy path
   # stays as a fallback for the brief window before/around an owner restart.
   @doc false
+  @spec ensure_lock_table_exists() :: :ok | :ets.table()
   def ensure_lock_table_exists do
     case :ets.whereis(@lock_table) do
       :undefined ->
@@ -402,6 +421,40 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
       _tid ->
         :ok
     end
+  end
+
+  @doc false
+  # The install step of a regeneration, as ONE step: compare `started_seq`
+  # against the sequence of whatever holds the generated-at term (a newer
+  # install, or an erase tombstone), and write the snapshot only if nothing
+  # newer is there. Serialised through `LockTableOwner` with `erase_local/1`,
+  # so an erase can never slip between the check and the write — that gap is
+  # where a paused regeneration used to resume, write its pre-mutation listing
+  # AND overwrite the tombstone with its own marker. Reads stay lock-free
+  # `:persistent_term` lookups; only the writers take turns.
+  #
+  # `:unavailable` when the owner is not running (a host boot before the
+  # module's children are up, or the gap around an owner restart): the
+  # snapshot is dropped rather than installed unchecked, and the next read
+  # costs one regeneration.
+  @spec install_snapshot(String.t(), [map()], String.t(), pos_integer()) ::
+          :installed | :refused | :unavailable
+  def install_snapshot(group_slug, posts, generated_at, started_seq) do
+    LockTableOwner.run_exclusive(fn ->
+      if stale_snapshot?(group_slug, started_seq) do
+        :refused
+      else
+        # Two puts, not three: the loaded-at and generated-at timestamps were
+        # always written with the SAME value, and each :persistent_term.put
+        # triggers a global GC pass — wasteful under autosave traffic. Store the
+        # timestamp once (L12).
+        safe_persistent_term_put(persistent_term_key(group_slug), posts)
+        safe_persistent_term_put(cache_generated_at_key(group_slug), {generated_at, started_seq})
+        :installed
+      end
+    end)
+  catch
+    :exit, _ -> :unavailable
   end
 
   # Safely put to :persistent_term (logs warning on failure instead of crashing)
@@ -458,16 +511,25 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   """
   @spec erase_local(String.t()) :: :ok
   def erase_local(group_slug) do
-    term_key = persistent_term_key(group_slug)
+    # Through the owner, so it takes its turn with `install_snapshot/4`. If
+    # the owner is down the erase runs directly: the tombstone is written
+    # first, so a serialised install that reads it afterwards is still refused.
+    LockTableOwner.run_exclusive(fn -> erase_now(group_slug) end)
+  catch
+    :exit, _ -> erase_now(group_slug)
+  end
+
+  defp erase_now(group_slug) do
+    # A tombstone, not an erase: a regeneration whose DB snapshot predates
+    # this mutation (StaleFixer trashing a post mid-regeneration, say) compares
+    # its sequence against this one and refuses to reinstall the pre-mutation
+    # listing — with the marker gone it had nothing to compare against, and
+    # warm reads never regenerate, so the stale listing stayed until the next
+    # mutation. One small term per erased slug outlives a renamed-away group.
+    safe_persistent_term_put(cache_generated_at_key(group_slug), {nil, next_sequence()})
 
     try do
-      :persistent_term.erase(term_key)
-    rescue
-      ArgumentError -> :ok
-    end
-
-    try do
-      :persistent_term.erase(cache_generated_at_key(group_slug))
+      :persistent_term.erase(persistent_term_key(group_slug))
     rescue
       ArgumentError -> :ok
     end
@@ -745,21 +807,28 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   @spec cache_generated_at(String.t()) :: String.t() | nil
   def cache_generated_at(group_slug) do
     case safe_persistent_term_get(cache_generated_at_key(group_slug)) do
-      # The entry carries the monotonic reading the regeneration started at
-      # alongside the timestamp, so a slower one can tell it has been overtaken.
-      # A bare string is what older entries hold.
-      {:ok, {generated_at, _started_at}} -> generated_at
+      # The entry carries the sequence the regeneration started at alongside
+      # the timestamp, so a slower one can tell it has been overtaken. A bare
+      # string is what older entries hold.
+      {:ok, {generated_at, _started_seq}} -> generated_at
       {:ok, generated_at} -> generated_at
       :not_found -> nil
     end
   end
 
   # True when a regeneration that started later has already installed its
-  # snapshot. An entry with no reading (or none at all) can't be compared, so
-  # the write goes ahead — the pre-existing behaviour.
-  defp stale_snapshot?(group_slug, start_time) do
+  # snapshot, or an invalidation (the `{nil, erased_seq}` tombstone) landed
+  # after this one began. Sequences never tie, so both compare strictly. The
+  # ordering is by sequence, not by DB snapshot: a regeneration that took its
+  # sequence before a mutation's erase but read the DB after it carries fresh
+  # data and is still refused — it costs one cold read, where the opposite
+  # mistake costs a stale listing until the next mutation. An entry with no
+  # sequence (or none at all) can't be compared, so the write goes ahead —
+  # the pre-existing behaviour.
+  defp stale_snapshot?(group_slug, started_seq) do
     case safe_persistent_term_get(cache_generated_at_key(group_slug)) do
-      {:ok, {_generated_at, started_at}} when is_integer(started_at) -> started_at > start_time
+      {:ok, {nil, erased_seq}} when is_integer(erased_seq) -> erased_seq > started_seq
+      {:ok, {_generated_at, seq}} when is_integer(seq) -> seq > started_seq
       _ -> false
     end
   end

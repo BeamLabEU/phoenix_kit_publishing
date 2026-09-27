@@ -44,29 +44,29 @@ defmodule PhoenixKit.Modules.Publishing.SharedTest do
 
   describe "fetch_option/2" do
     test "fetches atom key from map" do
-      assert Shared.fetch_option(%{title: "Hello"}, :title) == "Hello"
+      assert Shared.get_option(%{title: "Hello"}, :title) == "Hello"
     end
 
     test "fetches string key from map as fallback" do
-      assert Shared.fetch_option(%{"title" => "Hello"}, :title) == "Hello"
+      assert Shared.get_option(%{"title" => "Hello"}, :title) == "Hello"
     end
 
     test "fetches from keyword list" do
-      assert Shared.fetch_option([title: "Hello"], :title) == "Hello"
+      assert Shared.get_option([title: "Hello"], :title) == "Hello"
     end
 
     test "returns nil for missing key in map" do
-      assert Shared.fetch_option(%{other: "value"}, :title) == nil
+      assert Shared.get_option(%{other: "value"}, :title) == nil
     end
 
     test "returns nil for missing key in keyword list" do
-      assert Shared.fetch_option([other: "value"], :title) == nil
+      assert Shared.get_option([other: "value"], :title) == nil
     end
 
     test "returns nil for non-map non-list" do
-      assert Shared.fetch_option("string", :title) == nil
-      assert Shared.fetch_option(nil, :title) == nil
-      assert Shared.fetch_option(123, :title) == nil
+      assert Shared.get_option("string", :title) == nil
+      assert Shared.get_option(nil, :title) == nil
+      assert Shared.get_option(123, :title) == nil
     end
   end
 

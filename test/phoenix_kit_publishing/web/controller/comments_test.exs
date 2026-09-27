@@ -98,6 +98,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
     assert PublishingComments.list(post.uuid) == []
   end
 
+  # GET refuses a trashed group's posts; the POST gate only asked whether the
+  # group row existed, so a trashed group kept accepting comments.
+  test "a trashed group's post takes no comments", %{
+    conn: conn,
+    slug: slug,
+    post: post,
+    user: user
+  } do
+    {:ok, _} = Groups.update_group(slug, %{"comments_enabled" => "true"})
+    :ok = login(user)
+    {:ok, _} = Groups.trash_group(slug)
+
+    conn = post_comment(conn, slug, base_params(post, "Into the void"))
+
+    assert conn.status == 404
+    assert PublishingComments.list(post.uuid) == []
+  end
+
   test "a logged-in reader posts a comment and it renders", %{
     conn: conn,
     slug: slug,
@@ -491,7 +509,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
       assert PublishingComments.for_post_page(post.uuid).count == 0
     end
 
-    test "the enhancement script and form markers render", %{conn: conn, slug: slug} do
+    test "the enhancement script and form markers render", %{slug: slug} do
       html = build_conn() |> get("/#{slug}/discussed") |> html_response(200)
       assert html =~ "data-pk-comment-form"
       assert html =~ "__pkCommentFetch"

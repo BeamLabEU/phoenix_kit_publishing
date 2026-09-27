@@ -4,7 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorMultiEditorTest do
   second watches read-only, and the owner's typing reaches the watcher live.
 
   Worth pinning because the content path only recently learned to broadcast
-  at all — body edits arrive as a process message from the MarkdownEditor
+  at all — body edits arrive as a process message from the Leaf
   component, and that handler used to skip the whole collaborative pipeline
   (no broadcast, no activity refresh), so a spectator saw nothing while the
   owner's own lock quietly expired under them.
@@ -67,7 +67,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorMultiEditorTest do
 
     _ = render(watcher)
 
-    # Exactly how the MarkdownEditor component reports an edit.
+    # Exactly how the Leaf component reports an edit.
     send(
       owner.pid,
       {:leaf_changed, %{editor_id: "content-editor", markdown: "Live from the owner.", html: ""}}

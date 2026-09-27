@@ -73,23 +73,32 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   end
 
   @doc """
-  Gets a publishing group by slug.
+  Fetches a publishing group by slug.
 
   ## Examples
 
-      iex> Groups.get_group("news")
+      iex> Groups.fetch_group("news")
       {:ok, %{"name" => "News", "slug" => "news", ...}}
 
-      iex> Groups.get_group("nonexistent")
+      iex> Groups.fetch_group("nonexistent")
       {:error, :not_found}
   """
-  @spec get_group(String.t()) :: {:ok, group()} | {:error, :not_found}
-  def get_group(slug) when is_binary(slug) do
+  @spec fetch_group(String.t()) :: {:ok, group()} | {:error, :not_found}
+  def fetch_group(slug) when is_binary(slug) do
     case DBStorage.get_group_by_slug(slug) do
       nil -> {:error, :not_found}
       db_group -> {:ok, db_group |> StaleFixer.fix_stale_group() |> db_group_to_map()}
     end
   end
+
+  @doc """
+  The old name of `fetch_group/1`, kept for callers outside this module
+  (`phoenix_kit_legal` reads its blog group through the facade). Same
+  tuple shape; new code calls `fetch_group/1`.
+  """
+  @deprecated "Use fetch_group/1"
+  @spec get_group(String.t()) :: {:ok, group()} | {:error, :not_found}
+  def get_group(slug) when is_binary(slug), do: fetch_group(slug)
 
   @doc """
   Adds a new publishing group.
@@ -120,8 +129,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
 
   def add_group(name, opts) when is_binary(name) and (is_list(opts) or is_map(opts)) do
     trimmed = String.trim(name)
-    mode = opts |> fetch_option(:mode) |> normalize_mode_with_default()
-    normalized_type = opts |> fetch_option(:type) |> normalize_type()
+    mode = opts |> get_option(:mode) |> normalize_mode_with_default()
+    normalized_type = opts |> get_option(:type) |> normalize_type()
 
     cond do
       trimmed == "" ->
@@ -138,7 +147,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
 
       true ->
         taken = DBStorage.all_group_slugs()
-        preferred_slug = fetch_option(opts, :slug)
+        preferred_slug = get_option(opts, :slug)
 
         with {:ok, requested_slug} <- derive_requested_slug(preferred_slug, trimmed),
              :ok <- check_slug_availability(requested_slug, taken, preferred_slug) do
@@ -148,12 +157,12 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
 
           item_singular =
             opts
-            |> fetch_option(:item_singular)
+            |> get_option(:item_singular)
             |> normalize_item_name(default_singular)
 
           item_plural =
             opts
-            |> fetch_option(:item_plural)
+            |> get_option(:item_plural)
             |> normalize_item_name(default_plural)
 
           db_attrs = %{
@@ -296,7 +305,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
                         show_featured_image show_reading_time show_post_count
                         show_top_back_link listing_image_links listing_animations
                         show_prev_next search_enabled show_categories
-                        views_enabled show_view_counts comments_enabled)
+                        views_enabled show_view_counts comments_enabled
+                        sitemap_exclude)
   @enum_settings [
     {"featured_layout", @featured_layouts},
     {"featured_style", @band_styles},
@@ -315,6 +325,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # Source of truth for the settings keys `merge_group_config/2` persists —
   # exposed (undocumented) so the GroupSettings spec test can assert parity
   # against the real write path instead of a hardcoded list.
+  @spec config_setting_keys() :: [String.t()]
   def config_setting_keys do
     @bool_setting_keys ++ Enum.map(@enum_settings, &elem(&1, 0))
   end
@@ -634,7 +645,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     case DBStorage.restore_group(db_group) do
       {:ok, _} ->
         ListingCache.regenerate(slug)
-        PublishingPubSub.broadcast_group_created(%{"slug" => slug, "name" => db_group.name})
+        PublishingPubSub.broadcast_group_created(%{"uuid" => db_group.uuid, "slug" => slug})
 
         ActivityLog.log_manual(
           "publishing.group.restored",
@@ -676,7 +687,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   defp extract_and_validate_name(db_group, params) do
     name =
       params
-      |> fetch_option(:name)
+      |> get_option(:name)
       |> case do
         nil -> db_group.name
         value -> String.trim(to_string(value || ""))
@@ -688,7 +699,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   defp extract_and_validate_slug(db_group, params, name) do
     desired_slug =
       params
-      |> fetch_option(:slug)
+      |> get_option(:slug)
       |> case do
         nil -> db_group.slug
         value -> String.trim(to_string(value || ""))
@@ -759,6 +770,9 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "views_enabled" => Map.get(data, "views_enabled", false),
       "show_view_counts" => Map.get(data, "show_view_counts", false),
       "comments_enabled" => Map.get(data, "comments_enabled", false),
+      # Read by core's Sitemap source (`group["sitemap_exclude"]`) off this
+      # very map — keep the key top-level, not nested under "settings".
+      "sitemap_exclude" => Map.get(data, "sitemap_exclude", false),
       "name_i18n" => name_i18n_map(data)
     }
   end
@@ -906,5 +920,5 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   defp normalize_item_name(_, default), do: default
 
   @doc false
-  defdelegate fetch_option(opts, key), to: Shared
+  defdelegate get_option(opts, key), to: Shared
 end

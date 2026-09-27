@@ -45,6 +45,9 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.SaxHandler do
   @moduledoc false
   @behaviour Saxy.Handler
 
+  @impl Saxy.Handler
+  @spec handle_event(Saxy.Handler.event_name(), Saxy.Handler.event_data(), term()) ::
+          {:ok, term()}
   def handle_event(:start_document, _prolog, _state) do
     {:ok, %{stack: [], result: nil}}
   end

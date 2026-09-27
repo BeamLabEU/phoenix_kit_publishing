@@ -510,7 +510,7 @@ defmodule PhoenixKitPublishing.RouterDispatchIntegrationTest do
   end
 
   defp refute_group_named(slug) do
-    case Groups.get_group(slug) do
+    case Groups.fetch_group(slug) do
       {:ok, _} -> flunk("Test fixture leak: a group named #{inspect(slug)} exists in the test DB")
       _ -> :ok
     end

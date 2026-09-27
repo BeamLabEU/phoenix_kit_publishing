@@ -33,6 +33,7 @@ defmodule Mix.Tasks.PhoenixKitPublishing.Media.Adopt do
   @switches [apply: :boolean]
 
   @impl Mix.Task
+  @spec run([String.t()]) :: :ok | no_return()
   def run(argv) do
     case OptionParser.parse(argv, strict: @switches) do
       {opts, [], []} ->
@@ -51,7 +52,7 @@ defmodule Mix.Tasks.PhoenixKitPublishing.Media.Adopt do
     case MediaAdoption.run(first_owner_uuid(), apply?: apply?) do
       {:ok, report} ->
         Mix.shell().info(MediaAdoption.format_report(report))
-        if apply? and failures?(report), do: exit({:shutdown, 1})
+        if apply? and failures?(report), do: exit({:shutdown, 1}), else: :ok
 
       {:error, {:bad_hooks, problems}} ->
         halt_with_error(

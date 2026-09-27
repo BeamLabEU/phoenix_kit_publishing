@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
 
   Returns {detected_language, adjusted_params}
   """
+  @spec detect_language_or_group(String.t() | nil, map()) :: {String.t(), map()}
   def detect_language_or_group(language_param, params) do
     # First check if it's a known/predefined language
     # Then check if content exists for this language in the group (handles unknown languages like "af")
@@ -84,6 +85,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
 
   Returns {:language_detected, language, adjusted_params} or :not_a_language
   """
+  @spec detect_language_in_group_param(map()) ::
+          {:language_detected, String.t(), map()} | :not_a_language
   def detect_language_in_group_param(
         %{"group" => potential_lang, "path" => [_ | _] = path} = _params
       )
@@ -112,6 +115,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Validates if a code represents a valid language.
   """
+  @spec valid_language?(term()) :: boolean()
   def valid_language?(code) when is_binary(code) do
     # Check if it's a language code pattern (enabled, disabled, or even unknown)
     # This allows access to legacy content in disabled languages
@@ -158,6 +162,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Checks if a string looks like a language code pattern.
   Matches: 2-letter codes (en, fr), or dialect codes (en-US, pt-BR)
   """
+  @spec looks_like_language_code?(String.t()) :: boolean()
   def looks_like_language_code?(code) when is_binary(code) do
     # 2-3 letter base code or dialect code pattern (xx-XX, xxx-XXXX)
     String.match?(code, ~r/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/i)
@@ -171,6 +176,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Resolves a language code to an actual content language.
   Handles base codes by finding a matching dialect in available languages.
   """
+  @spec resolve_language_for_post(String.t(), [String.t()]) :: String.t()
   def resolve_language_for_post(language, available_languages) do
     ci_exact =
       Enum.find(available_languages, fn code ->
@@ -203,6 +209,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Find a dialect in a list of languages that matches the given base code.
   """
+  @spec find_dialect_for_base_in_languages(String.t(), [String.t()]) :: String.t() | nil
   def find_dialect_for_base_in_languages(base_code, languages),
     do: find_dialect_for_base(base_code, languages)
 
@@ -215,6 +222,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   If multiple dialects of the same base language are enabled, returns the full dialect.
   Otherwise returns the base code for cleaner URLs.
   """
+  @spec get_canonical_url_language(String.t()) :: String.t()
   def get_canonical_url_language(language) do
     enabled_languages = get_enabled_languages()
 
@@ -235,29 +243,83 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Gets the canonical URL language code for a post's language.
   This uses the actual content language (e.g., "en-US") to determine the canonical URL code.
   """
+  @spec get_canonical_url_language_for_post(String.t()) :: String.t()
   def get_canonical_url_language_for_post(post_language) do
     enabled_languages = get_enabled_languages()
     Publishing.get_display_code(post_language, enabled_languages)
   end
 
   @doc """
-  Returns true when the current request URL already matches the canonical URL.
-  """
-  def request_matches_canonical_url?(conn, canonical_url) do
-    request_url =
-      case conn.query_string do
-        nil -> conn.request_path
-        "" -> conn.request_path
-        query -> conn.request_path <> "?" <> query
-      end
+  Returns true when the canonical 301 would land on the request itself.
 
-    request_url == canonical_url
+  The redirect merges the request's query string onto the canonical URL
+  (`Controller.with_query_string/2`: the target's keys win, the request's
+  extra keys ride along), so the request already IS the target when the
+  paths agree and every key the canonical names is present with the
+  canonical's value. Comparing the raw strings sent every `?utm_source=`
+  request on a prefixless dialect primary back to itself, forever: the
+  request carried a query, the canonical none, and the 301 re-added it.
+  """
+  @spec request_matches_canonical_url?(Plug.Conn.t(), String.t()) :: boolean()
+  def request_matches_canonical_url?(conn, canonical_url) do
+    %URI{path: canonical_path, query: canonical_query} = URI.parse(canonical_url)
+    request_query = decode_query(conn.query_string)
+
+    conn.request_path == canonical_path and
+      Enum.all?(decode_query(canonical_query), fn {key, value} ->
+        Map.get(request_query, key) == value
+      end)
   end
+
+  defp decode_query(query) when is_binary(query) and query != "", do: URI.decode_query(query)
+  defp decode_query(_), do: %{}
+
+  @doc """
+  Whether a request must 301 onto `canonical_url` — the one rule for post,
+  listing, term-archive and feed URLs.
+
+  Three shapes are non-canonical: the language resolved to another code
+  (`/en-US/…` when one English dialect is enabled and the display code is
+  `en`), the prefix is redundant for a prefixless default, or the URL's
+  language SEGMENT is not the display segment while the language itself is
+  already canonical (`/en-US/…` when `en-US` owns `/en/` beside `en-GB`).
+  None of them redirects when the request already IS the canonical URL
+  (`request_matches_canonical_url?/2`), which is what keeps `?utm=` requests
+  and the canonical URLs themselves from looping.
+  """
+  @spec canonical_redirect?(Plug.Conn.t(), String.t(), String.t(), String.t()) :: boolean()
+  def canonical_redirect?(conn, language, canonical_language, canonical_url) do
+    (canonical_language != language or
+       prefixed_default_language_request?(conn, canonical_language) or
+       non_canonical_language_segment?(conn, language, canonical_language)) and
+      not request_matches_canonical_url?(conn, canonical_url)
+  end
+
+  # The URL's language segment, only when it IS one: after a language→group
+  # shift `conn.params["language"]` still holds the group slug, so the
+  # segment counts only when it names the language the request resolved to.
+  # Case-insensitive on both sides — `/en-GB/…` is the sibling's own URL.
+  defp non_canonical_language_segment?(conn, language, canonical_language)
+       when is_binary(language) and is_binary(canonical_language) do
+    case conn.params["language"] do
+      segment when is_binary(segment) ->
+        down = String.downcase(segment)
+
+        down == String.downcase(language) and
+          down != String.downcase(LanguageHelpers.public_url_segment(canonical_language))
+
+      _ ->
+        false
+    end
+  end
+
+  defp non_canonical_language_segment?(_conn, _language, _canonical_language), do: false
 
   @doc """
   Returns true when the request is using an explicit prefix for the default language
   even though the default language should be prefixless.
   """
+  @spec prefixed_default_language_request?(Plug.Conn.t(), String.t()) :: boolean()
   def prefixed_default_language_request?(conn, language) do
     Map.has_key?(conn.params, "language") and
       LanguageHelpers.default_language_no_prefix?() and
@@ -288,6 +350,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Gets the list of enabled language codes.
   """
+  @spec get_enabled_languages() :: [String.t()]
   def get_enabled_languages do
     Publishing.enabled_language_codes()
   rescue
@@ -297,6 +360,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Checks if a code is a base language code (2-3 letters, no dialect suffix).
   """
+  @spec base_code?(term()) :: boolean()
   def base_code?(code) when is_binary(code) do
     LanguageHelpers.base_language_code?(code)
   end
@@ -324,6 +388,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Gets the default language.
   """
+  @spec get_default_language() :: String.t()
   def get_default_language do
     case Publishing.get_primary_language() do
       code when is_binary(code) and code != "" ->
@@ -340,6 +405,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Gets a language's display name.
   """
+  @spec get_language_name(String.t()) :: String.t()
   def get_language_name(code) do
     case Languages.get_language(code) do
       %{"name" => name} -> name
@@ -350,6 +416,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   @doc """
   Gets a language's flag emoji.
   """
+  @spec get_language_flag(String.t()) :: String.t()
   def get_language_flag(code) do
     case Languages.get_predefined_language(code) do
       %{flag: flag} -> flag
@@ -365,6 +432,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Check if any post in the group has content for the given language.
   Uses listing cache when available for fast lookups.
   """
+  @spec has_content_for_language?(String.t(), String.t()) :: boolean()
   def has_content_for_language?(group_slug, language) do
     # Try cache first for fast lookup
     case ListingCache.read(group_slug) do

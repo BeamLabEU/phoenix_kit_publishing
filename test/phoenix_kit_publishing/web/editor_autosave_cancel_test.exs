@@ -38,11 +38,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorAutosaveCancelTest do
     # still discarded. The switch has to try to flush first and stay put if it
     # can't, the same policy "preview" uses. (A reviewer rightly called the
     # earlier cancel-only pin out for encoding "dropping the work is fine".)
+    # The click asks Leaf for its buffer first (`after_flush/2`); the switch
+    # proper runs in the continuation, and THAT is what must save.
     [_, after_head] = String.split(source, "def handle_event(\"switch_version\"", parts: 2)
     [switch_clause, _] = String.split(after_head, "def handle_event(", parts: 2)
+    assert switch_clause =~ "after_flush(socket, &switch_version_after_flush("
 
-    assert switch_clause =~ "flush_before_switch(socket)"
-    assert switch_clause =~ "{:blocked, socket} ->"
+    [_, continuation] =
+      String.split(source, "defp switch_version_after_flush(socket, version) do", parts: 2)
+
+    continuation = String.slice(continuation, 0, 400)
+    assert continuation =~ "flush_before_switch(socket)"
+    assert continuation =~ "{:blocked, socket} ->"
 
     # The flush must never run for a read-only spectator, whose buffer is stale
     # and would clobber the owner.
@@ -54,7 +61,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorAutosaveCancelTest do
     assert flush =~ ":blocked"
   end
 
-  test "every buffer-replacing navigation flushes first", %{source: source} do
+  test "every buffer-replacing navigation flushes first" do
     # The gap recurred once already — version switch was fixed and language
     # switch was missed — so pin the whole set rather than one path.
     for site <- [

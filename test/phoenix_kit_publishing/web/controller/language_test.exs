@@ -37,7 +37,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageTest do
       conn = Plug.Test.conn(:get, "/en/blog?page=2")
 
       assert Language.request_matches_canonical_url?(conn, "/en/blog?page=2")
-      refute Language.request_matches_canonical_url?(conn, "/en/blog")
+      refute Language.request_matches_canonical_url?(conn, "/en/news?page=2")
+      refute Language.request_matches_canonical_url?(conn, "/en/blog?page=3")
+    end
+
+    # The 301 merges the request's query onto the target (target keys win),
+    # so a request that only ADDS params to the canonical already is the
+    # URL the redirect would land on — sending it there again is a loop.
+    test "extra request params do not break the match" do
+      conn = Plug.Test.conn(:get, "/blog?utm_source=x")
+      assert Language.request_matches_canonical_url?(conn, "/blog")
+
+      conn = Plug.Test.conn(:get, "/blog?page=2&utm_source=x")
+      assert Language.request_matches_canonical_url?(conn, "/blog?page=2")
+    end
+
+    test "a target key the request lacks still redirects" do
+      conn = Plug.Test.conn(:get, "/blog?utm_source=x")
+      refute Language.request_matches_canonical_url?(conn, "/blog?page=2")
     end
   end
 

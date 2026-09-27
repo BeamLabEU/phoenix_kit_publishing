@@ -12,7 +12,8 @@ defmodule PhoenixKitPublishing.Migrations do
   `PhoenixKitNewsletters.Migrations` is this chain's closest sibling — same
   adoption situation, same semantic-guard requirement — adapted here for 7
   tables instead of 2, a composite-key pair, one named UNIQUE constraint, a
-  GIN index, and two `DESC`-ordered indexes.
+  GIN index, and two `DESC`-ordered indexes. V1 is the adoption; V2 (Phase
+  1 below) adds two expression indexes of this chain's own.
 
   ## Ownership situation — read before touching
 
@@ -168,18 +169,43 @@ defmodule PhoenixKitPublishing.Migrations do
   of all 7 tables: **no core release is required and there is no
   release-ordering hazard.** This package releases alone.
 
-  ### Phase 1 — the first real shape change (V2+) is when core must move too
+  ### Phase 1 — V2 adds two expression indexes, and changes NOTHING else
 
-  Before shipping a version that changes any of the 7 tables' shape:
+  V2 is this chain's first shape change: two non-unique btree expression
+  indexes over the media-folder pointer `lower(data->>'media_folder_uuid')`
+  (`MediaFolders.pointer/0`), one per table that carries the pointer —
+  `idx_publishing_groups_media_folder` on `phoenix_kit_publishing_groups`
+  and `idx_publishing_versions_media_folder` on
+  `phoenix_kit_publishing_versions`. `MediaReorganizer` joins storage
+  folders to groups and versions through exactly that expression (its
+  orphan scans and live-pointer checks), which none of V1's 22 indexes
+  serves. No column, constraint, table or row changes; no data moves; the
+  indexes are not partial, because the reorganizer's joins carry no
+  `data ? 'media_folder_uuid'` term for the planner to match a partial
+  index against. Both are guarded through `expression_index_guard/3` —
+  semantic like everything else here, matched on `pg_get_expr(indexprs)`
+  rather than on the index name, so a renamed host is recognised and never
+  given a duplicate. The name is not load-bearing in the other direction
+  either: when the shape is missing and a host already owns an index under
+  the canonical name on some OTHER expression, the guard creates the shape
+  under the first free `<name>_v2`, `_v3`, … — a bare `CREATE INDEX IF NOT
+  EXISTS` there would have been a silent no-op that still stamped V2, and
+  the index would have been absent for good. `down/1` below V2 removes the
+  shape by the same catalog match, whatever name it carries, and nothing
+  else — never a same-named index on a different expression.
 
-    1. add the objects that version alters to core's manifest generator's
-       `@excluded_exact` (`dev_docs/squash/generate_baseline.exs`) and
-       regenerate `ExpectedSchema`;
-    2. raise this package's `:phoenix_kit` floor to the release that ships
-       that regenerated manifest.
-
-  Skipping step 1 means `mix phoenix_kit.repair` restores the old shape
-  after every run, silently undoing the new version.
+  Core's `ExpectedSchema` manifest does not know these two indexes, and it
+  does not need to: `mix phoenix_kit.repair` reports drift, it never drops
+  anything — its only "extra" finding is an info-level one for a column on
+  a manifest table — and no module's own chain registers its objects in
+  core's manifest (the catalogue's do not either). Declaring them there
+  with a `since` beyond core's head would instead mark every host that ran
+  V2 as carrying a stale marker until core ships that version. What a shape
+  change here DOES need on core's side is the opposite case: an object core
+  itself created and this chain then alters must be excluded from core's
+  baseline generator (`@excluded_exact` in
+  `dev_docs/squash/generate_baseline.exs`), or the next squash recreates
+  the old shape. V2 alters nothing core created.
 
   ### Phase 2 — creation leaves core's baseline at the next squash cycle
 
@@ -201,8 +227,9 @@ defmodule PhoenixKitPublishing.Migrations do
   this module's data is a human, manual step — see README.md "Removing this
   module" for the operator SQL (one `DROP TABLE` over all 7). There is
   deliberately no automated uninstall path, and `down/1` NEVER drops any of
-  the 7 tables for ANY target version, including `0` — it only unstamps (or
-  re-stamps) the marker on the anchor table. The rows are every host's real
+  the 7 tables for ANY target version, including `0` — below V2 it removes
+  V2's two expression indexes, and otherwise only unstamps (or re-stamps)
+  the marker on the anchor table. The rows are every host's real
   content groups, posts, versions, per-language content, categories,
   category assignments, and view counters; rolling back this module's chain
   must not destroy any of them.
@@ -226,7 +253,7 @@ defmodule PhoenixKitPublishing.Migrations do
   alias PhoenixKit.Modules.Publishing.PublishingVersion
 
   @initial_version 1
-  @current_version 1
+  @current_version 2
   @default_prefix "public"
   @marker_prefix "pkpub_schema:"
 
@@ -237,6 +264,19 @@ defmodule PhoenixKitPublishing.Migrations do
   @categories "phoenix_kit_publishing_categories"
   @post_categories "phoenix_kit_publishing_post_categories"
   @post_views "phoenix_kit_publishing_post_views"
+
+  # V2's two objects — the only things this chain has ever created that
+  # core's baseline does not. Named in core's `idx_publishing_<table>_<what>`
+  # style so a catalog listing reads as one family.
+  @groups_media_folder_index "idx_publishing_groups_media_folder"
+  @versions_media_folder_index "idx_publishing_versions_media_folder"
+
+  # `MediaFolders.pointer/0`'s JSONB key, as the reorganizer's joins spell
+  # it — `lower(data->>'media_folder_uuid')`. The canonical form is what
+  # `pg_get_expr(indexprs, indrelid)` renders for that expression (verified
+  # live: Postgres re-parenthesises the operator and types the literal);
+  # the guard compares against it, so it must be Postgres's text, not ours.
+  @media_folder_expression "lower((data ->> 'media_folder_uuid'::text))"
 
   # The single table this chain's marker lives on — this chain's FK-tree
   # root, not a leaf table (see the moduledoc for why).
@@ -294,7 +334,8 @@ defmodule PhoenixKitPublishing.Migrations do
   @doc """
   Rolls back to `opts[:version]` (default `0`). Migration-context only.
   Never drops a table or a row in any of the 7, for any target — see the
-  moduledoc.
+  moduledoc. Below V2 it removes V2's two expression indexes (the only
+  objects this chain ever added), matched by shape, and nothing else.
   """
   @spec down(keyword() | map()) :: :ok
   def down(opts \\ []) do
@@ -355,7 +396,10 @@ defmodule PhoenixKitPublishing.Migrations do
   `target` selects how much of the chain to emit (default
   `current_version/0`): `0` applies nothing (not an operation — clearing
   the marker is `down/1`'s job); `1` is the pure adoption step across all 7
-  tables.
+  tables; `2` adds the two media-folder expression indexes. The chain is
+  cumulative — every version's guarded statements are emitted up to
+  `target`, the marker stamped last — so a host at V1 being raised to V2
+  re-runs V1's no-ops and then V2's, and a fresh install gets everything.
   """
   @spec up_statements(String.t(), non_neg_integer()) :: [String.t()]
   def up_statements(prefix \\ @default_prefix, target \\ @current_version)
@@ -367,15 +411,20 @@ defmodule PhoenixKitPublishing.Migrations do
     if target == 0 do
       []
     else
-      v1_statements(prefix, target)
+      v1_statements(prefix) ++ v2_statements(prefix, target) ++ marker_statements(prefix, target)
     end
   end
 
   @doc """
-  The SQL `down/1` executes, as data (marker bookkeeping only, on the
-  anchor table). V1 changes no shape of its own — it is pure adoption — so
-  there is nothing to drop beyond the marker; all 7 tables and every row in
-  them are left untouched, for any target including `0`.
+  The SQL `down/1` executes, as data. Below V2, the two expression indexes
+  V2 added are removed — by SHAPE, through the same catalog match the V2
+  guard creates them under, so they go whatever name they landed under and
+  a same-named index on another expression stays (the only objects this
+  chain has ever added to core's shape); then the marker is re-stamped at
+  `target`, or cleared for `0`. V1 changes no
+  shape of its own — it is pure adoption — so there is nothing else to
+  undo: all 7 tables and every row in them are left untouched, for any
+  target including `0`.
   """
   @spec down_statements(String.t(), non_neg_integer()) :: [String.t()]
   def down_statements(prefix \\ @default_prefix, target \\ 0)
@@ -385,16 +434,174 @@ defmodule PhoenixKitPublishing.Migrations do
     prefix = validated_prefix(prefix)
     qualified = Helpers.qualify_table(@version_table, prefix)
 
-    if target > 0 do
-      ["COMMENT ON TABLE #{qualified} IS '#{@marker_prefix}#{target}'"]
-    else
-      ["COMMENT ON TABLE #{qualified} IS NULL"]
+    v2_removal = if target < 2, do: v2_removal_statements(prefix), else: []
+
+    marker =
+      if target > 0 do
+        "COMMENT ON TABLE #{qualified} IS '#{@marker_prefix}#{target}'"
+      else
+        "COMMENT ON TABLE #{qualified} IS NULL"
+      end
+
+    v2_removal ++ [marker]
+  end
+
+  # ── marker ──────────────────────────────────────────────────────────────
+
+  # Always the last statement `up/1` runs: it certifies the DDL before it.
+  defp marker_statements(prefix, target) do
+    ["COMMENT ON TABLE #{Helpers.qualify_table(@groups, prefix)} IS '#{@marker_prefix}#{target}'"]
+  end
+
+  # ── V2 statement builder ────────────────────────────────────────────────
+
+  # Two expression indexes over the media-folder pointer,
+  # `lower(data->>'media_folder_uuid')`, on the two tables that carry it
+  # (`MediaFolders.pointer/0`: a group's folder on the group row, a post's
+  # folder on every version of the post). `MediaReorganizer` joins storage
+  # folders to both through exactly that expression, which no V1 index
+  # serves. Not partial: the reorganizer's joins carry no
+  # `data ? 'media_folder_uuid'` term, and a partial index the planner
+  # cannot prove applicable is never chosen. Guarded semantically (see
+  # `expression_index_guard/3`), never by name.
+  defp v2_statements(prefix, target) when target >= 2 do
+    [
+      expression_index_guard(
+        @groups_media_folder_index,
+        Helpers.qualify_table(@groups, prefix),
+        @media_folder_expression
+      ),
+      expression_index_guard(
+        @versions_media_folder_index,
+        Helpers.qualify_table(@versions, prefix),
+        @media_folder_expression
+      )
+    ]
+  end
+
+  defp v2_statements(_prefix, _target), do: []
+
+  # By shape, the exact inverse of `expression_index_guard/3`: the guard
+  # accepts a same-shaped index under ANY name as "V2 applied" (a renamed
+  # host, a host that built it by hand) and creates it under a fallback
+  # name when the canonical one is taken, so the only removal that undoes
+  # precisely what the guard certified is one that finds the shape through
+  # the same catalog match and drops whatever it is called. A by-name drop
+  # would leave a fallback-named copy behind and, worse, take a host's
+  # same-named index on a DIFFERENT expression with it. The match is
+  # `media_folder_index_match/2`, shared with the guard so the two cannot
+  # drift. `to_regclass` (never `::regclass`) so a host that never had the
+  # table rolls back to 0 without an error, as `IF EXISTS` used to allow.
+  defp v2_removal_statements(prefix) do
+    escaped_expression = String.replace(@media_folder_expression, "'", "''")
+
+    for table <- [@groups, @versions] do
+      qualified = Helpers.qualify_table(table, prefix)
+
+      """
+      DO $$
+      DECLARE
+        pointer_index record;
+      BEGIN
+        IF to_regclass('#{qualified}') IS NULL THEN
+          RETURN;
+        END IF;
+        FOR pointer_index IN
+          SELECT n.nspname AS schema, ic.relname AS name
+          FROM pg_index i
+          JOIN pg_class ic ON ic.oid = i.indexrelid
+          JOIN pg_namespace n ON n.oid = ic.relnamespace
+          JOIN pg_am am ON am.oid = ic.relam
+          WHERE #{media_folder_index_match(qualified, escaped_expression)}
+        LOOP
+          EXECUTE format('DROP INDEX %I.%I', pointer_index.schema, pointer_index.name);
+        END LOOP;
+      END
+      $$
+      """
     end
+  end
+
+  # Semantic, like every other guard here — "does this table already have a
+  # non-unique btree index whose single key is exactly this expression, with
+  # no partial predicate" — but where `index_guard/7` resolves `indkey` to
+  # column names, an expression key stores `0` in `indkey` and its text in
+  # `indexprs`, so the match is on `pg_get_expr(i.indexprs, i.indrelid)`:
+  # Postgres's own canonical rendering of the expression list, which is why
+  # `expression` must be that canonical text (`@media_folder_expression`)
+  # rather than however the `CREATE INDEX` spells it. `indnkeyatts = 1`
+  # bounds the key count, since the column-name aggregate that does that
+  # job in `index_guard/7` has nothing to resolve here. A differently-named
+  # index of the same shape (a renamed host) is a match, not a duplicate;
+  # an unrelated expression index on the same table (another key, another
+  # function) is not — `migrations_expression_index_test.exs` proves both.
+  #
+  # The name is a preference, not a condition. When the shape is missing,
+  # `name` is only the FIRST candidate: a host may already own an index of
+  # that name on some other expression (`CREATE INDEX IF NOT EXISTS` there
+  # would be a silent no-op, the marker would still stamp V2, and the shape
+  # would never arrive — the same test file reproduces it), so the block
+  # walks `<name>`, `<name>_v2`, `<name>_v3`, … to the first relation name
+  # free in the table's own schema (an index always lands beside its
+  # table; `pg_class` is the namespace tables, sequences and indexes
+  # share) and creates the shape there through `format('%I')`. No `IF NOT
+  # EXISTS`: the candidate is known free, and a silent skip is exactly the
+  # failure this exists to rule out.
+  defp expression_index_guard(name, qualified, expression) do
+    # The literal sits inside the `DO $$ ... $$` body as an ordinary
+    # single-quoted string, so the quotes it contains are doubled — the
+    # same rule `index_guard/7` applies to its `EXECUTE` argument.
+    escaped_expression = String.replace(expression, "'", "''")
+
+    """
+    DO $$
+    DECLARE
+      candidate text := '#{name}';
+      attempt integer := 1;
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_index i
+        JOIN pg_class ic ON ic.oid = i.indexrelid
+        JOIN pg_am am ON am.oid = ic.relam
+        WHERE #{media_folder_index_match(qualified, escaped_expression)}
+      ) THEN
+        WHILE EXISTS (
+          SELECT 1 FROM pg_class
+          WHERE relname = candidate
+            AND relnamespace = (SELECT relnamespace FROM pg_class WHERE oid = '#{qualified}'::regclass)
+        ) LOOP
+          attempt := attempt + 1;
+          candidate := '#{name}_v' || attempt;
+        END LOOP;
+        EXECUTE format('CREATE INDEX %I ON #{qualified} USING btree (#{escaped_expression})', candidate);
+      END IF;
+    END
+    $$
+    """
+  end
+
+  # The one catalog match V2's shape has — "a non-unique btree index on
+  # this table whose single key is exactly this expression, with no partial
+  # predicate" — as a `WHERE` fragment, so the guard that creates the shape
+  # and the removal that drops it read the same definition. `qualified` is
+  # resolved through `regclass` (immune to a table rename); `expression` is
+  # already quote-doubled for the enclosing `DO $$` body.
+  defp media_folder_index_match(qualified, escaped_expression) do
+    """
+    i.indrelid = '#{qualified}'::regclass
+          AND i.indisunique = false
+          AND am.amname = 'btree'
+          AND i.indnkeyatts = 1
+          AND i.indpred IS NULL
+          AND pg_get_expr(i.indexprs, i.indrelid) = '#{escaped_expression}'
+    """
+    |> String.trim()
   end
 
   # ── V1 statement builder ────────────────────────────────────────────────
 
-  defp v1_statements(prefix, target) do
+  defp v1_statements(prefix) do
     users = Helpers.qualify_table("phoenix_kit_users", prefix)
     uuid_default = Helpers.uuid_v7_call(prefix)
 
@@ -788,9 +995,7 @@ defmodule PhoenixKitPublishing.Migrations do
       )
     ]
 
-    marker = ["COMMENT ON TABLE #{q_groups} IS '#{@marker_prefix}#{target}'"]
-
-    tables ++ pkeys ++ unique_constraints ++ indexes ++ fks ++ marker
+    tables ++ pkeys ++ unique_constraints ++ indexes ++ fks
   end
 
   # Semantic: "does this table already have ANY primary key", not "does a
@@ -918,9 +1123,10 @@ defmodule PhoenixKitPublishing.Migrations do
   # position instead of erroring, shortening the aggregated column-name
   # array and making an unrelated expression index misread as a plain-column
   # match. `indexprs IS NULL` alone would already exclude every expression
-  # index (none of this chain's own indexes are ever expression-based); the
-  # `array_length` check is kept alongside it as an independent guard
-  # against the same join silently dropping a row for any other reason.
+  # index (none of V1's 22 is expression-based; V2's two are, and go
+  # through `expression_index_guard/3` instead); the `array_length` check
+  # is kept alongside it as an independent guard against the same join
+  # silently dropping a row for any other reason.
   #
   # `directions` is a per-column `:asc`/`:desc` list, always explicit (never
   # defaulted) — see the moduledoc's "`DESC` ordering" section for why a

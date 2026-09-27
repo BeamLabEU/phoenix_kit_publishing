@@ -23,6 +23,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
   use PhoenixKitPublishing.LiveCase
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
@@ -107,7 +108,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       %{post: post}
     end
 
-    test "body edits from the markdown editor reach the LiveView", %{
+    test "body edits from the Leaf editor reach the LiveView", %{
       conn: conn,
       group: group,
       post: post
@@ -253,6 +254,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       })
 
       assert assigns_of(view)[:form]["allow_version_access"] == true
+    end
+
+    test "the sitemap checkbox saves into the version and reads back on the post map", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      # The save stamps updated_by_uuid, so the scope's user must exist (see
+      # the Persistence save test below) — otherwise the write dies on the FK
+      # and the rescue turns it into a flash this test would never see.
+      saver_uuid = "019cce93-0000-7000-8000-00000000ee02"
+
+      TestRepo.query!(
+        """
+        INSERT INTO phoenix_kit_users (uuid, email, hashed_password, inserted_at, updated_at)
+        VALUES ($1::uuid, 'sitemap-saver@example.com', 'x', now(), now())
+        ON CONFLICT (email) DO NOTHING
+        """,
+        [Ecto.UUID.dump!(saver_uuid)]
+      )
+
+      {:ok, view, html} =
+        conn
+        |> put_test_scope(fake_scope(user_uuid: saver_uuid))
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      # The checkbox and its hidden-false partner (an unticked box submits
+      # nothing, so the hidden input is what turns the flag off again).
+      assert html =~ ~s(id="post-sitemap-exclude-checkbox")
+      assert html =~ ~s(type="hidden" name="sitemap_exclude" value="false")
+
+      render_change(view, "update_meta", %{
+        "sitemap_exclude" => "true",
+        "_target" => ["sitemap_exclude"]
+      })
+
+      assert assigns_of(view)[:form]["sitemap_exclude"] == true
+
+      _ = render_click(view, "save", %{})
+
+      # Core's Sitemap source reads `metadata.sitemap_exclude` off list_posts/2.
+      assert [%{metadata: %{sitemap_exclude: true}}] = Publishing.list_posts(group["slug"])
+      assert DBStorage.get_version(post[:uuid], 1).data["sitemap_exclude"] == true
     end
 
     test "warns before a save takes the live version down", %{
@@ -656,14 +700,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert is_binary(render_click(view, "select_ai_prompt", %{"prompt_uuid" => "fake-prompt"}))
     end
 
-    test "toolbar inserts route through the markdown editor component",
+    test "toolbar inserts route through the Leaf component",
          %{conn: conn, group: group, post: post} do
       {:ok, view, _html} =
         conn
         |> put_test_scope(fake_scope())
         |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
 
-      # The MarkdownEditor toolbar sends these; there is no phx event for them.
+      # Leaf's toolbar sends these; there is no phx event for them.
       send(view.pid, {:leaf_insert_request, %{type: :video}})
       send(view.pid, {:leaf_insert_request, %{type: :image}})
       assert is_binary(render(view))

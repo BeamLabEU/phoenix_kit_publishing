@@ -80,6 +80,24 @@ defmodule PhoenixKitPublishing.MigrationsDataSafetyTest do
     def down, do: :ok
   end
 
+  defmodule RollbackToOne do
+    @moduledoc false
+    use Ecto.Migration
+
+    def up, do: Migrations.down(prefix: "public", version: 1)
+    def down, do: :ok
+  end
+
+  defmodule RunUpToCurrent do
+    @moduledoc false
+    use Ecto.Migration
+
+    def up, do: Migrations.up(prefix: "public", version: Migrations.current_version())
+    def down, do: :ok
+  end
+
+  @v2_indexes ~w(idx_publishing_groups_media_folder idx_publishing_versions_media_folder)
+
   setup do
     {:ok, group} = Groups.add_group("Data Safety Group #{System.unique_integer([:positive])}")
     {:ok, post} = Posts.create_post(group["slug"], %{title: "Data Safety Post"})
@@ -196,6 +214,55 @@ defmodule PhoenixKitPublishing.MigrationsDataSafetyTest do
     assert all_counts() == counts_before
   end
 
+  # V2 as a real migration-context run, on a database that holds rows:
+  # down to 1 removes the two indexes and nothing else; up to 2 puts them
+  # back; a second up to 2 is a no-op. Rows are counted across every step
+  # because "nothing else" is the claim that matters.
+  test "a real down(version: 1) removes only V2's two indexes; a real up(version: 2) restores them",
+       %{group: group, post: post} do
+    counts_before = all_counts()
+    assert Migrations.migrated_version_runtime(prefix: "public") == 2
+    assert Enum.all?(@v2_indexes, &index_exists?/1), "test_helper installs the chain at V2"
+
+    inventory_at_2 = index_inventory()
+
+    run_migration(RollbackToOne)
+
+    assert Migrations.migrated_version_runtime(prefix: "public") == 1
+    refute Enum.any?(@v2_indexes, &index_exists?/1)
+
+    assert index_inventory() == inventory_at_2 -- @v2_indexes,
+           "down(version: 1) touched an index other than V2's two"
+
+    assert all_counts() == counts_before
+
+    run_migration(RunUpToCurrent)
+
+    assert Migrations.migrated_version_runtime(prefix: "public") == 2
+    assert index_inventory() == inventory_at_2
+    assert all_counts() == counts_before
+    assert Repo.get!(PublishingGroup, group["uuid"]).name == group["name"]
+    assert Repo.get!(PublishingPost, post[:uuid]).group_uuid == group["uuid"]
+
+    # Idempotence of V2's guards, for real: clear the marker so the version
+    # gate does not short-circuit, run again, still exactly one of each.
+    Repo.query!("COMMENT ON TABLE phoenix_kit_publishing_groups IS NULL")
+    run_migration(RunUpToCurrent)
+
+    assert Migrations.migrated_version_runtime(prefix: "public") == 2
+    assert index_inventory() == inventory_at_2
+    assert all_counts() == counts_before
+  end
+
+  test "a real down(version: 0) removes V2's indexes too, and only them" do
+    inventory_at_2 = index_inventory()
+
+    run_migration(RollbackToZero)
+
+    assert index_inventory() == inventory_at_2 -- @v2_indexes
+    assert Migrations.migrated_version_runtime(prefix: "public") == 0
+  end
+
   test "the survival check has teeth: a destructive rollback fails it", %{group: group} do
     counts_before = all_counts()
 
@@ -248,6 +315,28 @@ defmodule PhoenixKitPublishing.MigrationsDataSafetyTest do
   )
 
   defp all_counts, do: Map.new(@tables, &{&1, count(&1)})
+
+  defp index_exists?(name) do
+    %{rows: rows} =
+      Repo.query!(
+        "SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1",
+        [name]
+      )
+
+    rows != []
+  end
+
+  # Every index on the 7 tables, by name, sorted — the shape a rollback
+  # must leave untouched except for exactly what it says it removes.
+  defp index_inventory do
+    %{rows: rows} =
+      Repo.query!(
+        "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = ANY($1) ORDER BY 1",
+        [@tables]
+      )
+
+    List.flatten(rows)
+  end
 
   defp count(table) do
     %{rows: [[count]]} = Repo.query!("SELECT count(*) FROM #{table}")

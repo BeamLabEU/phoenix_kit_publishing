@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
   """
 
   use Phoenix.LiveView
+  use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Groups
@@ -30,7 +31,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
     group_slug = get_in(session, ["config", "group_slug"])
 
     group =
-      case group_slug && safe(fn -> Groups.get_group(group_slug) end) do
+      case group_slug && safe(fn -> Groups.fetch_group(group_slug) end) do
         {:ok, group} -> group
         _ -> nil
       end
@@ -75,20 +76,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
             navigate={Routes.path("/admin/publishing/#{@group_slug}/new")}
             class="btn btn-primary btn-sm gap-1"
           >
-            New entry
+            {gettext("New entry")}
           </.link>
           <.link
             navigate={Routes.path("/admin/publishing/#{@group_slug}")}
             class="btn btn-ghost btn-sm gap-1"
           >
-            Open in Publishing
+            {gettext("Open in Publishing")}
           </.link>
         </div>
 
         <%= if @posts == [] do %>
           <div class="card border border-dashed border-base-300 bg-base-100">
             <div class="card-body items-center text-center py-8">
-              <p class="text-sm opacity-70">Nothing published in this group yet.</p>
+              <p class="text-sm opacity-70">{gettext("Nothing published in this group yet.")}</p>
             </div>
           </div>
         <% else %>
@@ -106,21 +107,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
             </div>
           </div>
           <p :if={@total > length(@posts)} class="text-xs opacity-50">
-            Showing {length(@posts)} of {@total} — the full list lives in the Publishing admin.
+            {gettext("Showing %{shown} of %{total} — the full list lives in the Publishing admin.",
+              shown: length(@posts),
+              total: @total
+            )}
           </p>
         <% end %>
       <% else %>
         <div class="card border border-dashed border-base-300 bg-base-100">
           <div class="card-body py-6 gap-2">
             <p class="text-sm opacity-70 text-center">
-              No publishing group linked to this project yet.
+              {gettext("No publishing group linked to this project yet.")}
             </p>
             <p class="text-xs opacity-50 text-center">
-              Paste a group slug into this tab's settings in the project's
-              Modules &amp; features panel.
+              {gettext(
+                "Paste a group slug into this tab's settings in the project's Modules & features panel."
+              )}
             </p>
             <div :if={@candidates != []} class="mt-2">
-              <p class="text-xs font-semibold opacity-60 mb-1">Available groups:</p>
+              <p class="text-xs font-semibold opacity-60 mb-1">{gettext("Available groups:")}</p>
               <div class="flex flex-col gap-1">
                 <div
                   :for={candidate <- @candidates}
@@ -138,9 +143,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
     """
   end
 
-  defp published_label(0), do: "Nothing published"
-  defp published_label(1), do: "1 published entry"
-  defp published_label(n), do: "#{n} published entries"
+  defp published_label(0), do: gettext("Nothing published")
+
+  defp published_label(n),
+    do: ngettext("%{count} published entry", "%{count} published entries", n)
 
   # Listing maps carry the human title under metadata; fall back through
   # the slugs so a metadata gap never renders a blank row.

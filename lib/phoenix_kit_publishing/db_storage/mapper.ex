@@ -23,6 +23,14 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   Converts a full post read (post + version + content + all contents + all versions)
   into the map format expected by the web layer.
   """
+  @spec to_post_map(
+          PublishingPost.t(),
+          PublishingVersion.t(),
+          PublishingContent.t(),
+          [PublishingContent.t()],
+          [PublishingVersion.t()],
+          keyword()
+        ) :: map()
   def to_post_map(
         %PublishingPost{} = post,
         %PublishingVersion{} = version,
@@ -88,6 +96,13 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   Converts a post to a listing-format map (no content body, just metadata).
   Used for listing pages where full content isn't needed.
   """
+  @spec to_listing_map(
+          PublishingPost.t(),
+          PublishingVersion.t() | nil,
+          [PublishingContent.t()],
+          [PublishingVersion.t()],
+          keyword()
+        ) :: map()
   def to_listing_map(%PublishingPost{} = post, version, all_contents, all_versions, opts \\ []) do
     available_languages = Enum.map(all_contents, & &1.language) |> Enum.sort()
 
@@ -215,6 +230,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       slug: post.slug,
       version: version.version_number,
       allow_version_access: PublishingVersion.get_allow_version_access(version),
+      sitemap_exclude: PublishingVersion.get_sitemap_exclude(version),
       url_slug: content.url_slug,
       previous_url_slugs: PublishingContent.get_previous_url_slugs(content),
       published_at: format_datetime(published_at),
@@ -237,6 +253,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       slug: nil,
       # No version → no version-history access.
       allow_version_access: false,
+      sitemap_exclude: false,
       published_at: nil,
       featured_image_uuid: nil,
       featured: false,
@@ -253,6 +270,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       # Must mirror build_metadata/5 — the public version dropdown reads this
       # from the cached listing map; omitting it hid the dropdown on a warm cache.
       allow_version_access: PublishingVersion.get_allow_version_access(version),
+      sitemap_exclude: PublishingVersion.get_sitemap_exclude(version),
       published_at: format_datetime(published_at),
       featured_image_uuid: PublishingVersion.get_featured_image_uuid(version),
       featured: PublishingVersion.get_featured(version),
@@ -272,6 +290,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       slug: post.slug,
       # Must mirror build_metadata/5 — see the clause above.
       allow_version_access: PublishingVersion.get_allow_version_access(version),
+      sitemap_exclude: PublishingVersion.get_sitemap_exclude(version),
       published_at: format_datetime(published_at),
       featured_image_uuid:
         PublishingVersion.get_featured_image_uuid(version) ||

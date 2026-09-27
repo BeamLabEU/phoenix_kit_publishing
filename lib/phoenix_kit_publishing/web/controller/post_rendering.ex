@@ -29,6 +29,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   # Suppress dialyzer false positive for defensive fallback pattern
   @dialyzer {:nowarn_function, render_post_content: 2}
 
+  @typedoc "A post identifier as `Routing.parse_path/1` resolves it."
+  @type post_identifier ::
+          {:slug, String.t()} | {:timestamp, String.t() | Date.t(), String.t() | Time.t()}
+
+  @typedoc "What a post render hands the controller to respond with."
+  @type render_result :: {:ok, map()} | {:redirect_301, String.t()} | {:error, term()}
+
   # ============================================================================
   # Main Rendering Functions
   # ============================================================================
@@ -36,6 +43,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @doc """
   Renders a post after resolving URL slugs.
   """
+  @spec render_post(Plug.Conn.t(), String.t(), post_identifier(), String.t()) :: render_result()
   def render_post(conn, group_slug, identifier, language) do
     # For slug mode, resolve URL slug to internal slug first
     # This enables per-language URL slugs and 301 redirects for old slugs
@@ -55,6 +63,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @doc """
   Renders a post after identifier has been resolved.
   """
+  @spec render_resolved_post(Plug.Conn.t(), String.t(), post_identifier(), String.t()) ::
+          render_result()
   def render_resolved_post(conn, group_slug, identifier, language) do
     case PostFetching.fetch_post(group_slug, identifier, language) do
       {:ok, post} ->
@@ -66,9 +76,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
           # The editor's "Add language" writes {title: "Untitled", content: ""}
           # onto the ACTIVE version — instantly public. An untranslated stub
           # must read as a MISSING translation, not an empty published page:
-          # :not_found sends it through the smart fallback (other language →
-          # group listing). The primary language can't hit this — publishing
-          # requires a real primary title.
+          # :not_found sends it straight to the group listing with the
+          # closest-match flash (Fallback treats :not_found as a missing
+          # post, so it never tries the other languages). The primary
+          # language can't hit this — publishing requires a real primary
+          # title.
           stub_translation?(post) ->
             log_404(conn, group_slug, identifier, language, :not_found)
             {:error, :not_found}
@@ -83,17 +95,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     end
   end
 
-  # Same canonical-language check the live path runs: without it,
+  # The same two checks the live path runs, in the same order. Without them
   # /de/.../v/1 for a version with no German content silently served the
-  # fallback language's body at 200 under the German URL.
+  # fallback language's body at 200 under the German URL; with only the
+  # canonical check it issued a cacheable 301 for what is a CONTENT state —
+  # Fallback answers :post_not_found with the 302 + "closest match" flash
+  # onto the same version in a language that has it.
   defp respond_with_browsable_version(conn, group_slug, post, version, language) do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
     canonical_url = build_version_url(group_slug, post, canonical_language, version)
 
-    if canonical_redirect?(conn, language, canonical_language, canonical_url) do
-      {:redirect_301, canonical_url}
-    else
-      build_versioned_post_response(group_slug, post, version)
+    cond do
+      served_by_fallback_language?(post, language) ->
+        log_404(conn, group_slug, {:slug, post[:slug], version}, language, :post_not_found)
+        {:error, :post_not_found}
+
+      Language.canonical_redirect?(conn, language, canonical_language, canonical_url) ->
+        {:redirect_301, canonical_url}
+
+      true ->
+        build_versioned_post_response(group_slug, post, version)
     end
   end
 
@@ -110,35 +131,73 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
     canonical_url = PublishingHTML.build_post_url(group_slug, post, canonical_language)
 
-    if canonical_redirect?(conn, language, canonical_language, canonical_url) do
-      {:redirect_301, canonical_url}
-    else
-      group = fetch_group(group_slug)
-      html_content = render_post_content(post, notes_style: group_notes_style(group))
-      group_name = resolve_group_name(group, group_slug, canonical_language)
-      translations = Translations.build_translation_links(group_slug, post, canonical_language)
-      breadcrumbs = build_breadcrumbs(group_slug, post, canonical_language, group_name)
-      version_dropdown = build_version_dropdown(group_slug, post, canonical_language)
+    cond do
+      # `read_post` resolves a missing translation to fallback content
+      # silently, so `post.language` is the SERVED row's language. A
+      # translation this post does not have is a content state: the same
+      # 302 + "closest match" the listing sends (Fallback picks the target
+      # language), never the cacheable 301 the canonical check below issues
+      # for prefix/display-code parity — that one kept bouncing readers
+      # after the translation was added.
+      served_by_fallback_language?(post, language) ->
+        log_404(conn, group_slug, post[:slug], language, :post_not_found)
+        {:error, :post_not_found}
 
-      {:ok,
-       %{
-         page_title: post.metadata.title || Constants.default_title(),
-         group_slug: group_slug,
-         group: group,
-         group_name: group_name,
-         post: post,
-         html_content: html_content,
-         current_language: canonical_language,
-         translations: translations,
-         breadcrumbs: breadcrumbs,
-         version_dropdown: version_dropdown
-       }}
+      Language.canonical_redirect?(conn, language, canonical_language, canonical_url) ->
+        {:redirect_301, canonical_url}
+
+      true ->
+        build_post_page(group_slug, post, canonical_language)
     end
+  end
+
+  @doc false
+  # The requested language names the served row when the codes match, or
+  # when a base-code request ("en") matches the row's base ("en-US") — that
+  # shape belongs to the display-code canonicalisation, not the fallback.
+  # Public for Fallback, which must pick a version that serves in ITS
+  # language (a fallback-resolved read would 302 straight back).
+  @spec served_by_fallback_language?(map(), term()) :: boolean()
+  def served_by_fallback_language?(%{language: served}, requested)
+      when is_binary(served) and is_binary(requested) do
+    served_down = String.downcase(served)
+    requested_down = String.downcase(requested)
+
+    served_down != requested_down and
+      not (Language.base_code?(requested) and
+             String.downcase(LanguageHelpers.url_language_code(served)) == requested_down)
+  end
+
+  def served_by_fallback_language?(_post, _requested), do: false
+
+  defp build_post_page(group_slug, post, canonical_language) do
+    group = group_map(group_slug)
+    html_content = render_post_content(post, notes_style: group_notes_style(group))
+    group_name = resolve_group_name(group, group_slug, canonical_language)
+    translations = Translations.build_translation_links(group_slug, post, canonical_language)
+    breadcrumbs = build_breadcrumbs(group_slug, post, canonical_language, group_name)
+    version_dropdown = build_version_dropdown(group_slug, post, canonical_language)
+
+    {:ok,
+     %{
+       page_title: post.metadata.title || Constants.default_title(),
+       group_slug: group_slug,
+       group: group,
+       group_name: group_name,
+       post: post,
+       html_content: html_content,
+       current_language: canonical_language,
+       translations: translations,
+       breadcrumbs: breadcrumbs,
+       version_dropdown: version_dropdown
+     }}
   end
 
   @doc """
   Renders a specific version of a post (for version browsing feature).
   """
+  @spec render_versioned_post(Plug.Conn.t(), String.t(), String.t(), pos_integer(), String.t()) ::
+          render_result()
   def render_versioned_post(conn, group_slug, url_slug, version, language) do
     internal_slug = SlugResolution.resolve_url_slug_to_internal(group_slug, url_slug, language)
 
@@ -192,11 +251,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   # history behind), and the requested version must be at or before it. A
   # genuinely superseded version is always older than the one that replaced
   # it; a draft waiting to go out is always newer.
-  defp publicly_browsable_version?(group_slug, post, version) do
-    {_allow_access, live_version} = get_cached_version_info(group_slug, post)
+  #
+  # And the post must allow version browsing at all — the same live-version
+  # switch `render_versioned_post/5` gates on. Fallback asks this question
+  # about OTHER languages of a post whose own request just failed that gate;
+  # ignoring the switch here accepted a sibling that fails it identically,
+  # and the two URLs 302'd to each other forever.
+  @doc false
+  @spec publicly_browsable_version?(String.t(), map(), term()) :: boolean()
+  def publicly_browsable_version?(group_slug, post, version) do
+    {allow_access, live_version} = get_cached_version_info(group_slug, post)
 
-    is_integer(live_version) and is_integer(version) and version <= live_version and
-      historically_published?(post)
+    allow_access == true and is_integer(live_version) and is_integer(version) and
+      version <= live_version and historically_published?(post)
   end
 
   # Published now, or archived after having been published at some point.
@@ -212,7 +279,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
   defp build_versioned_post_response(group_slug, post, version) do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
-    group = fetch_group(group_slug)
+    group = group_map(group_slug)
     html_content = render_post_content(post, notes_style: group_notes_style(group))
     group_name = resolve_group_name(group, group_slug, canonical_language)
 
@@ -249,6 +316,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   If only one post exists on that date, render it directly.
   If multiple posts exist, redirect to the first one with time in URL.
   """
+  @spec handle_date_only_url(Plug.Conn.t(), String.t(), String.t(), String.t()) ::
+          render_result() | {:redirect, String.t()}
   def handle_date_only_url(conn, group_slug, date, language) do
     case Listing.fetch_group(group_slug) do
       {:ok, _group} ->
@@ -282,6 +351,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   Renders post content with caching for published posts.
   Uses Renderer.render_post/2 which caches based on content hash.
   """
+  @spec render_post_content(map(), keyword()) :: String.t()
   def render_post_content(post, opts \\ []) do
     html =
       case Renderer.render_post(post, opts) do
@@ -305,6 +375,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   end
 
   @doc ~S(The group's author-notes display style: "footnotes" or "panel".)
+  @spec group_notes_style(term()) :: String.t()
   def group_notes_style(group) when is_map(group),
     do: Map.get(group, "notes_style", Constants.default_notes_style())
 
@@ -319,6 +390,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   Returns nil if version access is disabled or only one published version exists.
   Uses listing cache for fast lookups.
   """
+  @spec build_version_dropdown(String.t(), map(), String.t()) :: map() | nil
   def build_version_dropdown(group_slug, post, language) do
     # Try to get cached data first (sub-microsecond from :persistent_term)
     # The cache stores the live version with all version metadata
@@ -380,6 +452,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   Gets version info from cache (allow_version_access and live_version).
   Falls back to DB reads if cache miss.
   """
+  @spec get_cached_version_info(String.t(), map()) :: {boolean(), integer() | nil}
   def get_cached_version_info(group_slug, current_post) do
     # Use appropriate cache lookup based on post mode
     cache_result = ListingCache.find_post_by_mode(group_slug, current_post)
@@ -423,7 +496,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
   # Fallback: Gets published version from DB when cache misses
   defp get_live_version_from_db(group_slug, post_identifier) do
-    case Publishing.get_published_version(group_slug, post_identifier) do
+    case Publishing.fetch_published_version(group_slug, post_identifier) do
       {:ok, version} -> version
       {:error, _} -> nil
     end
@@ -433,6 +506,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   Checks if a specific post allows public access to older versions.
   Always reads from the primary language's live version to ensure consistency.
   """
+  @spec post_allows_version_access?(String.t(), String.t(), term()) :: boolean()
   def post_allows_version_access?(group_slug, post_slug, _language) do
     primary_language = LanguageHelpers.get_primary_language()
 
@@ -454,6 +528,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @doc """
   Builds URL for a specific version of a post.
   """
+  @spec build_version_url(String.t(), map(), String.t() | nil, integer()) :: String.t()
   def build_version_url(group_slug, post, language, version) do
     base_url = PublishingHTML.build_post_url(group_slug, post, language)
     "#{base_url}/v/#{version}"
@@ -462,6 +537,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @doc """
   Builds a timestamp URL with date and time.
   """
+  @spec build_timestamp_url(
+          String.t(),
+          String.t() | Date.t(),
+          String.t() | Time.t(),
+          String.t()
+        ) :: String.t()
   def build_timestamp_url(group_slug, date, time, language) do
     PublishingHTML.build_public_path_with_time(language, group_slug, date, time)
   end
@@ -473,6 +554,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @doc """
   Builds breadcrumbs for a post page.
   """
+  @spec build_breadcrumbs(String.t(), map(), String.t(), String.t()) :: [map()]
   def build_breadcrumbs(group_slug, post, language, group_name) do
     [
       %{label: group_name, url: PublishingHTML.group_listing_path(language, group_slug)},
@@ -483,7 +565,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   # Fetches the group's public map once per request — the same map feeds the
   # language-resolved display name here and the controller's per-group display
   # config (assign_group_display_config/2), so post pages don't fetch twice.
-  defp fetch_group(group_slug) do
+  defp group_map(group_slug) do
     case Listing.fetch_group(group_slug) do
       {:ok, group} -> group
       {:error, _} -> %{}
@@ -511,11 +593,5 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
       user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
       path: conn.request_path
     )
-  end
-
-  defp canonical_redirect?(conn, language, canonical_language, canonical_url) do
-    (canonical_language != language or
-       Language.prefixed_default_language_request?(conn, canonical_language)) and
-      not Language.request_matches_canonical_url?(conn, canonical_url)
   end
 end

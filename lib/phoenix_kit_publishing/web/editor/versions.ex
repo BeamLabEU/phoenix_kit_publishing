@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.Web.Editor.Collaborative
   alias PhoenixKit.Modules.Publishing.Web.Editor.Forms
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
 
@@ -24,6 +25,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   @doc """
   Reads a specific version of a post.
   """
+  @spec read_version_post(Phoenix.LiveView.Socket.t(), integer() | nil) ::
+          {:ok, map()} | {:error, term()}
   def read_version_post(socket, version) do
     post = socket.assigns.post
     language = socket.assigns.current_language
@@ -46,6 +49,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   @doc """
   Applies a version switch to the socket.
   """
+  @spec apply_version_switch(
+          Phoenix.LiveView.Socket.t(),
+          integer(),
+          map(),
+          (String.t(), map(), integer() -> map())
+        ) ::
+          {Phoenix.LiveView.Socket.t(), String.t() | nil, String.t() | nil, String.t(),
+           String.t()}
   def apply_version_switch(socket, version, version_post, form_builder_fn) do
     group_slug = socket.assigns.group_slug
     form = form_builder_fn.(group_slug, version_post, version)
@@ -55,13 +66,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
 
     # Save old form_key and post slug BEFORE assigning new one (for presence cleanup)
     old_form_key = socket.assigns[:form_key]
-    old_post_slug = socket.assigns[:post] && PublishingPubSub.broadcast_id(socket.assigns.post)
+    old_post_slug = Collaborative.current_post_id(socket)
 
     socket =
       socket
       |> Phoenix.Component.assign(:post, %{version_post | group: group_slug})
       |> Phoenix.Component.assign(:form, form)
-      |> Phoenix.Component.assign(:content, version_post.content)
       |> Phoenix.Component.assign(:current_version, version)
       |> Phoenix.Component.assign(:available_versions, version_post.available_versions)
       |> Phoenix.Component.assign(:version_statuses, version_post.version_statuses)
@@ -72,8 +82,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
       |> Helpers.mark_clean()
       |> Phoenix.Component.assign(:form_key, new_form_key)
       |> Phoenix.Component.assign(:saved_status, form["status"])
-      |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-      |> Phoenix.LiveView.push_event("set-content", %{content: version_post.content})
+      |> Helpers.set_editor_content(version_post.content)
 
     # Return socket with cleanup info for the caller to handle collaborative editing
     {socket, old_form_key, old_post_slug, new_form_key, actual_language}
@@ -87,6 +96,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   Creates a new version from a source version.
   Returns {:ok, socket} or {:error, socket} for use in handle_event.
   """
+  @spec create_version_from_source(Phoenix.LiveView.Socket.t()) ::
+          {:ok, Phoenix.LiveView.Socket.t()} | {:error, Phoenix.LiveView.Socket.t()}
   def create_version_from_source(socket) do
     group_slug = socket.assigns.group_slug
     post = socket.assigns.post
@@ -135,6 +146,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
         socket =
           socket
           |> Phoenix.Component.assign(:show_new_version_modal, false)
+          # Set before the attempt (see above); left true here it swallowed
+          # the next colleague's :post_version_created.
+          |> Phoenix.Component.assign(:just_created_version, false)
           |> Phoenix.LiveView.put_flash(
             :error,
             gettext("Couldn't create a new version.") <> " " <> Errors.message(reason)
@@ -155,6 +169,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   @doc """
   Handles when a version is deleted by another editor.
   """
+  @spec handle_version_deleted(Phoenix.LiveView.Socket.t(), integer()) ::
+          Phoenix.LiveView.Socket.t()
   def handle_version_deleted(socket, deleted_version) do
     available_versions = socket.assigns[:available_versions] || []
     updated_versions = Enum.reject(available_versions, &(&1 == deleted_version))
@@ -224,19 +240,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
     # move (it is version-scoped), and the URL must stop claiming ?v=<gone>.
     form = Forms.post_form_with_primary_status(group_slug, fresh_post, surviving_version)
     new_form_key = PublishingPubSub.generate_form_key(group_slug, fresh_post, :edit)
+    # The deleted version's presence and topics go with it — handle_params
+    # sees the new key already assigned and would leave them registered.
+    old_form_key = socket.assigns[:form_key]
+    old_post_slug = Collaborative.current_post_id(socket)
 
     socket
     |> Phoenix.Component.assign(:post, %{fresh_post | group: group_slug})
     |> Phoenix.Component.assign(:form, form)
     |> Phoenix.Component.assign(:form_key, new_form_key)
+    |> Collaborative.cleanup_and_setup_collaborative_editing(old_form_key, new_form_key,
+      old_post_slug: old_post_slug
+    )
     |> Phoenix.Component.assign(:available_versions, updated_versions)
     |> Phoenix.Component.assign(:current_version, surviving_version)
-    |> Phoenix.Component.assign(:content, fresh_post.content)
     |> Phoenix.Component.assign(:saved_status, form["status"])
     |> Phoenix.Component.assign(:editing_published_version, Constants.published?(form["status"]))
     |> Helpers.mark_clean()
-    |> Phoenix.LiveView.push_event("changes-status", %{has_changes: false})
-    |> Phoenix.LiveView.push_event("set-content", %{content: fresh_post.content})
+    |> Helpers.set_editor_content(fresh_post.content)
     |> Phoenix.LiveView.push_patch(
       to:
         Helpers.build_edit_url(group_slug, fresh_post,
@@ -260,6 +281,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Versions do
   With variant versioning, all versions are editable since they're independent attempts.
   This function always returns false - no version locking.
   """
+  @spec viewing_older_version?(term(), term(), term()) :: false
   def viewing_older_version?(_current_version, _available_versions, _current_language), do: false
 
   defp editor_language(assigns), do: Helpers.editor_language(assigns)

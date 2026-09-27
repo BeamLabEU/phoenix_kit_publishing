@@ -82,7 +82,7 @@ defmodule PhoenixKit.Integration.Publishing.VersionsTest do
       alias PhoenixKit.Modules.Publishing.TranslationManager
       {:ok, _} = TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de", nil)
 
-      {:ok, v2} = Versions.create_new_version(group["slug"], post, %{}, %{})
+      {:ok, _v2} = Versions.create_new_version(group["slug"], post, %{}, %{})
 
       # V2 should have both en and de
       {:ok, v2_post} = Posts.read_post(group["slug"], post[:uuid], nil, 2)
@@ -178,13 +178,13 @@ defmodule PhoenixKit.Integration.Publishing.VersionsTest do
       :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
 
       assert {:ok, 1} =
-               Versions.get_published_version(group["slug"], post[:slug] || post[:uuid])
+               Versions.fetch_published_version(group["slug"], post[:slug] || post[:uuid])
     end
 
     test "returns error when no version is published" do
       {group, post} = create_group_and_post(title: "No Pub")
 
-      result = Versions.get_published_version(group["slug"], post[:slug] || post[:uuid])
+      result = Versions.fetch_published_version(group["slug"], post[:slug] || post[:uuid])
       assert match?({:error, _}, result)
     end
   end

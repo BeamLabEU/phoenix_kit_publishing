@@ -10,10 +10,15 @@ defmodule PhoenixKit.Modules.Publishing.Views do
 
   - the visitor's User-Agent doesn't look like a bot/CLI (`bot_ua?/1`), and
   - the visitor's session hasn't already viewed this post today — dedup
-    rides the Phoenix session cookie (`mark_viewed/2`), so there is **no
-    server-side visitor state and no reader PII**: the DB only ever stores
-    accepted counts. A cookieless client (most bots) still passes the
-    session check every time, which is why the UA filter runs first.
+    rides the Phoenix session cookie (`mark_viewed/2`); the DB only ever
+    stores accepted counts, never a reader, and
+  - under `publishing_unique_views` (default on) the visitor hasn't opened
+    this post today: a session carrying the dedup marker IS the visitor, a
+    cookieless request (a curl loop, a fresh session) is a hash of its
+    address — the first `x-forwarded-for` hop when present — held for the
+    day in `Views.VisitorTable`. The raw address is never stored. With the
+    setting off every page open counts, for a site that wants to see how
+    often a page was opened at all.
 
   Recording is fire-and-forget (`Task.Supervisor` under core's
   `PhoenixKit.TaskSupervisor`) — a slow or failing insert never delays or
@@ -26,8 +31,11 @@ defmodule PhoenixKit.Modules.Publishing.Views do
 
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PublishingPost
+  alias PhoenixKit.Modules.Publishing.Views.VisitorTable
+  alias PhoenixKit.Settings
 
   @session_key "pk_publishing_viewed"
+  @unique_views_key "publishing_unique_views"
   # Session-map cap: one browser session rarely reads more than this many
   # distinct posts per day; beyond it we stop deduping (never grow the cookie
   # unboundedly).
@@ -46,12 +54,22 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   already viewed the post today. Returns the (possibly updated) conn —
   callers thread it so the dedup marker lands in the session cookie.
   """
+  @spec maybe_record_view(Plug.Conn.t(), term()) :: Plug.Conn.t()
   def maybe_record_view(conn, post_uuid) when is_binary(post_uuid) do
     cond do
       bot_ua?(List.first(Plug.Conn.get_req_header(conn, "user-agent"))) ->
         conn
 
+      # Off means every page open counts — the session marker is a dedup
+      # too, so it is neither consulted nor written.
+      not unique_views?() ->
+        record_async(post_uuid)
+        conn
+
       viewed_or_capped?(conn, post_uuid) ->
+        conn
+
+      repeat_visitor?(conn, post_uuid) ->
         conn
 
       true ->
@@ -82,6 +100,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   the conflict target is the primary key and the update is an atomic
   `count = count + 1`.
   """
+  @spec record_view(String.t(), Date.t() | nil) :: :ok | :error
   def record_view(post_uuid, date \\ nil) do
     date = date || Date.utc_today()
 
@@ -105,7 +124,59 @@ defmodule PhoenixKit.Modules.Publishing.Views do
       :error
   end
 
+  @doc "The `publishing_unique_views` setting: one view per visitor per post per day."
+  @spec unique_views?() :: boolean()
+  def unique_views?, do: Settings.get_boolean_setting(@unique_views_key, true)
+
+  # Unique views on, and this visitor already opened the post today. A
+  # session that carries the marker was answered by viewed_or_capped?/2 —
+  # it is the visitor, and it has not seen this post today. Everything else
+  # is identified by its hashed address for the day.
+  defp repeat_visitor?(conn, post_uuid) do
+    not session_marked?(conn) and
+      not VisitorTable.first_view_today?(post_uuid, visitor_hash(conn))
+  end
+
+  defp session_marked?(conn), do: is_map(Plug.Conn.get_session(conn, @session_key))
+
+  # Never the address itself, and never the client's word for it: the LAST
+  # forwarded hop is the one the site's own proxy appended (the peer it saw);
+  # the first is whatever the client wrote, so hashing it let a curl loop
+  # mint a new visitor per request. Without a forwarded header, the socket
+  # address. The digest is an HMAC under the table owner's per-boot pepper,
+  # truncated — a plain hash of an IPv4 address is a 2^32 dictionary.
+  # One spelling per address, or "2001:db8::1" and "2001:0db8:0:0:0:0:0:1"
+  # would be two visitors. A value that is not an address (a forged header)
+  # is kept as written — it still hashes to one visitor per spelling.
+  defp canonical_address(nil), do: nil
+
+  defp canonical_address(address) do
+    case :inet.parse_address(String.to_charlist(address)) do
+      {:ok, ip} -> ip |> :inet.ntoa() |> to_string()
+      _ -> address
+    end
+  end
+
+  defp visitor_hash(conn) do
+    address =
+      conn
+      |> Plug.Conn.get_req_header("x-forwarded-for")
+      |> Enum.join(",")
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> List.last()
+
+    address = canonical_address(address) || inspect(conn.remote_ip)
+
+    case VisitorTable.pepper() do
+      nil -> :crypto.hash(:sha256, address) |> binary_part(0, 16)
+      pepper -> :crypto.mac(:hmac, :sha256, pepper, address) |> binary_part(0, 16)
+    end
+  end
+
   @doc "True when the User-Agent looks like a bot/CLI (or is absent)."
+  @spec bot_ua?(String.t() | nil) :: boolean()
   def bot_ua?(nil), do: true
   def bot_ua?(ua) when is_binary(ua), do: Regex.match?(@bot_ua, ua)
 
@@ -146,6 +217,7 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   # ===========================================================================
 
   @doc "All-time view totals for a list of post uuids: `%{post_uuid => total}`."
+  @spec totals([String.t()]) :: %{optional(String.t()) => non_neg_integer()}
   def totals(post_uuids) when is_list(post_uuids) do
     from(v in "phoenix_kit_publishing_post_views",
       where: v.post_uuid in ^Enum.map(post_uuids, &Ecto.UUID.dump!/1),
@@ -160,12 +232,14 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   end
 
   @doc "All-time view total for one post."
+  @spec total(String.t()) :: non_neg_integer()
   def total(post_uuid), do: totals([post_uuid]) |> Map.get(post_uuid, 0)
 
   @doc """
   A group's top posts by views in the trailing `days` window:
   `[{post_uuid, views}]`, most-viewed first, capped at `limit`.
   """
+  @spec top_posts(String.t(), pos_integer(), pos_integer()) :: [{String.t(), non_neg_integer()}]
   def top_posts(group_slug, days, limit) when days > 0 do
     since = Date.add(Date.utc_today(), -days + 1)
 

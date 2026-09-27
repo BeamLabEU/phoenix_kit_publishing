@@ -73,7 +73,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
 
     results =
       tree
-      |> matching(query, socket.assigns.selected)
+      |> matching(query, socket.assigns.selected, socket.assigns.language)
       |> Enum.take(@max_results)
 
     {:noreply,
@@ -111,13 +111,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.CategoriesPicker do
 
   # Rows for the dropdown. Already-selected categories are filtered out —
   # picking one twice does nothing, so offering it is just noise.
-  defp matching(tree, query, selected) do
+  #
+  # A match on the primary name OR the name in the editor's language: the
+  # chips show the translated name, so a writer types what they see, and
+  # a French editor searching "actualités" must still find "News".
+  defp matching(tree, query, selected, language) do
     needle = query |> to_string() |> String.trim() |> String.downcase()
 
     tree
     |> Enum.reject(fn {category, _depth} -> category.uuid in selected end)
     |> Enum.filter(fn {category, _depth} ->
-      needle == "" or String.contains?(String.downcase(category.name), needle)
+      needle == "" or
+        Enum.any?(
+          [category.name, PublishingCategory.translated_name(category, language)],
+          &String.contains?(String.downcase(&1), needle)
+        )
     end)
     |> Enum.map(fn {category, _depth} ->
       %{

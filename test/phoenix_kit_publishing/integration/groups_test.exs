@@ -1,6 +1,7 @@
 defmodule PhoenixKit.Integration.Publishing.GroupsTest do
   use PhoenixKit.DataCase, async: true
 
+  alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.Posts
@@ -105,37 +106,60 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
   end
 
   # ============================================================================
-  # get_group/1
+  # fetch_group/1
   # ============================================================================
 
-  describe "get_group/1" do
+  describe "fetch_group/1" do
     test "returns group by slug" do
       {:ok, created} = Groups.add_group(unique_name())
-      assert {:ok, found} = Groups.get_group(created["slug"])
+      assert {:ok, found} = Groups.fetch_group(created["slug"])
       assert found["slug"] == created["slug"]
       assert found["name"] == created["name"]
     end
 
     test "returns all data fields" do
       {:ok, created} = Groups.add_group(unique_name(), type: "faq", mode: "slug")
-      {:ok, found} = Groups.get_group(created["slug"])
+      {:ok, found} = Groups.fetch_group(created["slug"])
 
       assert found["mode"] == "slug"
       assert found["status"] == "active"
       assert found["item_singular"] == "question"
     end
 
-    test "returns trashed group (get_group finds any status)" do
+    test "returns trashed group (fetch_group finds any status)" do
       {:ok, group} = Groups.add_group(unique_name())
       {:ok, _} = Groups.trash_group(group["slug"])
-      {:ok, found} = Groups.get_group(group["slug"])
+      {:ok, found} = Groups.fetch_group(group["slug"])
       assert found["status"] == "trashed"
     end
 
     test "returns error for nonexistent slug" do
-      assert {:error, :not_found} = Groups.get_group("nonexistent-slug")
+      assert {:error, :not_found} = Groups.fetch_group("nonexistent-slug")
     end
   end
+
+  describe "get_group/1 (deprecated delegate)" do
+    # `phoenix_kit_legal` still calls the old name through the facade, so the
+    # delegate keeps the tuple shape. Called through a variable module: a
+    # static call to a deprecated function is a compile warning.
+    test "still answers with the tuple shape of fetch_group/1" do
+      {:ok, created} = Groups.add_group(unique_name())
+
+      assert {:ok, found} = deprecated_get_group(Groups, created["slug"])
+      assert found["slug"] == created["slug"]
+      assert {:error, :not_found} = deprecated_get_group(Groups, "nonexistent-slug")
+    end
+
+    test "the facade's get_group/1 answers with the same tuple shape" do
+      {:ok, created} = Groups.add_group(unique_name())
+
+      assert {:ok, %{"slug" => slug}} = deprecated_get_group(Publishing, created["slug"])
+      assert slug == created["slug"]
+      assert {:error, :not_found} = deprecated_get_group(Publishing, "nonexistent-slug")
+    end
+  end
+
+  defp deprecated_get_group(mod, slug), do: mod.get_group(slug)
 
   # ============================================================================
   # list_groups/0 and list_groups/1
@@ -193,7 +217,7 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
       new_slug = "updated-slug-#{System.unique_integer([:positive])}"
       {:ok, updated} = Groups.update_group(group["slug"], %{slug: new_slug})
       assert updated["slug"] == new_slug
-      assert {:error, :not_found} = Groups.get_group(group["slug"])
+      assert {:error, :not_found} = Groups.fetch_group(group["slug"])
     end
 
     test "renaming the slug invalidates the old slug's listing cache (L6)" do
@@ -346,7 +370,7 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
     test "trash_group/1 soft-deletes group" do
       {:ok, group} = Groups.add_group(unique_name())
       assert {:ok, _slug} = Groups.trash_group(group["slug"])
-      {:ok, found} = Groups.get_group(group["slug"])
+      {:ok, found} = Groups.fetch_group(group["slug"])
       assert found["status"] == "trashed"
     end
 
@@ -354,7 +378,7 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
       {:ok, group} = Groups.add_group(unique_name())
       {:ok, _} = Groups.trash_group(group["slug"])
       assert {:ok, _slug} = Groups.restore_group(group["slug"])
-      {:ok, found} = Groups.get_group(group["slug"])
+      {:ok, found} = Groups.fetch_group(group["slug"])
       assert found["status"] == "active"
     end
 
@@ -378,7 +402,7 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
     test "hard-deletes empty group" do
       {:ok, group} = Groups.add_group(unique_name())
       assert {:ok, _} = Groups.remove_group(group["slug"])
-      assert {:error, :not_found} = Groups.get_group(group["slug"])
+      assert {:error, :not_found} = Groups.fetch_group(group["slug"])
     end
 
     test "refuses to delete group with posts unless forced" do
@@ -392,7 +416,7 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
       {:ok, group} = Groups.add_group(unique_name())
       {:ok, _post} = Posts.create_post(group["slug"], %{})
       assert {:ok, _} = Groups.remove_group(group["slug"], force: true)
-      assert {:error, :not_found} = Groups.get_group(group["slug"])
+      assert {:error, :not_found} = Groups.fetch_group(group["slug"])
     end
 
     test "force-delete cascades to all posts and versions" do
@@ -408,7 +432,7 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
       {:ok, group} = Groups.add_group(unique_name())
       {:ok, _} = Groups.trash_group(group["slug"])
       assert {:ok, _} = Groups.remove_group(group["slug"])
-      assert {:error, :not_found} = Groups.get_group(group["slug"])
+      assert {:error, :not_found} = Groups.fetch_group(group["slug"])
     end
   end
 
