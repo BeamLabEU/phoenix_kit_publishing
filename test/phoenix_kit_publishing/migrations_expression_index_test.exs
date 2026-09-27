@@ -57,6 +57,14 @@ defmodule PhoenixKitPublishing.MigrationsExpressionIndexTest do
     def down, do: :ok
   end
 
+  defmodule RunDownToOneExpressionIndexHost do
+    @moduledoc false
+    use Ecto.Migration
+
+    def up, do: PhoenixKitPublishing.Migrations.down(prefix: "pkpubexpr_host", version: 1)
+    def down, do: :ok
+  end
+
   setup do
     Repo.query!("CREATE SCHEMA IF NOT EXISTS #{@prefix}")
     Repo.query!("CREATE TABLE #{@prefix}.phoenix_kit_users (uuid uuid PRIMARY KEY)")
@@ -218,6 +226,134 @@ defmodule PhoenixKitPublishing.MigrationsExpressionIndexTest do
     end
   end
 
+  describe "V2 when the canonical index name is taken by a different expression" do
+    @v2_expression "lower((data ->> 'media_folder_uuid'::text))"
+    @foreign_expression "lower((data ->> 'other_key'::text))"
+
+    # The hole this block closes: the guard decides by SHAPE, so it
+    # correctly finds the pointer index missing — but the statement it then
+    # ran was `CREATE INDEX IF NOT EXISTS <canonical name>`, and a host that
+    # already owns an index of that NAME on another expression made that a
+    # silent no-op. The chain still stamped V2, every later run skipped V2,
+    # and the reorganizer's index was absent for good.
+    setup do
+      # Canonical name taken on both tables, and `_v2` taken on groups as
+      # well, so the fallback has to walk past the first free suffix once.
+      Repo.query!("""
+      CREATE INDEX idx_publishing_groups_media_folder ON #{@prefix}.phoenix_kit_publishing_groups
+        USING btree (#{@foreign_expression})
+      """)
+
+      Repo.query!("""
+      CREATE INDEX idx_publishing_groups_media_folder_v2 ON #{@prefix}.phoenix_kit_publishing_groups
+        USING btree (#{@foreign_expression})
+      """)
+
+      Repo.query!("""
+      CREATE INDEX idx_publishing_versions_media_folder ON #{@prefix}.phoenix_kit_publishing_versions
+        USING btree (#{@foreign_expression})
+      """)
+
+      {:ok, foreign_before: foreign_index_definitions()}
+    end
+
+    test "up/1 lands the pointer index under the first free fallback name and leaves the foreign one alone",
+         %{foreign_before: foreign_before} do
+      run_migration(RunUpToTwoExpressionIndexHost)
+
+      assert shaped_pointer_index_names("phoenix_kit_publishing_groups") == [
+               "idx_publishing_groups_media_folder_v3"
+             ]
+
+      assert shaped_pointer_index_names("phoenix_kit_publishing_versions") == [
+               "idx_publishing_versions_media_folder_v2"
+             ]
+
+      # The same-named foreign indexes are exactly as the host built them.
+      assert foreign_index_definitions() == foreign_before
+      assert Migrations.migrated_version_runtime(prefix: @prefix) == 2
+
+      # And a re-run against the landed shape adds nothing more.
+      Repo.query!("COMMENT ON TABLE #{@prefix}.phoenix_kit_publishing_groups IS NULL")
+      run_migration(RunUpToTwoExpressionIndexHost)
+
+      assert shaped_pointer_index_names("phoenix_kit_publishing_groups") == [
+               "idx_publishing_groups_media_folder_v3"
+             ]
+
+      assert shaped_pointer_index_names("phoenix_kit_publishing_versions") == [
+               "idx_publishing_versions_media_folder_v2"
+             ]
+    end
+
+    test "down/1 below V2 removes the pointer index whatever its name and keeps the same-named foreign one",
+         %{foreign_before: foreign_before} do
+      run_migration(RunUpToTwoExpressionIndexHost)
+      run_migration(RunDownToOneExpressionIndexHost)
+
+      assert shaped_pointer_index_names("phoenix_kit_publishing_groups") == []
+      assert shaped_pointer_index_names("phoenix_kit_publishing_versions") == []
+      assert foreign_index_definitions() == foreign_before
+      assert Migrations.migrated_version_runtime(prefix: @prefix) == 1
+    end
+
+    test "down/1 below V2 drops by shape: a host-named pointer index the guard accepted goes too" do
+      Repo.query!("""
+      CREATE INDEX z_hosts_own_versions_pointer ON #{@prefix}.phoenix_kit_publishing_versions
+        USING btree (#{@v2_expression})
+      """)
+
+      run_migration(RunUpToTwoExpressionIndexHost)
+
+      assert shaped_pointer_index_names("phoenix_kit_publishing_versions") == [
+               "z_hosts_own_versions_pointer"
+             ]
+
+      run_migration(RunDownToOneExpressionIndexHost)
+
+      assert shaped_pointer_index_names("phoenix_kit_publishing_versions") == []
+
+      assert index_exists?(
+               "idx_publishing_versions_media_folder",
+               "phoenix_kit_publishing_versions"
+             )
+    end
+
+    # By SHAPE, independently of the guard's own catalog match: the full
+    # `pg_indexes.indexdef` text for a non-unique, non-partial btree index
+    # whose one key is the pointer expression — so a name is never assumed.
+    defp shaped_pointer_index_names(table) do
+      %{rows: rows} =
+        Repo.query!(
+          """
+          SELECT indexname FROM pg_indexes
+          WHERE schemaname = $1 AND tablename = $2
+            AND indexdef = 'CREATE INDEX ' || indexname || ' ON ' || $1 || '.' || $2 ||
+                           ' USING btree (' || $3 || ')'
+          ORDER BY 1
+          """,
+          [@prefix, table, @v2_expression]
+        )
+
+      List.flatten(rows)
+    end
+
+    defp foreign_index_definitions do
+      %{rows: rows} =
+        Repo.query!(
+          """
+          SELECT tablename, indexname, indexdef FROM pg_indexes
+          WHERE schemaname = $1 AND indexdef LIKE '%other_key%'
+          ORDER BY 1, 2
+          """,
+          [@prefix]
+        )
+
+      assert length(rows) == 3, "the fixture's three foreign indexes must all still exist"
+      rows
+    end
+  end
+
   # ── helpers ──────────────────────────────────────────────────────────
 
   defp run_migration(module) do
@@ -234,11 +370,11 @@ defmodule PhoenixKitPublishing.MigrationsExpressionIndexTest do
     )
   end
 
-  defp index_exists?(name) do
+  defp index_exists?(name, table \\ "phoenix_kit_publishing_groups") do
     %{rows: rows} =
       Repo.query!(
         "SELECT 1 FROM pg_indexes WHERE schemaname = $1 AND tablename = $2 AND indexname = $3",
-        [@prefix, "phoenix_kit_publishing_groups", name]
+        [@prefix, table, name]
       )
 
     rows != []

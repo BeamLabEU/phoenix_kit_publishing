@@ -593,9 +593,14 @@ on `phoenix_kit_publishing_groups` and `idx_publishing_versions_media_folder`
 on `phoenix_kit_publishing_versions` — which `MediaReorganizer` joins
 through and nothing in V1 served. It changes nothing else: no column,
 constraint, table or row; both guards match on `pg_get_expr(indexprs)`, so a
-renamed host is recognised, not duplicated. `down/1` never drops any of the
-7 tables, for any target — below V2 it removes exactly those two indexes, by
-name, then re-stamps or clears the marker. See
+renamed host is recognised, not duplicated, and the canonical name is only
+the first candidate — a host whose `idx_publishing_*_media_folder` name is
+already taken by ANOTHER expression gets the shape under `<name>_v2`,
+`_v3`, … (the first free name), never a silent `IF NOT EXISTS` no-op that
+stamps V2 over a missing index. `down/1` never drops any of the 7 tables,
+for any target — below V2 it removes exactly those two indexes by the same
+shape match, whatever name they landed under, leaving a same-named index on
+a different expression alone, then re-stamps or clears the marker. See
 `PhoenixKitPublishing.Migrations`' moduledoc for the full ownership
 writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL` safety-net
 section here.

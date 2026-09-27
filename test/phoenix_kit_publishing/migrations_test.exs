@@ -411,7 +411,10 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # V1 is (see "V1's published statements are frozen" above). Captured
     # from a REAL run of `up_statements("public", 2)` and verified live
     # against Postgres's own `pg_get_expr` rendering of the expression —
-    # never hand-typed.
+    # never hand-typed. Re-pinned once, deliberately, when the guard gained
+    # its fallback-name loop: the published `CREATE INDEX IF NOT EXISTS
+    # <canonical>` was a silent no-op on a host whose canonical name was
+    # taken by another expression, and stamped V2 over the missing index.
     test "V2's published statements are frozen: V1's DDL, then the two guards, then the marker" do
       v1 = Migrations.up_statements("public", 1)
       v2 = Migrations.up_statements("public", 2)
@@ -420,8 +423,8 @@ defmodule PhoenixKitPublishing.MigrationsTest do
              "V2 must begin with V1's DDL, verbatim and marker-less"
 
       assert v2 |> Enum.drop(length(v1) - 1) |> normalised() == [
-               "DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid JOIN pg_am am ON am.oid = ic.relam WHERE i.indrelid = 'public.phoenix_kit_publishing_groups'::regclass AND i.indisunique = false AND am.amname = 'btree' AND i.indnkeyatts = 1 AND i.indpred IS NULL AND pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))' ) THEN EXECUTE 'CREATE INDEX IF NOT EXISTS idx_publishing_groups_media_folder ON public.phoenix_kit_publishing_groups USING btree (lower((data ->> ''media_folder_uuid''::text)))'; END IF; END $$",
-               "DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid JOIN pg_am am ON am.oid = ic.relam WHERE i.indrelid = 'public.phoenix_kit_publishing_versions'::regclass AND i.indisunique = false AND am.amname = 'btree' AND i.indnkeyatts = 1 AND i.indpred IS NULL AND pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))' ) THEN EXECUTE 'CREATE INDEX IF NOT EXISTS idx_publishing_versions_media_folder ON public.phoenix_kit_publishing_versions USING btree (lower((data ->> ''media_folder_uuid''::text)))'; END IF; END $$",
+               "DO $$ DECLARE candidate text := 'idx_publishing_groups_media_folder'; attempt integer := 1; BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid JOIN pg_am am ON am.oid = ic.relam WHERE i.indrelid = 'public.phoenix_kit_publishing_groups'::regclass AND i.indisunique = false AND am.amname = 'btree' AND i.indnkeyatts = 1 AND i.indpred IS NULL AND pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))' ) THEN WHILE EXISTS ( SELECT 1 FROM pg_class WHERE relname = candidate AND relnamespace = (SELECT relnamespace FROM pg_class WHERE oid = 'public.phoenix_kit_publishing_groups'::regclass) ) LOOP attempt := attempt + 1; candidate := 'idx_publishing_groups_media_folder_v' || attempt; END LOOP; EXECUTE format('CREATE INDEX %I ON public.phoenix_kit_publishing_groups USING btree (lower((data ->> ''media_folder_uuid''::text)))', candidate); END IF; END $$",
+               "DO $$ DECLARE candidate text := 'idx_publishing_versions_media_folder'; attempt integer := 1; BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid JOIN pg_am am ON am.oid = ic.relam WHERE i.indrelid = 'public.phoenix_kit_publishing_versions'::regclass AND i.indisunique = false AND am.amname = 'btree' AND i.indnkeyatts = 1 AND i.indpred IS NULL AND pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))' ) THEN WHILE EXISTS ( SELECT 1 FROM pg_class WHERE relname = candidate AND relnamespace = (SELECT relnamespace FROM pg_class WHERE oid = 'public.phoenix_kit_publishing_versions'::regclass) ) LOOP attempt := attempt + 1; candidate := 'idx_publishing_versions_media_folder_v' || attempt; END LOOP; EXECUTE format('CREATE INDEX %I ON public.phoenix_kit_publishing_versions USING btree (lower((data ->> ''media_folder_uuid''::text)))', candidate); END IF; END $$",
                "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:2'"
              ]
     end
@@ -437,12 +440,42 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       assert length(guards) == 2
 
       for guard <- guards do
-        assert guard =~
+        # The shape match is the `IF NOT EXISTS ( ... ) THEN` subquery; the
+        # name appears only in the DECLARE before it (as the first
+        # candidate) and in the fallback-name loop after it, which picks
+        # where the shape lands when the canonical name is taken.
+        [_declare, rest] = String.split(guard, "IF NOT EXISTS (", parts: 2)
+        [shape_match, creation] = String.split(rest, ~r/\)\s*THEN/, parts: 2)
+
+        assert shape_match =~
                  "pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))'"
 
-        assert guard =~ "i.indnkeyatts = 1"
-        assert guard =~ "i.indpred IS NULL"
-        refute guard =~ ~r/indexname|relname\s*=/
+        assert shape_match =~ "i.indnkeyatts = 1"
+        assert shape_match =~ "i.indpred IS NULL"
+        refute shape_match =~ ~r/indexname|relname\s*=|candidate/
+
+        assert creation =~ "WHILE EXISTS"
+        assert creation =~ "relname = candidate"
+        assert creation =~ ~r/EXECUTE format\('CREATE INDEX %I ON/
+        refute creation =~ "IF NOT EXISTS"
+      end
+    end
+
+    # The fallback-name rule: `<canonical>`, then `<canonical>_v2`, `_v3`, …
+    # — the first relation name free in the table's own schema.
+    test "V2's guards fall back to <name>_v<N> when the canonical name is taken" do
+      v1_count = length(Migrations.up_statements("public", 1))
+
+      guards =
+        Migrations.up_statements("public", 2)
+        |> Enum.drop(v1_count - 1)
+        |> Enum.filter(&String.starts_with?(&1, "DO $$"))
+
+      for {guard, name} <- Enum.zip(guards, @v2_indexes) do
+        assert guard =~ "candidate text := '#{name}';"
+        assert guard =~ "attempt integer := 1;"
+        assert guard =~ "attempt := attempt + 1;"
+        assert guard =~ "candidate := '#{name}_v' || attempt;"
       end
     end
 
@@ -457,18 +490,29 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       end
     end
 
-    test "down below V2 removes exactly the two indexes, by name, then keeps the marker bookkeeping" do
-      for prefix <- ["public", "publishing_alt"] do
-        removal =
-          for name <- @v2_indexes, do: "DROP INDEX IF EXISTS #{prefix}.#{name}"
+    # Captured from a REAL run of `down_statements("public", 1)`, then the
+    # prefix parameterised — the removal is the guard's own shape match
+    # turned into a `DROP`, so it takes the index whatever name it landed
+    # under (canonical, `_v2`, a renamed host's) and never a same-named
+    # index on another expression. `to_regclass`, not `::regclass`: a host
+    # that never had the table rolls back to 0 without an error.
+    defp v2_removal(prefix) do
+      for table <- ~w(phoenix_kit_publishing_groups phoenix_kit_publishing_versions) do
+        "DO $$ DECLARE pointer_index record; BEGIN IF to_regclass('#{prefix}.#{table}') IS NULL THEN RETURN; END IF; FOR pointer_index IN SELECT n.nspname AS schema, ic.relname AS name FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid JOIN pg_namespace n ON n.oid = ic.relnamespace JOIN pg_am am ON am.oid = ic.relam WHERE i.indrelid = '#{prefix}.#{table}'::regclass AND i.indisunique = false AND am.amname = 'btree' AND i.indnkeyatts = 1 AND i.indpred IS NULL AND pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))' LOOP EXECUTE format('DROP INDEX %I.%I', pointer_index.schema, pointer_index.name); END LOOP; END $$"
+      end
+    end
 
-        assert Migrations.down_statements(prefix, 1) ==
+    test "down below V2 removes exactly the two indexes, by shape, then keeps the marker bookkeeping" do
+      for prefix <- ["public", "publishing_alt"] do
+        removal = v2_removal(prefix)
+
+        assert Migrations.down_statements(prefix, 1) |> normalised() ==
                  removal ++
                    [
                      "COMMENT ON TABLE #{prefix}.phoenix_kit_publishing_groups IS 'pkpub_schema:1'"
                    ]
 
-        assert Migrations.down_statements(prefix, 0) ==
+        assert Migrations.down_statements(prefix, 0) |> normalised() ==
                  removal ++ ["COMMENT ON TABLE #{prefix}.phoenix_kit_publishing_groups IS NULL"]
 
         # A rollback that stops at 2 has nothing of V2's to undo.
@@ -488,12 +532,14 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # path is closed by the source-text test below, which checks what is
     # executed rather than what is built. The exact V2 removal list is
     # pinned in the "V2" describe above; this one pins that NOTHING but
-    # those two `DROP INDEX` and the marker ever appears, in any target.
+    # those two shape-matched `DROP INDEX` blocks and the marker ever
+    # appears, in any target — and that each block drops on ONE of the two
+    # V2 tables, through the guard's own shape match, never by a name.
     test "down/1 emits the two V2 index removals below V2 and the marker bookkeeping, nothing else" do
       for prefix <- ["public", "publishing_alt"], target <- [0, 1, 2] do
         statements = Migrations.down_statements(prefix, target)
 
-        {removals, rest} = Enum.split_with(statements, &String.starts_with?(&1, "DROP INDEX"))
+        {removals, rest} = Enum.split_with(statements, &String.starts_with?(&1, "DO $$"))
 
         assert rest == [List.last(statements)]
 
@@ -507,7 +553,15 @@ defmodule PhoenixKitPublishing.MigrationsTest do
 
           for removal <- removals do
             assert removal =~
-                     ~r/^DROP INDEX IF EXISTS #{prefix}\.idx_publishing_(groups|versions)_media_folder$/
+                     ~r/i\.indrelid = '#{prefix}\.phoenix_kit_publishing_(groups|versions)'::regclass/
+
+            assert removal =~
+                     "pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))'"
+
+            assert removal =~
+                     "EXECUTE format('DROP INDEX %I.%I', pointer_index.schema, pointer_index.name)"
+
+            refute removal =~ "idx_publishing_"
           end
         else
           assert removals == []
@@ -742,6 +796,16 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       normalized = statement |> String.replace(~r/\s+/, " ") |> String.trim()
 
       cond do
+        # V2's expression-index guard: the index is created through
+        # `format('CREATE INDEX %I ...', candidate)`, and `candidate` starts
+        # as the canonical name (falling back to `<name>_v<N>` only when
+        # that name is taken by another expression) — so the operation is
+        # the declared first candidate.
+        String.starts_with?(normalized, "DO ") and
+            normalized =~ ~r/EXECUTE format\('CREATE INDEX %I ON/ ->
+          [_, name] = Regex.run(~r/DECLARE candidate text := '(\w+)';/, normalized)
+          {"CREATE INDEX", name}
+
         String.starts_with?(normalized, "DO ") and
             normalized =~ ~r/EXECUTE '(CREATE|CREATE UNIQUE)/ ->
           [_, verb, name] =

@@ -185,8 +185,14 @@ defmodule PhoenixKitPublishing.Migrations do
   index against. Both are guarded through `expression_index_guard/3` —
   semantic like everything else here, matched on `pg_get_expr(indexprs)`
   rather than on the index name, so a renamed host is recognised and never
-  given a duplicate — and `down/1` below V2 removes exactly these two, by
-  name, and nothing else.
+  given a duplicate. The name is not load-bearing in the other direction
+  either: when the shape is missing and a host already owns an index under
+  the canonical name on some OTHER expression, the guard creates the shape
+  under the first free `<name>_v2`, `_v3`, … — a bare `CREATE INDEX IF NOT
+  EXISTS` there would have been a silent no-op that still stamped V2, and
+  the index would have been absent for good. `down/1` below V2 removes the
+  shape by the same catalog match, whatever name it carries, and nothing
+  else — never a same-named index on a different expression.
 
   Core's `ExpectedSchema` manifest does not know these two indexes, and it
   does not need to: `mix phoenix_kit.repair` reports drift, it never drops
@@ -329,7 +335,7 @@ defmodule PhoenixKitPublishing.Migrations do
   Rolls back to `opts[:version]` (default `0`). Migration-context only.
   Never drops a table or a row in any of the 7, for any target — see the
   moduledoc. Below V2 it removes V2's two expression indexes (the only
-  objects this chain ever added) and nothing else.
+  objects this chain ever added), matched by shape, and nothing else.
   """
   @spec down(keyword() | map()) :: :ok
   def down(opts \\ []) do
@@ -411,9 +417,11 @@ defmodule PhoenixKitPublishing.Migrations do
 
   @doc """
   The SQL `down/1` executes, as data. Below V2, the two expression indexes
-  V2 added are removed (`DROP INDEX IF EXISTS`, by their canonical names —
-  the only objects this chain has ever added to core's shape); then the
-  marker is re-stamped at `target`, or cleared for `0`. V1 changes no
+  V2 added are removed — by SHAPE, through the same catalog match the V2
+  guard creates them under, so they go whatever name they landed under and
+  a same-named index on another expression stays (the only objects this
+  chain has ever added to core's shape); then the marker is re-stamped at
+  `target`, or cleared for `0`. V1 changes no
   shape of its own — it is pure adoption — so there is nothing else to
   undo: all 7 tables and every row in them are left untouched, for any
   target including `0`.
@@ -473,13 +481,44 @@ defmodule PhoenixKitPublishing.Migrations do
 
   defp v2_statements(_prefix, _target), do: []
 
-  # By canonical name, on purpose: a shape-matched removal could take a
-  # host's own same-shaped index with it, and an index this chain never
-  # created (a renamed one) is not this chain's to remove. `IF EXISTS`, so
-  # a host that never reached V2 rolls back to 0 without an error.
+  # By shape, the exact inverse of `expression_index_guard/3`: the guard
+  # accepts a same-shaped index under ANY name as "V2 applied" (a renamed
+  # host, a host that built it by hand) and creates it under a fallback
+  # name when the canonical one is taken, so the only removal that undoes
+  # precisely what the guard certified is one that finds the shape through
+  # the same catalog match and drops whatever it is called. A by-name drop
+  # would leave a fallback-named copy behind and, worse, take a host's
+  # same-named index on a DIFFERENT expression with it. The match is
+  # `media_folder_index_match/2`, shared with the guard so the two cannot
+  # drift. `to_regclass` (never `::regclass`) so a host that never had the
+  # table rolls back to 0 without an error, as `IF EXISTS` used to allow.
   defp v2_removal_statements(prefix) do
-    for name <- [@groups_media_folder_index, @versions_media_folder_index] do
-      "DROP INDEX IF EXISTS #{Helpers.qualify_table(name, prefix)}"
+    escaped_expression = String.replace(@media_folder_expression, "'", "''")
+
+    for table <- [@groups, @versions] do
+      qualified = Helpers.qualify_table(table, prefix)
+
+      """
+      DO $$
+      DECLARE
+        pointer_index record;
+      BEGIN
+        IF to_regclass('#{qualified}') IS NULL THEN
+          RETURN;
+        END IF;
+        FOR pointer_index IN
+          SELECT n.nspname AS schema, ic.relname AS name
+          FROM pg_index i
+          JOIN pg_class ic ON ic.oid = i.indexrelid
+          JOIN pg_namespace n ON n.oid = ic.relnamespace
+          JOIN pg_am am ON am.oid = ic.relam
+          WHERE #{media_folder_index_match(qualified, escaped_expression)}
+        LOOP
+          EXECUTE format('DROP INDEX %I.%I', pointer_index.schema, pointer_index.name);
+        END LOOP;
+      END
+      $$
+      """
     end
   end
 
@@ -496,36 +535,68 @@ defmodule PhoenixKitPublishing.Migrations do
   # index of the same shape (a renamed host) is a match, not a duplicate;
   # an unrelated expression index on the same table (another key, another
   # function) is not — `migrations_expression_index_test.exs` proves both.
+  #
+  # The name is a preference, not a condition. When the shape is missing,
+  # `name` is only the FIRST candidate: a host may already own an index of
+  # that name on some other expression (`CREATE INDEX IF NOT EXISTS` there
+  # would be a silent no-op, the marker would still stamp V2, and the shape
+  # would never arrive — the same test file reproduces it), so the block
+  # walks `<name>`, `<name>_v2`, `<name>_v3`, … to the first relation name
+  # free in the table's own schema (an index always lands beside its
+  # table; `pg_class` is the namespace tables, sequences and indexes
+  # share) and creates the shape there through `format('%I')`. No `IF NOT
+  # EXISTS`: the candidate is known free, and a silent skip is exactly the
+  # failure this exists to rule out.
   defp expression_index_guard(name, qualified, expression) do
-    create_index_sql =
-      "CREATE INDEX IF NOT EXISTS #{name} ON #{qualified} USING btree (#{expression})"
-
-    # Both literals sit inside the `DO $$ ... $$` body as ordinary
-    # single-quoted strings, so the quotes they contain are doubled — the
+    # The literal sits inside the `DO $$ ... $$` body as an ordinary
+    # single-quoted string, so the quotes it contains are doubled — the
     # same rule `index_guard/7` applies to its `EXECUTE` argument.
     escaped_expression = String.replace(expression, "'", "''")
-    escaped_create_index_sql = String.replace(create_index_sql, "'", "''")
 
     """
     DO $$
+    DECLARE
+      candidate text := '#{name}';
+      attempt integer := 1;
     BEGIN
       IF NOT EXISTS (
         SELECT 1
         FROM pg_index i
         JOIN pg_class ic ON ic.oid = i.indexrelid
         JOIN pg_am am ON am.oid = ic.relam
-        WHERE i.indrelid = '#{qualified}'::regclass
+        WHERE #{media_folder_index_match(qualified, escaped_expression)}
+      ) THEN
+        WHILE EXISTS (
+          SELECT 1 FROM pg_class
+          WHERE relname = candidate
+            AND relnamespace = (SELECT relnamespace FROM pg_class WHERE oid = '#{qualified}'::regclass)
+        ) LOOP
+          attempt := attempt + 1;
+          candidate := '#{name}_v' || attempt;
+        END LOOP;
+        EXECUTE format('CREATE INDEX %I ON #{qualified} USING btree (#{escaped_expression})', candidate);
+      END IF;
+    END
+    $$
+    """
+  end
+
+  # The one catalog match V2's shape has — "a non-unique btree index on
+  # this table whose single key is exactly this expression, with no partial
+  # predicate" — as a `WHERE` fragment, so the guard that creates the shape
+  # and the removal that drops it read the same definition. `qualified` is
+  # resolved through `regclass` (immune to a table rename); `expression` is
+  # already quote-doubled for the enclosing `DO $$` body.
+  defp media_folder_index_match(qualified, escaped_expression) do
+    """
+    i.indrelid = '#{qualified}'::regclass
           AND i.indisunique = false
           AND am.amname = 'btree'
           AND i.indnkeyatts = 1
           AND i.indpred IS NULL
           AND pg_get_expr(i.indexprs, i.indrelid) = '#{escaped_expression}'
-      ) THEN
-        EXECUTE '#{escaped_create_index_sql}';
-      END IF;
-    END
-    $$
     """
+    |> String.trim()
   end
 
   # ── V1 statement builder ────────────────────────────────────────────────
