@@ -72,9 +72,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   # Save quickly — DB writes are ~5ms, no reason to delay
   @autosave_debounce_ms 500
-  # How long a switch, a preview or a translation waits for Leaf to hand its
-  # buffer over before acting on what the server holds (`after_flush/2`).
-  @flush_timeout_ms 1_500
+  # A switch, a preview or a translation waits for Leaf to hand its buffer
+  # over (`after_flush/2`): after this long the editor says it is still
+  # collecting the edits, and after the second interval it gives the click
+  # up rather than act on what the server holds — acting would drop the
+  # keystrokes the late reply carries.
+  @flush_slow_ms 1_500
+  @flush_abandon_ms 6_000
 
   @leaf_editor_modes [:visual, :hybrid, :markdown, :html]
   # Fallback when the site-wide setting is unavailable (older core, no repo).
@@ -194,6 +198,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:form_key, nil)
       |> assign(:awaiting_buffer_ref, nil)
       |> assign(:pending_after_flush, nil)
+      |> assign(:flush_slow?, false)
       |> assign(:leaf_dirty, false)
       |> assign(:handover_retried?, false)
       |> assign(:media_selector_scope, nil)
@@ -1645,6 +1650,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     {:noreply, socket} =
       socket
       |> assign(:pending_after_flush, nil)
+      |> assign(:flush_slow?, false)
       |> apply_flushed(content)
 
     action.(socket)
@@ -1653,30 +1659,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # A flush answered for a document that has since been replaced again.
   def handle_info({:leaf_flushed, _}, socket), do: {:noreply, socket}
 
-  # Leaf never answered `after_flush/2`: no script on the page, or it went
-  # away. Act on what the server holds rather than leaving the click dead.
-  # First, though, one trip to the back of the mailbox: a `content_changed`
-  # that arrived just ahead of this timer has only produced its
-  # `{:leaf_changed, …}` (Leaf sends it to self), which now sits BEHIND the
-  # timer. Acting at once would switch without those keystrokes and then
-  # drop them as belonging to the old document.
+  # Leaf has not answered `after_flush/2` yet: say so, keep waiting. A
+  # throttled background tab is the usual reason.
   def handle_info(
-        {:flush_timeout, ref},
+        {:flush_slow, ref},
         %{assigns: %{pending_after_flush: {ref, _action}}} = socket
       ) do
-    send(self(), {:flush_timeout, ref, :final})
-    {:noreply, socket}
+    Process.send_after(self(), {:flush_abandon, ref}, @flush_abandon_ms - @flush_slow_ms)
+    {:noreply, assign(socket, :flush_slow?, true)}
   end
 
+  def handle_info({:flush_slow, _}, socket), do: {:noreply, socket}
+
+  # Still nothing: the click is given up, not acted on. Acting on what the
+  # server holds would drop the keystrokes a late reply carries; the writer
+  # is told and can click again once the page answers.
   def handle_info(
-        {:flush_timeout, ref, :final},
-        %{assigns: %{pending_after_flush: {ref, action}}} = socket
+        {:flush_abandon, ref},
+        %{assigns: %{pending_after_flush: {ref, _action}}} = socket
       ) do
-    action.(assign(socket, :pending_after_flush, nil))
+    {:noreply,
+     socket
+     |> assign(:pending_after_flush, nil)
+     |> assign(:flush_slow?, false)
+     |> put_flash(
+       :warning,
+       gettext(
+         "The editor did not answer, so nothing was switched. Your last edits may not be saved yet — please try again."
+       )
+     )}
   end
 
-  def handle_info({:flush_timeout, _}, socket), do: {:noreply, socket}
-  def handle_info({:flush_timeout, _, :final}, socket), do: {:noreply, socket}
+  def handle_info({:flush_abandon, _}, socket), do: {:noreply, socket}
 
   # A hand-over nobody answered in time. Either the commands were pushed
   # before Leaf's script mounted (a switch made while it was still loading:
@@ -2671,13 +2685,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # its blur flush, which the very click that got us here triggered, arrives
   # AFTER the click. So: flush with a ref, and run `action` (a fun of the
   # socket) once `{:leaf_flushed, ref}` has come back with the buffer
-  # applied, or after `@flush_timeout_ms` if it never does. A newer click
-  # replaces an older pending action; the older reply is ignored by its ref.
+  # applied. No reply after `@flush_slow_ms` shows a "collecting" state; none
+  # after `@flush_abandon_ms` gives the click up with a warning — never an
+  # action on stale text. A newer click replaces an older pending action;
+  # the older reply is ignored by its ref.
   defp after_flush(socket, action) when is_function(action, 1) do
     ref = "act-#{System.unique_integer([:positive])}"
     send_update(Leaf, id: "content-editor", action: :flush, ref: ref)
-    Process.send_after(self(), {:flush_timeout, ref}, @flush_timeout_ms)
-    {:noreply, assign(socket, :pending_after_flush, {ref, action})}
+    Process.send_after(self(), {:flush_slow, ref}, @flush_slow_ms)
+
+    {:noreply,
+     socket
+     |> assign(:pending_after_flush, {ref, action})
+     |> assign(:flush_slow?, false)}
   end
 
   # The switch proper, once Leaf has handed its buffer over: outstanding
@@ -3782,6 +3802,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         the blocked state keeps a loud badge — it carries a reason
                         the writer must act on. --%>
                   <%= cond do %>
+                    <% @flush_slow? -> %>
+                      <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
+                        <span class="loading loading-spinner loading-2xs"></span>
+                        {gettext("Collecting your edits…")}
+                      </span>
                     <% @is_autosaving -> %>
                       <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
                         <span class="loading loading-spinner loading-2xs"></span>
@@ -4226,6 +4251,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <p class="text-xs text-base-content/60 mt-1 ml-1">
                     {gettext(
                       "Adds ?v=N access to this post's published versions. Off by default — only the live version is public."
+                    )}
+                  </p>
+                </div>
+
+                <%!-- Sitemap exclusion. Core's Sitemap source reads
+                      `metadata.sitemap_exclude` off the post map; rides the
+                      form exactly like `allow_version_access` above, hidden
+                      false input included. --%>
+                <div>
+                  <label class="label cursor-pointer justify-start gap-2 py-1">
+                    <input
+                      type="hidden"
+                      name="sitemap_exclude"
+                      value="false"
+                      disabled={edit_disabled? or @viewing_older_version}
+                    />
+                    <input
+                      type="checkbox"
+                      id="post-sitemap-exclude-checkbox"
+                      name="sitemap_exclude"
+                      value="true"
+                      checked={@form["sitemap_exclude"] in [true, "true"]}
+                      disabled={edit_disabled? or @viewing_older_version}
+                      class="checkbox checkbox-primary checkbox-sm"
+                    />
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
+                      {gettext("Exclude from the sitemap")}
+                    </span>
+                  </label>
+                  <p class="text-xs text-base-content/60 mt-1 ml-1">
+                    {gettext(
+                      "Leaves this post out of the site's sitemap. The post stays public at its URL."
                     )}
                   </p>
                 </div>

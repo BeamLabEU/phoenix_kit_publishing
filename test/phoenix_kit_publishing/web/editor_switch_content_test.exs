@@ -189,33 +189,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
   end
 
-  test "a change already in the mailbox ahead of the timeout goes with the switch", ctx do
-    user = with_real_user()
-    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid, user_uuid: user)
+  test "a surface that never answers the flush is told, then the click is given up", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
 
     render_click(view, "switch_language", %{"language" => "de-DE"})
     assert_push_event(view, @leaf, %{action: "flush", ref: ref})
 
-    # Leaf's change event was ahead of the timer, but the component turns it
-    # into a message to self, which lands BEHIND the timer. Acting at once
-    # would switch without it and then drop it as the old document's.
-    send(view.pid, {:flush_timeout, ref})
-    send(view.pid, {:leaf_changed, leaf_payload("English body. X")})
-    assert_patch(view)
+    # First the wait shows; nothing is switched on stale text.
+    send(view.pid, {:flush_slow, ref})
+    assert render(view) =~ "Collecting your edits"
+    refute_push_event(view, @leaf, %{action: "set_content"})
 
-    {:ok, english} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
-    assert english.content == "English body. X"
-  end
+    # Then the click is abandoned with a warning, and the surface is still
+    # the English document.
+    send(view.pid, {:flush_abandon, ref})
+    html = render(view)
+    assert html =~ "The editor did not answer"
+    refute html =~ "Collecting your edits"
+    refute_push_event(view, @leaf, %{action: "set_content"})
+    assert :sys.get_state(view.pid).socket.assigns.pending_after_flush == nil
 
-  test "a surface that never answers the flush does not leave the click dead", ctx do
-    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
-
-    render_click(view, "switch_language", %{"language" => "de-DE"})
-    assert_push_event(view, @leaf, %{action: "flush", ref: _ref})
-
-    # No Leaf on the page: the timeout acts on what the server holds.
-    assert_patch(view, 3_000)
-    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
+    # A reply that comes after the abandon changes nothing.
+    send(view.pid, {:leaf_flushed, Map.put(leaf_payload("English body."), :ref, ref)})
+    refute_push_event(view, @leaf, %{action: "set_content"})
   end
 
   test "a flush reply that is not dirty leaves the post clean", ctx do

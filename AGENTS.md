@@ -78,15 +78,15 @@ Deliberate non-features, so nobody adds them assuming they were missed.
 - **No frontend bundle and no LiveView JS hooks.** Tailwind/daisyUI classes are
   emitted by the renderer; the host's `app.css` gets an `@source` for
   `phoenix_kit_publishing` from `css_sources/0`.
-- **No migrations of its own that change shape.** This module owns its 7
+- **No migrations that create or reshape its tables.** This module owns its 7
   tables' *future* shape through its own versioned chain,
   `PhoenixKitPublishing.Migrations` (`migration_module/0`) — but core's chain
   still *creates* all 7 on every install (V135 baseline for
   groups/posts/versions/contents, V159 for categories/post_categories/
   post_views, V164 rebuilds one index). V1 of this chain is a pure adoption
-  of that current shape (see "Database & migrations" below and the chain's
-  own moduledoc) — it changes nothing on an existing install beyond stamping
-  a version marker.
+  of that current shape and V2 only adds two expression indexes (see
+  "Database & migrations" below and the chain's own moduledoc) — no column,
+  constraint or table has ever changed through it.
 - **No all-groups public overview.** If one returns it returns as an opt-in
   reserved route, not as a catch-all sibling.
 - **No guest commenting.** The comments seam requires a logged-in user because
@@ -449,8 +449,10 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 
 - **`..._groups`** — content containers. `name`, `slug` (unique), `mode`
   (`"timestamp"` / `"slug"`), `status` (`"active"` / `"trashed"`), `position`;
-  `data` JSONB holds type, item names, icon, feature flags, the ~22 display
-  settings and `name_i18n`; `title_i18n` / `description_i18n` are reserved.
+  `data` JSONB holds type, item names, icon, feature flags, the ~23 display
+  settings (including `sitemap_exclude`, read by core's Sitemap source off
+  the `list_groups/0` map) and `name_i18n`; `title_i18n` / `description_i18n`
+  are reserved.
 - **`..._posts`** — routing shell only: `slug`, `mode`, `post_date`, `post_time`
   (URL identity), `active_version_uuid` FK (null = unpublished), `trashed_at`
   (null = active), `created_by_uuid` / `updated_by_uuid`. No content, status or
@@ -458,8 +460,8 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **`..._versions`** — source of truth for published state: `post_uuid`,
   `version_number` (unique per post), `status` (draft/published/archived),
   `published_at`, `data` JSONB (`featured_image_uuid`, tags, seo, description,
-  `allow_version_access`, notes, `created_from`). Status is version-level: every
-  language in a version shares it.
+  `allow_version_access`, `sitemap_exclude`, notes, `created_from`). Status is
+  version-level: every language in a version shares it.
 - **`..._contents`** — per-language title and body: `version_uuid`, `language`
   (unique per version), `title`, `content` (markdown), `url_slug` (per-language
   routing), plus reserved `status` / `data`. Read fallback: requested language →
@@ -482,7 +484,8 @@ raw `Phoenix.PubSub` call.
 
 | Topic | Built by | Payloads |
 |-------|----------|----------|
-| `publishing:groups` | `PubSub.groups_topic/0` | `{:group_created, group}`, `{:group_updated, group}`, `{:group_deleted, slug}` |
+| `publishing:groups` | `PubSub.groups_topic/0` | `{:group_created, %{uuid, slug}}`, `{:group_updated, %{uuid, slug}}`, `{:group_deleted, slug}` — receivers reload the group from the DB |
+| `publishing:<group>:categories` | `categories_topic/1` | `{:categories_changed, group_slug}` after every committed create/update/delete/reorder/move; `CategoriesLive` reloads its tree |
 | `publishing:<group>:posts` | `posts_topic/1` | `:post_created`, `:post_updated`, `:post_deleted`, `:post_status_changed`, `:version_created`, `:version_live_changed`, `:version_deleted` |
 | `publishing:<group>:post:<slug>:versions` | `post_versions_topic/2` | version lifecycle for one post |
 | `publishing:<group>:post:<slug>:translations` | `post_translations_topic/2` | `:translation_created` / `:translation_deleted`, version scope as a STRING |
@@ -509,6 +512,7 @@ Site-wide keys, all read through `PhoenixKit.Settings`.
 | `publishing_render_og_tags` | `true` | Render og/twitter meta tags **in-page** (inside the public body), so previews work even when the host root layout ignores the forwarded `:og`. Turn off when the host renders `:og` in `<head>`, to avoid duplicates |
 | `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD in-page on post pages, from the same refined `:og` map. `escape: :html_safe` on the encode so no value can close the script tag early |
 | `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → 404, never the smart fallback (a feed URL must not redirect to HTML). Canonical-prefix 301s ARE emitted feed-to-feed, matching `rel="self"` |
+| `publishing_unique_views` | `true` | One view per visitor per post per day: a session carrying the dedup marker is the visitor, a cookieless request is a hash of its address (first `x-forwarded-for` hop, else `remote_ip`) held for the day in `Views.VisitorTable` — never the raw address. Off → every page open counts |
 | `publishing_translation_endpoint_uuid` | unset | Admin override for the AI endpoint used by translation |
 | `publishing_translation_prompt_uuid` | unset | Admin override for the AI prompt used by translation |
 
@@ -573,16 +577,31 @@ every `CREATE TABLE`/PK/UNIQUE-constraint/index/FK statement is
 `IF NOT EXISTS`/DO-guarded and semantic (matches by shape via
 `pg_constraint`/`pg_index`, never by object name alone — a renamed host must
 never get a duplicate), so on every existing install it is a no-op against
-tables core already built. `down/1` never drops any of the 7 tables, for any
-target — see `PhoenixKitPublishing.Migrations`' moduledoc for the full
-ownership writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL`
-safety-net section here.
+tables core already built. V2 is the chain's first **shape change** (Phase
+1): two non-unique btree expression indexes over the media-folder pointer,
+`lower(data->>'media_folder_uuid')` — `idx_publishing_groups_media_folder`
+on `phoenix_kit_publishing_groups` and `idx_publishing_versions_media_folder`
+on `phoenix_kit_publishing_versions` — which `MediaReorganizer` joins
+through and nothing in V1 served. It changes nothing else: no column,
+constraint, table or row; both guards match on `pg_get_expr(indexprs)`, so a
+renamed host is recognised, not duplicated. `down/1` never drops any of the
+7 tables, for any target — below V2 it removes exactly those two indexes, by
+name, then re-stamps or clears the marker. See
+`PhoenixKitPublishing.Migrations`' moduledoc for the full ownership
+writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL` safety-net
+section here.
 
-Phase 1 (a future shape change) needs a core-side `ExpectedSchema` manifest
-update first, or `mix phoenix_kit.repair` silently reverts it. Phase 2 (a
-future core baseline squash that drops these tables from core) is already
-covered: V1 alone can build the complete shape of all 7 tables from nothing,
-so a fresh install still gets a working schema even without core's chain.
+V2 carries the Phase 1 dependency: core's `ExpectedSchema` manifest must
+declare both indexes (two `class: :index` objects, `keys:
+["lower(data ->> 'media_folder_uuid'::text)"]`, `predicate: nil`) and this
+package's `:phoenix_kit` floor must rise to the release that ships them
+BEFORE a host runs V2 — otherwise `mix phoenix_kit.repair` treats them as
+drift and silently removes them after every run. Every later shape change
+repeats those two steps, core side first. Phase 2 (a future core baseline
+squash that drops these tables from core) is already covered: the chain
+alone builds the complete shape of all 7 tables from nothing, so a fresh
+install still gets a working schema even without core's chain
+(`migrations_catalog_parity_test.exs` proves it, catalog row for row).
 
 All tables use UUIDv7 primary keys, and every table-backed schema declares
 `use PhoenixKit.SchemaPrefix`.
@@ -670,6 +689,7 @@ repeat loop in Commands is the stability check.
 |---------|-------------------------------|-------|
 | Public dispatch (`RouterDispatch`) | The host router's `call/2` override and `restore_path/2` are a pair: without the restore, the canonical-URL redirect emits the internal prefix and loops forever. Never add a second `call/2` override. | [dev_docs/guides/router-dispatch.md](dev_docs/guides/router-dispatch.md) |
 | Smart fallback / 404 policy | A missing GROUP renders 404; only a missing child of an existing group redirects. Under `url_prefix: "/"` the alternative hijacks host paths. | [dev_docs/guides/router-dispatch.md](dev_docs/guides/router-dispatch.md) |
+| Sitemap exclusion | The sitemap knobs live where core's Sitemap source reads them: `sitemap_exclude` is a top-level key on the `list_groups/0` group map and `metadata.sitemap_exclude` on the `list_posts/2` post map (version `data`, mapped from the latest version like `allow_version_access`). Publishing never filters for the sitemap itself; `integration/sitemap_source_test.exs` runs core's real source against both. | — |
 | Per-group display settings | A new setting must be added in all five places (`Constants` → schema accessor → `merge_group_config`/`db_group_to_map` → edit form → `GroupSettings` spec) or the spec test fails; `update_group/3` stays lenient, `validate_group_settings/1` stays strict. | [dev_docs/guides/group-display-settings.md](dev_docs/guides/group-display-settings.md) |
 | Translatable group name | Overrides live in an isolated `data["name_i18n"]` map, never in the multilang helper's `data`-owning convention, which would clobber the display settings. The slug is never translated. | [dev_docs/guides/group-display-settings.md](dev_docs/guides/group-display-settings.md) |
 | Activity logging | An audit failure never crashes its mutation, and a changeset never reaches metadata. | [dev_docs/guides/activity-logging.md](dev_docs/guides/activity-logging.md) |
@@ -723,8 +743,8 @@ newest-created release as Latest and demotes the current one.
   `phoenix_kit_publishing_contents (version_uuid/group, language, url_slug)` for
   non-trashed rows, so a duplicate becomes impossible at the source instead of
   something the read path's auto-renamer cleans up. This is a shape change, so it
-  is V2 of `PhoenixKitPublishing.Migrations` plus the core-side `ExpectedSchema`
-  exclusion and floor bump that Phase 1 requires (see Database & migrations).
+  is V3 of `PhoenixKitPublishing.Migrations` plus the core-side `ExpectedSchema`
+  declaration and floor bump that Phase 1 requires (see Database & migrations).
 - **Unify the two base→dialect resolvers.** `new_translation_request?/2` (against
   `post.available_languages`) and `Posts.resolve_language_to_dialect/1` (against
   `enabled_language_codes/0`) answer the same question with different tie-breaks;
@@ -769,17 +789,6 @@ newest-created release as Latest and demotes the current one.
   then dropped as the old document's. A background tab's throttled timers
   are the realistic case, where nobody is typing. Raising the fallback or
   blocking the switch behind a "syncing…" state is the alternative.
-- **Core's Sitemap reads exclusion knobs publishing never writes.**
-  `group["sitemap_exclude"]` / `group["settings"]["sitemap_exclude"]` and
-  `post.metadata.sitemap_exclude` are matched by core but exist nowhere here;
-  either add them to `GroupSettings` and the version `data`, or ask core to
-  drop them.
-- **Group broadcasts ship the whole group map** (`{:group_updated, group}`),
-  name and settings included, while every receiver reloads from the DB.
-  `%{uuid, slug}` would do; `pubsub_test.exs` pins the payloads.
-- **`CategoriesLive` subscribes to nothing** and the categories context
-  broadcasts nothing, so two admins on the same group's categories go stale
-  until a reload (the context refuses stale targets, so no corruption).
 - **`get_`/`fetch_` return shapes are mixed:** `DBStorage.get_group/1` returns
   a struct or nil, `Groups.get_group/1` a tuple; `get_category/1` a tuple,
   `get_post_by_uuid/1` nil. A public API rename, so a release decision.
