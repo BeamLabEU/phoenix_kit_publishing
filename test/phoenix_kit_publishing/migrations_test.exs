@@ -2,6 +2,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
   use ExUnit.Case, async: true
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.MediaFolders
   alias PhoenixKitPublishing.Migrations
 
   @moduledoc """
@@ -57,7 +58,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     alias PhoenixKit.Migrations.Postgres.Helpers
 
     test "current_version/0 and version_table/0" do
-      assert Migrations.current_version() == 1
+      assert Migrations.current_version() == 2
       assert Migrations.version_table() == "phoenix_kit_publishing_groups"
     end
 
@@ -107,16 +108,16 @@ defmodule PhoenixKitPublishing.MigrationsTest do
 
     # `validate_target!` also gates `migrated_version/1` and
     # `migrated_version_runtime/1` (both default their target to
-    # `initial_version/0`, well under the ceiling) — 0 and 1 must both stay
-    # reachable for every public builder.
-    test "validate_target! admits 0 and 1, and nothing above current_version/0" do
-      for target <- [0, 1] do
+    # `initial_version/0`, well under the ceiling) — 0, 1 and 2 must all
+    # stay reachable for every public builder.
+    test "validate_target! admits 0, 1 and 2, and nothing above current_version/0" do
+      for target <- [0, 1, 2] do
         assert Migrations.up_statements("public", target) |> is_list()
         assert Migrations.down_statements("public", target) |> is_list()
       end
 
-      assert_raise ArgumentError, fn -> Migrations.up_statements("public", 2) end
-      assert_raise ArgumentError, fn -> Migrations.down_statements("public", 2) end
+      assert_raise ArgumentError, fn -> Migrations.up_statements("public", 3) end
+      assert_raise ArgumentError, fn -> Migrations.down_statements("public", 3) end
     end
 
     # This chain interpolates the prefix into every object it creates, and
@@ -318,12 +319,21 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       end
     end
 
-    test "up stamps the version marker, and stamps it last" do
-      statements = Migrations.up_statements()
+    test "up stamps the version marker, and stamps it last, for every target" do
+      for target <- [1, 2] do
+        statements = Migrations.up_statements("public", target)
 
-      assert List.last(statements) ==
-               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:1'",
-             "the marker must be stamped after the DDL it certifies, not before"
+        assert List.last(statements) ==
+                 "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:#{target}'",
+               "the marker must be stamped after the DDL it certifies, not before"
+
+        assert Enum.count(statements, &String.starts_with?(&1, "COMMENT ON TABLE")) == 1,
+               "target #{target}: the marker must be stamped once, at the end"
+      end
+
+      assert List.last(Migrations.up_statements()) ==
+               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:2'",
+             "the default target is current_version/0"
     end
 
     test "applying up to version 0 is not an operation" do
@@ -337,14 +347,18 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       # that is already there. One exemption: the marker COMMENT — not a
       # guarded operation, it's the thing being stamped. Unlike
       # customer_support's chain, there is no safety-net ALTER exemption
-      # here — see the moduledoc for why this adoption needs none.
-      exempt = ["COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:1'"]
+      # here — see the moduledoc for why this adoption needs none. V2's
+      # two expression indexes run against the same tables and are held to
+      # the same rule.
+      for target <- [1, 2] do
+        ddl =
+          Migrations.up_statements("public", target)
+          |> Enum.reject(&String.starts_with?(&1, "COMMENT ON TABLE"))
 
-      ddl = Enum.reject(Migrations.up_statements(), &(&1 in exempt))
-
-      for stmt <- ddl do
-        assert stmt =~ "IF NOT EXISTS",
-               "statement is not idempotent against a core-created table:\n#{stmt}"
+        for stmt <- ddl do
+          assert stmt =~ "IF NOT EXISTS",
+                 "target #{target}: statement is not idempotent against a core-created table:\n#{stmt}"
+        end
       end
     end
 
@@ -358,24 +372,109 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # collapse into one indistinguishable bucket and this test could not
     # tell them apart.
     test "statement sections appear in the order tables -> pkeys -> unique_constraints -> indexes -> fks -> marker" do
-      statements = Migrations.up_statements()
-
-      sections =
-        Enum.map(statements, fn stmt ->
-          cond do
-            String.starts_with?(stmt, "CREATE TABLE") -> :table
-            String.starts_with?(stmt, "COMMENT ON TABLE") -> :marker
-            stmt =~ "PRIMARY KEY" -> :pkey
-            stmt =~ "ADD CONSTRAINT" and stmt =~ " UNIQUE (" -> :unique_constraint
-            stmt =~ "EXECUTE 'CREATE" -> :index
-            stmt =~ "FOREIGN KEY" -> :fk
-          end
-        end)
-
-      order = Enum.dedup(sections)
+      order = Migrations.up_statements("public", 1) |> sections() |> Enum.dedup()
 
       assert order == [:table, :pkey, :unique_constraint, :index, :fk, :marker],
              "sections are out of order: #{inspect(order)}"
+    end
+
+    # V2 is appended AFTER V1's whole section list and before the marker:
+    # the chain is cumulative, a later version never interleaves with an
+    # earlier one's statements (which the frozen V1 pin above would catch
+    # too, but this says why).
+    test "V2's statements follow V1's, and the marker still comes last" do
+      order = Migrations.up_statements("public", 2) |> sections() |> Enum.dedup()
+
+      assert order == [:table, :pkey, :unique_constraint, :index, :fk, :v2_index, :marker],
+             "sections are out of order: #{inspect(order)}"
+    end
+
+    defp sections(statements) do
+      Enum.map(statements, fn stmt ->
+        cond do
+          String.starts_with?(stmt, "CREATE TABLE") -> :table
+          String.starts_with?(stmt, "COMMENT ON TABLE") -> :marker
+          stmt =~ "PRIMARY KEY" -> :pkey
+          stmt =~ "ADD CONSTRAINT" and stmt =~ " UNIQUE (" -> :unique_constraint
+          stmt =~ "pg_get_expr(i.indexprs" -> :v2_index
+          stmt =~ "EXECUTE 'CREATE" -> :index
+          stmt =~ "FOREIGN KEY" -> :fk
+        end
+      end)
+    end
+  end
+
+  describe "V2 — the media-folder expression indexes" do
+    @v2_indexes ~w(idx_publishing_groups_media_folder idx_publishing_versions_media_folder)
+
+    # V2 is a PUBLISHED version once this ships, frozen for the same reason
+    # V1 is (see "V1's published statements are frozen" above). Captured
+    # from a REAL run of `up_statements("public", 2)` and verified live
+    # against Postgres's own `pg_get_expr` rendering of the expression —
+    # never hand-typed.
+    test "V2's published statements are frozen: V1's DDL, then the two guards, then the marker" do
+      v1 = Migrations.up_statements("public", 1)
+      v2 = Migrations.up_statements("public", 2)
+
+      assert Enum.take(v2, length(v1) - 1) == Enum.drop(v1, -1),
+             "V2 must begin with V1's DDL, verbatim and marker-less"
+
+      assert v2 |> Enum.drop(length(v1) - 1) |> normalised() == [
+               "DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid JOIN pg_am am ON am.oid = ic.relam WHERE i.indrelid = 'public.phoenix_kit_publishing_groups'::regclass AND i.indisunique = false AND am.amname = 'btree' AND i.indnkeyatts = 1 AND i.indpred IS NULL AND pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))' ) THEN EXECUTE 'CREATE INDEX IF NOT EXISTS idx_publishing_groups_media_folder ON public.phoenix_kit_publishing_groups USING btree (lower((data ->> ''media_folder_uuid''::text)))'; END IF; END $$",
+               "DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid JOIN pg_am am ON am.oid = ic.relam WHERE i.indrelid = 'public.phoenix_kit_publishing_versions'::regclass AND i.indisunique = false AND am.amname = 'btree' AND i.indnkeyatts = 1 AND i.indpred IS NULL AND pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))' ) THEN EXECUTE 'CREATE INDEX IF NOT EXISTS idx_publishing_versions_media_folder ON public.phoenix_kit_publishing_versions USING btree (lower((data ->> ''media_folder_uuid''::text)))'; END IF; END $$",
+               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:2'"
+             ]
+    end
+
+    test "V2's guards match the expression through pg_get_expr, never the index name" do
+      v1_count = length(Migrations.up_statements("public", 1))
+
+      guards =
+        Migrations.up_statements("public", 2)
+        |> Enum.drop(v1_count - 1)
+        |> Enum.filter(&String.starts_with?(&1, "DO $$"))
+
+      assert length(guards) == 2
+
+      for guard <- guards do
+        assert guard =~
+                 "pg_get_expr(i.indexprs, i.indrelid) = 'lower((data ->> ''media_folder_uuid''::text))'"
+
+        assert guard =~ "i.indnkeyatts = 1"
+        assert guard =~ "i.indpred IS NULL"
+        refute guard =~ ~r/indexname|relname\s*=/
+      end
+    end
+
+    test "the expression is the reorganizer's join key, lower-cased pointer" do
+      # `MediaFolders.pointer/0` names the JSONB key the index covers; a
+      # renamed pointer without a V3 would leave the index on a dead key.
+      {_column, key} = MediaFolders.pointer()
+      assert key == "media_folder_uuid"
+
+      for stmt <- Migrations.up_statements("public", 2) |> Enum.take(-3) |> Enum.take(2) do
+        assert stmt =~ "lower((data ->> ''#{key}''::text))"
+      end
+    end
+
+    test "down below V2 removes exactly the two indexes, by name, then keeps the marker bookkeeping" do
+      for prefix <- ["public", "publishing_alt"] do
+        removal =
+          for name <- @v2_indexes, do: "DROP INDEX IF EXISTS #{prefix}.#{name}"
+
+        assert Migrations.down_statements(prefix, 1) ==
+                 removal ++
+                   [
+                     "COMMENT ON TABLE #{prefix}.phoenix_kit_publishing_groups IS 'pkpub_schema:1'"
+                   ]
+
+        assert Migrations.down_statements(prefix, 0) ==
+                 removal ++ ["COMMENT ON TABLE #{prefix}.phoenix_kit_publishing_groups IS NULL"]
+
+        # A rollback that stops at 2 has nothing of V2's to undo.
+        assert Migrations.down_statements(prefix, 2) ==
+                 ["COMMENT ON TABLE #{prefix}.phoenix_kit_publishing_groups IS 'pkpub_schema:2'"]
+      end
     end
   end
 
@@ -387,21 +486,33 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # builder produced, so anything appended past it (a literal
     # `execute("DROP TABLE ...")` in `up/1`) would be invisible to it. That
     # path is closed by the source-text test below, which checks what is
-    # executed rather than what is built.
-    test "down/1 emits exactly the marker bookkeeping, in every target and prefix" do
-      assert Migrations.down_statements("public", 0) ==
-               ["COMMENT ON TABLE public.phoenix_kit_publishing_groups IS NULL"]
+    # executed rather than what is built. The exact V2 removal list is
+    # pinned in the "V2" describe above; this one pins that NOTHING but
+    # those two `DROP INDEX` and the marker ever appears, in any target.
+    test "down/1 emits the two V2 index removals below V2 and the marker bookkeeping, nothing else" do
+      for prefix <- ["public", "publishing_alt"], target <- [0, 1, 2] do
+        statements = Migrations.down_statements(prefix, target)
 
-      assert Migrations.down_statements("public", 1) ==
-               ["COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:1'"]
+        {removals, rest} = Enum.split_with(statements, &String.starts_with?(&1, "DROP INDEX"))
 
-      assert Migrations.down_statements("publishing_alt", 0) ==
-               ["COMMENT ON TABLE publishing_alt.phoenix_kit_publishing_groups IS NULL"]
+        assert rest == [List.last(statements)]
 
-      assert Migrations.down_statements("publishing_alt", 1) ==
-               [
-                 "COMMENT ON TABLE publishing_alt.phoenix_kit_publishing_groups IS 'pkpub_schema:1'"
-               ]
+        assert String.starts_with?(
+                 hd(rest),
+                 "COMMENT ON TABLE #{prefix}.phoenix_kit_publishing_groups IS "
+               )
+
+        if target < 2 do
+          assert length(removals) == 2
+
+          for removal <- removals do
+            assert removal =~
+                     ~r/^DROP INDEX IF EXISTS #{prefix}\.idx_publishing_(groups|versions)_media_folder$/
+          end
+        else
+          assert removals == []
+        end
+      end
     end
 
     # For `up/1` the expected content is the full set of OPERATIONS rather
@@ -460,6 +571,9 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       {"DO", "phoenix_kit_publishing_post_categories_category_uuid_fkey"},
       {"DO", "phoenix_kit_publishing_post_categories_post_uuid_fkey"},
       {"DO", "phoenix_kit_publishing_post_views_post_uuid_fkey"},
+      # V2 — the only two objects this chain adds to core's shape.
+      {"CREATE INDEX", "idx_publishing_groups_media_folder"},
+      {"CREATE INDEX", "idx_publishing_versions_media_folder"},
       {"COMMENT ON TABLE", "phoenix_kit_publishing_groups"}
     ]
 
@@ -609,7 +723,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
                  "up_statements(#{inspect(prefix)}) contains: #{stmt}"
         end
 
-        for target <- [0, 1] do
+        for target <- [0, 1, 2] do
           for stmt <- Migrations.down_statements(prefix, target) do
             refute strip_referential_actions(stmt) =~ forbidden,
                    "down_statements(#{inspect(prefix)}, #{target}) contains: #{stmt}"
@@ -753,11 +867,12 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # shape-based key, and none matches purely by `conname`/`indexname`.
     test "every DO-block guard is semantic (shape-based), never name-equality alone" do
       do_blocks =
-        Migrations.up_statements("public", 1)
+        Migrations.up_statements("public", 2)
         |> Enum.filter(&String.starts_with?(&1, "DO $$"))
 
-      # 7 pkeys + 1 unique constraint + 22 indexes + 12 fks.
-      assert length(do_blocks) == 42
+      # 7 pkeys + 1 unique constraint + 22 indexes + 12 fks, then V2's 2
+      # expression indexes.
+      assert length(do_blocks) == 44
 
       for block <- do_blocks do
         refute block =~ ~r/WHERE\s+conname\s*=\s*'[^']+'/,

@@ -246,13 +246,27 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpers do
       # Post/group slugs become URL segments too, so reject route words like
       # "admin"/"api" the same way url_slugs do — a post slugged "admin" is
       # unreachable behind the host's own routes.
-      slug in @reserved_route_words ->
+      reserved_route_word?(slug) ->
         {:error, :reserved_route_word}
 
       true ->
         {:ok, slug}
     end
   end
+
+  @doc """
+  Whether `slug` is a route word the host serves itself (`admin`, `api`,
+  `assets`, `phoenix_kit`, `auth`, `login`, `logout`, `register`,
+  `settings`). A group or post slugged with one is shadowed by the host's
+  own routes and never reachable — `validate_slug/1`, `validate_url_slug/4`
+  and `PhoenixKit.Modules.Publishing.valid_slug?/1` all refuse it here.
+  """
+  @spec reserved_route_word?(String.t()) :: boolean()
+  def reserved_route_word?(slug) when is_binary(slug), do: slug in @reserved_route_words
+
+  @doc "The reserved route words, in full — so a caller can enumerate what `reserved_route_word?/1` refuses."
+  @spec reserved_route_words() :: [String.t()]
+  def reserved_route_words, do: @reserved_route_words
 
   @doc """
   Validates whether the given string is a slug and not a reserved language code.
@@ -278,7 +292,7 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpers do
       LanguageHelpers.reserved_language_code?(url_slug) ->
         {:error, :reserved_language_code}
 
-      url_slug in @reserved_route_words ->
+      reserved_route_word?(url_slug) ->
         {:error, :reserved_route_word}
 
       conflicts_with_post_slug?(group_slug, url_slug, exclude_post_slug) ->

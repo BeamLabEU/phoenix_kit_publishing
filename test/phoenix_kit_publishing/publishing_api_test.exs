@@ -2,6 +2,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingAPITest do
   use ExUnit.Case, async: true
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.SlugHelpers
 
   # ============================================================================
   # Module Loading
@@ -125,6 +126,24 @@ defmodule PhoenixKit.Modules.Publishing.PublishingAPITest do
       refute Publishing.valid_slug?("hello world")
       refute Publishing.valid_slug?("hello_world")
       refute Publishing.valid_slug?("hello.world")
+    end
+
+    # A group slugged "admin" is shadowed by the host's own routes; the
+    # per-language url_slug path already refused these words, the group
+    # path did not.
+    test "rejects every reserved route word, and only whole words" do
+      words = SlugHelpers.reserved_route_words()
+      assert "admin" in words
+
+      for word <- words do
+        refute Publishing.valid_slug?(word), "#{inspect(word)} must be rejected"
+        assert SlugHelpers.reserved_route_word?(word)
+      end
+
+      assert Publishing.valid_slug?("admin-notes")
+      assert Publishing.valid_slug?("administration")
+      assert Publishing.valid_slug?("my-api")
+      refute SlugHelpers.reserved_route_word?("administration")
     end
   end
 

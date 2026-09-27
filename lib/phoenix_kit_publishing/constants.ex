@@ -89,16 +89,6 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   end
 
   @doc """
-  Now, on the site's wall clock — the clock timestamp-mode posts are written
-  and displayed on. A UTC-tagged carrier for that wall clock, the same shape
-  `to_site_wall/2` hands the stamping path.
-
-  Hoist this out of a loop; every call is a settings read.
-  """
-  @spec site_now() :: DateTime.t()
-  def site_now, do: to_site_wall(DateTime.utc_now())
-
-  @doc """
   The site's `time_zone` setting — an IANA id such as `Europe/Tallinn`, or a
   legacy fixed offset such as `"2"` on a site that never touched the picker.
   `"0"` when settings are unreachable (no DB yet, a sandbox without an

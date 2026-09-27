@@ -740,6 +740,20 @@ defmodule PhoenixKit.Modules.Publishing.MediaFolders do
       {:ok, _outcome} ->
         []
 
+      # Another library's file: core refuses it (a folder holds only its
+      # own library's files). The picker browses Media and never offers
+      # one, so this is a forged pick — the same case the one-time adoption
+      # (`MediaAdoption`) skips without a word — reported to the caller
+      # like any other refusal but logged at debug, not warning: nothing an
+      # operator can act on.
+      {:error, :other_library} ->
+        Logger.debug(
+          "[Publishing] file #{inspect(file_uuid)} not filed into #{folder_uuid}: " <>
+            "it belongs to another library (a forged pick)"
+        )
+
+        [{file_uuid, :other_library}]
+
       {:error, reason} ->
         Logger.warning(
           "[Publishing] file #{inspect(file_uuid)} not filed into #{folder_uuid}: " <>
