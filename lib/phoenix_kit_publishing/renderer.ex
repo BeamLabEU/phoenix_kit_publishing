@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio, as: AudioComponent
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Embed, as: EmbedComponent
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.RenderSignal
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Shared.Components.Image
@@ -1740,23 +1741,39 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   """
   @spec invalidate_cache(String.t(), String.t(), String.t()) :: :ok
   def invalidate_cache(group_slug, identifier, language) do
-    # Build pattern to match all cache keys for this post
-    # We don't know the content hash, so we invalidate by prefix
-    pattern = "#{@cache_version}:publishing_post:#{group_slug}:#{identifier}:#{language}:"
+    # The key ends in a content hash (and maybe a notes-style token), which
+    # the caller does not know. The prefix covers every hash for this post.
+    prefix = cache_prefix(group_slug, identifier, language)
 
-    # Since PhoenixKit.Cache doesn't support pattern matching,
-    # we'll just log this for now and rely on content hash changes
-    # credo:disable-for-lines:6 Credo.Check.Warning.MissingMetadataKeyInLoggerConfig
-    Logger.info("Cache invalidation requested",
-      group: group_slug,
-      identifier: identifier,
-      language: language,
-      pattern: pattern
-    )
+    case PhoenixKit.Cache.clear_by_prefix(@cache_name, prefix) do
+      {:ok, count} ->
+        Logger.info(
+          "Invalidated #{count} cached renders for #{group_slug}/#{identifier} (#{language})"
+        )
 
-    # The content hash in the key will change automatically when content changes
-    # So we don't need to explicitly delete old entries
+      {:error, reason} ->
+        Logger.warning(
+          "Cache invalidation failed for #{group_slug}/#{identifier} (#{language}): #{inspect(reason)}"
+        )
+    end
+
     :ok
+  rescue
+    error ->
+      Logger.warning(
+        "Publishing cache not available for invalidation of #{group_slug}/#{identifier}: #{inspect(error)}"
+      )
+
+      :ok
+  end
+
+  @doc false
+  # `v8:publishing_post:<group>:<identifier>:<language>:` — every cached
+  # render of one post, whatever its content hash. Public so a test can
+  # ask the cache about the same prefix `invalidate_cache/3` deletes.
+  @spec cache_prefix(String.t(), String.t(), String.t()) :: String.t()
+  def cache_prefix(group_slug, identifier, language) do
+    "#{@cache_version}:publishing_post:#{group_slug}:#{identifier}:#{language}:"
   end
 
   @doc """
@@ -1816,17 +1833,33 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   end
 
   defp render_and_cache(post, cache_key, opts) do
-    html =
-      render_markdown(post.content,
-        tag_links: tag_link_context(post),
-        notes_style: Keyword.get(opts, :notes_style)
-      )
+    case cache_render(fn ->
+           render_markdown(post.content,
+             tag_links: tag_link_context(post),
+             notes_style: Keyword.get(opts, :notes_style)
+           )
+         end) do
+      {:ok, html} ->
+        put_cached(cache_key, html)
+        {:ok, html}
 
-    # Cache the rendered HTML
-    put_cached(cache_key, html)
+      # An image lookup raised (schema not migrated yet, database down).
+      # The HTML is the placeholder for this request. Storing it would keep
+      # the placeholder after the database is fine, because the cache key is
+      # a hash of the article text and that text did not change.
+      {:retry, html} ->
+        Logger.warning(
+          "Publishing render for #{post[:group]}/#{post[:uuid] || post[:slug]} " <>
+            "not cached: an image lookup failed"
+        )
 
-    {:ok, html}
+        {:ok, html}
+    end
   end
+
+  # `{:retry, html}` when an image lookup raised (core 2.41.1 and later).
+  # Older cores report `{:ok, html}` and the render is stored.
+  defp cache_render(fun) when is_function(fun, 0), do: RenderSignal.take(fun)
 
   defp build_cache_key(post, opts) do
     # Build content hash from content + metadata + the two inputs that

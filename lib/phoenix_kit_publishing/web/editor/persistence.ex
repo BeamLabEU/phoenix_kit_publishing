@@ -1010,9 +1010,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   end
 
   defp invalidate_post_cache(group_slug, post) do
-    identifier = post.slug
-
-    Renderer.invalidate_cache(group_slug, identifier, post.language)
+    # The render key is the uuid when the post has one (`build_cache_key/2`).
+    # Clearing only the slug leaves that entry until the TTL.
+    [post[:uuid], post[:slug]]
+    |> Enum.filter(&(is_binary(&1) and &1 != ""))
+    |> Enum.uniq()
+    |> Enum.each(&Renderer.invalidate_cache(group_slug, &1, post.language))
   end
 
   defp editor_language(assigns), do: Helpers.editor_language(assigns)

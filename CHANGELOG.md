@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.1 - 2026-09-27
+
+### Fixed
+
+- A published page whose image lookup raised is no longer stored in the
+  render cache. That request still shows the placeholder; the next request
+  renders again, so a few minutes of schema drift cannot leave "Image not
+  available" in place after the migration has run. A missing file is still
+  cached. This needs core 2.41.1 (`RenderCache`); on an older core every
+  render is stored, as before.
+- `Renderer.invalidate_cache/3` deletes that post's cached renders by the
+  prefix it builds (`Cache.clear_by_prefix/2`). Saving a post clears both
+  the uuid key the renderer writes and the slug key.
+
 ## 0.12.0 - 2026-09-26
 
 ### Added
