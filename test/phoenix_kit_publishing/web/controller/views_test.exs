@@ -107,17 +107,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ViewsTest do
       assert drain(post.uuid) == 2
     end
 
-    test "the first x-forwarded-for address is the visitor behind a proxy", %{
+    test "the last forwarded hop — the proxy's own word — is the visitor", %{
       slug: slug,
       post: post
     } do
-      # Same socket address, two forwarded clients: two visitors.
+      # The first hop is the client's to write: a loop that rotates it must
+      # not mint a new visitor per request. The last hop is what the proxy
+      # saw, so the same peer counts once.
       forwarded("203.0.113.5, 10.0.0.1") |> browse("/#{slug}/counted") |> html_response(200)
-      forwarded("203.0.113.5, 10.0.0.9") |> browse("/#{slug}/counted") |> html_response(200)
+      forwarded("203.0.113.6, 10.0.0.1") |> browse("/#{slug}/counted") |> html_response(200)
+      forwarded("198.51.100.9, 10.0.0.1") |> browse("/#{slug}/counted") |> html_response(200)
       assert drain(post.uuid) == 1
 
-      forwarded("203.0.113.6, 10.0.0.1") |> browse("/#{slug}/counted") |> html_response(200)
+      # A different peer behind the proxy is a new visitor.
+      forwarded("203.0.113.5, 10.0.0.9") |> browse("/#{slug}/counted") |> html_response(200)
       assert drain(post.uuid) == 2
+    end
+
+    test "the digest is keyed, not a plain hash of the address", %{slug: slug} do
+      from_ip({192, 0, 2, 78}) |> browse("/#{slug}/counted") |> html_response(200)
+
+      plain = :crypto.hash(:sha256, inspect({192, 0, 2, 78})) |> binary_part(0, 16)
+      hashes = Enum.map(Views.VisitorTable.entries(), fn {{_, _, hash}, _} -> hash end)
+
+      assert hashes != []
+      refute plain in hashes
+      assert is_binary(Views.VisitorTable.pepper())
     end
 
     test "the visitor table never holds a raw address", %{slug: slug} do

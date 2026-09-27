@@ -133,18 +133,28 @@ defmodule PhoenixKit.Modules.Publishing.Views do
 
   defp session_marked?(conn), do: is_map(Plug.Conn.get_session(conn, @session_key))
 
-  # Never the address itself: a truncated SHA-256 of the first forwarded hop
-  # (the client behind a proxy) or, without one, of the socket address.
+  # Never the address itself, and never the client's word for it: the LAST
+  # forwarded hop is the one the site's own proxy appended (the peer it saw);
+  # the first is whatever the client wrote, so hashing it let a curl loop
+  # mint a new visitor per request. Without a forwarded header, the socket
+  # address. The digest is an HMAC under the table owner's per-boot pepper,
+  # truncated — a plain hash of an IPv4 address is a 2^32 dictionary.
   defp visitor_hash(conn) do
     address =
-      case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
-        [forwarded | _] -> forwarded |> String.split(",", parts: 2) |> hd() |> String.trim()
-        [] -> ""
-      end
+      conn
+      |> Plug.Conn.get_req_header("x-forwarded-for")
+      |> Enum.join(",")
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> List.last()
 
-    address = if address == "", do: inspect(conn.remote_ip), else: address
+    address = address || inspect(conn.remote_ip)
 
-    :crypto.hash(:sha256, address) |> binary_part(0, 16)
+    case VisitorTable.pepper() do
+      nil -> :crypto.hash(:sha256, address) |> binary_part(0, 16)
+      pepper -> :crypto.mac(:hmac, :sha256, pepper, address) |> binary_part(0, 16)
+    end
   end
 
   @doc "True when the User-Agent looks like a bot/CLI (or is absent)."

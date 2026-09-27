@@ -55,8 +55,23 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
     ArgumentError -> []
   end
 
+  @pepper_key {__MODULE__, :pepper}
+
+  @doc """
+  The per-boot secret the visitor hashes are keyed with. A plain hash of an
+  address is a dictionary attack over the IPv4 space against a readable
+  table; an HMAC under a key nobody stores makes the digests worthless
+  offline, and a day-bucketed table has no reason to survive a restart.
+  `nil` before the owner has started, in which case nothing is counted as
+  a repeat anyway (`first_view_today?/3` answers true without the table).
+  """
+  @spec pepper() :: binary() | nil
+  def pepper, do: :persistent_term.get(@pepper_key, nil)
+
   @impl true
   def init(:ok) do
+    :persistent_term.put(@pepper_key, :crypto.strong_rand_bytes(32))
+
     if :ets.whereis(@table) == :undefined do
       :ets.new(@table, [
         :set,
