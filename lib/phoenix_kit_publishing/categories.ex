@@ -46,6 +46,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.PublishingPostCategory
   alias PhoenixKit.Modules.Publishing.PublishingVersion
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.SlugHelpers
 
   require Logger
@@ -187,9 +188,9 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         end
       end
 
-    log_category_failure(result, "publishing.category.created", opts, nil, %{
-      "group" => group_slug
-    })
+    result
+    |> log_category_failure("publishing.category.created", opts, nil, %{"group" => group_slug})
+    |> broadcast_changed(group_slug)
   end
 
   @doc """
@@ -215,6 +216,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       end
     end)
     |> log_category_failure("publishing.category.updated", opts, uuid, %{})
+    |> broadcast_changed()
   end
 
   # Runs inside `update_category/3`'s transaction — `rollback/1` throws, so
@@ -301,7 +303,9 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         end
       end
 
-    log_category_failure(result, "publishing.category.deleted", opts, uuid, %{})
+    result
+    |> log_category_failure("publishing.category.deleted", opts, uuid, %{})
+    |> broadcast_changed()
   end
 
   # Assignments live in `version.data`, which no foreign key can reach, so
@@ -405,6 +409,10 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     |> log_category_failure("publishing.category.reordered", opts, nil, %{
       "group" => group_slug
     })
+    |> case do
+      {:ok, changed} = ok when changed > 0 -> broadcast_changed(ok, group_slug)
+      other -> other
+    end
   end
 
   def reorder_categories(group_slug, _ordered_uuids, opts) do
@@ -923,6 +931,28 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   rescue
     _ -> :ok
   end
+
+  # Tells every admin page on the group's tree to reload. Called on the
+  # RESULT of a mutation, after the write — and after the transaction, for
+  # the ones that run in one — so a receiver's reload never reads the
+  # tree from before the commit. Errors pass through untouched.
+  defp broadcast_changed(result, group_slug \\ nil)
+
+  defp broadcast_changed({:ok, _} = ok, group_slug) when is_binary(group_slug) do
+    PublishingPubSub.broadcast_categories_changed(group_slug)
+    ok
+  end
+
+  defp broadcast_changed({:ok, %{group_uuid: _} = record} = ok, nil) do
+    case group_slug_of(record) do
+      nil -> :ok
+      slug -> PublishingPubSub.broadcast_categories_changed(slug)
+    end
+
+    ok
+  end
+
+  defp broadcast_changed(other, _group_slug), do: other
 
   # Failure chokepoint — the success row is written at each mutation site;
   # this records the error branch (db_pending) so a failed admin action

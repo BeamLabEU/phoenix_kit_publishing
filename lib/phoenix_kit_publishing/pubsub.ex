@@ -62,11 +62,14 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   end
 
   @doc """
-  Broadcasts a group created event.
+  Broadcasts a group created event with a minimal payload (uuid + slug).
+
+  Every receiver reloads the groups from the DB; the name, description
+  and settings never need to cross PubSub. See `broadcast_post_created/2`.
   """
   @spec broadcast_group_created(map()) :: broadcast_result
   def broadcast_group_created(group) do
-    Manager.broadcast(groups_topic(), {:group_created, group})
+    Manager.broadcast(groups_topic(), {:group_created, minimal_payload(group)})
   end
 
   @doc """
@@ -78,11 +81,50 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
   end
 
   @doc """
-  Broadcasts a group updated event.
+  Broadcasts a group updated event with a minimal payload (uuid + slug).
   """
   @spec broadcast_group_updated(map()) :: broadcast_result
   def broadcast_group_updated(group) do
-    Manager.broadcast(groups_topic(), {:group_updated, group})
+    Manager.broadcast(groups_topic(), {:group_updated, minimal_payload(group)})
+  end
+
+  # ============================================================================
+  # Category Tree Updates (one topic per group)
+  # ============================================================================
+
+  @doc """
+  Returns the topic for a group's category tree.
+  """
+  @spec categories_topic(String.t()) :: String.t()
+  def categories_topic(group_slug) do
+    "#{@topic_prefix}:#{group_slug}:categories"
+  end
+
+  @doc """
+  Subscribes the current process to `{:categories_changed, group_slug}`.
+  """
+  @spec subscribe_to_categories(String.t()) :: subscription_result
+  def subscribe_to_categories(group_slug) do
+    Manager.subscribe(categories_topic(group_slug))
+  end
+
+  @doc """
+  Unsubscribes the current process from a group's category tree updates.
+  """
+  @spec unsubscribe_from_categories(String.t()) :: :ok
+  def unsubscribe_from_categories(group_slug) do
+    Manager.unsubscribe(categories_topic(group_slug))
+  end
+
+  @doc """
+  Broadcasts that a group's category tree changed (create, update, delete,
+  reorder, move). The payload is only the group slug: receivers reload the
+  tree, which is one query, and a per-row payload would have to describe a
+  re-parent, a renumbering and a delete-with-lifted-children alike.
+  """
+  @spec broadcast_categories_changed(String.t()) :: broadcast_result
+  def broadcast_categories_changed(group_slug) do
+    Manager.broadcast(categories_topic(group_slug), {:categories_changed, group_slug})
   end
 
   # ============================================================================
@@ -134,10 +176,11 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
     Manager.broadcast(posts_topic(group_slug), {:post_updated, minimal_payload(post)})
   end
 
-  # Strips a post map to the only fields receivers actually use, so
-  # broadcasts don't leak title/body/version metadata into PubSub traces.
-  defp minimal_payload(post) when is_map(post) do
-    %{uuid: post[:uuid] || post["uuid"], slug: post[:slug] || post["slug"]}
+  # Strips a post or group map to the only fields receivers actually use, so
+  # broadcasts don't leak title/body/settings into PubSub traces. Accepts
+  # atom or string keys (group maps are string-keyed).
+  defp minimal_payload(record) when is_map(record) do
+    %{uuid: record[:uuid] || record["uuid"], slug: record[:slug] || record["slug"]}
   end
 
   defp minimal_payload(other), do: other

@@ -380,14 +380,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     {:noreply, assign(socket, :groups, load_db_groups())}
   end
 
-  def handle_info({:group_updated, group}, socket) do
+  # The payload is `%{uuid, slug}` only; the group itself is reloaded.
+  def handle_info({:group_updated, _payload}, socket) do
     groups = load_db_groups()
     current_group = Enum.find(groups, fn b -> b["slug"] == socket.assigns.group_slug end)
 
     socket =
       socket
       |> assign(:groups, groups)
-      |> assign(:current_group, current_group || group)
+      |> assign(:current_group, current_group || socket.assigns.current_group)
       |> assign_page_title()
 
     {:noreply, socket}

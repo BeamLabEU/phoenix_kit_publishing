@@ -215,16 +215,44 @@ defmodule PhoenixKit.Modules.Publishing.PubSubTest do
       PublishingPubSub.unsubscribe_from_posts(group)
     end
 
-    test "broadcast_group_created / _updated / _deleted" do
+    test "broadcast_group_created / _updated carry only uuid + slug, _deleted the slug" do
       :ok = PublishingPubSub.subscribe_to_groups()
-      group_payload = %{"slug" => "g1", "name" => "Group One"}
-      :ok = PublishingPubSub.broadcast_group_created(group_payload)
-      assert_receive {:group_created, ^group_payload}, 500
-      :ok = PublishingPubSub.broadcast_group_updated(group_payload)
-      assert_receive {:group_updated, ^group_payload}, 500
+      uuid = "019cce93-0000-7000-8000-00000000c0de"
+
+      # A group map as `Groups` builds it: string keys, name and settings
+      # included. Receivers reload from the DB, so none of that may ride
+      # the broadcast.
+      full_group = %{
+        "uuid" => uuid,
+        "slug" => "g1",
+        "name" => "Group One",
+        "description" => "secret",
+        "featured_enabled" => true
+      }
+
+      :ok = PublishingPubSub.broadcast_group_created(full_group)
+      assert_receive {:group_created, %{uuid: ^uuid, slug: "g1"} = payload}, 500
+      assert map_size(payload) == 2
+
+      :ok = PublishingPubSub.broadcast_group_updated(full_group)
+      assert_receive {:group_updated, %{uuid: ^uuid, slug: "g1"} = payload}, 500
+      assert map_size(payload) == 2
+
       :ok = PublishingPubSub.broadcast_group_deleted("g1")
       assert_receive {:group_deleted, "g1"}, 500
       PublishingPubSub.unsubscribe_from_groups()
+    end
+
+    test "categories_topic includes group slug" do
+      assert PublishingPubSub.categories_topic("blog") == "publishing:blog:categories"
+    end
+
+    test "broadcast_categories_changed carries only the group slug" do
+      group = "tg-#{System.unique_integer([:positive])}"
+      :ok = PublishingPubSub.subscribe_to_categories(group)
+      :ok = PublishingPubSub.broadcast_categories_changed(group)
+      assert_receive {:categories_changed, ^group}, 500
+      PublishingPubSub.unsubscribe_from_categories(group)
     end
 
     test "broadcast_translation_created / _deleted" do

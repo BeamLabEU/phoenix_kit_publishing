@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Categories
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
@@ -27,6 +28,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   def mount(%{"group" => group_slug}, _session, socket) do
     case Publishing.get_group(group_slug) do
       {:ok, group} ->
+        # Subscribed BEFORE the first read, so a change that lands between
+        # the two is delivered rather than lost.
+        if connected?(socket), do: PublishingPubSub.subscribe_to_categories(group_slug)
+
         {:ok,
          socket
          |> assign(:project_title, Settings.get_project_title())
@@ -290,6 +295,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
       ),
       do: {:noreply, assign(socket, :move, %{move | pick: id})}
 
+  # Another admin changed this group's tree. The page reloads it; an open
+  # form or Move dialog stays open — its parent tree is re-pruned inside
+  # `reload_tree/1`, so the change shows up there too.
+  def handle_info({:categories_changed, _group_slug}, socket),
+    do: {:noreply, reload_tree(socket)}
+
   def handle_info(msg, socket) do
     Logger.debug("[Publishing.CategoriesLive] unhandled message: #{inspect(msg)}")
     {:noreply, socket}
@@ -362,7 +373,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
     |> assign(:sibling_counts, sibling_counts)
     |> assign(:parents_with_children, parents_with_children)
     |> refresh_parent_tree()
+    |> refresh_move_tree()
   end
+
+  # The Move dialog's target tree was a snapshot taken when it opened, so a
+  # category created or moved by another admin while it sat open was not
+  # offered. Re-prune it from the fresh tree, keeping the pick.
+  defp refresh_move_tree(%{assigns: %{move: %{uuid: uuid} = move, tree: tree}} = socket),
+    do: assign(socket, :move, %{move | tree: parent_tree(tree, uuid)})
+
+  defp refresh_move_tree(socket), do: socket
 
   # Precomputed on tree/editing changes, not per render (validate fires per
   # keystroke).

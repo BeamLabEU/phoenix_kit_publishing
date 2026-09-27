@@ -202,7 +202,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
       |> put_test_scope(fake_scope())
       |> live("/admin/publishing")
 
-    send(view.pid, {:group_created, %{"slug" => "new-group", "name" => "New"}})
+    send(
+      view.pid,
+      {:group_created, %{uuid: "019cce93-0000-7000-8000-00000000abcd", slug: "new-group"}}
+    )
+
     assert is_binary(render(view))
   end
 

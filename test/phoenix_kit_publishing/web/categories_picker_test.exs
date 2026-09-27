@@ -115,4 +115,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesPickerTest do
     # the dropdown shows two identical rows.
     assert child_row.sublabel == "Parent"
   end
+
+  test "typing the translated name finds the category", ctx do
+    # The chips show the translated name, so that is what a writer types.
+    {:ok, _} =
+      Categories.create_category(ctx.slug, %{
+        "name" => "Announcements",
+        "name_i18n" => %{"fr-FR" => "Annonces"}
+      })
+
+    {:ok, view, _html} =
+      build_conn()
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{ctx.slug}/#{ctx.post[:uuid]}/edit?lang=fr-FR")
+
+    for needle <- ["ANNONCES", "annonc"] do
+      render_hook(element(view, "#post-categories-picker-search"), "category_search", %{
+        "q" => needle,
+        "limit" => 8
+      })
+
+      assert_push_event(view, "category_results", %{results: results})
+
+      assert Enum.any?(results, &(&1.label == "Announcements")),
+             "#{inspect(needle)} matches the French name the chip would show"
+    end
+
+    # The primary name still matches too, case-insensitively.
+    render_hook(element(view, "#post-categories-picker-search"), "category_search", %{
+      "q" => "announce",
+      "limit" => 8
+    })
+
+    assert_push_event(view, "category_results", %{results: results})
+    assert Enum.any?(results, &(&1.label == "Announcements"))
+  end
 end
