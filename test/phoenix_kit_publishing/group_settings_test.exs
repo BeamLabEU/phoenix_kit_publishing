@@ -72,6 +72,7 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettingsTest do
       assert defaults["show_top_back_link"] == PublishingGroup.show_top_back_link?(empty)
       assert defaults["listing_image_links"] == PublishingGroup.listing_image_links?(empty)
       assert defaults["listing_animations"] == PublishingGroup.listing_animations?(empty)
+      assert defaults["sitemap_exclude"] == PublishingGroup.sitemap_exclude?(empty)
     end
 
     test "covers every schema key (no accessor-parity blind spots)" do

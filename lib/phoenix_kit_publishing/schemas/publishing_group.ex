@@ -77,6 +77,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `search_enabled` - A search box on the public listing (`?q=`, plain GET —
     no JS required); matches are a case-insensitive substring over the active
     published version's per-language title + body (default `false`).
+  - `sitemap_exclude` - Leave the group's listing and every post in it out of
+    the site's sitemap (core's Sitemap source reads this off the group map;
+    default `false`).
   - `name_i18n` - Per-language overrides for the group's display name, keyed by
     language code (e.g. `%{"et" => "Blogi"}`). The primary-language name lives in
     the `name` column; secondary languages fall back to it when absent. The slug
@@ -289,6 +292,9 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
 
   @doc "Returns whether the public listing shows a search box (default false)."
   def search_enabled?(%__MODULE__{data: data}), do: Map.get(data, "search_enabled", false)
+
+  @doc "Returns whether the group and its posts are left out of the sitemap (default false)."
+  def sitemap_exclude?(%__MODULE__{data: data}), do: Map.get(data, "sitemap_exclude", false)
 
   @doc "Returns the per-language display-name overrides map (language code => name)."
   def name_translations(%__MODULE__{data: data}) do

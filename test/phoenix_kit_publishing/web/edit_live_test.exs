@@ -224,6 +224,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     assert saved["post_width"] == "wide"
   end
 
+  test "saving the sitemap exclusion toggle lands where core's Sitemap source reads it",
+       %{conn: conn, group: group} do
+    {:ok, view, html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    assert html =~ "Exclude this group from the sitemap"
+
+    view
+    |> form("#group-edit-form", group: %{"name" => group["name"], "slug" => group["slug"]})
+    |> render_submit(%{"group" => %{"sitemap_exclude" => "true"}})
+
+    # Core matches `group["sitemap_exclude"]` on the maps list_groups/0 returns —
+    # a top-level key, not one nested under "settings".
+    assert %{"sitemap_exclude" => true} =
+             Enum.find(Groups.list_groups(), &(&1["slug"] == group["slug"]))
+
+    view
+    |> form("#group-edit-form", group: %{"name" => group["name"], "slug" => group["slug"]})
+    |> render_submit(%{"group" => %{"sitemap_exclude" => "false"}})
+
+    {:ok, saved} = Groups.get_group(group["slug"])
+    assert saved["sitemap_exclude"] == false
+  end
+
   describe "the language it opens on" do
     setup do
       {:ok, _} = Languages.enable_system()

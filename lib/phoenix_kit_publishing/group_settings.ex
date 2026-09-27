@@ -101,6 +101,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         depends_on: nil
       },
       %{
+        key: "sitemap_exclude",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :listing,
+        label: "Exclude from the sitemap",
+        description:
+          "Leave the group's listing and every post in it out of the site's sitemap (core's Sitemap source reads this flag).",
+        depends_on: nil
+      },
+      %{
         key: "featured_enabled",
         type: :boolean,
         allowed: @boolean_allowed,

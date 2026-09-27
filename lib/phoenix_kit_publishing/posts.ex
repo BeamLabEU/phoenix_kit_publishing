@@ -1435,6 +1435,11 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         "allow_version_access",
         normalize_featured(Map.get(params, "allow_version_access"))
       )
+      # Core's Sitemap source reads `metadata.sitemap_exclude` off the post map.
+      |> maybe_put_version_field(
+        "sitemap_exclude",
+        normalize_featured(Map.get(params, "sitemap_exclude"))
+      )
       |> put_audio_uuid(Map.get(params, "audio_uuid"))
 
     # Also update version-level status and published_at if provided.

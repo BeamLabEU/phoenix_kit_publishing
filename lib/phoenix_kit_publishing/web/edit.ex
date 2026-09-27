@@ -238,6 +238,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "listing_animations" => group["listing_animations"],
       "show_prev_next" => group["show_prev_next"],
       "search_enabled" => group["search_enabled"],
+      "sitemap_exclude" => group["sitemap_exclude"],
       "show_categories" => group["show_categories"],
       "views_enabled" => group["views_enabled"],
       "comments_enabled" => group["comments_enabled"],
@@ -597,6 +598,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                     options={timeline_granularity_options()}
                   />
                 </div>
+
+                <.checkbox field={@form[:sitemap_exclude]}>
+                  {gettext("Exclude this group from the sitemap")}
+                  <:description>
+                    {gettext("Neither the listing nor any post in this group is listed in the sitemap.")}
+                  </:description>
+                </.checkbox>
               </div>
 
               <%!-- Post page: an individual article --%>

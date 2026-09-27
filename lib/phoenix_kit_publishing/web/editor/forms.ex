@@ -62,6 +62,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "featured_image_uuid" => Map.get(post.metadata, :featured_image_uuid, ""),
       "featured" => Map.get(post.metadata, :featured, false),
       "allow_version_access" => Map.get(post.metadata, :allow_version_access, false),
+      "sitemap_exclude" => Map.get(post.metadata, :sitemap_exclude, false),
       # A list, unlike every other field here. It never reaches an <input>:
       # the picker edits it through its own events and the save path reads it
       # straight off the form, which is also what makes it participate in
@@ -143,6 +144,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
         "featured_image_uuid" => featured_image_uuid,
         "featured" => normalize_featured_flag(form),
         "allow_version_access" => Map.get(form, "allow_version_access") in [true, "true", "on"],
+        "sitemap_exclude" => Map.get(form, "sitemap_exclude") in [true, "true", "on"],
         # This rebuilds the form from a whitelist, so anything not named here
         # is dropped — and this one runs on every keystroke. Left out, a
         # category selection would survive exactly until the writer typed the
@@ -173,6 +175,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "featured_image_uuid" => "",
       "featured" => false,
       "allow_version_access" => false,
+      "sitemap_exclude" => false,
       "category_uuids" => [],
       "url_slug" => "",
       "audio_uuid" => "",
