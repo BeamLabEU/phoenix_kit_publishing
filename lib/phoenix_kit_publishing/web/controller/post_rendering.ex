@@ -251,13 +251,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   # history behind), and the requested version must be at or before it. A
   # genuinely superseded version is always older than the one that replaced
   # it; a draft waiting to go out is always newer.
+  #
+  # And the post must allow version browsing at all — the same live-version
+  # switch `render_versioned_post/5` gates on. Fallback asks this question
+  # about OTHER languages of a post whose own request just failed that gate;
+  # ignoring the switch here accepted a sibling that fails it identically,
+  # and the two URLs 302'd to each other forever.
   @doc false
   @spec publicly_browsable_version?(String.t(), map(), term()) :: boolean()
   def publicly_browsable_version?(group_slug, post, version) do
-    {_allow_access, live_version} = get_cached_version_info(group_slug, post)
+    {allow_access, live_version} = get_cached_version_info(group_slug, post)
 
-    is_integer(live_version) and is_integer(version) and version <= live_version and
-      historically_published?(post)
+    allow_access == true and is_integer(live_version) and is_integer(version) and
+      version <= live_version and historically_published?(post)
   end
 
   # Published now, or archived after having been published at some point.

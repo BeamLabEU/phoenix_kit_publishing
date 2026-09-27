@@ -22,8 +22,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   - `:not_found` (post trashed/deleted) → group listing
   - `:post_not_found | :unpublished | :version_access_disabled` on a slug
     path → other languages → group listing
-  - same on a `/v/N` path → the same version in another language that
-    serves it → the slug chain above
+  - `:post_not_found | :unpublished` on a `/v/N` path → the same version in
+    another language that serves it → the slug chain above
+  - `:version_access_disabled` on a `/v/N` path → group listing (the switch
+    is per post, not per language, so no other language can serve it)
   - same on a timestamp path → other languages → other times on the date →
     group listing
   - any other reason with a known group → group listing
@@ -102,12 +104,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
     fallback_timestamp_to_other_language(group_slug, date, time, language)
   end
 
+  # Version browsing (/<group>/<slug>/v/N) with the switch OFF: allow_version_access
+  # is read from the post's primary-language live version, so every language
+  # fails the same gate — a cross-language hop can only 302 back here. The
+  # group listing (the catch-all's outcome, which this path took before the
+  # version clause below existed) is the nearest page that renders.
+  defp handle_fallback_case(:version_access_disabled, [group_slug, _, "v", _], language) do
+    if group_exists?(group_slug) do
+      {:ok, PublishingHTML.group_listing_path(language, group_slug)}
+    else
+      :no_fallback
+    end
+  end
+
   # Version browsing (/<group>/<slug>/v/N): a version the requested language
   # has no row for lands on the SAME version in a language that serves it —
   # the reader asked for history, not the live post. When no language can
   # browse that version, the slug chain above takes over.
   defp handle_fallback_case(reason, [group_slug, post_slug, "v", version_str], language)
-       when reason in [:post_not_found, :unpublished, :version_access_disabled] do
+       when reason in [:post_not_found, :unpublished] do
     with true <- group_exists?(group_slug),
          {version, ""} <- Integer.parse(version_str),
          {:ok, url} <- find_version_in_other_language(group_slug, post_slug, version, language) do
