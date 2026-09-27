@@ -373,7 +373,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCacheRegenerateTest do
       # v2 becomes the LATEST version and is an unpublished draft.
       {:ok, _v2} = DBStorage.create_version_from(post.uuid, 1)
 
-      posts = PostFetching.fetch_posts_with_cache(group_slug)
+      posts = PostFetching.list_posts_with_cache(group_slug)
       published = Listing.filter_published(posts)
 
       # The post is still listed (active version is published)...

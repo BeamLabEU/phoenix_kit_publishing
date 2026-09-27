@@ -26,7 +26,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
 
   @impl true
   def mount(%{"group" => group_slug}, _session, socket) do
-    case Publishing.get_group(group_slug) do
+    case Publishing.fetch_group(group_slug) do
       {:ok, group} ->
         # Subscribed BEFORE the first read, so a change that lands between
         # the two is delivered rather than lost.
@@ -85,7 +85,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           "slug" => category.slug,
           "parent_uuid" => category.parent_uuid || "",
           "description" => category.description || "",
-          "position" => to_string(category.position || 0)
+          "position" => to_string(category.position)
         }
 
         {:noreply, open_form(socket, to_form(params, as: :category), category.uuid)}
@@ -323,7 +323,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   defp get_group_category(socket, uuid) do
     group_uuid = socket.assigns.group["uuid"]
 
-    case Categories.get_category(uuid) do
+    case Categories.fetch_category(uuid) do
       {:ok, %{group_uuid: ^group_uuid} = category} -> {:ok, category}
       {:ok, _foreign} -> {:error, :not_found}
       {:error, reason} -> {:error, reason}

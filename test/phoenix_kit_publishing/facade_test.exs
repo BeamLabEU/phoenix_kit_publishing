@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.FacadeTest do
   describe "group delegations" do
     test "all group functions are exported from facade" do
       assert function_exported?(Publishing, :list_groups, 0)
+      assert function_exported?(Publishing, :fetch_group, 1)
       assert function_exported?(Publishing, :get_group, 1)
       assert function_exported?(Publishing, :add_group, 1)
       assert function_exported?(Publishing, :add_group, 2)
@@ -45,7 +46,7 @@ defmodule PhoenixKit.Modules.Publishing.FacadeTest do
   describe "version delegations" do
     test "all version functions are exported from facade" do
       assert function_exported?(Publishing, :list_versions, 2)
-      assert function_exported?(Publishing, :get_published_version, 2)
+      assert function_exported?(Publishing, :fetch_published_version, 2)
       assert function_exported?(Publishing, :get_version_status, 4)
       assert function_exported?(Publishing, :get_version_metadata, 4)
       assert function_exported?(Publishing, :create_new_version, 2)
@@ -156,8 +157,8 @@ defmodule PhoenixKit.Modules.Publishing.FacadeTest do
       refute Publishing.valid_slug?("")
     end
 
-    test "fetch_option is accessible" do
-      assert Publishing.fetch_option(%{key: "val"}, :key) == "val"
+    test "get_option is accessible" do
+      assert Publishing.get_option(%{key: "val"}, :key) == "val"
     end
 
     test "audit_metadata is accessible" do

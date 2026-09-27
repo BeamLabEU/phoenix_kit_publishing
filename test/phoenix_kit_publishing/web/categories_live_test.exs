@@ -51,7 +51,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     |> render_submit()
 
     assert render(view) =~ "Renamed"
-    {:ok, reloaded} = Categories.get_category(cat.uuid)
+    {:ok, reloaded} = Categories.fetch_category(cat.uuid)
     assert reloaded.name == "Renamed"
   end
 
@@ -155,7 +155,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     |> form("#category-form", category: %{"name" => "C renamed", "slug" => c.slug})
     |> render_submit()
 
-    {:ok, reloaded} = Categories.get_category(c.uuid)
+    {:ok, reloaded} = Categories.fetch_category(c.uuid)
     assert reloaded.name == "C renamed"
     assert reloaded.parent_uuid == q.uuid
   end
@@ -173,7 +173,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     |> form("#category-form", category: %{"name" => "C", "slug" => c.slug})
     |> render_submit()
 
-    {:ok, reloaded} = Categories.get_category(c.uuid)
+    {:ok, reloaded} = Categories.fetch_category(c.uuid)
     assert reloaded.parent_uuid == nil
   end
 
@@ -194,7 +194,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     view |> element(row("category-move-picker", a.uuid)) |> render_click()
     view |> form("#category-move-form") |> render_submit()
 
-    {:ok, reloaded} = Categories.get_category(b.uuid)
+    {:ok, reloaded} = Categories.fetch_category(b.uuid)
     assert reloaded.parent_uuid == a.uuid
     assert [{%{name: "A"}, 0}, {%{name: "B"}, 1}] = Categories.list_tree(slug)
   end
@@ -236,7 +236,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
       })
 
     assert html =~ "Move to"
-    {:ok, reloaded} = Categories.get_category(child.uuid)
+    {:ok, reloaded} = Categories.fetch_category(child.uuid)
     assert reloaded.parent_uuid == parent.uuid
   end
 
@@ -259,7 +259,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
              Categories.list_tree(slug)
 
     # The cross-parent placement did not re-parent the child.
-    {:ok, reloaded_child} = Categories.get_category(child.uuid)
+    {:ok, reloaded_child} = Categories.fetch_category(child.uuid)
     assert reloaded_child.parent_uuid == a.uuid
   end
 
@@ -294,7 +294,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     # Sent before the pick's patch landed: still the old, top-level value.
     render_submit(view, "confirm_move", %{"move" => %{"parent_uuid" => ""}})
 
-    {:ok, reloaded} = Categories.get_category(b.uuid)
+    {:ok, reloaded} = Categories.fetch_category(b.uuid)
     assert reloaded.parent_uuid == a.uuid
   end
 
@@ -327,18 +327,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
   end
 
   test "a category id that is not a uuid is not found, not a crash", %{slug: slug} do
-    assert {:error, :not_found} = Categories.get_category("not-a-uuid")
+    assert {:error, :not_found} = Categories.fetch_category("not-a-uuid")
     assert {:error, :not_found} = Categories.move_category("not-a-uuid", nil)
     {:ok, lone} = Categories.create_category(slug, %{"name" => "Lone"})
     assert {:error, :not_found} = Categories.update_category("not-a-uuid", %{"name" => "x"})
-    {:ok, still} = Categories.get_category(lone.uuid)
+    {:ok, still} = Categories.fetch_category(lone.uuid)
     assert still.name == "Lone"
   end
 
   test "a move to a parent that is not a uuid is refused, not a crash", %{slug: slug} do
     {:ok, lone} = Categories.create_category(slug, %{"name" => "Lone"})
     assert {:error, :parent_not_found} = Categories.move_category(lone.uuid, "root")
-    {:ok, still} = Categories.get_category(lone.uuid)
+    {:ok, still} = Categories.fetch_category(lone.uuid)
     assert still.parent_uuid == nil
   end
 
@@ -368,7 +368,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     assert has_element?(view, parent_input("move", a.uuid))
 
     view |> form("#category-move-form") |> render_submit()
-    {:ok, reloaded} = Categories.get_category(b.uuid)
+    {:ok, reloaded} = Categories.fetch_category(b.uuid)
     assert reloaded.parent_uuid == a.uuid
   end
 
@@ -382,7 +382,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     # Kebab buttons only render for this group's rows, so push the events
     # directly — a crafted client can do the same.
     render_hook(view, "delete", %{"uuid" => foreign.uuid})
-    assert {:ok, _still_there} = Categories.get_category(foreign.uuid)
+    assert {:ok, _still_there} = Categories.fetch_category(foreign.uuid)
 
     assert render_hook(view, "edit", %{"uuid" => foreign.uuid}) =~ "Category not found"
   end
@@ -457,7 +457,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     view |> element(row("category-move-picker", c.uuid)) |> render_click()
     view |> form("#category-move-form") |> render_submit()
 
-    {:ok, reloaded} = Categories.get_category(b.uuid)
+    {:ok, reloaded} = Categories.fetch_category(b.uuid)
     assert reloaded.parent_uuid == c.uuid
   end
 

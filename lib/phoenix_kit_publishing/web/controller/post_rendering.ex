@@ -160,7 +160,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def served_by_fallback_language?(_post, _requested), do: false
 
   defp build_post_page(group_slug, post, canonical_language) do
-    group = fetch_group(group_slug)
+    group = group_map(group_slug)
     html_content = render_post_content(post, notes_style: group_notes_style(group))
     group_name = resolve_group_name(group, group_slug, canonical_language)
     translations = Translations.build_translation_links(group_slug, post, canonical_language)
@@ -259,7 +259,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
   defp build_versioned_post_response(group_slug, post, version) do
     canonical_language = Language.get_canonical_url_language_for_post(post.language)
-    group = fetch_group(group_slug)
+    group = group_map(group_slug)
     html_content = render_post_content(post, notes_style: group_notes_style(group))
     group_name = resolve_group_name(group, group_slug, canonical_language)
 
@@ -470,7 +470,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
   # Fallback: Gets published version from DB when cache misses
   defp get_live_version_from_db(group_slug, post_identifier) do
-    case Publishing.get_published_version(group_slug, post_identifier) do
+    case Publishing.fetch_published_version(group_slug, post_identifier) do
       {:ok, version} -> version
       {:error, _} -> nil
     end
@@ -530,7 +530,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   # Fetches the group's public map once per request — the same map feeds the
   # language-resolved display name here and the controller's per-group display
   # config (assign_group_display_config/2), so post pages don't fetch twice.
-  defp fetch_group(group_slug) do
+  defp group_map(group_slug) do
     case Listing.fetch_group(group_slug) do
       {:ok, group} -> group
       {:error, _} -> %{}

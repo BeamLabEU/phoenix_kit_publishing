@@ -1208,7 +1208,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     |> repo.one()
   end
 
-  @doc "Fetches a version by its uuid."
+  @doc "Gets a version by its uuid."
   @spec get_version_by_uuid(String.t()) :: PublishingVersion.t() | nil
   def get_version_by_uuid(version_uuid) do
     repo().get(PublishingVersion, version_uuid)

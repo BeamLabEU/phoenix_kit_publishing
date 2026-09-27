@@ -205,7 +205,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
   end
 
   defp preview_notes_style(group_slug) do
-    case Publishing.get_group(group_slug) do
+    case Publishing.fetch_group(group_slug) do
       {:ok, group} -> PostRendering.group_notes_style(group)
       _ -> Constants.default_notes_style()
     end

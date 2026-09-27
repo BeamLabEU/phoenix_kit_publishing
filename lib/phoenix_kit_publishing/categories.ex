@@ -145,7 +145,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   end
 
   @doc "A category by uuid. Anything that is not a uuid is `:not_found`, never a raise."
-  def get_category(uuid) when is_binary(uuid) do
+  @spec fetch_category(String.t()) :: {:ok, PublishingCategory.t()} | {:error, :not_found}
+  def fetch_category(uuid) when is_binary(uuid) do
     with {:ok, _} <- Ecto.UUID.cast(uuid),
          %PublishingCategory{} = category <- repo().get(PublishingCategory, uuid) do
       {:ok, category}
@@ -200,7 +201,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   """
   def update_category(uuid, attrs, opts \\ []) do
     repo().transaction(fn ->
-      with {:ok, category} <- get_category(uuid),
+      with {:ok, category} <- fetch_category(uuid),
            :ok <- lock_group_categories(category.group_uuid, attrs),
            :ok <-
              validate_parent(
@@ -282,7 +283,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   """
   def delete_category(uuid, opts \\ []) do
     result =
-      with {:ok, category} <- get_category(uuid) do
+      with {:ok, category} <- fetch_category(uuid) do
         case repo().delete(category) do
           {:ok, deleted} ->
             unfile_deleted_category(deleted)
@@ -617,7 +618,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   end
 
   defp do_replace_post_categories(post_uuid, category_uuids, opts) do
-    with {:ok, post} <- get_post(post_uuid),
+    with {:ok, post} <- fetch_post(post_uuid),
          {:ok, version} <- target_version(post) do
       # Non-UUID strings must be dropped BEFORE the query — Ecto raises a
       # CastError on an uncastable value inside `in ^list`.
@@ -689,7 +690,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   that, so `?v=2` shows how v2 was filed.
   """
   def categories_of_post(post_uuid) do
-    with {:ok, post} <- get_post(post_uuid),
+    with {:ok, post} <- fetch_post(post_uuid),
          {:ok, version} <- target_version(post) do
       group_slug = group_slug_of(post)
       categories_by_uuids(group_slug, PublishingVersion.get_category_uuids(version))
@@ -745,7 +746,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
 
   @doc "Category uuids on a post's ACTIVE version."
   def category_uuids_for_post(post_uuid) do
-    with {:ok, post} <- get_post(post_uuid),
+    with {:ok, post} <- fetch_post(post_uuid),
          {:ok, version} <- target_version(post) do
       PublishingVersion.get_category_uuids(version)
     else
@@ -839,7 +840,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   # Helpers
   # ===========================================================================
 
-  defp get_post(post_uuid) do
+  defp fetch_post(post_uuid) do
     case repo().get(PublishingPost, post_uuid) do
       nil -> {:error, :not_found}
       post -> {:ok, post}

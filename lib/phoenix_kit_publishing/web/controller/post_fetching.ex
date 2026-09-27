@@ -36,16 +36,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostFetching do
   # ============================================================================
 
   @doc """
-  Fetches posts using cache when available, falls back to direct DB read.
+  Lists a group's posts from the listing cache when available, falling back to a direct DB read.
 
   Tries ListingCache (persistent_term) first for sub-microsecond reads.
   On cache miss, regenerates from the database.
   """
-  def fetch_posts_with_cache(group_slug) do
-    fetch_posts_with_listing_cache(group_slug)
+  def list_posts_with_cache(group_slug) do
+    list_posts_with_listing_cache(group_slug)
   end
 
-  defp fetch_posts_with_listing_cache(group_slug) do
+  defp list_posts_with_listing_cache(group_slug) do
     start_time = System.monotonic_time(:microsecond)
 
     case ListingCache.read(group_slug) do

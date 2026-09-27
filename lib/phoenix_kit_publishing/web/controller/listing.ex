@@ -50,7 +50,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
           per_page = get_per_page_setting()
 
           # Try cache first, fall back to DB query
-          all_posts_unfiltered = PostFetching.fetch_posts_with_cache(group_slug)
+          all_posts_unfiltered = PostFetching.list_posts_with_cache(group_slug)
           published_posts = filter_published(all_posts_unfiltered)
 
           # Resolve posts for the requested language, with fallback handling
@@ -292,7 +292,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
       Translations.build_listing_translations(
         group_slug,
         canonical_language,
-        PostFetching.fetch_posts_with_cache(group_slug)
+        PostFetching.list_posts_with_cache(group_slug)
       )
 
     {:ok,
@@ -365,7 +365,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   """
   def group_date_counts(group_slug) do
     group_slug
-    |> PostFetching.fetch_posts_with_cache()
+    |> PostFetching.list_posts_with_cache()
     |> filter_published()
     |> PublishingHTML.build_date_counts()
   end
@@ -471,7 +471,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
         Translations.build_listing_translations(
           group_slug,
           canonical_language,
-          PostFetching.fetch_posts_with_cache(group_slug)
+          PostFetching.list_posts_with_cache(group_slug)
         )
 
       {:ok,
@@ -512,7 +512,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   def chronological_posts(group_slug, language, limit \\ nil) do
     posts =
       group_slug
-      |> PostFetching.fetch_posts_with_cache()
+      |> PostFetching.list_posts_with_cache()
       |> filter_published()
       |> filter_by_exact_language(group_slug, language)
       |> resolve_posts_for_language(language)

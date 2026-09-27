@@ -124,7 +124,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
 
     # Fetch language_slugs from cache for per-language URL slugs
     # Falls back to using post.slug for all languages if cache miss
-    language_slugs = fetch_language_slugs_from_cache(group_slug, post)
+    language_slugs = language_slugs_from_cache(group_slug, post)
 
     # Include ALL available languages that are published
     # This allows legacy/disabled languages to still show in the public switcher
@@ -250,7 +250,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Translations do
   # falling straight to post.slug emitted internal slugs for every localized
   # entry, costing a canonical-redirect hop per click (permanently, when the
   # cache is disabled).
-  defp fetch_language_slugs_from_cache(group_slug, post) do
+  defp language_slugs_from_cache(group_slug, post) do
     case ListingCache.find_post_by_mode(group_slug, post) do
       {:ok, cached_post} ->
         cached_post.language_slugs || %{}

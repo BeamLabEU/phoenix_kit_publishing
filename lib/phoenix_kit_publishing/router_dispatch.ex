@@ -219,7 +219,7 @@ defmodule PhoenixKitPublishing.RouterDispatch do
 
   defp known_group?(slug) when is_binary(slug) do
     not reserved_by_other_module?(slug) and
-      case Groups.get_group(slug) do
+      case Groups.fetch_group(slug) do
         {:ok, _group} -> true
         _ -> false
       end

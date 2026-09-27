@@ -509,13 +509,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     can_update? = post_slug && socket.assigns[:posts] && socket.assigns[:group_slug]
 
     if can_update? do
-      fetch_and_update_post(socket, post_slug)
+      reload_post(socket, post_slug)
     else
       refresh_posts(socket)
     end
   end
 
-  defp fetch_and_update_post(socket, post_slug) do
+  defp reload_post(socket, post_slug) do
     case Publishing.read_post(
            socket.assigns.group_slug,
            post_slug,
@@ -527,7 +527,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
       {:error, reason} ->
         Logger.warning(
-          "[Publishing.Listing] fetch_and_update_post failed for #{post_slug}: #{inspect(reason)}, doing full refresh"
+          "[Publishing.Listing] reload_post failed for #{post_slug}: #{inspect(reason)}, doing full refresh"
         )
 
         refresh_posts(socket)

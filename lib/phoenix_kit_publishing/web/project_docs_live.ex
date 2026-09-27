@@ -31,7 +31,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
     group_slug = get_in(session, ["config", "group_slug"])
 
     group =
-      case group_slug && safe(fn -> Groups.get_group(group_slug) end) do
+      case group_slug && safe(fn -> Groups.fetch_group(group_slug) end) do
         {:ok, group} -> group
         _ -> nil
       end

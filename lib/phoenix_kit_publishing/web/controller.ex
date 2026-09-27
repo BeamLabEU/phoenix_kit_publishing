@@ -168,7 +168,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     group_slug = params["group"]
 
     with true <- Publishing.enabled?() and public_enabled?(),
-         {:ok, group} <- Publishing.get_group(group_slug),
+         {:ok, group} <- Publishing.fetch_group(group_slug),
          # Same status the GET path's group_trashed?/1 reads — get_group
          # returns trashed groups too, so a trashed group kept taking comments.
          true <- group["status"] != "trashed",
@@ -425,7 +425,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp group_trashed?(group_slug) when not is_binary(group_slug), do: false
 
   defp group_trashed?(group_slug) do
-    case Publishing.get_group(group_slug) do
+    case Publishing.fetch_group(group_slug) do
       {:ok, group} -> group["status"] == "trashed"
       {:error, _} -> false
     end
@@ -505,7 +505,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # would ingest the listing page as a broken feed).
   defp handle_feed(conn, group_slug, language, scope) do
     with true <- PublishingHTML.feeds_enabled?(),
-         {:ok, group} <- Publishing.get_group(group_slug),
+         {:ok, group} <- Publishing.fetch_group(group_slug),
          :render <- feed_canonical_redirect(conn, group_slug, language, scope),
          {:ok, all_posts, term_label} <-
            Listing.scoped_chronological_posts(group_slug, language, scope) do
@@ -921,7 +921,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     # `original` when large isn't generated. Either way `url` (below) is
     # always set from featured_image_url/2; only width/height/mime_type
     # are absent when neither variant record exists.
-    variant = fetch_variant(uuid, "large") || fetch_variant(uuid, "original")
+    variant = get_variant(uuid, "large") || get_variant(uuid, "original")
     url = PublishingHTML.featured_image_url(%{metadata: %{featured_image_uuid: uuid}}, "large")
 
     case variant do
@@ -935,7 +935,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     _ -> %{url: nil}
   end
 
-  defp fetch_variant(uuid, variant) do
+  defp get_variant(uuid, variant) do
     Storage.get_file_instance_by_name(uuid, variant)
   rescue
     _ -> nil

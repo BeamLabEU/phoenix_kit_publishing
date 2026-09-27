@@ -403,11 +403,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     if Constants.published?(post.metadata.status) and render_cache_enabled?(post.group) do
       cache_key = build_cache_key(post, opts)
 
-      case get_cached(cache_key) do
+      case fetch_cached(cache_key) do
         {:ok, html} ->
           {:ok, html}
 
-        :miss ->
+        {:error, :miss} ->
           render_and_cache(post, cache_key, opts)
       end
     else
@@ -1872,15 +1872,15 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     _ -> ""
   end
 
-  defp get_cached(key) do
+  defp fetch_cached(key) do
     case PhoenixKit.Cache.get(@cache_name, key) do
-      nil -> :miss
+      nil -> {:error, :miss}
       html -> {:ok, html}
     end
   rescue
     _ ->
       # Cache not available (tests, compilation)
-      :miss
+      {:error, :miss}
   end
 
   defp put_cached(key, value) do

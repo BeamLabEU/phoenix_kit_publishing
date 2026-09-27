@@ -118,7 +118,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     assert is_binary(html)
     assert html =~ "Group updated"
     assert html =~ "Stayed Name"
-    {:ok, persisted} = Groups.get_group(group["slug"])
+    {:ok, persisted} = Groups.fetch_group(group["slug"])
     assert persisted["name"] == "Stayed Name"
   end
 
@@ -135,7 +135,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
 
     assert {:error, {:live_redirect, %{to: to}}} = result
     assert to =~ "/admin/publishing/#{group["slug"]}"
-    {:ok, persisted} = Groups.get_group(group["slug"])
+    {:ok, persisted} = Groups.fetch_group(group["slug"])
     assert persisted["name"] == "Exited Name"
   end
 
@@ -200,7 +200,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     )
     |> render_submit(%{"group" => %{"name_i18n" => %{"fr-FR" => "Blogue"}}})
 
-    {:ok, saved} = Groups.get_group(group["slug"])
+    {:ok, saved} = Groups.fetch_group(group["slug"])
     assert saved["name_i18n"] == %{"fr-FR" => "Blogue"}
   end
 
@@ -219,7 +219,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
       "group" => %{"show_reading_time" => "true", "post_width" => "wide"}
     })
 
-    {:ok, saved} = Groups.get_group(group["slug"])
+    {:ok, saved} = Groups.fetch_group(group["slug"])
     assert saved["show_reading_time"] == true
     assert saved["post_width"] == "wide"
   end
@@ -246,7 +246,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     |> form("#group-edit-form", group: %{"name" => group["name"], "slug" => group["slug"]})
     |> render_submit(%{"group" => %{"sitemap_exclude" => "false"}})
 
-    {:ok, saved} = Groups.get_group(group["slug"])
+    {:ok, saved} = Groups.fetch_group(group["slug"])
     assert saved["sitemap_exclude"] == false
   end
 

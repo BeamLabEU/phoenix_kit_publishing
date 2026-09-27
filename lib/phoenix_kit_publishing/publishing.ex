@@ -92,7 +92,9 @@ defmodule PhoenixKit.Modules.Publishing do
 
   defdelegate list_groups(), to: Groups
   defdelegate list_groups(status), to: Groups
-  defdelegate get_group(slug), to: Groups
+  defdelegate fetch_group(slug), to: Groups
+  @deprecated "Use fetch_group/1"
+  defdelegate get_group(slug), to: Groups, as: :fetch_group
   defdelegate add_group(name, opts \\ []), to: Groups
   defdelegate remove_group(slug), to: Groups
   defdelegate remove_group(slug, opts), to: Groups
@@ -153,7 +155,7 @@ defmodule PhoenixKit.Modules.Publishing do
   alias PhoenixKit.Modules.Publishing.Versions
 
   defdelegate list_versions(group_slug, post_slug), to: Versions
-  defdelegate get_published_version(group_slug, post_slug), to: Versions
+  defdelegate fetch_published_version(group_slug, post_slug), to: Versions
   defdelegate get_version_status(group_slug, post_slug, version_number, language), to: Versions
   defdelegate get_version_metadata(group_slug, post_slug, version_number, language), to: Versions
 
@@ -759,7 +761,7 @@ defmodule PhoenixKit.Modules.Publishing do
   end
 
   @doc false
-  defdelegate fetch_option(opts, key), to: Shared
+  defdelegate get_option(opts, key), to: Shared
 
   @doc false
   defdelegate audit_metadata(scope, action), to: Shared

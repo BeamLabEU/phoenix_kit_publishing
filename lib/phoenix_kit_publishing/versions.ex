@@ -40,10 +40,10 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
       []
   end
 
-  @doc "Gets the published version number for a post."
-  @spec get_published_version(String.t(), String.t()) ::
+  @doc "Fetches the published version number for a post."
+  @spec fetch_published_version(String.t(), String.t()) ::
           {:ok, integer()} | {:error, :not_found | :no_published_version}
-  def get_published_version(group_slug, post_slug) do
+  def fetch_published_version(group_slug, post_slug) do
     case DBStorage.get_post(group_slug, post_slug) do
       nil ->
         {:error, :not_found}
@@ -60,7 +60,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   rescue
     e ->
       Logger.warning(
-        "[Publishing] get_published_version failed for #{group_slug}/#{post_slug}: #{inspect(e)}"
+        "[Publishing] fetch_published_version failed for #{group_slug}/#{post_slug}: #{inspect(e)}"
       )
 
       {:error, :not_found}
@@ -697,7 +697,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   end
 
   defp do_create_version(group_slug, post_uuid, db_post, source_version, opts) do
-    scope = Shared.fetch_option(opts, :scope)
+    scope = Shared.get_option(opts, :scope)
     created_by_uuid = Shared.resolve_scope_user_uuids(scope)
 
     user_opts = %{created_by_uuid: created_by_uuid}

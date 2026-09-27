@@ -217,6 +217,15 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   `load_publishing_groups_for_tabs/0` catch only `Ecto.QueryError`,
   `DBConnection.ConnectionError` and `Postgrex.Error`: tabs render on every admin
   mount, but a `MatchError` there is a real bug and must still surface.
+- **Lookup shapes: `get_*` returns the record or `nil`; `fetch_*` returns
+  `{:ok, record} | {:error, atom}`** (an atom from `Errors`) — two layers
+  used to answer "get" with different shapes (`DBStorage.get_group/1` a
+  struct or nil, the context's a tuple), so every caller had to read the
+  spec. Holds for private helpers too. A `get_` that always answers with a
+  computed value (`get_config/0`, `get_primary_language/0`) is not a lookup
+  and is outside the rule. `get_group/1` on `Groups` and the facade is the
+  one deprecated delegate (`fetch_group/1` under its old name, kept for
+  `phoenix_kit_legal`).
 - **Soft delete:** posts use `trashed_at` (nil = active), groups use
   `status` (`"active"` / `"trashed"`). There is no post status column — status is
   version-level.
@@ -789,9 +798,8 @@ newest-created release as Latest and demotes the current one.
   then dropped as the old document's. A background tab's throttled timers
   are the realistic case, where nobody is typing. Raising the fallback or
   blocking the switch behind a "syncing…" state is the alternative.
-- **`get_`/`fetch_` return shapes are mixed:** `DBStorage.get_group/1` returns
-  a struct or nil, `Groups.get_group/1` a tuple; `get_category/1` a tuple,
-  `get_post_by_uuid/1` nil. A public API rename, so a release decision.
+- **Drop the deprecated `get_group/1` delegate** (`Groups` and the facade)
+  once `phoenix_kit_legal` calls `fetch_group/1`; its tests go with it.
 - **The public view counter has no per-IP cap** (`Views.record_async/1`):
   cookieless requests dedupe only by user agent, so a loop of curl requests
   inflates a count and costs a pool checkout each.

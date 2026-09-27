@@ -178,13 +178,13 @@ defmodule PhoenixKit.Integration.Publishing.VersionsTest do
       :ok = Versions.publish_version(group["slug"], post[:uuid], 1)
 
       assert {:ok, 1} =
-               Versions.get_published_version(group["slug"], post[:slug] || post[:uuid])
+               Versions.fetch_published_version(group["slug"], post[:slug] || post[:uuid])
     end
 
     test "returns error when no version is published" do
       {group, post} = create_group_and_post(title: "No Pub")
 
-      result = Versions.get_published_version(group["slug"], post[:slug] || post[:uuid])
+      result = Versions.fetch_published_version(group["slug"], post[:slug] || post[:uuid])
       assert match?({:error, _}, result)
     end
   end

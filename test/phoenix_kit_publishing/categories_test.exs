@@ -84,7 +84,7 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
 
       {:ok, _} = Categories.delete_category(a.uuid)
 
-      {:ok, reloaded} = Categories.get_category(b.uuid)
+      {:ok, reloaded} = Categories.fetch_category(b.uuid)
       assert reloaded.parent_uuid == nil
     end
   end
@@ -112,7 +112,7 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
 
       {:ok, _} = Categories.reorder_categories(slug, [child.uuid, a.uuid])
 
-      {:ok, reloaded} = Categories.get_category(child.uuid)
+      {:ok, reloaded} = Categories.fetch_category(child.uuid)
       assert reloaded.parent_uuid == a.uuid
     end
 
@@ -129,7 +129,7 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
           "not-a-uuid"
         ])
 
-      {:ok, foreign_reloaded} = Categories.get_category(foreign.uuid)
+      {:ok, foreign_reloaded} = Categories.fetch_category(foreign.uuid)
       assert foreign_reloaded.position == 0
     end
 
@@ -270,7 +270,7 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
       refute_receive {:categories_changed, _}, 50
 
       # The receiver's reload must see the committed row.
-      {:ok, reloaded} = Categories.get_category(cat.uuid)
+      {:ok, reloaded} = Categories.fetch_category(cat.uuid)
       assert reloaded.name == "Renamed"
     end
 
