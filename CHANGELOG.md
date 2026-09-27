@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.13.0 - 2026-09-27
+
+### Added
+
+- Per-day, address-based deduplication for cookieless post views, controlled by
+  `publishing_unique_views` (default on). Visitor identifiers are keyed hashes
+  held in a bounded ETS table; raw addresses are not stored. At capacity, views
+  continue counting without retaining additional identifiers.
+- Group and post `sitemap_exclude` settings exposed to core's Sitemap source.
+- Migration V2 adds expression indexes for group and version media-folder
+  pointers. Run `mix phoenix_kit.update` in the host app to apply them. No tables,
+  columns, or content rows change; rollback removes the matching indexes only.
+- Category changes broadcast to other open category administration pages.
+
+### Changed
+
+- Admin forms, dialogs, tabs, and empty states use core components.
+- Lookup APIs returning result tuples use `fetch_*` names. Callers must replace
+  `Publishing.get_published_version/2` and `Versions.get_published_version/2`
+  with `fetch_published_version/2`, and `Categories.get_category/1` with
+  `fetch_category/1`. `Groups.get_group/1` and the facade delegate remain as
+  deprecated aliases for `fetch_group/1`. The option helper `fetch_option/2`
+  is now `get_option/2` in Shared, Groups, and the facade.
+- Removed the facade's `broadcast_version_created/3` delegate and unused PubSub
+  helpers `broadcast_translation_progress/5`, `broadcast_translation_completed/3`,
+  `subscribe_to_group_editors/1`, and `unsubscribe_from_group_editors/1`.
+  AI translation progress is delivered through the AI module's events.
+- Public URL origins prefer the configured site URL or endpoint URL.
+- Dependencies refreshed; the core dependency floor remains 2.38.0.
+
+### Fixed
+
+- Language and version switches replace Leaf's visible document and collect
+  pending client keystrokes before saving. Preview, translation, and version
+  creation also wait for the client buffer. An unanswered action shows a waiting
+  indicator after 1.5 seconds and is cancelled after 6 seconds.
+- Creating a version saves the latest client text before copying the source.
+- Clean Leaf echoes no longer overwrite stored Markdown with normalized text;
+  saved-state tracking and collaborative buffer updates follow Leaf's protocol.
+- Public canonical redirects preserve query parameters without looping, and
+  segment-owning dialects redirect their full-code URLs to the canonical segment.
+  Missing translations use temporary fallback redirects, including version URLs.
+- Listing-cache installs and invalidations are serialized so stale regeneration
+  cannot overwrite a newer snapshot or an invalidation.
+- Read-time version repair rechecks state under the relevant database guards.
+- Failed image lookups are not retained in the render cache when core 2.41.1 or
+  newer supplies `RenderCache`; post cache invalidation clears UUID and slug keys.
+  This includes the previously unpublished 0.12.1 fixes.
+- Cold test builds wait for the publishing dispatch module before expanding
+  core's router macro, preventing intermittent missing routes.
+
 ## 0.12.1 - 2026-09-27
 
 ### Fixed

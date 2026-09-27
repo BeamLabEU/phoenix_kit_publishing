@@ -155,7 +155,7 @@ defmodule PhoenixKitPublishing.Migrations do
   A dedicated test (`migrations_renamed_host_test.exs`) reproduces a
   renamed-host shape — every PK/FK/UNIQUE-constraint/index on all 7 tables
   renamed to an arbitrary name — and runs a real `up/1` through
-  `Ecto.Migration.Runner`: no error, no duplicate object of any kind, and the
+  Ecto's internal migration runner: no error, no duplicate object of any kind, and the
   version marker still lands correctly on a second run.
 
   ### Phase 0 — this V1 adopts, and changes NOTHING

@@ -2,7 +2,7 @@ defmodule PhoenixKit.Modules.Publishing.MediaReorganizer do
   @moduledoc """
   Publishing's plan source for core's media reorganizer
   (`mix phoenix_kit.media.reorganize`), registered through
-  `PhoenixKit.Modules.Publishing.media_reorganizer/0`.
+  the publishing module's media reorganizer callback.
 
   The group folders of `PhoenixKit.Modules.Publishing.MediaFolders` are
   planned by core's `PhoenixKit.Modules.Storage.Reorganizer.ResourceSource`,
