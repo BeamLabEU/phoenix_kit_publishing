@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.13.1 - 2026-10-05
+
+### Fixed
+
+- `update_post/4` with `"status" => "published"` now publishes the saved version
+  through `publish_version/4` (status and live pointer move together under the
+  post's lock). It used to save the content, drop the status and answer `{:ok, post}`
+  with a draft. A publish refused after the content saved returns
+  `{:error, {:publish_failed, reason}}` with a translated message in every locale;
+  the save stands. Pass `publish: false` to save only — the editor does.
+- Clamped excerpts on listing cards no longer stretch past their line clamp inside
+  equal-height cards (daisyUI's `.card-body p { flex-grow: 1 }`).
+
 ## 0.13.0 - 2026-09-27
 
 ### Added

@@ -22,6 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   @timestamp_modes Constants.timestamp_modes()
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.DBStorage.Mapper
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
@@ -438,7 +439,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         {:error, reason} ->
           Logger.warning(
             "[Publishing] update_post saved #{inspect(post_uuid)} but could not publish " <>
-              "version #{version}: #{inspect(reason)}"
+              "version #{version}: #{Errors.truncate_for_log(reason)}"
           )
 
           {:error, {:publish_failed, reason}}

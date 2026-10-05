@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.UpdatePostPublishTest do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
+  alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.Posts
 
   setup do
@@ -112,5 +113,26 @@ defmodule PhoenixKit.Modules.Publishing.UpdatePostPublishTest do
 
     assert reason == :title_required
     assert {nil, _version_uuid, "draft"} = stored(ctx.post.uuid)
+  end
+
+  # The one refusal that comes AFTER the save: the translation's own title is
+  # fine, but the primary language has none, so publish_version says no.
+  test "a publish refused after the save is {:publish_failed, reason}, the save standing", ctx do
+    primary = LanguageHelpers.get_primary_language()
+    version = DBStorage.get_version(ctx.post.uuid, 1)
+    primary_content = DBStorage.get_content(version.uuid, primary)
+    {:ok, _} = DBStorage.update_content(primary_content, %{title: ""})
+
+    {:ok, translation} = Publishing.add_language_to_post(ctx.slug, ctx.post.uuid, "et", 1)
+
+    assert {:error, {:publish_failed, :title_required}} =
+             Publishing.update_post(ctx.slug, translation, %{
+               "title" => "Tõlge",
+               "content" => "saved anyway",
+               "status" => "published"
+             })
+
+    assert {nil, _version_uuid, "draft"} = stored(ctx.post.uuid)
+    assert DBStorage.get_content(version.uuid, "et").content =~ "saved anyway"
   end
 end

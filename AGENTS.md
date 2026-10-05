@@ -194,7 +194,7 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   `phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}`, or the host
   header renders the page as logged-out even when the controller knows better.
 - **Gettext:** this module owns `PhoenixKitPublishing.Gettext` and
-  `priv/gettext` (en, et, fr, it, ru). Modules opt in with
+  `priv/gettext` (de, en, et, fr, it, ru). Modules opt in with
   `use Gettext, backend: PhoenixKitPublishing.Gettext`; tabs pass
   `gettext_backend: PhoenixKitPublishing.Gettext`. Extract with
   `mix gettext.extract --merge`. Only the macro form `gettext("…")` is visible to
