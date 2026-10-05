@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.13.2 - 2026-10-05
+
+### Changed
+
+- **Leaf requirement is now `>= 0.5.1 and < 1.0.0`** (was `~> 0.4.1 or ~> 0.5`).
+  The editor waits for correlated `{:leaf_flushed, …}` replies and relies on
+  `:set_content` baselining the dirty state; both first shipped in Leaf 0.5.1, so
+  with 0.4.1 Preview, translation, Create Version and language/version switches
+  timed out. Hosts must also update their Leaf JS bundle.
+
+### Fixed
+
+- `update_post/4` given a UUID from a different group than the group slug no longer
+  saves content and then reports `:not_found`; the post is looked up within its group.
+- Version history works with the listing cache disabled (or for posts outside the
+  capped cache): the fallback resolves the group-scoped post and takes
+  `allow_version_access` and the live version from the same active version.
+- The public version dropdown no longer lists archived versions that were never
+  published, which linked to a URL that fell back.
+- A blank new version keeps the post's media-folder pointer; version creation takes
+  the post lock first.
+
 ## 0.13.1 - 2026-10-05
 
 ### Fixed
