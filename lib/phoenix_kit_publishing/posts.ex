@@ -322,6 +322,36 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   @doc """
   Updates a post in the database.
+
+  ## Publishing through a save
+
+  `"status" => "published"` in `params` publishes the saved version: the
+  content is saved first, then `Versions.publish_version/4` makes it the
+  live one (archiving any other published version, under the post's lock).
+  The post that comes back carries the published status.
+
+  It used to be dropped without a word — the status is never *written* by
+  a save, because which version is live is decided in one place — so a
+  caller that built a post through this function and asked for it
+  published got `{:ok, post}` and a draft. An AI agent writing a post
+  through the API did exactly that.
+
+  When the content saves but the publish is refused (a blank
+  primary-language title, a trashed post), the answer is
+  `{:error, {:publish_failed, reason}}`: the save stands, the post is
+  still a draft, and the caller is told so rather than told `:ok`.
+
+  ## Options
+
+    * `:publish` — pass `false` to save only, even when the params ask for
+      `"published"`. The editor does: it saves a whole form (a snapshot of
+      what the page knew when it loaded, which may say "published" about a
+      version unpublished since) and publishes as its own, deliberate step.
+    * `:scope`, `:actor_uuid` — who is doing it, for the audit fields and
+      the activity log.
+    * `:source_id` — passed to the publish broadcast, so the sender can
+      ignore its own message.
+    * `:skip_broadcast` — do not broadcast the update.
   """
   @spec update_post(String.t(), map(), map(), map() | keyword()) ::
           {:ok, map()} | {:error, any()}
@@ -370,7 +400,62 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         )
     end
 
-    result
+    maybe_publish_after_save(result, group_slug, post, params, opts_map, audit_meta)
+  end
+
+  # The save asked for "published" and the saved version is not the live
+  # one: publish it. See `update_post/4`'s doc for why this is a second step
+  # and not a status write.
+  defp maybe_publish_after_save(
+         {:ok, saved} = result,
+         group_slug,
+         post,
+         params,
+         opts_map,
+         audit_meta
+       ) do
+    wanted? = Constants.published?(Map.get(params, "status"))
+    live? = Constants.published?(get_in(saved, [:metadata, :status]))
+
+    if wanted? and not live? and Map.get(opts_map, :publish, true) != false do
+      post_uuid = saved[:uuid] || post[:uuid]
+      version = saved[:version] || post[:version] || 1
+
+      publish_opts =
+        [
+          actor_uuid: actor_uuid_for_log(opts_map, audit_meta),
+          source_id: Map.get(opts_map, :source_id)
+        ]
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+
+      case Publishing.Versions.publish_version(group_slug, post_uuid, version, publish_opts) do
+        :ok ->
+          reread_published(saved, post_uuid, version)
+
+        {:error, reason} ->
+          Logger.warning(
+            "[Publishing] update_post saved #{inspect(post_uuid)} but could not publish " <>
+              "version #{version}: #{inspect(reason)}"
+          )
+
+          {:error, {:publish_failed, reason}}
+      end
+    else
+      result
+    end
+  end
+
+  defp maybe_publish_after_save(result, _group_slug, _post, _params, _opts_map, _audit_meta),
+    do: result
+
+  # The post as it is now that it is live. Should the read fail, the publish
+  # still happened — answer with the saved post rather than an error about a
+  # write that succeeded.
+  defp reread_published(saved, post_uuid, version) do
+    case read_post_by_uuid(post_uuid, saved[:language], version) do
+      {:ok, published} -> {:ok, published}
+      _ -> {:ok, saved}
+    end
   end
 
   # Activity-log actor preference: explicit opts > scope-derived audit

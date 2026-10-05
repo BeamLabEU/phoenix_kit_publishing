@@ -391,7 +391,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         result =
           case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
                  scope: scope,
-                 actor_uuid: actor_uuid
+                 actor_uuid: actor_uuid,
+                 # The editor publishes as its own step (handle_successful_update).
+                 publish: false
                }) do
             {:ok, updated_post} ->
               # Preserve UUID from create_post (update_post may not include it)
@@ -426,7 +428,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       {:ok, new_post} ->
         case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
                scope: scope,
-               actor_uuid: actor_uuid
+               actor_uuid: actor_uuid,
+               # The editor publishes as its own step (handle_successful_update).
+               publish: false
              }) do
           {:ok, _updated_post} = result ->
             handle_post_update_result(
@@ -543,7 +547,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
 
     case Publishing.update_post(group_slug, post, params, %{
            scope: scope,
-           actor_uuid: Shared.actor_uuid_from_socket(socket)
+           actor_uuid: Shared.actor_uuid_from_socket(socket),
+           # The editor publishes as its own step (handle_successful_update).
+           publish: false
          }) do
       {:ok, updated_post} ->
         handle_successful_update(
