@@ -13,6 +13,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.Renderer
@@ -24,7 +25,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
 
   @status_published Constants.status_published()
-  @public_version_statuses [Constants.status_published(), Constants.status_archived()]
 
   # Suppress dialyzer false positive for defensive fallback pattern
   @dialyzer {:nowarn_function, render_post_content: 2}
@@ -406,7 +406,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
       # active version, which is the one you're already reading.
       published_versions =
         version_statuses
-        |> Enum.filter(fn {_v, status} -> status in @public_version_statuses end)
+        |> Enum.filter(fn {number, status} ->
+          publication_date = Map.get(post[:version_publication_dates] || %{}, number)
+
+          is_integer(live_version) and number <= live_version and
+            historically_published?(%{
+              metadata: %{status: status, published_at: publication_date}
+            })
+        end)
         |> Enum.map(fn {v, _status} -> v end)
         |> Enum.sort(:desc)
 
@@ -465,40 +472,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
         {allow_access, live_version}
 
       {:error, _} ->
-        # Cache miss - fall back to DB reads
-        post_identifier = get_post_identifier(current_post)
-
-        primary_language = LanguageHelpers.get_primary_language()
-
-        allow_access = get_allow_access_from_db(group_slug, current_post, primary_language)
-        live_version = get_live_version_from_db(group_slug, post_identifier)
-        {allow_access, live_version}
+        live_version_info_from_db(group_slug, current_post)
     end
   end
 
-  defp get_post_identifier(post) do
-    post[:uuid] || post.slug
-  end
+  defp live_version_info_from_db(group_slug, post) do
+    db_post =
+      if post[:uuid],
+        do: DBStorage.get_group_post_by_uuid(group_slug, post.uuid, [:active_version]),
+        else: DBStorage.get_post(group_slug, post.slug)
 
-  # Fallback: Gets allow_version_access from DB when cache misses
-  defp get_allow_access_from_db(group_slug, current_post, primary_language) do
-    if current_post.language == primary_language do
-      Map.get(current_post.metadata, :allow_version_access, false)
-    else
-      post_identifier = get_post_identifier(current_post)
+    case db_post do
+      %{trashed_at: nil, active_version: %{status: @status_published} = version} ->
+        {Map.get(version.data || %{}, "allow_version_access", false), version.version_number}
 
-      case Publishing.read_post(group_slug, post_identifier, primary_language, nil) do
-        {:ok, primary_post} -> Map.get(primary_post.metadata, :allow_version_access, false)
-        {:error, _} -> false
-      end
-    end
-  end
-
-  # Fallback: Gets published version from DB when cache misses
-  defp get_live_version_from_db(group_slug, post_identifier) do
-    case Publishing.fetch_published_version(group_slug, post_identifier) do
-      {:ok, version} -> version
-      {:error, _} -> nil
+      _ ->
+        {false, nil}
     end
   end
 

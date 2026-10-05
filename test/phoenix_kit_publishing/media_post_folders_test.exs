@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.MediaPostFoldersTest do
   alias PhoenixKit.Modules.Publishing.MediaReorganizer
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.PublishingVersion
+  alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Modules.Storage.Folder
   alias PhoenixKit.Modules.Storage.Reorganizer
   alias PhoenixKitPublishing.Test.MediaHooks, as: Hooks
@@ -78,6 +79,21 @@ defmodule PhoenixKit.Modules.Publishing.MediaPostFoldersTest do
   end
 
   describe "ensure_post_folder/4" do
+    test "a blank version keeps the post's folder without copying editorial metadata" do
+      group = group!("News")
+      post = post!(group, version_data: %{"featured" => true})
+      {:ok, folder} = MediaFolders.ensure_post_folder(post, group_folder!(group), nil)
+
+      assert {:ok, blank} = Versions.create_version_from(group.slug, post.uuid, nil)
+      assert blank.content == ""
+
+      assert DBStorage.get_version(post.uuid, blank.version).data == %{
+               "media_folder_uuid" => folder.uuid
+             }
+
+      assert pointers(post) == [folder.uuid, folder.uuid]
+    end
+
     test "creates Publishing/<group>/<slug> and points every version at it" do
       group = group!("News")
       post = post!(group, slug: "spring-fair", versions: 3)

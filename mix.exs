@@ -122,20 +122,13 @@ defmodule PhoenixKitPublishing.MixProject do
       {:phoenix_kit_comments, "~> 0.3", only: :test},
 
       # The post editor. Leaf is a standalone package (phoenix_kit depends on it
-      # too, for the comment composer), so publishing declares it directly now
-      # that the editor calls it. The 0.4.1 floor is load-bearing: inline
-      # suggestions — the `{:leaf_suggest, …}` message, the `:suggestions`
-      # command and the caret popup that `#hashtag` autocomplete rides on —
-      # arrived in 0.4.0, and `:flush` lets a save collect the last keystrokes
-      # instead of whatever the debounce had settled.
-      #
-      # The range is a FLOOR plus a major-ish ceiling, not `~> 0.4.1` — that
-      # reads as `>= 0.4.1 and < 0.5.0`, which locked publishing out of leaf
-      # 0.5 entirely. phoenix_kit core declares `~> 0.3`, so a host resolving
-      # both got leaf 0.5.1 + publishing 0.4.4 and silently stayed a release
-      # behind. 0.5 removed nothing publishing calls (its attr set is a strict
-      # superset of 0.4.1's; the message contract only gained `:leaf_flushed`).
-      {:leaf, "~> 0.4.1 or ~> 0.5"},
+      # too, for the comment composer). 0.5.1 is the first published version
+      # with correlated `:flush` replies (`{:leaf_flushed, …}`) and the dirty
+      # baseline on `:set_content`. The editor requires both for safe document
+      # switches; 0.4.1 supports bare flushes but never answers their refs.
+      # Keep the ceiling open across later 0.x minors: a three-segment `~>`
+      # would strand hosts resolving a newer Leaf alongside core.
+      {:leaf, ">= 0.5.1 and < 1.0.0"},
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},

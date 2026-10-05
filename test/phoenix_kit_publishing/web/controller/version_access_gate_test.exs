@@ -21,6 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.VersionAccessGateTest do
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
+  alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
   alias PhoenixKit.Settings
 
   setup do
@@ -62,6 +63,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.VersionAccessGateTest do
     older = get_version(ctx, 1)
     assert older.status == 200
     assert older.resp_body =~ "FIRST-CUT"
+  end
+
+  test "history stays readable with the listing cache disabled", ctx do
+    {:ok, _} = Versions.create_version_from(ctx.slug, ctx.post.uuid, 1)
+    :ok = Versions.publish_version(ctx.slug, ctx.post.uuid, 2)
+    {:ok, _} = Settings.update_boolean_setting("publishing_memory_cache_enabled", false)
+
+    assert get_version(ctx, 1).status == 200
+  end
+
+  test "cache misses use the live access setting instead of the historical one", ctx do
+    {:ok, v2} = Versions.create_version_from(ctx.slug, ctx.post.uuid, 1)
+    {:ok, _} = Posts.update_post(ctx.slug, v2, %{"allow_version_access" => "false"})
+    :ok = Versions.publish_version(ctx.slug, ctx.post.uuid, 2)
+    {:ok, old} = Publishing.read_post_by_uuid(ctx.post.uuid, "en", 1)
+    {:ok, _} = Settings.update_boolean_setting("publishing_memory_cache_enabled", false)
+
+    assert PostRendering.get_cached_version_info(ctx.slug, old) == {false, 2}
+    refute PostRendering.publicly_browsable_version?(ctx.slug, old, 1)
+  end
+
+  test "the version dropdown leaves out an archived draft that never shipped", ctx do
+    {:ok, v2} = Versions.create_version_from(ctx.slug, ctx.post.uuid, 1)
+    {:ok, _} = Posts.update_post(ctx.slug, v2, %{"status" => "archived"})
+    {:ok, _} = Versions.create_version_from(ctx.slug, ctx.post.uuid, 1)
+    :ok = Versions.publish_version(ctx.slug, ctx.post.uuid, 3)
+    {:ok, live} = Publishing.read_post_by_uuid(ctx.post.uuid, "en", 3)
+
+    dropdown = PostRendering.build_version_dropdown(ctx.slug, live, "en")
+    assert Enum.map(dropdown.versions, & &1.version) == [3, 1]
   end
 
   test "taking the post down closes its version history", ctx do

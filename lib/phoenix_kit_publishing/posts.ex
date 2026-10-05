@@ -1145,7 +1145,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     cond do
       # If we have a UUID, use it directly (most reliable)
       post[:uuid] ->
-        DBStorage.get_post_by_uuid(post[:uuid], [:group])
+        DBStorage.get_group_post_by_uuid(group_slug, post[:uuid], [:group])
 
       # Timestamp-mode: use date/time
       post[:mode] in @timestamp_modes && post[:date] && post[:time] ->

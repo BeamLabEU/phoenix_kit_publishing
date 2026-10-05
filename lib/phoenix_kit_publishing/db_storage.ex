@@ -577,6 +577,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
           {:ok, PublishingVersion.t()} | {:error, term()}
   def create_version_from(post_uuid, source_version_number, opts \\ %{}) do
     repo().transaction(fn ->
+      # Folder filing and saves also take this lock before changing version data.
+      lock_post_row!(repo(), post_uuid)
       source_version = get_version(post_uuid, source_version_number)
       unless source_version, do: repo().rollback(:source_not_found)
 

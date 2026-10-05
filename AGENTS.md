@@ -41,11 +41,13 @@ reorganizer's `ResourceSource`; `PublishingGroup.changeset/2` needs
 reading it as offset 0 — under an older core every timestamp post is stamped
 and syndicated on UTC while the editor shows the site clock. Don't lower it.
 
-The `leaf` requirement is `~> 0.4.1 or ~> 0.5`, and the two-branch form is
-deliberate: plain `~> 0.4.1` reads as `< 0.5.0`, and because core declares
-`~> 0.3` a host resolving both then silently held publishing a release behind.
-The `0.4.1` floor is load-bearing (inline suggestions and `:flush`). Don't
-re-tighten the range.
+The `leaf` requirement is `>= 0.5.1 and < 1.0.0`. The floor is load-bearing:
+0.4.1 has bare `:flush`, but the editor now waits for correlated
+`{:leaf_flushed, …}` replies and needs `:set_content` to baseline dirty state,
+both first published in 0.5.1. Keep the ceiling open through later 0.x minors;
+a three-segment `~>` previously held publishing a release behind in hosts
+resolving a newer Leaf alongside core. Hosts must update their Leaf JS bundle
+with the dependency too.
 
 ## What this module does NOT do
 

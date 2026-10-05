@@ -372,12 +372,25 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
     repo = PhoenixKit.RepoHelper.repo()
 
     repo.transaction(fn ->
+      DBStorage.lock_post_row!(repo, db_post.uuid)
+
+      # The folder belongs to the post, even when its editorial content starts blank.
+      folder_data =
+        db_post.uuid
+        |> DBStorage.list_versions()
+        |> Enum.reverse()
+        |> Enum.find_value(%{}, fn version ->
+          if get_in(version.data || %{}, ["media_folder_uuid"]),
+            do: Map.take(version.data, ["media_folder_uuid"])
+        end)
+
       with {:ok, db_version} <-
              DBStorage.create_version(%{
                post_uuid: db_post.uuid,
                version_number: DBStorage.next_version_number(db_post.uuid),
                status: "draft",
-               created_by_uuid: created_by_uuid
+               created_by_uuid: created_by_uuid,
+               data: folder_data
              }),
            {:ok, _content} <-
              DBStorage.create_content(%{

@@ -69,6 +69,20 @@ defmodule PhoenixKit.Modules.Publishing.UpdatePostPublishTest do
     assert {nil, _version_uuid, "draft"} = stored(ctx.post.uuid)
   end
 
+  test "a UUID from another group is refused before content is saved", ctx do
+    {:ok, other} = Groups.add_group("other-#{System.unique_integer([:positive])}", mode: "slug")
+
+    assert {:error, :not_found} =
+             Publishing.update_post(other["slug"], ctx.post, %{
+               "content" => "wrong group write",
+               "status" => "published"
+             })
+
+    version = DBStorage.get_version(ctx.post.uuid, 1)
+    assert DBStorage.get_content(version.uuid, ctx.post.language).content == ctx.post.content
+    assert {nil, _uuid, "draft"} = stored(ctx.post.uuid)
+  end
+
   test "publish: false saves only, whatever the params ask — the editor's contract", ctx do
     assert {:ok, saved} =
              Publishing.update_post(

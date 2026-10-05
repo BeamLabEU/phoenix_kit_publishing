@@ -84,6 +84,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       version: version.version_number,
       available_versions: available_versions,
       version_statuses: version_statuses,
+      version_publication_dates:
+        Map.new(all_versions, &{&1.version_number, format_datetime(&1.published_at)}),
       version_dates: version_dates,
       content: content.content,
       content_updated_at: content.updated_at,
@@ -149,6 +151,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       version: current_version,
       available_versions: available_versions,
       version_statuses: version_statuses,
+      version_publication_dates:
+        Map.new(all_versions, &{&1.version_number, format_datetime(&1.published_at)}),
       version_dates: version_dates,
       content: primary_content && extract_excerpt(primary_content),
       metadata:

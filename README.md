@@ -18,6 +18,11 @@ Or for local development:
 
 Then run `mix deps.get` and `mix phoenix_kit.install`. The module is auto-discovered by PhoenixKit at startup — no additional config needed. The installer also adds the necessary Tailwind CSS `@source` directive so all styles render correctly.
 
+The editor requires Leaf 0.5.1 or later. When upgrading, update any vendored
+`leaf.js` bundle or CDN version alongside the dependency: language/version
+switches, Preview, version creation, and translation wait for Leaf's correlated
+flush replies, which older bundles do not send.
+
 ### Database Setup
 
 The 7 publishing tables — `phoenix_kit_publishing_groups`, `_posts`,
@@ -27,9 +32,10 @@ core versioned migrations. Run `mix phoenix_kit.install` in the host app and
 they're set up automatically. This module also owns their *future* shape
 through its own versioned chain, `PhoenixKitPublishing.Migrations`
 (`migration_module/0`), which `mix phoenix_kit.update` discovers and drives
-alongside core's own chain — no separate command to run. Its current version
-(V1) is a pure adoption of the shape core already creates: it changes
-nothing on an existing install beyond stamping a version marker.
+alongside core's own chain — no separate command to run. V1 adopts the shape
+core already creates, stamping a version marker. V2 adds two expression
+indexes for media-folder pointers without changing tables, columns, or content.
+Run `mix phoenix_kit.update` in existing hosts to apply the current chain.
 
 ### Enable the Module
 
