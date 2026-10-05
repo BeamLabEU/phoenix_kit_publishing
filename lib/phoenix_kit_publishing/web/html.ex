@@ -1138,8 +1138,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         </h2>
 
         <%= if @excerpt && @excerpt != "" do %>
+          <%!-- `grow-0`: daisyUI's `.card-body` gives every `<p>`
+               `flex-grow: 1`, so in a row of equal-height cards a clamped
+               excerpt was stretched taller than its three lines and the text
+               after the "…" showed underneath, cut off by the card. --%>
           <p class={[
-            "text-base-content/70 line-clamp-3",
+            "text-base-content/70 line-clamp-3 grow-0",
             (@highlight? && "text-base") || "text-sm"
           ]}>
             {@excerpt}
@@ -1289,7 +1293,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <h2 class="card-title text-lg">
           <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
         </h2>
-        <p :if={@excerpt && @excerpt != ""} class="line-clamp-2 text-sm text-base-content/70">
+        <p :if={@excerpt && @excerpt != ""} class="line-clamp-2 grow-0 text-sm text-base-content/70">
           {@excerpt}
         </p>
         <div class="card-actions mt-auto items-center justify-between pt-2">
@@ -1591,7 +1595,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <h3 class="card-title text-2xl">
           <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
         </h3>
-        <p :if={@excerpt && @excerpt != ""} class="text-base line-clamp-3 text-base-content/70">
+        <p :if={@excerpt && @excerpt != ""} class="text-base line-clamp-3 grow-0 text-base-content/70">
           {@excerpt}
         </p>
         <.band_card_footer post={@post} group_slug={@group_slug} date_counts={@date_counts} post_url={@post_url} />
