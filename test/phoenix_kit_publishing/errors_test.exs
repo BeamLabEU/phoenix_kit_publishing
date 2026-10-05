@@ -99,6 +99,14 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
                "Failed to read source post: :not_found"
     end
 
+    test "{:publish_failed, reason} says the save stands and translates the inner reason" do
+      assert Errors.message({:publish_failed, :title_required}) ==
+               "Saved as a draft, but it could not be published: Title is required to publish"
+
+      assert Errors.message({:publish_failed, :post_trashed}) =~
+               "Saved as a draft, but it could not be published: "
+    end
+
     test "tagged tuple with very long reason gets truncated" do
       long = String.duplicate("x", 1000)
       msg = Errors.message({:ai_translation_failed, long})

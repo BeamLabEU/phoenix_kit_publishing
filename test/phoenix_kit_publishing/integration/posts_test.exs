@@ -235,18 +235,32 @@ defmodule PhoenixKit.Integration.Publishing.PostsTest do
       assert updated[:content] == "<p>New body</p>"
     end
 
-    test "update_post does not publish a version by itself — that's publish_version's job (M4)" do
+    test "a save never WRITES the published status — publishing is publish_version's job (M4)" do
       group = create_group("slug")
       {:ok, post} = Posts.create_post(group["slug"], %{title: "Defer", content: "x"})
 
-      # Saving with status=published must NOT mark the version published on its
-      # own; publishing is atomic via Versions.publish_version. Otherwise a save
-      # could commit published while the paired publish rolled back.
-      {:ok, _} = Posts.update_post(group["slug"], post, %{"status" => "published"}, %{})
+      # The save itself must not mark the version published: publishing is
+      # atomic via Versions.publish_version, or a save could commit published
+      # while the paired publish rolled back. `publish: false` is the save on
+      # its own — what the editor asks for, before its own publish step.
+      {:ok, _} =
+        Posts.update_post(group["slug"], post, %{"status" => "published"}, %{publish: false})
 
       [v] = DBStorage.list_versions(post[:uuid])
       assert v.status == "draft"
       assert DBStorage.get_post_by_uuid(post[:uuid]).active_version_uuid == nil
+    end
+
+    test "asked to publish, a save does it THROUGH publish_version, pointer and status together" do
+      group = create_group("slug")
+      {:ok, post} = Posts.create_post(group["slug"], %{title: "Go live", content: "x"})
+
+      {:ok, saved} = Posts.update_post(group["slug"], post, %{"status" => "published"}, %{})
+
+      [v] = DBStorage.list_versions(post[:uuid])
+      assert v.status == "published"
+      assert DBStorage.get_post_by_uuid(post[:uuid]).active_version_uuid == v.uuid
+      assert saved[:metadata][:status] == "published"
     end
 
     test "read_post by UUID is pinned to the requested group (M6)" do

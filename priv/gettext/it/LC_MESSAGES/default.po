@@ -3767,3 +3767,8 @@ msgstr "Visualizzazioni uniche attivate — una visualizzazione per visitatore, 
 #, elixir-autogen, elixir-format
 msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
 msgstr "Attivo: ogni visitatore viene contato una volta per articolo al giorno — per sessione, altrimenti per un hash con chiave dell’indirizzo; i lettori che condividono un indirizzo contano una volta finché il browser non conserva il marcatore. Disattivo: viene contata ogni apertura della pagina."
+
+#: lib/phoenix_kit_publishing/errors.ex
+#, elixir-autogen, elixir-format
+msgid "Saved as a draft, but it could not be published: %{reason}"
+msgstr "Salvato come bozza, ma non è stato possibile pubblicarlo: %{reason}"

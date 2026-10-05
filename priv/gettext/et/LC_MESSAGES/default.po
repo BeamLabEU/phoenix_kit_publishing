@@ -3767,3 +3767,8 @@ msgstr "Unikaalsed vaatamised sees — üks vaatamine külastaja, postituse ja p
 #, elixir-autogen, elixir-format
 msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
 msgstr "Sees: iga külastaja loetakse postituse kohta päevas üks kord — seansi, selle puudumisel aadressi võtmega räsi järgi; ühte aadressi jagavad lugejad loetakse üks kord, kuni brauser markeri alles hoiab. Väljas: loetakse iga lehe avamine."
+
+#: lib/phoenix_kit_publishing/errors.ex
+#, elixir-autogen, elixir-format
+msgid "Saved as a draft, but it could not be published: %{reason}"
+msgstr "Salvestatud mustandina, kuid avaldamine ebaõnnestus: %{reason}"

@@ -15,7 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
       `:invalid_mode`, `:no_published_version`, etc.
     * tagged tuples — `{:ai_translation_failed, reason}`,
       `{:ai_extract_failed, reason}`, `{:ai_request_failed, reason}`,
-      `{:source_post_read_failed, reason}`
+      `{:source_post_read_failed, reason}`, `{:publish_failed, reason}`
     * strings — passed through unchanged (legacy / interpolated messages)
     * `%Ecto.Changeset{}` — a humanized, two-error-capped summary of its
       field errors (defensive: changesets are normally normalized to atoms
@@ -97,6 +97,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | {:ai_extract_failed, term()}
           | {:ai_request_failed, term()}
           | {:source_post_read_failed, term()}
+          | {:publish_failed, term()}
 
   @doc """
   Translates an error reason (atom, tagged tuple, or string) into a
@@ -184,6 +185,15 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
 
   def message({:source_post_read_failed, reason}) do
     gettext("Failed to read source post: %{reason}", reason: truncate_for_log(reason))
+  end
+
+  # `update_post/4` saved the content and was then refused the publish it was
+  # asked for. The inner reason is one of this module's own, so it is
+  # translated rather than inspected.
+  def message({:publish_failed, reason}) do
+    gettext("Saved as a draft, but it could not be published: %{reason}",
+      reason: message(reason)
+    )
   end
 
   # Changesets normally get normalized to atoms upstream, but if one reaches

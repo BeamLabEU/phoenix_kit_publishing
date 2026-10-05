@@ -427,9 +427,10 @@ lib/phoenix_kit_publishing/
   `ResourceSource`) moves the folders when the host's hooks change. Design:
   `dev_docs/2026-09-25-publishing-media-reorganizer.md`.
 - `Publishing.Errors` — every public-API error tuple returns either an atom
-  listed in `@type error_atom` or one of four tagged tuples
+  listed in `@type error_atom` or one of five tagged tuples
   (`{:ai_translation_failed, _}`, `{:ai_extract_failed, _}`,
-  `{:ai_request_failed, _}`, `{:source_post_read_failed, _}`). `message/1`
+  `{:ai_request_failed, _}`, `{:source_post_read_failed, _}`,
+  `{:publish_failed, _}`). `message/1`
   translates through this module's gettext backend, keeping the API layer
   locale-agnostic; `truncate_for_log/2` is the canonical way to put an opaque
   reason in a `Logger` call (500-char budget, appends `(truncated, N bytes)`). A
@@ -790,6 +791,8 @@ newest-created release as Latest and demotes the current one.
 - **Drop the deprecated `get_group/1` delegate** (`Groups` and the facade)
   once `phoenix_kit_legal` calls `fetch_group/1`; its tests go with it.
 - **Translation button immediate-disable** in the editor. `phx-disable-with`
-  covers most cases; the gap is a double-enqueue on slow networks before the
-  server's `ai_translation_status` assign returns. Closing it means this module's
-  first JS, so it arrives via `js_sources/0`, never an inline script.
+  covers most cases; on a slow network the button can still be clicked twice
+  before the server's `ai_translation_status` assign returns. The second click
+  queues nothing — `phoenix_kit_ai`'s enqueue is atomic — so what is left is
+  the button's look. Closing it means this module's first JS, so it arrives
+  via `js_sources/0`, never an inline script.
