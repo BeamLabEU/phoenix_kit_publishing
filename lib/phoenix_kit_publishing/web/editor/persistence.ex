@@ -392,7 +392,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
                  scope: scope,
                  actor_uuid: actor_uuid,
-                 # The editor publishes as its own step (handle_successful_update).
+                 # Save only: a post created here stays a draft until it is published as a step of its own.
                  publish: false
                }) do
             {:ok, updated_post} ->
@@ -429,7 +429,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
                scope: scope,
                actor_uuid: actor_uuid,
-               # The editor publishes as its own step (handle_successful_update).
+               # Save only: a post created here stays a draft until it is published as a step of its own.
                publish: false
              }) do
           {:ok, _updated_post} = result ->

@@ -336,8 +336,11 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   published got `{:ok, post}` and a draft. An AI agent writing a post
   through the API did exactly that.
 
-  When the content saves but the publish is refused (a blank
-  primary-language title, a trashed post), the answer is
+  A post that cannot go live is usually refused by the save itself, before
+  anything is written — a blank title on the primary language is
+  `{:error, :title_required}`. When the content does save and the publish
+  is then refused (saving a translation while the primary language still
+  has no title, for one), the answer is
   `{:error, {:publish_failed, reason}}`: the save stands, the post is
   still a draft, and the caller is told so rather than told `:ok`.
 

@@ -3777,3 +3777,8 @@ msgstr "Уникальные просмотры включены — один п
 #, elixir-autogen, elixir-format
 msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
 msgstr "Вкл.: каждый посетитель учитывается один раз на запись в день — по сеансу, иначе по ключевому хешу адреса; читатели за одним адресом учитываются один раз, пока их браузер не сохранит метку. Выкл.: учитывается каждое открытие страницы."
+
+#: lib/phoenix_kit_publishing/errors.ex
+#, elixir-autogen, elixir-format
+msgid "Saved as a draft, but it could not be published: %{reason}"
+msgstr "Сохранено как черновик, но опубликовать не удалось: %{reason}"

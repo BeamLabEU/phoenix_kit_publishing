@@ -3767,3 +3767,8 @@ msgstr "Eindeutige Aufrufe aktiviert — ein Aufruf pro Besucher, Beitrag und Ta
 #, elixir-autogen, elixir-format
 msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
 msgstr "An: Jeder Besucher wird pro Beitrag und Tag einmal gezählt — nach Sitzung, sonst nach einem geschlüsselten Hash der Adresse; Leser hinter einer gemeinsamen Adresse zählen einmal, bis ihr Browser die Markierung behält. Aus: Jedes Öffnen der Seite wird gezählt."
+
+#: lib/phoenix_kit_publishing/errors.ex
+#, elixir-autogen, elixir-format
+msgid "Saved as a draft, but it could not be published: %{reason}"
+msgstr "Als Entwurf gespeichert, konnte aber nicht veröffentlicht werden: %{reason}"
