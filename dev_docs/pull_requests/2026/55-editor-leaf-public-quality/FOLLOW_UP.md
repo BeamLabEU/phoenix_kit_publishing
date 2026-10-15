@@ -27,3 +27,21 @@ Triage only (2026-10-05): every finding re-verified by reading current code at H
 ## Open
 
 None.
+
+## CLAUDE_REVIEW (2026-10-15)
+
+### Fixed
+
+- **`Listing` LV erased the regenerated cache and re-broadcast** — now `erase_local/1`.
+- **`client_events_test.exs` regex missed the socket-first `push_event`** — fixed; the
+  two missed events are listed with their listeners.
+
+### Open
+
+- **Autosave `mark_saved` baselines the client's current text** (BUG - MEDIUM) —
+  needs a Leaf-side change or a ref'd flush verified in a browser.
+- **Unique-view dedup behind a CDN / second proxy** — needs a trusted-proxy-hops
+  setting or a `conn.remote_ip` preference.
+- **AI translation lock if a job finishes before `:translation_started`** — track
+  completed languages in a set that survives the start event.
+- Nitpicks listed in `CLAUDE_REVIEW.md`.

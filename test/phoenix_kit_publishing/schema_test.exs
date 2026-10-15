@@ -194,6 +194,29 @@ defmodule PhoenixKit.Modules.Publishing.SchemaTest do
       assert PublishingGroup.translated_name(group, "fr-FR") == "Blogue"
     end
 
+    test "translated_name/2 never lends one dialect's override to a sibling" do
+      group = %PublishingGroup{name: "Blog", data: %{"name_i18n" => %{"en-GB" => "Colour Blog"}}}
+
+      assert PublishingGroup.translated_name(group, "en-GB") == "Colour Blog"
+      # the sole dialect of the base answers the bare base the public side asks with
+      assert PublishingGroup.translated_name(group, "en") == "Colour Blog"
+      # a different dialect of the same base keeps the primary name
+      assert PublishingGroup.translated_name(group, "en-US") == "Blog"
+      assert PublishingGroup.translated_name(group, "en-AU") == "Blog"
+    end
+
+    test "translated_name/2 treats a bare base with several dialect overrides as ambiguous" do
+      group =
+        %PublishingGroup{
+          name: "Blog",
+          data: %{"name_i18n" => %{"en-GB" => "Colour Blog", "en-AU" => "Aussie Blog"}}
+        }
+
+      assert PublishingGroup.translated_name(group, "en") == "Blog"
+      assert PublishingGroup.translated_name(group, "en-GB") == "Colour Blog"
+      assert PublishingGroup.translated_name(group, "en-AU") == "Aussie Blog"
+    end
+
     test "translated_name/2 ignores blank overrides" do
       group = %PublishingGroup{name: "Blog", data: %{"name_i18n" => %{"fr" => ""}}}
       assert PublishingGroup.translated_name(group, "fr") == "Blog"

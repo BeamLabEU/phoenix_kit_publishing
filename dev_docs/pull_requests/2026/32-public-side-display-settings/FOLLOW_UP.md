@@ -112,3 +112,9 @@ two-layer design; the 5,000-post listing-cache bound predates the PR.
 ## Open
 
 None.
+
+## CLAUDE_REVIEW (2026-10-15)
+
+Fixed: sibling-dialect leak in `name_i18n` resolution; dependent-toggle reset in the
+Edit Group form; split `merge_name_i18n` comment; listing sort uuid tie-break.
+Open: none (nitpicks left as-is are explained in `CLAUDE_REVIEW.md`).

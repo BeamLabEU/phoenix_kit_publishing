@@ -9,3 +9,7 @@ PINCER_REVIEW verdict: Approve. Docs-only PR adding the routing anti-pattern poi
 ## Open
 
 None.
+
+## CLAUDE_REVIEW (2026-10-15)
+
+No findings; see `CLAUDE_REVIEW.md`.

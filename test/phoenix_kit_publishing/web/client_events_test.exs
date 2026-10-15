@@ -15,7 +15,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.ClientEventsTest do
   # Event name => the hook that handles it, and where it is mounted.
   @listeners %{
     # core's SearchPicker hook, via `results_event` on <.search_picker>
-    "category_results" => "PhoenixKitHooks.SearchPicker (categories_picker.ex)"
+    "category_results" => "PhoenixKitHooks.SearchPicker (categories_picker.ex)",
+    # core's SortableGrid/Sortable hooks, via `sortable:flash` on categories_live.ex
+    "sortable:flash" => "core's sortable hook (categories_live.ex)",
+    # core's SearchPicker hook, via `staged_event` on <.search_picker>
+    "category_staged" => "PhoenixKitHooks.SearchPicker (categories_picker.ex)"
   }
 
   test "every pushed event name has a listener on the page that pushes it" do
@@ -23,7 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.ClientEventsTest do
       "lib/**/*.ex"
       |> Path.wildcard()
       |> Enum.flat_map(fn file ->
-        Regex.scan(~r/push_event\(\s*"([^"]+)"/, File.read!(file))
+        Regex.scan(~r/push_event\(\s*(?:[\w@.]+,\s*)?"([^"]+)"/, File.read!(file))
         |> Enum.map(fn [_, name] -> {name, file} end)
       end)
 

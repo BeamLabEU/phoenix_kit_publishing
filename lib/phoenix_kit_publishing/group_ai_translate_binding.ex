@@ -31,21 +31,29 @@ defmodule PhoenixKitPublishing.GroupAITranslateBinding do
   @spec apply_translation(String.t(), map(), String.t(), map()) :: map()
   def apply_translation(_resource_type, params, lang, fields) when is_map(params) do
     case fields do
-      %{"name" => name} when is_binary(name) and name != "" ->
-        name_i18n =
-          case params["name_i18n"] do
-            %{} = map -> map
-            _ -> %{}
-          end
-
-        # Same cap the persist paths apply — the in-form preview must not
-        # momentarily show a longer name than what will be saved.
-        capped = String.slice(name, 0, Constants.max_group_name_length())
-        Map.put(params, "name_i18n", Map.put(name_i18n, lang, capped))
+      %{"name" => name} when is_binary(name) ->
+        apply_name(params, lang, String.trim(name))
 
       _ ->
         params
     end
+  end
+
+  # Mirrors `GroupAITranslatable`: a blank translation is not a translation, so
+  # the in-form preview must not show one the persist path would refuse.
+  defp apply_name(params, _lang, ""), do: params
+
+  defp apply_name(params, lang, name) do
+    name_i18n =
+      case params["name_i18n"] do
+        %{} = map -> map
+        _ -> %{}
+      end
+
+    # Same cap the persist paths apply — the in-form preview must not
+    # momentarily show a longer name than what will be saved.
+    capped = String.slice(name, 0, Constants.max_group_name_length())
+    Map.put(params, "name_i18n", Map.put(name_i18n, lang, capped))
   end
 
   @doc "The acting user's UUID for the translation audit trail."

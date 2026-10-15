@@ -48,3 +48,10 @@ parent app throughout the session.
 
 None. The two maintainer questions (C, E above) are surfaced in the PR body,
 not deferred silently.
+
+## CLAUDE_REVIEW (2026-10-15)
+
+Fixed: band-style reset on toggle (shared with #32), stale breadcrumb after Save,
+whitespace-only translation in the AI binding preview, `GroupAITranslateBinding` tests.
+Open: `:no_translated_name` not in `Errors` (deliberate, see review); band styles
+never rendered with a real featured image in tests.

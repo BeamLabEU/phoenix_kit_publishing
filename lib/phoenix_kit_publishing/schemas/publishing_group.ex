@@ -348,10 +348,12 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   Returns the group's display name in `lang`, falling back to the primary-language
   `name` column when there's no translation for that language.
 
-  Matching is base-language tolerant: the admin form stores overrides under the
-  full language code (e.g. `"fr-FR"`) while the public side resolves by the short
-  code (`"fr"`), so a lookup succeeds when either side uses the full or short form
-  (as long as the base is unambiguous).
+  Matching is base-language tolerant in two directions only: a full code
+  (`"fr-FR"`) finds an override stored under its base (`"fr"`), and a bare base
+  (`"fr"`, how the public side resolves) finds the override of the ONE dialect
+  that shares it. A sibling dialect never answers for another — an `"en-GB"`
+  override is not the name an `"en-US"` or `"en-AU"` reader sees — and a bare
+  base with several dialect overrides is ambiguous, so it takes the primary name.
   """
   @spec translated_name(t(), String.t() | atom()) :: String.t()
   def translated_name(%__MODULE__{name: name} = group, lang) do
@@ -364,14 +366,29 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @spec resolve_name_translation(map(), String.t() | atom()) :: String.t() | nil
   def resolve_name_translation(translations, lang) when is_map(translations) do
     lang = to_string(lang)
-    base = lang |> String.split("-") |> List.first()
+    base = base_code(lang)
 
     non_blank(translations[lang]) ||
       non_blank(translations[base]) ||
-      Enum.find_value(translations, fn {code, value} ->
-        if String.split(to_string(code), "-") |> List.first() == base, do: non_blank(value)
-      end)
+      sole_dialect_override(translations, lang, base)
   end
+
+  # Only a bare-base request may borrow a dialect's override, and only when
+  # exactly one dialect of that base carries one.
+  defp sole_dialect_override(translations, base, base) do
+    translations
+    |> Enum.filter(fn {code, value} ->
+      base_code(to_string(code)) == base and non_blank(value) != nil
+    end)
+    |> case do
+      [{_code, value}] -> non_blank(value)
+      _ -> nil
+    end
+  end
+
+  defp sole_dialect_override(_translations, _lang, _base), do: nil
+
+  defp base_code(code), do: code |> String.split("-") |> List.first()
 
   defp non_blank(value) when is_binary(value) and value != "", do: value
   defp non_blank(_), do: nil

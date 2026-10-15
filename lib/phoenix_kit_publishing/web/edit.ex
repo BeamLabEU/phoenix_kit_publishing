@@ -49,12 +49,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
          |> assign(:page_title, gettext("Edit"))
          |> assign(:page_section, gettext("Publishing"))
          |> assign(:page_section_path, Routes.path("/admin/publishing"))
-         |> assign(:page_crumbs, [
-           %{
-             label: group["name"] || group_slug,
-             path: Routes.path("/admin/publishing/#{group_slug}")
-           }
-         ])
+         |> assign(:page_crumbs, group_crumbs(group, group_slug))
          |> assign(
            :current_path,
            Routes.path("/admin/publishing/edit-group/#{group_slug}")
@@ -87,7 +82,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
 
   @impl true
   def handle_event("validate", %{"group" => params}, socket) do
-    {:noreply, assign(socket, :form, Component.to_form(params, as: :group))}
+    # A dependent block (featured/newest/timeline/views) leaves the DOM while
+    # its toggle is off, so the incoming params lack its inputs. Keep the last
+    # known values underneath: re-ticking the toggle must show what is stored,
+    # not the first option of each select, or the next Save would persist that.
+    merged = merge_form_params(socket.assigns.form.source, params)
+    {:noreply, assign(socket, :form, Component.to_form(merged, as: :group))}
   end
 
   # Language tab switch from the tabs component. handle_switch_language/2 debounces
@@ -116,6 +116,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
           socket
           |> assign(:group, updated_group)
           |> assign(:form, updated_form)
+          |> assign(:page_crumbs, group_crumbs(updated_group, updated_group["slug"]))
           |> put_flash(:info, gettext("Group updated"))
 
         cond do
@@ -260,6 +261,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
 
   # The non-primary language tabs — one translatable name input each.
   defp secondary_language_tabs(tabs), do: Enum.reject(tabs, & &1.is_primary)
+
+  defp group_crumbs(group, slug) do
+    [
+      %{
+        label: group["name"] || slug,
+        path: Routes.path("/admin/publishing/#{slug}")
+      }
+    ]
+  end
+
+  # Incoming params win key by key; `name_i18n` merges per language so a
+  # validate that carries one tab's value cannot drop the others.
+  defp merge_form_params(current, incoming) when is_map(current) do
+    Map.merge(current, incoming, fn
+      "name_i18n", %{} = old, %{} = new -> Map.merge(old, new)
+      _key, _old, new -> new
+    end)
+  end
+
+  defp merge_form_params(_current, incoming), do: incoming
 
   # Current value of a per-language name override out of the form params. The
   # form carries `name_i18n` as a `%{lang => name}` map (seeded on mount, echoed

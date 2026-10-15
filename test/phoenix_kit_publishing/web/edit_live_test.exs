@@ -56,6 +56,52 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     assert html =~ "Please provide a valid group name"
   end
 
+  test "unticking and re-ticking a dependent toggle keeps its stored settings",
+       %{conn: conn, group: group} do
+    {:ok, _} =
+      Groups.update_group(group["slug"], %{
+        "featured_enabled" => "true",
+        "featured_layout" => "card",
+        "featured_style" => "cover",
+        "views_enabled" => "true",
+        "show_view_counts" => "true"
+      })
+
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    # The dependent blocks leave the DOM while their toggle is off, so the
+    # next validate carries none of their inputs.
+    view |> form("#group-edit-form", group: %{"featured_enabled" => "false"}) |> render_change()
+    view |> form("#group-edit-form", group: %{"views_enabled" => "false"}) |> render_change()
+    view |> form("#group-edit-form", group: %{"featured_enabled" => "true"}) |> render_change()
+    view |> form("#group-edit-form", group: %{"views_enabled" => "true"}) |> render_change()
+    view |> form("#group-edit-form") |> render_submit()
+
+    {:ok, saved} = Groups.fetch_group(group["slug"])
+    assert saved["featured_layout"] == "card"
+    assert saved["featured_style"] == "cover"
+    assert saved["show_view_counts"] == true
+  end
+
+  test "a plain Save that renames the group refreshes the breadcrumb",
+       %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    html =
+      view
+      |> form("#group-edit-form", group: %{"name" => "Renamed Crumb", "slug" => group["slug"]})
+      |> render_submit()
+
+    refute html =~ group["name"]
+    assert html =~ "Renamed Crumb"
+  end
+
   test "handle_info catch-all swallows unexpected messages without crashing",
        %{conn: conn, group: group} do
     {:ok, view, _html} =

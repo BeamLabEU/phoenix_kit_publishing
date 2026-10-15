@@ -353,7 +353,6 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
 
   defp merge_group_config(existing_data, _params), do: existing_data
 
-  # Per-language display-name overrides arrive as a `%{lang => name}` map (form
   # The config merge is read-modify-write over the whole data JSONB — the
   # same shape the post save locks for (`lock_post_row!`). Without the
   # group-row lock, two concurrent group-edit saves read the same snapshot
@@ -381,6 +380,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     end
   end
 
+  # Per-language display-name overrides arrive as a `%{lang => name}` map (form
   # inputs named `group[name_i18n][<lang>]`). Per-key merge over the stored
   # map: a submitted non-blank value sets its key, a submitted BLANK deletes
   # it, and a key the form didn't submit at all is kept — the edit form only

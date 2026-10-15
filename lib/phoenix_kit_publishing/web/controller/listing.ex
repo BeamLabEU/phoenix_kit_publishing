@@ -543,7 +543,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
       # second precision, so same-second publishes would otherwise order
       # non-deterministically across cache rebuilds — flipping feed order
       # and swapping prev/next neighbors.
-      |> Enum.sort_by(&{listing_sort_key(&1), &1[:uuid] || ""}, :desc)
+      |> Enum.sort_by(&listing_sort_pair/1, :desc)
 
     if limit, do: Enum.take(posts, limit), else: posts
   end
@@ -576,8 +576,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   # timestamp-mode posts and the version's published_at for slug-mode posts (which
   # have no post_date) — so a slug-mode blog sorts by when readers saw the post,
   # not by row-creation time. Keys are ISO-8601 strings, which sort chronologically.
-  defp sort_listing(posts, "oldest"), do: Enum.sort_by(posts, &listing_sort_key/1, :asc)
-  defp sort_listing(posts, _newest), do: Enum.sort_by(posts, &listing_sort_key/1, :desc)
+  # The uuid tie-break (same rationale as split_newest/2) keeps same-second
+  # posts from reordering between cache rebuilds and swapping across pages.
+  defp sort_listing(posts, "oldest"), do: Enum.sort_by(posts, &listing_sort_pair/1, :asc)
+  defp sort_listing(posts, _newest), do: Enum.sort_by(posts, &listing_sort_pair/1, :desc)
+
+  defp listing_sort_pair(post), do: {listing_sort_key(post), post[:uuid] || ""}
 
   defp listing_sort_key(post) do
     cond do
@@ -626,7 +630,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     # uuid tie-break: same-second effective dates would otherwise pin
     # whichever post enumerates first in the current sort order, so a sort
     # toggle or cache regen could swap the Latest band between ties.
-    newest = Enum.max_by(posts, &{listing_sort_key(&1), &1[:uuid] || ""})
+    newest = Enum.max_by(posts, &listing_sort_pair/1)
     # List.delete removes by structural equality — safe because post maps
     # carry distinct uuids, so two entries can never be structurally equal.
     {[newest], List.delete(posts, newest)}

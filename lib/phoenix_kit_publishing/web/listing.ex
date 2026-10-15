@@ -358,20 +358,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   def handle_info({:cache_changed, group_slug}, socket) do
     # The listing cache is node-local (:persistent_term), so a mutation on another
-    # node leaves this node's cache stale. INVALIDATE it (cheap erase) rather than
-    # eagerly regenerating: the next public read on this node misses and rebuilds
-    # fresh from the DB (silently — see ListingCache read-miss path).
+    # node leaves this node's cache stale. Erase THIS node's copy (cheap) rather
+    # than eagerly regenerating: the next public read on this node misses and
+    # rebuilds fresh from the DB (silently — see ListingCache read-miss path).
+    #
+    # `erase_local/1`, never `invalidate/1`: this is a PubSub receiver, and
+    # `invalidate/1` also broadcasts `{:cache_invalidated, _}` to the whole
+    # cluster — one broadcast per open Listing view per mutation, each erasing
+    # every node's freshly regenerated listing (AGENTS.md, Landmines).
     #
     # Why not regenerate here:
     #   * Re-broadcasting `:cache_changed` from this handler — a subscriber of its
-    #     own group's cache topic — would echo back and loop forever; erase emits
-    #     nothing, so there is no storm to guard against.
+    #     own group's cache topic — would echo back and loop forever.
     #   * The lock-deduped regenerate could return `:already_in_progress` and skip,
     #     leaving a stale-but-present term that `read/1` serves as a hit with no
     #     self-heal. Erase has no such window — a missing term always rebuilds.
     #   * This view renders from the DB via `refresh_posts/1`, never from the cache,
     #     so an eager regenerate here would just be a second, redundant DB read.
-    ListingCache.invalidate(group_slug)
+    ListingCache.erase_local(group_slug)
     {:noreply, refresh_posts(socket)}
   end
 

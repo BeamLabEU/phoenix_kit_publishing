@@ -39,6 +39,46 @@ defmodule PhoenixKitPublishing.GettextCatalogueTest do
              Enum.map_join(missing, "\n", fn {id, file} -> "  #{file}: #{inspect(id)}" end)
   end
 
+  describe "split backend (split_module_by: [:locale, :domain])" do
+    # The backend compiles one module per locale and domain, in parallel. If
+    # the option were dropped, lookups would still pass, so pin the layout:
+    # one split module per shipped catalogue.
+    test "has one compiled module per shipped locale catalogue" do
+      for locale <- ~w(de en et fr it ru) do
+        module = Module.concat(PhoenixKitPublishing.Gettext, "T_#{locale}_default")
+
+        assert Code.ensure_loaded?(module),
+               "#{inspect(module)} is missing — is split_module_by still set?"
+      end
+    end
+
+    test "looks up a translated msgid in each shipped locale" do
+      # "Publishing" is the admin tab label; en keeps it, the rest translate it.
+      expected = %{
+        "de" => "Veröffentlichung",
+        "en" => "Publishing",
+        "et" => "Avaldamine",
+        "fr" => "Publication",
+        "it" => "Pubblicazione",
+        "ru" => "Публикация"
+      }
+
+      for {locale, translated} <- expected do
+        assert lookup(locale) == translated
+      end
+    end
+
+    test "an unshipped locale falls back to the msgid" do
+      assert lookup("pt") == "Publishing"
+    end
+  end
+
+  defp lookup(locale) do
+    Gettext.with_locale(PhoenixKitPublishing.Gettext, locale, fn ->
+      Gettext.dgettext(PhoenixKitPublishing.Gettext, "default", "Publishing")
+    end)
+  end
+
   defp pot_msgids(path) do
     path
     |> File.read!()
