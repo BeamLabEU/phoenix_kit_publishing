@@ -98,11 +98,16 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     object_output(%{
       "id" => %{"type" => "string"},
       "group" => %{"type" => "string"},
+      "slug" => %{"type" => ["string", "null"]},
+      "mode" => %{"type" => "string"},
+      "title" => %{"type" => ["string", "null"]},
       "status" => %{"type" => "string"},
       "version" => %{"type" => "integer"},
       "language" => %{"type" => "string"},
       "markdown" => %{"type" => "string"},
       "fields" => %{"type" => "object"},
+      "versions" => %{"type" => "array"},
+      "public_paths" => %{"type" => "object"},
       "content_updated_at" => %{"type" => ["string", "null"]},
       "revision" => %{"type" => "string"},
       "warnings" => warnings_output()

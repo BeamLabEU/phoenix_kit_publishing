@@ -1,9 +1,12 @@
 defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
   use PhoenixKit.DataCase, async: false
 
-  alias PhoenixKit.Modules.Publishing.{Posts, Versions}
+  import Ecto.Query, only: [from: 2]
+
+  alias PhoenixKit.Modules.Publishing.{Posts, PublishingContent, PublishingVersion, Versions}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
+  alias PhoenixKitPublishing.Test.Repo
 
   setup do
     Fx.languages!()
@@ -25,7 +28,63 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
       assert %{"og" => %{}, "tags" => [], "category_ids" => []} = body["fields"]
       assert body["revision"] =~ ~r/\A[0-9a-f]{64}\z/
       assert is_binary(body["content_updated_at"]) or body["content_updated_at"] == nil
+      refute Map.has_key?(body, "warnings")
     end
+  end
+
+  test "fields carry each stored value under its own key", %{g: g, post: post} do
+    category = Fx.category!(g["slug"], "Fields Cat")
+    image = Ecto.UUID.generate()
+    og_image = Ecto.UUID.generate()
+
+    {:ok, current} = Posts.read_post_by_uuid(post[:uuid], nil, 1)
+
+    {:ok, _} =
+      Posts.update_post(
+        g["slug"],
+        current,
+        %{
+          "description" => "desc-value",
+          "seo_title" => "seo-value",
+          "excerpt" => "excerpt-value",
+          "featured" => true,
+          "sitemap_exclude" => true,
+          "featured_image_uuid" => image,
+          "og_title" => "og-title-value",
+          "og_description" => "og-description-value",
+          "og_image_uuid" => og_image,
+          "url_slug" => "url-slug-value",
+          "category_uuids" => [category.uuid]
+        },
+        publish: false
+      )
+
+    assert {:ok, %{"fields" => fields}} = get(%{"id" => post[:uuid]})
+
+    assert fields == %{
+             "description" => "desc-value",
+             "seo_title" => "seo-value",
+             "excerpt" => "excerpt-value",
+             "featured" => true,
+             "sitemap_exclude" => true,
+             "featured_image_id" => image,
+             "og" => %{
+               "title" => "og-title-value",
+               "description" => "og-description-value",
+               "image_id" => og_image
+             },
+             "tags" => [],
+             "category_ids" => [category.uuid],
+             "url_slug" => "url-slug-value"
+           }
+  end
+
+  test "fields of a fresh post are empty or false, not shifted", %{post: post} do
+    assert {:ok, %{"fields" => fields}} = get(%{"id" => post[:uuid]})
+    assert fields["featured"] == false and fields["sitemap_exclude"] == false
+    assert fields["og"] == %{"title" => nil, "description" => nil, "image_id" => nil}
+    assert fields["seo_title"] == nil and fields["excerpt"] == nil
+    assert fields["featured_image_id"] == nil
   end
 
   test "include_content false omits the markdown", %{post: post} do
@@ -50,7 +109,34 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
   } do
     assert {:ok, body} = get(%{"id" => post[:uuid]}, %{"language" => "de-DE"})
     assert body["language"] == "en-US"
-    assert [%{"code" => "language_missing"}] = body["warnings"]
+    assert body["title"] == "Hello"
+    assert body["markdown"] =~ "# Body"
+    assert [%{"code" => "language_missing", "message" => message}] = body["warnings"]
+    assert message =~ "de-DE" and message =~ "en-US"
+  end
+
+  test "no language asked and the primary row missing: the fallback names the primary language",
+       %{g: g, post: post} do
+    Fx.translation!(g["slug"], post[:uuid], "de-DE", "Hallo", "Inhalt")
+    drop_content(post[:uuid], "en-US")
+
+    assert {:ok, body} = get(%{"id" => post[:uuid]})
+    assert body["language"] == "de-DE" and body["title"] == "Hallo"
+    assert [%{"code" => "language_missing", "message" => message}] = body["warnings"]
+    assert message =~ "primary language en-US"
+  end
+
+  test "no language asked and only a legacy base-code row: the read heals it and the answer is the healed row",
+       %{post: post} do
+    Repo.update_all(
+      from(c in PublishingContent, where: c.version_uuid == ^Fx.version(post[:uuid]).uuid),
+      set: [language: "en"]
+    )
+
+    assert {:ok, body} = get(%{"id" => post[:uuid]})
+    assert body["language"] == "en-US" and body["languages"] == ["en-US"]
+    assert body["title"] == "Hello" and body["markdown"] =~ "# Body"
+    refute Map.has_key?(body, "warnings")
   end
 
   test "a language that is not enabled and not present is language_not_enabled with allowed", %{
@@ -86,14 +172,74 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
              get(%{"id" => post[:uuid]}, %{"version" => 9})
   end
 
-  test "a trashed post is not_found with context.trashed; list_posts shows it", %{
+  test "a trashed post by id is not_found with context.trashed; list_posts shows it", %{
     g: g,
     post: post
   } do
     {:ok, _} = Posts.trash_post(g["slug"], post[:uuid])
     assert {:error, :not_found, message, %{trashed: true}} = get(%{"id" => post[:uuid]})
     assert message =~ "trash"
-    assert {:error, :not_found, _, _} = get(%{"group" => g["slug"], "slug" => "hello"})
+
+    assert {:ok, %{"posts" => posts}} =
+             ApiCase.call("publishing.list_posts", %{"group" => g["slug"], "status" => "trashed"})
+
+    assert Enum.any?(posts, &(&1["id"] == post[:uuid]))
+  end
+
+  test "a trashed post by group+slug is a plain not_found (the slug lookup excludes trashed posts)",
+       %{g: g, post: post} do
+    {:ok, _} = Posts.trash_post(g["slug"], post[:uuid])
+    assert {:error, :not_found, _, context} = get(%{"group" => g["slug"], "slug" => "hello"})
+    refute Map.has_key?(context, :trashed)
+  end
+
+  test "a post without any version is not_found, not a version_not_found about a version nobody asked for",
+       %{post: post} do
+    Repo.delete_all(from(v in PublishingVersion, where: v.post_uuid == ^post[:uuid]))
+    assert {:error, :not_found, message, _} = get(%{"id" => post[:uuid]})
+    assert message =~ "no versions"
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "version_not_found"}]}} =
+             get(%{"id" => post[:uuid]}, %{"version" => 1})
+  end
+
+  test "a stale active pointer is healed by the read and the answer describes the healed post",
+       %{g: g, post: post} do
+    Fx.publish!(g["slug"], post[:uuid], 1)
+    assert {:ok, %{"status" => "published"}} = get(%{"id" => post[:uuid]})
+
+    # The pointer now names a version that is not published: the read path heals it.
+    Repo.update_all(
+      from(v in PublishingVersion, where: v.post_uuid == ^post[:uuid]),
+      set: [status: "draft"]
+    )
+
+    assert {:ok, first} = get(%{"id" => post[:uuid]})
+    assert {:ok, second} = get(%{"id" => post[:uuid]})
+    assert Fx.db_post(post[:uuid]).active_version_uuid == nil
+    assert first["status"] == "draft" and first["active_version"] == nil
+    assert first["revision"] == second["revision"]
+  end
+
+  test "when the heal moves the default version the answer shows the healed version",
+       %{g: g, post: post} do
+    {:ok, _} = Versions.create_new_version(g["slug"], post, %{}, %{})
+    Fx.body!(g["slug"], post[:uuid], "second version body", 2)
+    Fx.publish!(g["slug"], post[:uuid], 1)
+    assert {:ok, %{"version" => 1, "markdown" => "# Body" <> _}} = get(%{"id" => post[:uuid]})
+
+    Repo.update_all(
+      from(v in PublishingVersion,
+        where: v.post_uuid == ^post[:uuid] and v.version_number == 1
+      ),
+      set: [status: "draft"]
+    )
+
+    assert {:ok, first} = get(%{"id" => post[:uuid]})
+    assert {:ok, second} = get(%{"id" => post[:uuid]})
+    assert first["version"] == 2 and first["status"] == "draft"
+    assert first["markdown"] == "second version body"
+    assert first["revision"] == second["revision"]
   end
 
   test "bad refs: invalid_ref, unknown id, uncastable id", %{post: post} do
@@ -110,6 +256,16 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
     assert {:ok, %{"id" => id, "mode" => "timestamp"}} = get(%{"id" => p[:uuid]})
     assert id == p[:uuid]
     assert {:error, :not_found, _, _} = get(%{"group" => ts["slug"], "slug" => "anything"})
+  end
+
+  defp drop_content(post_uuid, language) do
+    version = Fx.version(post_uuid)
+
+    Repo.delete_all(
+      from(c in PublishingContent,
+        where: c.version_uuid == ^version.uuid and c.language == ^language
+      )
+    )
   end
 
   test "tags are derived from the body hashtags and read-only", %{g: g, post: post} do

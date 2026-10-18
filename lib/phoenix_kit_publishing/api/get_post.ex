@@ -10,12 +10,54 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPost do
   @spec call(map(), map()) :: {:ok, map()} | {:error, atom(), String.t(), map()}
   def call(input, _ctx) do
     with {:ok, hit} <- resolve(input["post"]),
-         {:ok, version} <-
-           Refs.resolve_version(hit.db_post, input["version"], :read) |> Refs.version_error(),
-         contents = DBStorage.list_contents(version.uuid),
-         {:ok, language} <- language(input["language"], contents),
+         {:ok, state} <- load(hit, input, true) do
+      {:ok, build(state, input)}
+    end
+  end
+
+  # The read may heal the post (move its active pointer, relabel a language row, trash an empty
+  # post), so the answer is built from a snapshot taken AFTER it. When the heal moved the version
+  # the post shows, the read is repeated once for the healed post (a second heal is a no-op).
+  defp load(hit, input, settle?) do
+    with {:ok, version} <- version(hit.db_post, input["version"]),
+         {:ok, language} <-
+           language(input["language"], DBStorage.list_contents(version.uuid)),
          {:ok, post} <- read(hit.db_post.uuid, language, version.version_number) do
-      {:ok, build(hit, version, contents, post, language, input)}
+      if settle?,
+        do: settle(hit, version, language, post, input),
+        else: snapshot(hit, version, language, post)
+    end
+  end
+
+  defp settle(hit, version, language, post, input) do
+    with {:ok, fresh_hit} <- resolve(%{"id" => hit.db_post.uuid}),
+         {:ok, fresh_version} <- version(fresh_hit.db_post, input["version"]) do
+      if fresh_version.uuid == version.uuid,
+        do: snapshot(fresh_hit, fresh_version, language, post),
+        else: load(fresh_hit, input, false)
+    end
+  end
+
+  defp snapshot(hit, version, language, post) do
+    {:ok,
+     %{
+       hit: hit,
+       version: version,
+       contents: DBStorage.list_contents(version.uuid),
+       post: post,
+       requested: language
+     }}
+  end
+
+  # A post without any version has nothing to read; "version_not_found" would blame a version
+  # the caller never named.
+  defp version(db_post, number) do
+    case Refs.resolve_version(db_post, number, :read) do
+      {:error, :version_not_found} when is_nil(number) ->
+        {:error, :not_found, "The post has no versions.", %{}}
+
+      other ->
+        Refs.version_error(other)
     end
   end
 
@@ -51,7 +93,8 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPost do
     end
   end
 
-  defp build(hit, version, contents, post, requested, input) do
+  defp build(state, input) do
+    %{hit: hit, version: version, contents: contents, post: post, requested: requested} = state
     shown = post[:language]
     content = Enum.find(contents, &(&1.language == shown))
     versions = DBStorage.list_versions(hit.db_post.uuid)
@@ -70,21 +113,24 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPost do
         do: detail,
         else: Map.put(detail, "markdown", post[:content] || "")
 
-    # The module falls back silently to another language: never present that text as the requested one.
-    warnings =
-      if shown == requested,
-        do: [],
-        else: [
-          %{
-            "code" => "language_missing",
-            "message" => "#{requested} has no text on this version; showing #{shown}"
-          }
-        ]
-
     hit.db_post
     |> Presenter.post_summary(hit.group, versions, contents)
     |> Map.merge(detail)
-    |> Common.with_warnings(warnings)
+    |> Common.with_warnings(warnings(shown, requested, input["language"]))
+  end
+
+  # The module falls back silently to another language: never present that text as the requested one.
+  defp warnings(shown, shown, _asked), do: []
+
+  defp warnings(shown, requested, asked) do
+    subject = if is_nil(asked), do: "the primary language #{requested}", else: requested
+
+    [
+      %{
+        "code" => "language_missing",
+        "message" => "#{subject} has no text on this version; showing #{shown}"
+      }
+    ]
   end
 
   # seo_title and excerpt live in version.data (version-level), not in the post map's metadata.

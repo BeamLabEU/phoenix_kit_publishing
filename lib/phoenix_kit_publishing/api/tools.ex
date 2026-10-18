@@ -91,8 +91,10 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "excerpt, featured image, og, derived read-only tags, categories, url_slug), the versions and the " <>
           "public paths. version defaults to the active one, else the latest; language defaults to the primary " <>
           "language, and a language without text falls back with a language_missing warning. include_content " <>
-          "false omits the Markdown. Pass the returned revision as if_revision to the write tools. A trashed " <>
-          "post is not found here: use list_posts with status trashed.",
+          "false omits the Markdown. title is the title of the language shown. Pass the returned revision as " <>
+          "if_revision to the write tools. Like the admin editor, a read may repair a stale active-version " <>
+          "pointer, and the answer describes the repaired post. A trashed post is not found here: use " <>
+          "list_posts with status trashed.",
       input_schema: Schemas.get_post(),
       output_schema: Schemas.get_post_output(),
       handler: {PhoenixKit.Modules.Publishing.API.GetPost, :call},
