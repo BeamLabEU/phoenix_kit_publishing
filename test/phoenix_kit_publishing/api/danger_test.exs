@@ -83,6 +83,77 @@ defmodule PhoenixKit.Modules.Publishing.API.DangerTest do
     end
   end
 
+  describe "set_translation" do
+    defp st(ref, extra \\ %{}) do
+      Map.merge(
+        %{"post" => ref, "language" => "de-DE", "title" => "t", "content" => "plain"},
+        extra
+      )
+    end
+
+    test "a draft write of an unpublished post is not dangerous", %{ref: ref} do
+      refute Danger.set_translation(st(ref), ctx())
+    end
+
+    test "the active version is dangerous; a draft beside a live version is not; an archived one is",
+         %{g: g, post: post, ref: ref} do
+      Fx.publish!(g["slug"], post[:uuid], 1)
+      assert Danger.set_translation(st(ref, %{"version" => 1}), ctx())
+      {:ok, _} = Versions.create_new_version(g["slug"], post, %{}, %{})
+      refute Danger.set_translation(st(ref), ctx()), "the highest draft is v2"
+      Fx.publish!(g["slug"], post[:uuid], 2)
+
+      assert Danger.set_translation(st(ref, %{"version" => 1}), ctx()),
+             "v1 is archived and the post has a live version"
+    end
+
+    test "an archived version of an UNPUBLISHED post is not dangerous", %{
+      g: g,
+      post: post,
+      ref: ref
+    } do
+      Fx.publish!(g["slug"], post[:uuid], 1)
+      :ok = Versions.unpublish_post(g["slug"], post[:uuid], target_status: "archived")
+      refute Danger.set_translation(st(ref, %{"version" => 1}), ctx())
+    end
+
+    test "a slug in the input does not make it dangerous (no slug clause)", %{
+      g: g,
+      post: post,
+      ref: ref
+    } do
+      Fx.publish!(g["slug"], post[:uuid], 1)
+      {:ok, _} = Versions.create_new_version(g["slug"], post, %{}, %{})
+      refute Danger.set_translation(st(ref, %{"slug" => "renamed"}), ctx())
+    end
+
+    test "fail closed: unresolvable refs and missing versions answer true", %{ref: ref} do
+      assert Danger.set_translation(st(%{"id" => Ecto.UUID.generate()}), ctx())
+      assert Danger.set_translation(st(%{"id" => "nope"}), ctx())
+      assert Danger.set_translation(st(%{}), ctx())
+      assert Danger.set_translation(st(ref, %{"version" => 99}), ctx())
+      assert Danger.set_translation(%{}, ctx())
+    end
+
+    test "a database error answers true (never 'safe')", %{ref: ref} do
+      TestRepo.query!(
+        "ALTER TABLE phoenix_kit_publishing_versions RENAME TO phoenix_kit_publishing_versions_x"
+      )
+
+      assert Danger.set_translation(st(ref), ctx())
+    end
+
+    test "a trashed post is not dangerous by the live clause (the handler refuses it)", %{
+      g: g,
+      post: post,
+      ref: ref
+    } do
+      Fx.publish!(g["slug"], post[:uuid], 1)
+      {:ok, _} = Posts.trash_post(g["slug"], post[:uuid])
+      refute Danger.set_translation(st(ref, %{"version" => 1}), ctx())
+    end
+  end
+
   describe "live_condition/3 (the pure recheck of the :locked_check closure)" do
     test "from the two fresh rows only" do
       live = %{active_version_uuid: "a", slug: "s"}

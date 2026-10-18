@@ -31,7 +31,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       list_categories(),
       create_post(),
       update_post(),
-      create_version()
+      create_version(),
+      set_translation()
     ]
   end
 
@@ -194,6 +195,30 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       output_schema: Schemas.create_version_output(),
       handler: {PhoenixKit.Modules.Publishing.API.CreateVersion, :call},
       annotations: %{idempotent: false}
+    )
+  end
+
+  defp set_translation do
+    Tool.new!(
+      name: "publishing.set_translation",
+      audience: :admin,
+      scope: "publishing.posts:write",
+      permission: @permission,
+      title: "Set a translation",
+      description:
+        "Adds or updates ONE non-primary language of a version: title and body are required and must not " <>
+          "be blank (a published version with an empty language row would show an empty page). The primary " <>
+          "language is edited with update_post. version defaults to the highest draft. A new language row " <>
+          "is created first; if the write then fails an empty row stays (the API deletes nothing) and the " <>
+          "error says so. og_title, og_description and og_image_id are optional; null clears. Writing to " <>
+          "the live version or an archived one, or body text with HTML, components, post links or link " <>
+          "destinations other than http, https, mailto or tel, needs a confirmation: send dry_run first and " <>
+          "confirm the preview. if_revision is the revision of get_post.",
+      input_schema: Schemas.set_translation(),
+      output_schema: Schemas.set_translation_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.SetTranslation, :call},
+      danger: {PhoenixKit.Modules.Publishing.API.Danger, :set_translation},
+      annotations: %{idempotent: true}
     )
   end
 

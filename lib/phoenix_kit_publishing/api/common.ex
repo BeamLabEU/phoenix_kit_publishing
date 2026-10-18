@@ -271,6 +271,31 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
       else: :ok
   end
 
+  @doc """
+  An image id field (a media file UUID; `null` or "" clears), stored in canonical (lowercase)
+  form. An absent field passes.
+  """
+  @spec canonical_image_id(map(), String.t()) ::
+          {:ok, map()} | {:error, :validation_failed, String.t(), map()}
+  def canonical_image_id(input, field) do
+    case Map.fetch(input, field) do
+      :error ->
+        {:ok, input}
+
+      {:ok, empty} when empty in [nil, ""] ->
+        {:ok, input}
+
+      {:ok, value} when is_binary(value) ->
+        case Ecto.UUID.cast(value) do
+          {:ok, uuid} -> {:ok, Map.put(input, field, uuid)}
+          :error -> invalid(field, "must be a media file id (UUID) or null")
+        end
+
+      {:ok, _other} ->
+        invalid(field, "must be a string")
+    end
+  end
+
   # --- batch rows and previews -----------------------------------------------------------
 
   @spec row_ok(term(), String.t(), term(), map()) :: map()

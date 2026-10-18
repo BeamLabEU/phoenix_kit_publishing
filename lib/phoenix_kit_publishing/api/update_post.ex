@@ -94,33 +94,13 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
 
   defp title_present(_input), do: :ok
 
-  # Image ids are media file UUIDs; null or "" clears. Stored in canonical (lowercase) form.
   defp images(input) do
     Enum.reduce_while(@image_fields, {:ok, input}, fn field, {:ok, acc} ->
-      case image(field, acc) do
+      case Common.canonical_image_id(acc, field) do
         {:ok, acc} -> {:cont, {:ok, acc}}
         error -> {:halt, error}
       end
     end)
-  end
-
-  defp image(field, input) do
-    case Map.fetch(input, field) do
-      :error ->
-        {:ok, input}
-
-      {:ok, empty} when empty in [nil, ""] ->
-        {:ok, input}
-
-      {:ok, value} when is_binary(value) ->
-        case Ecto.UUID.cast(value) do
-          {:ok, uuid} -> {:ok, Map.put(input, field, uuid)}
-          :error -> Common.invalid(field, "must be a media file id (UUID) or null")
-        end
-
-      {:ok, _other} ->
-        Common.invalid(field, "must be a string")
-    end
   end
 
   defp text_opts("content"), do: [max: TextScan.max_body_bytes(), reason: "content_too_large"]

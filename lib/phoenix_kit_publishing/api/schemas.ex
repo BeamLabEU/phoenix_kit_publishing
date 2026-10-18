@@ -203,6 +203,32 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def set_translation do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "language" => row_text(20),
+        "title" => %{"type" => "string", "maxLength" => 500},
+        "content" => %{"type" => "string", "maxLength" => 2_097_152},
+        "og_title" => nullable_text(5000),
+        "og_description" => nullable_text(5000),
+        "og_image_id" => nullable_text(200),
+        "if_revision" => row_text(200)
+      },
+      ["post", "language", "title", "content"]
+    )
+  end
+
+  def set_translation_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "language" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end
