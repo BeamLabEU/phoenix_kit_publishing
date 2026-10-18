@@ -25,22 +25,24 @@ defmodule PhoenixKit.Modules.Publishing.API.DeleteCategories do
   defp plan(refs, categories) do
     {entries, _seen} =
       Enum.map_reduce(refs, MapSet.new(), fn ref, seen ->
-        case Refs.resolve_category(ref, categories) do
-          {:ok, category} ->
-            if MapSet.member?(seen, category.uuid),
-              do: {duplicate(ref), seen},
-              else: {{:delete, ref, category}, MapSet.put(seen, category.uuid)}
-
-          {:error, :invalid_ref} ->
-            {{:error, ref, Common.row_error(ref, "invalid_ref", "give {id} or {slug}")}, seen}
-
-          {:error, :not_found} ->
-            {{:error, ref, Common.row_error(ref, "not_found", "The category does not exist.")},
-             seen}
-        end
+        classify(ref, Refs.resolve_category(ref, categories), seen)
       end)
 
     entries
+  end
+
+  defp classify(ref, {:ok, category}, seen) do
+    if MapSet.member?(seen, category.uuid),
+      do: {duplicate(ref), seen},
+      else: {{:delete, ref, category}, MapSet.put(seen, category.uuid)}
+  end
+
+  defp classify(ref, {:error, :invalid_ref}, seen) do
+    {{:error, ref, Common.row_error(ref, "invalid_ref", "give {id} or {slug}")}, seen}
+  end
+
+  defp classify(ref, {:error, :not_found}, seen) do
+    {{:error, ref, Common.row_error(ref, "not_found", "The category does not exist.")}, seen}
   end
 
   defp duplicate(ref) do
