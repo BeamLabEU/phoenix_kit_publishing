@@ -16,11 +16,48 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
   #   publishing.groups:delete       trash_groups, restore_groups
   #   publishing.translations:ai     translate_post
 
+  alias PhoenixKit.API.Tool
+  alias PhoenixKit.Modules.Publishing.API.Schemas
+
   @permission "publishing"
 
   @spec all() :: [PhoenixKit.API.Tool.t()]
   def all do
-    []
+    [list_groups(), get_group_settings_schema()]
+  end
+
+  defp list_groups do
+    Tool.new!(
+      name: "publishing.list_groups",
+      audience: :admin,
+      scope: "publishing.groups:read",
+      permission: @permission,
+      title: "List groups",
+      description:
+        "Lists the publishing groups (blogs, pages, legal sections) with their mode, type, item names, " <>
+          "display settings and the number of posts. status is active (default) or trashed. Not paginated.",
+      input_schema: Schemas.list_groups(),
+      output_schema: Schemas.list_groups_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.ListGroups, :call},
+      annotations: %{read_only: true, idempotent: true}
+    )
+  end
+
+  defp get_group_settings_schema do
+    Tool.new!(
+      name: "publishing.get_group_settings_schema",
+      audience: :admin,
+      scope: "publishing.groups:read",
+      permission: @permission,
+      title: "Get the group settings schema",
+      description:
+        "The machine-readable list of the per-group display settings (key, type, allowed values, default, " <>
+          "scope, label) and their defaults: the vocabulary for the settings object of upsert_groups.",
+      input_schema: Schemas.get_group_settings_schema(),
+      output_schema: Schemas.get_group_settings_schema_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.GetGroupSettingsSchema, :call},
+      annotations: %{read_only: true, idempotent: true}
+    )
   end
 
   # Each tool task adds its `defp` below this line and one entry to `all/0`, in the order of
