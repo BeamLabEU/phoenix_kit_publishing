@@ -35,10 +35,36 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       opts = Common.write_opts(ApiCase.ctx(), "t", activity_mode: "manual")
       assert opts[:activity_mode] == "manual"
     end
+
+    test "a scope passed in extra is used as is and costs no lookup; without it the scope is looked up once" do
+      me = self()
+      handler = "write-opts-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach(
+        handler,
+        TestRepo.config()[:telemetry_prefix] ++ [:query],
+        fn _event, _measurements, _meta, _config -> send(me, :query) end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      opts = Common.write_opts(ApiCase.ctx(), "t", scope: :already_built)
+      assert opts[:scope] == :already_built
+      refute_received :query
+
+      user = Fx.user!()
+      ctx = ApiCase.ctx()
+      ctx = %{ctx | actor: %{ctx.actor | user_uuid: user.uuid}}
+      assert %Scope{} = Common.write_opts(ctx, "t")[:scope]
+      assert_received :query
+    end
   end
 
   describe "scope/1" do
     test "is the full union of the actor's roles, not the narrowed active role; nil for a missing user" do
+      # the settings cache is not started in the test environment, so the sandbox rollback
+      # undoes this write and nothing leaks into later tests
       capture_log(fn ->
         {:ok, _} = PhoenixKit.Settings.update_boolean_setting("role_switcher_enabled", true)
       end)
@@ -151,6 +177,15 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       assert is_binary(message) and message =~ "3" and not (message =~ "%{")
     end
 
+    test "a placeholder without a matching option stays as written" do
+      changeset =
+        ApiChangesetSchema.changeset(%{"name" => "ok"})
+        |> Ecto.Changeset.add_error(:name, "needs %{count} items and %{other}", other: 7)
+
+      assert [%{path: "name", message: "needs %{count} items and 7"}] =
+               Common.changeset_errors(changeset)
+    end
+
     test "flattens nested embed errors into dotted paths with string messages" do
       changeset =
         ApiChangesetSchema.changeset(%{
@@ -189,6 +224,39 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
 
       refute base == Common.post_state(db, nil, [version], [%{content | content: "other"}])
       refute base == Common.post_state(db, nil, [%{version | status: "archived"}], [content])
+    end
+
+    test "post_state follows the group status, the version tuple, the slug and the post columns" do
+      g = Fx.group!()
+      post = Fx.post!(g["slug"], %{title: "S2", slug: "s2"})
+      db = DBStorage.get_post_by_uuid(post[:uuid])
+      version = DBStorage.get_version(post[:uuid], 1)
+      [content] = DBStorage.list_contents(version.uuid)
+      group = %{status: "active"}
+      base = Common.post_state(db, group, [version], [content])
+
+      changed = [
+        Common.post_state(db, %{status: "trashed"}, [version], [content]),
+        Common.post_state(db, nil, [version], [content]),
+        Common.post_state(%{db | slug: "other"}, group, [version], [content]),
+        Common.post_state(%{db | trashed_at: ~U[2030-01-01 00:00:00Z]}, group, [version], [
+          content
+        ]),
+        Common.post_state(%{db | active_version_uuid: Ecto.UUID.generate()}, group, [version], [
+          content
+        ]),
+        Common.post_state(db, group, [%{version | version_number: 9}], [content]),
+        Common.post_state(db, group, [%{version | published_at: ~U[2030-01-01 00:00:00Z]}], [
+          content
+        ]),
+        Common.post_state(db, group, [%{version | data: %{"x" => 1}}], [content]),
+        Common.post_state(db, group, [], [content]),
+        Common.post_state(db, group, [version], [%{content | language: "de"}]),
+        Common.post_state(db, group, [version], [])
+      ]
+
+      for state <- changed, do: refute(state == base)
+      assert length(Enum.uniq(changed)) == length(changed)
     end
 
     test "put_log_fields adds names only; reason_text never inspects" do
@@ -427,6 +495,34 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
 
       refute r1 == Common.post_revision(db, version, %{content | title: "Two"})
     end
+
+    test "follows every component of the tuple it hashes" do
+      g = Fx.group!()
+      post = Fx.post!(g["slug"], %{title: "Parts", slug: "parts"})
+      db = DBStorage.get_post_by_uuid(post[:uuid])
+      version = DBStorage.get_version(post[:uuid], 1)
+      [content] = DBStorage.list_contents(version.uuid)
+      base = Common.post_revision(db, version, content)
+
+      changed = [
+        Common.post_revision(%{db | slug: "other"}, version, content),
+        Common.post_revision(%{db | trashed_at: ~U[2030-01-01 00:00:00Z]}, version, content),
+        Common.post_revision(%{db | active_version_uuid: Ecto.UUID.generate()}, version, content),
+        Common.post_revision(%{db | post_date: ~D[2030-01-01]}, version, content),
+        Common.post_revision(%{db | post_time: ~T[10:11:00]}, version, content),
+        Common.post_revision(db, %{version | status: "archived"}, content),
+        Common.post_revision(db, %{version | version_number: 9}, content),
+        Common.post_revision(db, %{version | published_at: ~U[2030-01-01 00:00:00Z]}, content),
+        Common.post_revision(db, %{version | data: %{"x" => 1}}, content),
+        Common.post_revision(db, nil, content),
+        Common.post_revision(db, version, %{content | language: "de"}),
+        Common.post_revision(db, version, %{content | content: "other body"}),
+        Common.post_revision(db, version, nil)
+      ]
+
+      for revision <- changed, do: refute(revision == base)
+      assert length(Enum.uniq(changed)) == length(changed)
+    end
   end
 
   describe "line_diff/2 bounds (spec §9.12)" do
@@ -438,7 +534,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       new = String.replace(old, "line 20000\n", "CHANGED\n")
       us = timed(fn -> send(self(), {:d, Common.line_diff(old, new)}) end)
       assert_received {:d, diff}
-      assert us < 500_000
+      assert us < 100_000
       assert diff["mode"] == "line"
       assert diff["text"] =~ "-line 20000"
       assert diff["text"] =~ "+CHANGED"
@@ -451,7 +547,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
         end)
 
       assert_received {:d, diff}
-      assert us < 1_000_000
+      assert us < 200_000
       assert diff["mode"] == "coarse" and diff["truncated"] == true
       assert diff["old_lines"] == 20_000 and diff["new_lines"] == 20_000
     end
@@ -459,8 +555,42 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
     test "a 400-line total rewrite is a line diff, without quadratic work" do
       us = timed(fn -> send(self(), {:d, Common.line_diff(lines(400, "a"), lines(400, "b"))}) end)
       assert_received {:d, diff}
-      assert us < 1_000_000
+      assert us < 150_000
       assert diff["mode"] == "line"
+    end
+
+    test "the Myers cap is 400 lines: 400 is a line diff, 401 is coarse" do
+      assert %{"mode" => "line"} = Common.line_diff(lines(400, "a"), lines(400, "b"))
+
+      assert %{"mode" => "coarse", "old_lines" => 401, "new_lines" => 401} =
+               Common.line_diff(lines(401, "a"), lines(401, "b"))
+
+      assert %{"mode" => "coarse", "old_lines" => 401, "new_lines" => 3} =
+               Common.line_diff(lines(401, "a"), lines(3, "b"))
+    end
+
+    test "the Myers branch shows two lines of context on each side of a change" do
+      assert Common.line_diff("a\nb\nc\nd\ne\nf", "a\nB\nc\nd\ne\nf") == %{
+               "mode" => "line",
+               "text" => "@@ -1,4 +1,4 @@\n a\n-b\n+B\n c\n d",
+               "hunks" => 1,
+               "truncated" => false
+             }
+
+      assert Common.line_diff("a\nb\nc\nd\ne\nf\ng", "a\nb\nX\nd\ne\nf\ng")["text"] ==
+               "@@ -1,5 +1,5 @@\n a\n b\n-c\n+X\n d\n e"
+    end
+
+    test "a coarse diff shows the first and last 10 lines of each middle and the omitted counts" do
+      diff = Common.line_diff(lines(20_000, "a"), lines(20_000, "b"))
+      assert diff["text"] =~ "-... 19980 lines omitted"
+      assert diff["text"] =~ "+... 19980 lines omitted"
+      assert diff["text"] =~ "-a1\n-a2\n"
+      assert diff["text"] =~ "-a19999\n-a20000"
+      assert diff["text"] =~ "+b1\n+b2\n"
+      assert diff["text"] =~ "+b19999\n+b20000"
+      refute diff["text"] =~ "a11\n"
+      assert String.starts_with?(diff["text"], "@@ coarse @@\n")
     end
 
     test "a 500-line pure append is a line diff (one middle empty)" do
@@ -520,7 +650,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       new = String.duplicate("\n", 260_000)
       us = timed(fn -> send(self(), {:d, Common.line_diff("", new)}) end)
       assert_received {:d, diff}
-      assert us < 1_000_000
+      assert us < 500_000
       assert diff["mode"] == "line" and diff["truncated"] == true
       assert byte_size(diff["text"]) <= 4096
       assert diff["text"] =~ "@@ -0,0 +1,260001 @@"
@@ -549,7 +679,60 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       assert change["raw_html"]["dangerous"] == true
       assert change["from_sha256"] == Common.sha256(old)
       assert change["to_bytes"] == byte_size(new)
-      assert String.length(change["head"]) <= 300 and String.length(change["tail"]) <= 300
+      assert change["head"] == String.slice(new, 0, 300)
+      assert change["tail"] == String.slice(new, -300, 300)
+
+      assert String.length(change["tail"]) == 300 and
+               String.ends_with?(change["tail"], "</script>")
+
+      assert change["added_urls_truncated"] == false
+    end
+
+    test "head and tail of a short body are the whole body, and a nil old body is empty" do
+      change = Common.content_change(nil, "short body")
+      assert change["head"] == "short body" and change["tail"] == "short body"
+      assert change["from_bytes"] == 0 and change["from_sha256"] == Common.sha256("")
+    end
+
+    test "added_urls sees angle-bracket destinations, autolinks, bare URLs, references and scheme-relative links" do
+      new =
+        "[x](<https://evil.example/a>) <https://auto.example> https://bare.example/p, " <>
+          "[r]: <https://q.example> [s](//rel.example/p) [t]: //ref-rel.example/z " <>
+          "<img src=\"HTTP://Raw.Example/i.png\"> see https://dot.example."
+
+      assert Common.content_change("", new)["added_urls"] == [
+               "auto.example",
+               "bare.example",
+               "dot.example",
+               "evil.example",
+               "q.example",
+               "raw.example",
+               "ref-rel.example",
+               "rel.example"
+             ]
+    end
+
+    test "added_urls compares hosts case-insensitively, ignores empty hosts and plain // text" do
+      old = "[a](https://Example.com/a)"
+
+      new =
+        "[a](https://EXAMPLE.com/b) [x](http://) [y](https:///p) [z](https://.) a // b and http:// alone"
+
+      assert Common.content_change(old, new)["added_urls"] == []
+    end
+
+    test "added_urls is cut at 50 hosts and says so" do
+      new =
+        Enum.map_join(1..60, " ", &"[l](https://h#{String.pad_leading("#{&1}", 2, "0")}.example)")
+
+      change = Common.content_change("", new)
+      assert length(change["added_urls"]) == 50
+      assert hd(change["added_urls"]) == "h01.example"
+      assert change["added_urls_truncated"] == true
+
+      assert Common.content_change("", Enum.join(Enum.take(String.split(new), 50), " "))[
+               "added_urls_truncated"
+             ] == false
     end
 
     test "added_urls are the hosts the new body has and the old one lacks, sorted, not all new hosts" do
@@ -582,6 +765,11 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
                  reason: "content_too_large"
                )
 
+      assert {:error, :validation_failed, _, %{errors: [error]}} =
+               Common.check_text("content", String.duplicate("a", 11), max: 10)
+
+      refute Map.has_key?(error, :reason)
+
       assert :ok = Common.check_text("content", "fine", max: 10)
       assert :ok = Common.check_text("content", nil, max: 10)
     end
@@ -596,6 +784,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
 
       assert message == "is longer than #{cap} bytes"
       assert error.limit == cap and error.path == "content"
+      assert error.reason == "content_too_large"
       assert :ok = Common.check_text("content", String.duplicate("a", cap), [])
       assert {:error, :validation_failed, _, _} = Common.check_text("content", 12, [])
     end

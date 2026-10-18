@@ -6,11 +6,12 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   import Ecto.Query, only: [from: 2]
 
+  require Logger
+
   alias PhoenixKit.Modules.Publishing.API.TextScan
   alias PhoenixKit.Modules.Publishing.Errors
 
   alias PhoenixKit.Modules.Publishing.{
-    DBStorage,
     PublishingCategory,
     PublishingContent,
     PublishingGroup,
@@ -30,6 +31,10 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   The options every API write passes to the context functions. The activity mode travels in
   `:activity_mode`, NEVER `:mode` (`Groups.add_group/2` reads the group's URL mode from `:mode`).
   `extra` is merged over the defaults and adds only options the called function documents.
+
+  The scope costs a user and a role query, so a handler calls this ONCE per request. A batch
+  handler that needs the options per row builds them once and reuses them, or passes the scope it
+  already has as `scope: scope` in `extra` (then no lookup is made).
   """
   @spec write_opts(map(), String.t(), keyword()) :: keyword()
   def write_opts(ctx, tool, extra \\ []) do
@@ -44,10 +49,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
       }
       |> put_approver(Map.get(ctx, :approved_by_uuid))
 
-    Keyword.merge(
-      [actor_uuid: actor.user_uuid, activity_mode: "auto", scope: scope(ctx), log_metadata: meta],
-      extra
-    )
+    [actor_uuid: actor.user_uuid, activity_mode: "auto", log_metadata: meta]
+    |> Keyword.merge(extra)
+    |> Keyword.put_new_lazy(:scope, fn -> scope(ctx) end)
   end
 
   defp put_approver(meta, uuid) when is_binary(uuid), do: Map.put(meta, "approved_by_uuid", uuid)
@@ -125,7 +129,6 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
        %{reason: "went_live"}}
 
   def classify(:locked_check_failed) do
-    require Logger
     Logger.warning("[Publishing.API] the locked check raised; the write was refused")
     {:internal_error, nil, "The request could not be completed.", %{}}
   end
@@ -147,8 +150,6 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   def classify(other) do
-    require Logger
-
     Logger.warning("[Publishing.API] unclassified error: #{log_tag(other)}")
 
     {:internal_error, nil, "The request could not be completed.", %{}}
@@ -218,8 +219,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   defp join_path(path, field), do: path <> "." <> to_string(field)
 
   defp interpolate_error({message, opts}) do
-    Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-      Enum.find_value(opts, key, &option_value(&1, key))
+    Regex.replace(~r"%{(\w+)}", message, fn placeholder, key ->
+      Enum.find_value(opts, placeholder, &option_value(&1, key))
     end)
   end
 
@@ -227,15 +228,19 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   @doc """
   Checks a text field before any write: valid UTF-8, no NUL byte (Postgres would reject it and
-  the write would surface as a 500), at most `:max` bytes (`:reason` names the reason of the
-  over-long case, e.g. "content_too_large"). `nil` passes.
+  the write would surface as a 500), at most `:max` bytes (default: the body cap, whose
+  over-long reason is "content_too_large"; `:reason` overrides the reason). `nil` passes.
   """
   @spec check_text(String.t(), term(), keyword()) ::
           :ok | {:error, :validation_failed, String.t(), map()}
   def check_text(_path, nil, _opts), do: :ok
 
   def check_text(path, value, opts) when is_binary(value) do
-    max = Keyword.get(opts, :max, TextScan.max_body_bytes())
+    {max, default_reason} =
+      case Keyword.fetch(opts, :max) do
+        {:ok, max} -> {max, nil}
+        :error -> {TextScan.max_body_bytes(), "content_too_large"}
+      end
 
     cond do
       not String.valid?(value) ->
@@ -245,7 +250,12 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
         invalid(path, "must not contain a NUL byte")
 
       byte_size(value) > max ->
-        invalid(path, "is longer than #{max} bytes", Keyword.get(opts, :reason), %{limit: max})
+        invalid(
+          path,
+          "is longer than #{max} bytes",
+          Keyword.get(opts, :reason, default_reason),
+          %{limit: max}
+        )
 
       true ->
         :ok
@@ -498,24 +508,26 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   @spec slug_taken?(String.t(), String.t()) :: false | {true, :live | :trashed}
   def slug_taken?(group_slug, slug) do
     cond do
-      DBStorage.get_post(group_slug, slug) ->
-        {true, :live}
-
-      trashed_slug?(group_slug, slug) ->
-        {true, :trashed}
-
-      true ->
-        false
+      slug_row?(group_slug, slug, true) -> {true, :live}
+      slug_row?(group_slug, slug, false) -> {true, :trashed}
+      true -> false
     end
   end
 
-  defp trashed_slug?(group_slug, slug) do
-    from(p in PublishingPost,
-      join: g in PublishingGroup,
-      on: g.uuid == p.group_uuid,
-      where: g.slug == ^group_slug and p.slug == ^slug and not is_nil(p.trashed_at)
-    )
-    |> repo().exists?()
+  defp slug_row?(group_slug, slug, live?) do
+    query =
+      from(p in PublishingPost,
+        join: g in PublishingGroup,
+        on: g.uuid == p.group_uuid,
+        where: g.slug == ^group_slug and p.slug == ^slug
+      )
+
+    query =
+      if live?,
+        do: from(p in query, where: is_nil(p.trashed_at)),
+        else: from(p in query, where: not is_nil(p.trashed_at))
+
+    repo().exists?(query)
   end
 
   # --- the :locked_check closure (spec §8) -------------------------------------------------
@@ -561,8 +573,11 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   sizes, hashes, head, tail, the bounded line diff, and facts computed over the WHOLE new body
   (`added_urls`, `raw_html`), because a coarse or truncated diff can miss a harmful hunk.
   """
-  @spec content_change(String.t(), String.t()) :: map()
+  @spec content_change(String.t() | nil, String.t()) :: map()
   def content_change(old, new) do
+    old = old || ""
+    {added_urls, urls_truncated?} = added_urls(old, new)
+
     %{
       "scope" => "language",
       "from_bytes" => byte_size(old),
@@ -572,24 +587,41 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
       "head" => String.slice(new, 0, 300),
       "tail" => String.slice(new, -300, 300),
       "diff" => line_diff(old, new),
-      "added_urls" => added_urls(old, new),
+      "added_urls" => added_urls,
+      "added_urls_truncated" => urls_truncated?,
       "raw_html" => TextScan.scan(new)
     }
   end
 
-  @url_re ~r{\]\(\s*(https?://[^\s)]*)|\]:\s*(https?://\S*)}i
+  # Every http(s) URL anywhere in the body (autolinks, angle-bracket destinations, bare URLs,
+  # reference definitions, raw attributes) plus scheme-relative `//host` destinations, which are
+  # external links too. Advice for the approver, so it errs on the side of listing more.
+  @absolute_url_re ~r{https?://[^\s<>()\[\]"'`\\]+}i
+  @relative_url_re ~r{(?:\]\(|\]:)\s*<?\s*(//[^\s<>()\[\]"'`\\]+)}
+  @max_added_urls 50
 
   defp hosts(text) do
-    @url_re
-    |> Regex.scan(text)
-    |> Enum.flat_map(fn [_all | groups] -> Enum.reject(groups, &(&1 == "")) end)
-    |> Enum.map(&(&1 |> URI.parse() |> Map.get(:host)))
-    |> Enum.reject(&is_nil/1)
+    absolute = @absolute_url_re |> Regex.scan(text) |> Enum.map(&hd/1)
+    relative = @relative_url_re |> Regex.scan(text) |> Enum.map(&Enum.at(&1, 1))
+
+    (absolute ++ relative)
+    |> Enum.map(&url_host/1)
+    |> Enum.reject(&(&1 == ""))
     |> MapSet.new()
   end
 
-  defp added_urls(old, new),
-    do: new |> hosts() |> MapSet.difference(hosts(old)) |> Enum.sort() |> Enum.take(50)
+  # Hosts compare case-insensitively; sentence punctuation glued to a bare URL is not part of it.
+  defp url_host(url) do
+    (URI.parse(url).host || "")
+    |> String.replace(~r/[,;!*].*\z/s, "")
+    |> String.trim_trailing(".")
+    |> String.downcase()
+  end
+
+  defp added_urls(old, new) do
+    added = new |> hosts() |> MapSet.difference(hosts(old)) |> Enum.sort()
+    {Enum.take(added, @max_added_urls), length(added) > @max_added_urls}
+  end
 
   @doc ~S|A unified line diff, bounded (see spec §9.12): `%{"mode", "text", "hunks", "truncated"}` (+ line counts when coarse).|
   @spec line_diff(String.t(), String.t()) :: map()

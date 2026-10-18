@@ -148,7 +148,7 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
     assert {:validation_failed, "slot_taken", _, _} = Common.classify(slot)
   end
 
-  test "a static scan finds no {:error, atom} or rollback(atom) in the sources that the table does not cover" do
+  test "a static scan finds no {:error, atom} / {:error, atom, ...} or rollback(atom) in the sources that the table does not cover" do
     known =
       MapSet.new(
         @error_atoms ++
@@ -160,7 +160,7 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
           not String.contains?(path, "/web/"),
           not String.contains?(path, "/api/"),
           [_full | groups] <-
-            Regex.scan(~r/\{:error, :([a-z_]+)\}|rollback\(:([a-z_]+)\)/, File.read!(path)),
+            Regex.scan(~r/\{:error, :([a-z_]+)[,}]|rollback\(:([a-z_]+)\)/, File.read!(path)),
           atom <- groups,
           atom != "",
           do: String.to_atom(atom)
