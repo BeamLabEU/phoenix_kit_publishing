@@ -45,8 +45,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
 
   defp find_by_slug(group, slug, include_trashed?) do
     DBStorage.get_post(group, slug) ||
-      if include_trashed?,
-        do: Enum.find(DBStorage.list_posts(group, "trashed"), &(&1.slug == slug))
+      if include_trashed?, do: DBStorage.get_trashed_post(group, slug)
   end
 
   defp cast_uuid(id) do

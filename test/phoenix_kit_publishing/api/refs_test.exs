@@ -88,6 +88,29 @@ defmodule PhoenixKit.Modules.Publishing.API.RefsTest do
       assert {:ok, _} = Refs.resolve_post(%{"id" => post[:uuid]}, include_trashed: true)
     end
 
+    test "the trashed slug lookup stays inside its group and ignores live posts", %{
+      g: g,
+      post: post
+    } do
+      other = Fx.group!()
+      {:ok, _} = Posts.trash_post(g["slug"], post[:uuid])
+
+      assert {:error, :not_found} =
+               Refs.resolve_post(%{"group" => other["slug"], "slug" => "t"},
+                 include_trashed: true
+               )
+
+      live = Fx.post!(g["slug"], %{title: "L", slug: "live"})
+
+      assert {:ok, %{db_post: %{uuid: live_uuid}}} =
+               Refs.resolve_post(%{"group" => g["slug"], "slug" => "live"}, include_trashed: true)
+
+      assert live_uuid == live[:uuid]
+      assert DBStorage.get_trashed_post(g["slug"], "live") == nil
+      assert %{uuid: trashed_uuid} = DBStorage.get_trashed_post(g["slug"], "t")
+      assert trashed_uuid == post[:uuid]
+    end
+
     test "a timestamp post has no slug: the slug form is not_found and the id form works (Review Focus 2)" do
       ts = Fx.group!(mode: "timestamp")
       p = Fx.post!(ts["slug"], %{title: "Stamp"})
