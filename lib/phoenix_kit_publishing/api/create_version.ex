@@ -31,9 +31,16 @@ defmodule PhoenixKit.Modules.Publishing.API.CreateVersion do
       input["from_version"] ||
         versions |> Enum.map(& &1.version_number) |> Enum.max(fn -> nil end)
 
-    if Enum.any?(versions, &(&1.version_number == number)),
-      do: {:ok, number},
-      else: Common.invalid("from_version", "the version does not exist", "version_not_found")
+    cond do
+      Enum.any?(versions, &(&1.version_number == number)) ->
+        {:ok, number}
+
+      is_nil(number) ->
+        Common.invalid("post", "the post has no version to copy", "version_not_found")
+
+      true ->
+        Common.invalid("from_version", "the version does not exist", "version_not_found")
+    end
   end
 
   defp preview(hit, source) do
@@ -55,7 +62,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreateVersion do
            %{},
            Common.write_opts(ctx, @tool)
          ) do
-      {:ok, post} ->
+      {:ok, _post} ->
         db = DBStorage.get_post_by_uuid(hit.db_post.uuid, [:group])
         versions = DBStorage.list_versions(db.uuid)
         latest = Enum.max_by(versions, & &1.version_number)
@@ -63,7 +70,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreateVersion do
         {:ok,
          %{
            "action" => "created",
-           "version" => post[:version] || latest.version_number,
+           "version" => latest.version_number,
            "post" =>
              Presenter.write_summary(db, db.group, versions, DBStorage.list_contents(latest.uuid))
          }}
