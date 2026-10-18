@@ -6,15 +6,21 @@ defmodule PhoenixKit.Modules.Publishing.API.FieldEscapingTest do
   known to render and (b) carry the raw form of none. A field that renders raw joins the scan.
 
   Fields without a public render site in this fixture (`seo_title`, the version-level
-  `excerpt`, the category `description`) are covered by (b) only: the listing excerpt is
-  derived from the body, and the version-level `description` is reached only as the last
-  fallback for og:description and JSON-LD when the language has no body (the empty post).
+  `excerpt`, the category `description`) are covered by (b) only (setup reads them back, so
+  the refute is not vacuous): the listing excerpt is derived from the body, and the
+  version-level `description` is reached only as the last fallback for og:description and
+  JSON-LD when the language has no body (the empty post).
+
+  The JSON-LD script is checked on its own: it must hold the expected fields JSON-escaped
+  and no `<` at all (the `Phoenix.HTML.raw/1` sink is only safe because of that), and the
+  HTML expectations are checked against the page with that script removed, so the script
+  cannot vouch for a field the HTML sites no longer escape.
   """
 
   # async: false: mutates the global publishing settings rows.
   use PhoenixKitPublishing.ConnCase, async: false
 
-  alias PhoenixKit.Modules.Publishing.{Categories, Groups, Posts, Versions}
+  alias PhoenixKit.Modules.Publishing.{Categories, DBStorage, Groups, Posts, Versions}
   alias PhoenixKit.Settings
 
   @fields ~w(group cat_name cat_description title_a description_a seo_title_a excerpt_a
@@ -23,10 +29,23 @@ defmodule PhoenixKit.Modules.Publishing.API.FieldEscapingTest do
   defp marker(field), do: ~s(<b id="m-#{field}">x</b>)
   defp raw(field), do: ~s(<b id="m-#{field}">)
 
-  # HTML-escaped (attributes and text) or JSON-escaped (JSON-LD).
-  defp escaped?(body, field) do
-    body =~ "&lt;b id=&quot;m-#{field}&quot;&gt;" or body =~ ~s(\\u003Cb id=\\"m-#{field}\\")
+  @jsonld_re ~r{<script type="application/ld\+json">(.*?)</script>}s
+
+  # The JSON-LD script content, or nil; and the page without that script.
+  defp jsonld(body) do
+    case Regex.run(@jsonld_re, body) do
+      [_, json] -> json
+      nil -> nil
+    end
   end
+
+  defp without_jsonld(body), do: Regex.replace(@jsonld_re, body, "")
+
+  # HTML-escaped, in attributes and text.
+  defp html_escaped?(html, field), do: html =~ "&lt;b id=&quot;m-#{field}&quot;&gt;"
+
+  # JSON-escaped: `<` becomes a unicode escape and quotes are backslash-escaped.
+  defp json_escaped?(json, field), do: json =~ ~s(\\u003Cb id=\\"m-#{field}\\")
 
   setup do
     {:ok, _} = Settings.update_boolean_setting("publishing_enabled", true)
@@ -89,6 +108,13 @@ defmodule PhoenixKit.Modules.Publishing.API.FieldEscapingTest do
       :ok = Versions.publish_version(slug, post.uuid, 1)
     end
 
+    # Read the fields without a render site back, so their refute is not vacuous.
+    version_a = DBStorage.get_version(post_a.uuid, 1)
+    assert version_a.data["seo_title"] == marker(:seo_title_a)
+    assert version_a.data["excerpt"] == marker(:excerpt_a)
+    assert {:ok, %{description: description}} = Categories.fetch_category(cat.uuid)
+    assert description == marker(:cat_description)
+
     %{slug: slug, post_uuid: post_a.uuid}
   end
 
@@ -97,23 +123,40 @@ defmodule PhoenixKit.Modules.Publishing.API.FieldEscapingTest do
     slug: slug
   } do
     expected = [
-      {"/#{slug}/marked-post", [:group, :cat_name, :title_a, :og_title_a, :og_description_a]},
-      {"/#{slug}/empty-post", [:group, :cat_name, :title_b, :description_b]},
-      {"/#{slug}", [:group, :title_a, :title_b]},
-      {"/#{slug}/category/marked", [:group, :cat_name, :title_a, :title_b]},
-      {"/#{slug}/feed.xml", [:group, :title_a, :title_b]}
+      {"/#{slug}/marked-post", [:group, :cat_name, :title_a, :og_title_a, :og_description_a],
+       [:og_title_a, :og_description_a]},
+      {"/#{slug}/empty-post", [:group, :cat_name, :title_b, :description_b],
+       [:title_b, :description_b]},
+      {"/#{slug}", [:group, :title_a, :title_b], []},
+      {"/#{slug}/category/marked", [:group, :cat_name, :title_a, :title_b], []},
+      {"/#{slug}/feed.xml", [:group, :title_a, :title_b], []}
     ]
 
-    for {path, rendered} <- expected do
+    for {path, rendered, in_jsonld} <- expected do
       body = conn |> get(path) |> response(200)
+      html = without_jsonld(body)
+      json = jsonld(body)
 
       for field <- @fields do
         refute body =~ raw(field), "#{path} renders #{field} unescaped"
+        refute body =~ ~s(<b id=\\"m-#{field}\\"), "#{path} renders #{field} as raw JSON"
       end
 
       for field <- rendered do
-        assert escaped?(body, field),
+        assert html_escaped?(html, field),
                "#{path} no longer carries #{field}, so its escaping check is vacuous"
+      end
+
+      if in_jsonld == [] do
+        assert json == nil, "#{path} unexpectedly carries a JSON-LD script"
+      else
+        assert json, "#{path} no longer carries a JSON-LD script"
+        refute json =~ "<", "#{path} JSON-LD carries a raw angle bracket"
+
+        for field <- in_jsonld do
+          assert json_escaped?(json, field),
+                 "#{path} JSON-LD no longer carries #{field}, so its escaping check is vacuous"
+        end
       end
     end
   end
