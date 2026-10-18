@@ -23,7 +23,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
 
   @spec all() :: [PhoenixKit.API.Tool.t()]
   def all do
-    [list_groups(), get_group_settings_schema(), list_posts()]
+    [list_groups(), get_group_settings_schema(), list_posts(), get_post()]
   end
 
   defp list_groups do
@@ -75,6 +75,27 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       input_schema: Schemas.list_posts(),
       output_schema: Schemas.list_posts_output(),
       handler: {PhoenixKit.Modules.Publishing.API.ListPosts, :call},
+      annotations: %{read_only: true, idempotent: true}
+    )
+  end
+
+  defp get_post do
+    Tool.new!(
+      name: "publishing.get_post",
+      audience: :admin,
+      scope: "publishing.posts:read",
+      permission: @permission,
+      title: "Get a post",
+      description:
+        "Reads one post by id or by group and slug: the Markdown body, the fields (description, seo_title, " <>
+          "excerpt, featured image, og, derived read-only tags, categories, url_slug), the versions and the " <>
+          "public paths. version defaults to the active one, else the latest; language defaults to the primary " <>
+          "language, and a language without text falls back with a language_missing warning. include_content " <>
+          "false omits the Markdown. Pass the returned revision as if_revision to the write tools. A trashed " <>
+          "post is not found here: use list_posts with status trashed.",
+      input_schema: Schemas.get_post(),
+      output_schema: Schemas.get_post_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.GetPost, :call},
       annotations: %{read_only: true, idempotent: true}
     )
   end

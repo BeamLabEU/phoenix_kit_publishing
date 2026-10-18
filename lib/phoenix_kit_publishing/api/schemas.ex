@@ -82,6 +82,33 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def get_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "language" => row_text(20),
+        "include_content" => %{"type" => "boolean"}
+      },
+      ["post"]
+    )
+  end
+
+  def get_post_output do
+    object_output(%{
+      "id" => %{"type" => "string"},
+      "group" => %{"type" => "string"},
+      "status" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "language" => %{"type" => "string"},
+      "markdown" => %{"type" => "string"},
+      "fields" => %{"type" => "object"},
+      "content_updated_at" => %{"type" => ["string", "null"]},
+      "revision" => %{"type" => "string"},
+      "warnings" => warnings_output()
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end
