@@ -23,7 +23,13 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     p5: ~w(upsert_groups trash_groups restore_groups),
     p6: ~w(translate_post)
   ]
-  @phase :p5
+  @phase :p6
+
+  # The declared order of the tool list: translate_post sits after set_translation although it is built last.
+  @spec_order ~w(list_groups get_group_settings_schema list_posts get_post list_categories
+                 create_post update_post create_version set_translation translate_post
+                 publish_post unpublish_post schedule_post trash_posts restore_posts
+                 upsert_categories delete_categories upsert_groups trash_groups restore_groups)
 
   # name => {scope, read_only?, max_items, danger kind}. :always | :fn | nil
   @table %{
@@ -59,7 +65,14 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
   test "the declared tools are the finished phases plus a prefix of the current one, in order" do
     {finished, next} = expected_names()
     names = Tools.all() |> Enum.map(&String.replace_prefix(&1.name, "publishing.", ""))
-    assert Enum.take(names, length(finished)) == finished
+
+    # Once every phase is done the order is the declaration order of the spec, not the build order.
+    if @phase == :p6 do
+      assert names == @spec_order
+    else
+      assert Enum.take(names, length(finished)) == finished
+    end
+
     extra = Enum.drop(names, length(finished))
     assert extra == Enum.take(next, length(extra))
   end

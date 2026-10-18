@@ -1271,6 +1271,108 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
+  describe "translate_post" do
+    use Oban.Testing, repo: PhoenixKitPublishing.Test.Repo
+
+    setup ctx do
+      start_supervised!(
+        {Oban,
+         repo: PhoenixKitPublishing.Test.Repo, testing: :manual, queues: false, plugins: false}
+      )
+
+      {:ok, _} = Settings.update_boolean_setting("ai_enabled", true)
+      Fx.languages!(["en-US", "de-DE", "fr-FR"])
+
+      {:ok, endpoint} =
+        PhoenixKitAI.create_endpoint(%{
+          name: "Exec pub ep #{System.unique_integer([:positive])}",
+          provider: "openrouter",
+          api_key: "pub-test-key",
+          model: "x/y",
+          enabled: true
+        })
+
+      {:ok, prompt} =
+        PhoenixKitAI.create_prompt(%{
+          name: "Exec pub translate #{System.unique_integer([:positive])}",
+          content: "Translate {{Text}} to {{Language}}"
+        })
+
+      {:ok, _} = Settings.update_setting("publishing_translation_endpoint_uuid", endpoint.uuid)
+      {:ok, _} = Settings.update_setting("publishing_translation_prompt_uuid", prompt.uuid)
+      Fx.body!(ctx.g["slug"], ctx.post[:uuid], "english body")
+      :ok
+    end
+
+    test "always answers confirmation_required with the targets; the code enqueues once", ctx do
+      token = issue_token(ctx.user, scopes())
+      input = %{"post" => ref(ctx)}
+
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"targets" => targets, "estimated_jobs" => 2}]
+                }
+              }, _} = call_with(token, "publishing.translate_post", input)
+
+      assert Enum.sort(targets) == ["de-DE", "fr-FR"]
+      assert all_enqueued(worker: PhoenixKitAI.TranslateWorker) == []
+
+      assert {200, %{"action" => "queued", "enqueued" => 2, "conflicts" => 0}, _} =
+               call_with(
+                 token,
+                 "publishing.translate_post",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert length(all_enqueued(worker: PhoenixKitAI.TranslateWorker)) == 2
+
+      assert {409, %{"context" => %{"reason" => "used"}}, _} =
+               call_with(
+                 token,
+                 "publishing.translate_post",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert length(all_enqueued(worker: PhoenixKitAI.TranslateWorker)) == 2
+    end
+
+    test "the code is refused with reason changed after the post changed in between", ctx do
+      token = issue_token(ctx.user, scopes())
+      input = %{"post" => ref(ctx)}
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(token, "publishing.translate_post", input)
+
+      Fx.translation!(ctx.g["slug"], ctx.post[:uuid], "de-DE", "Hallo", "Inhalt")
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 token,
+                 "publishing.translate_post",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert all_enqueued(worker: PhoenixKitAI.TranslateWorker) == []
+    end
+
+    test "a key without the translations scope is refused with 403 and nothing is queued", ctx do
+      token = issue_token(ctx.user, ["publishing.posts:write", "publishing.posts:publish"])
+
+      assert {403,
+              %{
+                "code" => "forbidden",
+                "context" => %{"required_scope" => "publishing.translations:ai"}
+              }, _} = call_with(token, "publishing.translate_post", %{"post" => ref(ctx)})
+
+      assert all_enqueued(worker: PhoenixKitAI.TranslateWorker) == []
+    end
+  end
+
   test "every scope the declared tools carry is a known publishing scope, and the key gets all of them" do
     declared = scopes_declared() |> Enum.uniq() |> Enum.sort()
 
@@ -1290,11 +1392,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     six =
       ~w(publishing.create_version publishing.get_group_settings_schema publishing.get_post publishing.list_categories publishing.list_groups publishing.list_posts)
 
-    declared = Tools.all() |> Enum.map(& &1.name)
-    names = PublishingAPI.tools(false) |> Enum.map(& &1.name) |> Enum.sort()
-    expected = six |> Enum.filter(&(&1 in declared)) |> Enum.sort()
-
-    assert expected != []
-    assert names == expected
+    assert length(Tools.all()) == 20
+    assert PublishingAPI.tools(false) |> Enum.map(& &1.name) |> Enum.sort() == Enum.sort(six)
   end
 end

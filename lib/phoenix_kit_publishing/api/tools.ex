@@ -33,6 +33,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       update_post(),
       create_version(),
       set_translation(),
+      translate_post(),
       publish_post(),
       unpublish_post(),
       schedule_post(),
@@ -233,6 +234,33 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       handler: {PhoenixKit.Modules.Publishing.API.SetTranslation, :call},
       danger: {PhoenixKit.Modules.Publishing.API.Danger, :set_translation},
       annotations: %{idempotent: true}
+    )
+  end
+
+  defp translate_post do
+    Tool.new!(
+      name: "publishing.translate_post",
+      audience: :admin,
+      scope: "publishing.translations:ai",
+      permission: @permission,
+      title: "Translate a post with AI",
+      description:
+        "Queues AI translation jobs of the primary-language text into other languages. It costs money: " <>
+          "one paid job per language, and each job OVERWRITES the language it translates. Always needs a " <>
+          "confirmation; the preview lists the targets, the languages skipped, the languages whose existing " <>
+          "text will be overwritten, the endpoint and the prompt. version defaults to the highest draft; " <>
+          "languages (up to 50) defaults to every enabled language except the primary; a language that " <>
+          "already has text is skipped unless overwrite_existing is true. The endpoint and the prompt come " <>
+          "from the site's settings, not from the request. The answer reports QUEUED work (enqueued, " <>
+          "conflicts, in_flight), never 'translated': poll get_post, a language appears in languages with " <>
+          "its title once its job wrote the row. A second identical call is de-duplicated (conflicts). " <>
+          "Not idempotent.",
+      input_schema: Schemas.translate_post(),
+      output_schema: Schemas.translate_post_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.TranslatePost, :call},
+      danger: :always,
+      cost: 5,
+      annotations: %{open_world: true, idempotent: false}
     )
   end
 

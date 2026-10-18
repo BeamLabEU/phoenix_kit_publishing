@@ -232,6 +232,32 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def translate_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "languages" => %{"type" => "array", "maxItems" => 50, "items" => row_text(20)},
+        "overwrite_existing" => %{"type" => "boolean"}
+      },
+      ["post"]
+    )
+  end
+
+  def translate_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "source_language" => %{"type" => "string"},
+      "targets" => %{"type" => "array", "items" => %{"type" => "string"}},
+      "skipped" => %{"type" => "array", "items" => %{"type" => "string"}},
+      "enqueued" => %{"type" => "integer"},
+      "conflicts" => %{"type" => "integer"},
+      "errors" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "in_flight" => %{"type" => "array", "items" => %{"type" => "string"}}
+    })
+  end
+
   def publish_post do
     object(
       %{
