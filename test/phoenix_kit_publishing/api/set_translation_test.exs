@@ -415,6 +415,17 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     assert %{title: "Gestempelt"} = Fx.content(p[:uuid], "de-DE")
   end
 
+  test "a NUL byte in any text field is a validation error with the path and writes no row",
+       ctx do
+    for field <- ~w(title content og_title og_description) do
+      assert {:error, :validation_failed, _, %{errors: [%{path: ^field}]}} =
+               set(ctx, %{field => "a\u0000b"}),
+             field
+
+      assert Fx.content(ctx.post[:uuid], "de-DE") == nil, field
+    end
+  end
+
   test "the handler refuses a title over the character limit with no row", ctx do
     input = %{
       "post" => Fx.ref(ctx.post),
