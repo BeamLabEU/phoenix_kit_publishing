@@ -26,7 +26,13 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
            Refs.resolve_version(hit.db_post, input["version"], :write) |> Refs.version_error(),
          {:ok, language} <- language(input["language"]),
          row = DBStorage.get_content(version.uuid, language),
-         :ok <- Common.check_revision(input, hit.db_post, version, row) do
+         :ok <-
+           Common.check_revision(
+             input,
+             hit.db_post,
+             version,
+             revision_row(input, hit, version, language, row)
+           ) do
       t = %{
         input: input,
         hit: hit,
@@ -45,6 +51,20 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
       end
     end
   end
+
+  # get_post of a language without a row shows the text it falls back to, and its revision covers
+  # that row: a new language is checked against the same row.
+  defp revision_row(_input, _hit, _version, _language, %{} = row), do: row
+
+  defp revision_row(%{"if_revision" => expected}, hit, version, language, nil)
+       when not is_nil(expected) do
+    case Refs.read_post_for_preview(hit.db_post.uuid, language, version.version_number) do
+      {:ok, %{language: shown}} -> DBStorage.get_content(version.uuid, shown)
+      _other -> nil
+    end
+  end
+
+  defp revision_row(_input, _hit, _version, _language, nil), do: nil
 
   defp texts(input) do
     with :ok <-

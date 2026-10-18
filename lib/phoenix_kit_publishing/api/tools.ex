@@ -226,7 +226,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "error says so. og_title, og_description and og_image_id are optional; null clears. Writing to " <>
           "the live version or an archived one, or body text with HTML, components, post links or link " <>
           "destinations other than http, https, mailto or tel, needs a confirmation: send dry_run first and " <>
-          "confirm the preview. if_revision is the revision of get_post.",
+          "confirm the preview. if_revision is the revision of get_post of the same language and version; for " <>
+          "a language without text yet it is the revision get_post showed for the text it fell back to.",
       input_schema: Schemas.set_translation(),
       output_schema: Schemas.set_translation_output(),
       handler: {PhoenixKit.Modules.Publishing.API.SetTranslation, :call},

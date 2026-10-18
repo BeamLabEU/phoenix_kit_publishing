@@ -293,6 +293,41 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     assert Fx.content(ctx.post[:uuid], "de-DE").content == "Neuer Inhalt"
   end
 
+  test "if_revision of get_post lets a NEW language through, and refuses it once the text it showed changed",
+       ctx do
+    read = fn ->
+      {:ok, %{"revision" => rev, "language" => shown}} =
+        ApiCase.call("publishing.get_post", %{
+          "post" => Fx.ref(ctx.post),
+          "language" => "de-DE",
+          "version" => 1
+        })
+
+      assert shown == "en-US", "the fixture is not a missing row: this test would be vacuous"
+      rev
+    end
+
+    stale = read.()
+
+    {:ok, _} =
+      ApiCase.call("publishing.update_post", %{
+        "post" => Fx.ref(ctx.post),
+        "version" => 1,
+        "content" => "changed english body"
+      })
+
+    assert {:error, :revision_mismatch, _, %{current_revision: current}} =
+             set(ctx, %{"version" => 1, "if_revision" => stale})
+
+    assert current == read.()
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+
+    assert {:ok, %{"action" => "created"}} =
+             set(ctx, %{"version" => 1, "if_revision" => current})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE").content == "Inhalt"
+  end
+
   test "if_revision mismatch, trashed post and trashed group", ctx do
     assert {:error, :revision_mismatch, _, %{current_revision: _}} =
              set(ctx, %{"if_revision" => String.duplicate("0", 64)})
