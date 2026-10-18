@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing do
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Publishing.ActivityLog
+  alias PhoenixKit.Modules.Publishing.API
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.SlugHelpers
@@ -713,7 +714,8 @@ defmodule PhoenixKit.Modules.Publishing do
   # The machine API's admin tools (`PhoenixKit.Modules.Publishing.API`). `api_tools/0` is an
   # optional `PhoenixKit.Module` callback. No `@impl`: the core floor predates the callback,
   # where `@impl` would warn.
-  def api_tools, do: PhoenixKit.Modules.Publishing.API.tools()
+  @spec api_tools() :: [PhoenixKit.API.Tool.t()]
+  def api_tools, do: API.tools()
 
   # ============================================================================
   # Shared Helpers (used across submodules)

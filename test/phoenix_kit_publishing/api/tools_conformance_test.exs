@@ -3,7 +3,11 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
 
   alias PhoenixKit.API.Tool
   alias PhoenixKit.API.ToolLint
+  alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.API
+  alias PhoenixKit.Modules.Publishing.API.Danger
   alias PhoenixKit.Modules.Publishing.API.Tools
+  alias PhoenixKit.Modules.Publishing.Constants
 
   # Tool names in the order of spec §6.2, by phase. @phase is the last COMPLETED phase; the
   # task that closes a phase bumps it. Inside a phase the declared tools must be a prefix of
@@ -105,7 +109,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
 
         :fn ->
           assert match?(
-                   {PhoenixKit.Modules.Publishing.API.Danger, f} when is_atom(f),
+                   {Danger, f} when is_atom(f),
                    tool.danger
                  ),
                  tool.name
@@ -136,7 +140,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
   end
 
   test "a title property carries the module's length limit" do
-    max_title = PhoenixKit.Modules.Publishing.Constants.max_title_length()
+    max_title = Constants.max_title_length()
 
     for tool <- Tools.all(),
         %{"maxLength" => max} <- [get_in(tool.input_schema, ["properties", "title"])] do
@@ -186,13 +190,14 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     assert Enum.reject(used, &MapSet.member?(allowed, &1)) == []
   end
 
+  @tag :core_api
   test "ToolLint finds nothing wrong with the tools" do
     assert :ok = ToolLint.check_tools(Tools.all())
   end
 
   test "api_tools/0 hands core the tools of API.tools/0" do
-    assert Enum.map(PhoenixKit.Modules.Publishing.api_tools(), & &1.name) ==
-             Enum.map(PhoenixKit.Modules.Publishing.API.tools(), & &1.name)
+    assert Enum.map(Publishing.api_tools(), & &1.name) ==
+             Enum.map(API.tools(), & &1.name)
   end
 
   defp collect_properties(%{"properties" => props}), do: Map.keys(props)

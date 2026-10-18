@@ -2,6 +2,7 @@ defmodule PhoenixKitPublishing.Test.ApiFixtures do
   @moduledoc false
   # Fixtures for the API tests. Every function writes through the module's own contexts.
 
+  alias Ecto.Adapters.SQL
   alias PhoenixKit.Modules.Publishing
 
   alias PhoenixKit.Modules.Publishing.{
@@ -14,6 +15,8 @@ defmodule PhoenixKitPublishing.Test.ApiFixtures do
   }
 
   alias PhoenixKit.Settings
+  alias PhoenixKit.Users.Auth.User
+  alias PhoenixKitPublishing.Test.Repo
 
   @doc "Enables the given language codes (the first is the default/primary)."
   def languages!(codes \\ ["en-US", "de-DE"]) do
@@ -56,7 +59,6 @@ defmodule PhoenixKitPublishing.Test.ApiFixtures do
   @doc "Publishes version `n` (default 1) of the post."
   def publish!(group_slug, post_uuid, version \\ 1) do
     :ok = Versions.publish_version(group_slug, post_uuid, version)
-    :ok
   end
 
   @doc "Adds a language row to the post's version and fills its title and body."
@@ -95,11 +97,11 @@ defmodule PhoenixKitPublishing.Test.ApiFixtures do
                     phoenix_kit_publishing_contents phoenix_kit_publishing_categories phoenix_kit_activities),
         into: %{} do
       %{rows: [[count]]} =
-        Ecto.Adapters.SQL.query!(PhoenixKitPublishing.Test.Repo, "SELECT count(*) FROM #{table}")
+        SQL.query!(Repo, "SELECT count(*) FROM #{table}")
 
       %{rows: [[digest]]} =
-        Ecto.Adapters.SQL.query!(
-          PhoenixKitPublishing.Test.Repo,
+        SQL.query!(
+          Repo,
           "SELECT coalesce(md5(string_agg(t::text, '' ORDER BY t::text)), '') FROM #{table} t"
         )
 
@@ -120,7 +122,7 @@ defmodule PhoenixKitPublishing.Test.ApiFixtures do
 
   @doc "A user row (for tests that assert created_by). Inserted directly: register_user/1 rides the rate limiter, which the test env does not start."
   def user! do
-    PhoenixKitPublishing.Test.Repo.insert!(%PhoenixKit.Users.Auth.User{
+    Repo.insert!(%User{
       email: "pub-api-#{System.unique_integer([:positive])}@example.com",
       hashed_password: "x",
       first_name: "Pub",
