@@ -58,6 +58,17 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  # --- category reads ---------------------------------------------------------------------
+
+  def list_categories, do: object(%{"group" => row_text(200)}, ["group"])
+
+  def list_categories_output do
+    object_output(%{
+      "categories" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "count" => %{"type" => "integer"}
+    })
+  end
+
   # --- post reads -------------------------------------------------------------------------
 
   def list_posts do

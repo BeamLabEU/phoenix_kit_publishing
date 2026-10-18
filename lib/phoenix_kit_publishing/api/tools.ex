@@ -23,7 +23,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
 
   @spec all() :: [PhoenixKit.API.Tool.t()]
   def all do
-    [list_groups(), get_group_settings_schema(), list_posts(), get_post()]
+    [list_groups(), get_group_settings_schema(), list_posts(), get_post(), list_categories()]
   end
 
   defp list_groups do
@@ -98,6 +98,24 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       input_schema: Schemas.get_post(),
       output_schema: Schemas.get_post_output(),
       handler: {PhoenixKit.Modules.Publishing.API.GetPost, :call},
+      annotations: %{read_only: true, idempotent: true}
+    )
+  end
+
+  defp list_categories do
+    Tool.new!(
+      name: "publishing.list_categories",
+      audience: :admin,
+      scope: "publishing.categories:read",
+      permission: @permission,
+      title: "List categories",
+      description:
+        "Lists the categories of one group as a flat list in tree order: id, slug, name, name_i18n, " <>
+          "description, position, parent_id, depth (0 for a root) and published_post_count, the number " <>
+          "of live posts filed in the category itself. Not paginated.",
+      input_schema: Schemas.list_categories(),
+      output_schema: Schemas.list_categories_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.ListCategories, :call},
       annotations: %{read_only: true, idempotent: true}
     )
   end
