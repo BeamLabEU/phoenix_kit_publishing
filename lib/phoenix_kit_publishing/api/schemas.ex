@@ -260,6 +260,28 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def schedule_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "publish_at" => %{"type" => "string", "minLength" => 16, "maxLength" => 16},
+        "if_revision" => row_text(100)
+      },
+      ["post", "publish_at"]
+    )
+  end
+
+  def schedule_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "publish_at" => %{"type" => "string"},
+      "time_zone" => %{"type" => "string"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end

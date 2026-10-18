@@ -34,7 +34,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       create_version(),
       set_translation(),
       publish_post(),
-      unpublish_post()
+      unpublish_post(),
+      schedule_post()
     ]
   end
 
@@ -261,6 +262,29 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       handler: {PhoenixKit.Modules.Publishing.API.UnpublishPost, :call},
       danger: :always,
       annotations: %{destructive: true, idempotent: true}
+    )
+  end
+
+  defp schedule_post do
+    Tool.new!(
+      name: "publishing.schedule_post",
+      audience: :admin,
+      scope: "publishing.posts:publish",
+      permission: @permission,
+      title: "Schedule a post",
+      description:
+        "Publishes a version at a future time in a timestamp-mode group. publish_at is " <>
+          "YYYY-MM-DDTHH:MM on the site clock (the answer carries time_zone), without seconds or a zone, " <>
+          "and must be later than now; the minute must be free (another post, also a trashed one, holding " <>
+          "it answers slot_taken). The post's date and time move to publish_at, so its public URL " <>
+          "changes with its date, and a post that is live now disappears until then. version defaults " <>
+          "to the highest draft. Always needs a confirmation; the preview says all of this. Repeating " <>
+          "the call is safe: a post already scheduled for that minute answers unchanged.",
+      input_schema: Schemas.schedule_post(),
+      output_schema: Schemas.schedule_post_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.SchedulePost, :call},
+      danger: :always,
+      annotations: %{idempotent: true}
     )
   end
 
