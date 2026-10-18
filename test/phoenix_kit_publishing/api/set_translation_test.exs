@@ -3,6 +3,8 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
 
   import PhoenixKitPublishing.ActivityLogAssertions
 
+  import Ecto.Query, only: [from: 2]
+
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts, PublishingContent, Versions}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
@@ -56,6 +58,21 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
              before
 
     assert Fx.content(ctx.post[:uuid], "de-DE").content == "Neuer Inhalt"
+  end
+
+  test "a handler called without schema validation answers empty_translation for a null text",
+       ctx do
+    input = %{
+      "post" => Fx.ref(ctx.post),
+      "language" => "de-DE",
+      "title" => nil,
+      "content" => "Inhalt"
+    }
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "empty_translation"}]}} =
+             PhoenixKit.Modules.Publishing.API.SetTranslation.call(input, ApiCase.ctx())
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
   end
 
   test "the primary language is refused", ctx do
@@ -167,10 +184,10 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     assert {:preview,
             %{
               "requires_confirmation" => true,
-              "rows" => [%{"changes" => %{"content" => %{"raw_html" => raw}}}]
+              "rows" => [
+                %{"changes" => %{"content" => %{"raw_html" => %{"dangerous" => true}}}}
+              ]
             }, _} = set(ctx, %{"content" => "<b>x</b>"}, %{dry_run?: true})
-
-    assert raw != []
 
     assert {:preview, %{"requires_confirmation" => false}, _} =
              set(ctx, %{}, %{dry_run?: true})
@@ -212,5 +229,127 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
                "title" => "a",
                "content" => "b"
              })
+  end
+
+  test "the fingerprint follows title, body, language, og values and the post state", ctx do
+    fingerprint = fn extra ->
+      {:preview, _, f} = set(ctx, extra, %{dry_run?: true})
+      f
+    end
+
+    base = fingerprint.(%{})
+    assert base =~ ~r/\A[0-9a-f]{64}\z/
+    assert base == fingerprint.(%{})
+
+    refute base == fingerprint.(%{"title" => "Hallo anders"})
+    refute base == fingerprint.(%{"content" => "Inhalt anders"})
+    refute base == fingerprint.(%{"language" => "fr-FR"})
+
+    with_og = fingerprint.(%{"og_title" => "OG"})
+    refute base == with_og
+    refute with_og == fingerprint.(%{"og_title" => "OG other"})
+    refute with_og == fingerprint.(%{"og_title" => "OG", "og_description" => "text"})
+
+    refute with_og ==
+             fingerprint.(%{"og_title" => "OG", "og_image_id" => Ecto.UUID.generate()})
+
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "someone else edited")
+    refute base == fingerprint.(%{})
+  end
+
+  test "an unconfirmed call on a version that is live is refused up front and writes no row",
+       ctx do
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    assert {:error, :revision_mismatch, _, %{reason: "went_live"}} =
+             set(ctx, %{"version" => 1})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+
+    assert {:ok, %{"action" => "created"}} =
+             set(ctx, %{"version" => 1}, %{confirmation_uuid: "c"})
+
+    assert %{title: "Hallo"} = Fx.content(ctx.post[:uuid], "de-DE")
+  end
+
+  test "a failed read-back after the row was created reports the left-behind row", ctx do
+    handler = "set-translation-reread-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      TestRepo.config()[:telemetry_prefix] ++ [:query],
+      fn _e, _m, meta, _c ->
+        if meta.source == "phoenix_kit_publishing_contents" and meta.query =~ ~r/^INSERT/ do
+          TestRepo.delete_all(
+            from(c in PublishingContent, where: c.language == "de-DE"),
+            []
+          )
+        end
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert {:error, :validation_failed, _,
+            %{errors: [%{reason: "language_missing"}], left_behind: "empty row for de-DE"}} =
+             set(ctx)
+  end
+
+  test "content: 262,144 bytes is accepted, 262,145 is content_too_large", ctx do
+    ok = String.duplicate("a", 262_144)
+    assert {:ok, %{"action" => "created"}} = set(ctx, %{"content" => ok})
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "content_too_large"}]}} =
+             set(ctx, %{"content" => ok <> "a"})
+  end
+
+  test "title: 500 characters (multibyte) are accepted, 501 are refused with no row", ctx do
+    assert {:ok, %{"action" => "created"}} =
+             set(ctx, %{"title" => String.duplicate("é", 500)})
+
+    assert String.length(Fx.content(ctx.post[:uuid], "de-DE").title) == 500
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "title"}]}} =
+             set(ctx, %{"title" => String.duplicate("é", 501), "language" => "fr-FR"})
+
+    assert Fx.content(ctx.post[:uuid], "fr-FR") == nil
+  end
+
+  test "a timestamp-mode post is addressed by id" do
+    Fx.languages!(["en-US", "de-DE"])
+    ts = Fx.group!(mode: "timestamp")
+    p = Fx.post!(ts["slug"], %{title: "Stamped"})
+    Fx.body!(ts["slug"], p[:uuid], "stamped body")
+
+    assert {:ok, %{"action" => "created", "language" => "de-DE"}} =
+             ApiCase.call("publishing.set_translation", %{
+               "post" => Fx.ref(p),
+               "language" => "de-DE",
+               "title" => "Gestempelt",
+               "content" => "Inhalt"
+             })
+
+    assert %{title: "Gestempelt"} = Fx.content(p[:uuid], "de-DE")
+  end
+
+  test "a draft that is not the live version is a plain write; the same text again previews as a no-op change",
+       ctx do
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    {:ok, _} =
+      ApiCase.call("publishing.create_version", %{"post" => Fx.ref(ctx.post)})
+
+    assert {:ok, %{"action" => "created", "version" => 2}} = set(ctx, %{"version" => 2})
+    assert %{content: "Inhalt"} = Fx.content(ctx.post[:uuid], "de-DE", 2)
+    assert Fx.content(ctx.post[:uuid], "de-DE", 1) == nil
+
+    assert {:preview,
+            %{
+              "requires_confirmation" => false,
+              "rows" => [%{"action" => "update", "changes" => %{"content" => change}}]
+            }, _} = set(ctx, %{"version" => 2}, %{dry_run?: true})
+
+    assert change["from_sha256"] == change["to_sha256"]
   end
 end

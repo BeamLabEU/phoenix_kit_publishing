@@ -51,7 +51,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
   end
 
   defp present(path, value) do
-    if String.trim(value) == "",
+    if String.trim(value || "") == "",
       do: Common.invalid(path, "must not be blank", "empty_translation"),
       else: :ok
   end
@@ -96,7 +96,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
     term =
       {:set_translation, Common.post_state(hit.db_post, hit.group, [version], contents), language,
        Common.sha256(input["title"]), Common.sha256(input["content"]),
-       Common.sha256(:erlang.term_to_binary(Common.og_params(input, row)))}
+       Common.fingerprint(Common.og_params(input, row))}
 
     Common.preview([out], %{"requires_confirmation" => Danger.set_translation(input, ctx)}, term)
   end
@@ -106,30 +106,37 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
   # --- write: the four steps of the tool ---------------------------------------------------
 
   defp execute(t, ctx) do
-    %{input: input, hit: hit, version: version, language: language, row: row} = t
+    %{hit: hit, version: version, language: language} = t
 
     with :ok <- Danger.recheck(hit.db_post, version, nil, ctx),
-         {:ok, created?} <- ensure_row(t, ctx),
-         {:ok, post} <- reread(t) do
-      check =
-        Common.locked_check(ctx, fn locked, v -> Danger.live_condition(locked, v, nil) end)
-
-      params =
-        Map.merge(
-          %{"title" => input["title"], "content" => input["content"]},
-          Common.og_params(input, row)
-        )
-
-      fields = ["content", "title"] ++ Enum.filter(@og_fields, &Map.has_key?(input, &1))
-
-      opts =
-        Common.write_opts(ctx, @tool, publish: false, locked_check: check)
-        |> Common.put_log_fields(Enum.sort(fields))
-
-      case Posts.update_post(hit.group.slug, post, params, opts) do
-        {:ok, _post} -> {:ok, answer(hit, version, language, created?)}
-        {:error, reason} -> left_behind(Common.error(reason), created?, language)
+         {:ok, created?} <- ensure_row(t, ctx) do
+      case reread(t) do
+        {:ok, post} -> write(t, post, created?, ctx)
+        error -> left_behind(error, created?, language)
       end
+    end
+  end
+
+  defp write(t, post, created?, ctx) do
+    %{input: input, hit: hit, version: version, language: language, row: row} = t
+
+    check = Common.locked_check(ctx, fn locked, v -> Danger.live_condition(locked, v, nil) end)
+
+    params =
+      Map.merge(
+        %{"title" => input["title"], "content" => input["content"]},
+        Common.og_params(input, row)
+      )
+
+    fields = ["content", "title"] ++ Enum.filter(@og_fields, &Map.has_key?(input, &1))
+
+    opts =
+      Common.write_opts(ctx, @tool, publish: false, locked_check: check)
+      |> Common.put_log_fields(Enum.sort(fields))
+
+    case Posts.update_post(hit.group.slug, post, params, opts) do
+      {:ok, _post} -> {:ok, answer(hit, version, language, created?)}
+      {:error, reason} -> left_behind(Common.error(reason), created?, language)
     end
   end
 
