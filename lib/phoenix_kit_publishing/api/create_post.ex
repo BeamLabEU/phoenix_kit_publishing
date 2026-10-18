@@ -78,10 +78,12 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
     end
   end
 
-  defp slug(_group, _slug),
+  defp slug(%{mode: "timestamp"}, _slug),
     do: Common.invalid("slug", "a timestamp-mode group has no post slugs", "slug_not_allowed")
 
   # --- dry run -----------------------------------------------------------------------------
+  # The preview does not predict `slot_taken` (a full minute range in a timestamp-mode group):
+  # that is only found by the confirmed write.
 
   defp preview(input, group, slug, ctx) do
     content = input["content"] || ""
@@ -97,7 +99,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
 
     row = Map.reject(row, fn {_key, value} -> is_nil(value) end)
 
-    term = {:create_post, group.slug, group.status, input["title"], slug, Common.sha256(content)}
+    term = {:create_post, group.slug, input["title"], slug, Common.sha256(content)}
     Common.preview([row], %{"requires_confirmation" => Danger.create_post(input, ctx)}, term)
   end
 
@@ -110,25 +112,34 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
 
     case Posts.create_post(group.slug, attrs ++ Common.write_opts(ctx, @tool)) do
       {:ok, post} ->
-        case DBStorage.get_post_by_uuid(post[:uuid], [:group]) do
-          nil -> Common.error(:not_found)
-          db -> {:ok, created(db, input)}
-        end
+        {:ok, created(DBStorage.get_post_by_uuid(post[:uuid], [:group]), post, input)}
 
       {:error, reason} ->
         Common.error(reason)
     end
   end
 
-  defp created(db, input) do
+  # The post exists once `Posts.create_post/2` answered `:ok`; a failed re-read must not turn
+  # into an error answer, or a retrying caller would create a duplicate.
+  defp created(nil, post, input),
+    do: %{"action" => "created", "post" => %{"id" => post[:uuid]}, "changed" => changed(input)}
+
+  defp created(db, _post, input) do
     versions = DBStorage.list_versions(db.uuid)
-    contents = DBStorage.list_contents(hd(versions).uuid)
-    changed = ["title"] ++ if(input["content"] in [nil, ""], do: [], else: ["content"])
+
+    contents =
+      case versions do
+        [first | _] -> DBStorage.list_contents(first.uuid)
+        [] -> []
+      end
 
     %{
       "action" => "created",
       "post" => Presenter.write_summary(db, db.group, versions, contents),
-      "changed" => changed
+      "changed" => changed(input)
     }
   end
+
+  defp changed(input),
+    do: ["title"] ++ if(input["content"] in [nil, ""], do: [], else: ["content"])
 end

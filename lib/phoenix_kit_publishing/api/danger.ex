@@ -109,6 +109,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
 
   @doc false
   # `null` content means "clear": the empty text is not dangerous. Any other non-string fails closed.
+  # Raises on a non-map `input`: call it only under `guard/1`.
   def text_dangerous?(input) do
     case Map.fetch(input, "content") do
       :error -> false

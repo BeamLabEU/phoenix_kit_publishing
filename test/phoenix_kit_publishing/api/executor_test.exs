@@ -347,6 +347,53 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
            ) == 1
   end
 
+  test "create_post with HTML needs a confirmation; the code writes once and not for other text",
+       %{
+         g: g,
+         user: user
+       } do
+    token = issue_token(user, scopes())
+
+    input = %{
+      "group" => g["slug"],
+      "title" => "Html",
+      "content" => "<b>previewed</b>",
+      "slug" => "html-post"
+    }
+
+    created = fn -> Enum.count(DBStorage.list_posts(g["slug"]), &(&1.slug == "html-post")) end
+
+    assert {200,
+            %{
+              "executed" => false,
+              "status" => "confirmation_required",
+              "confirm_token" => code,
+              "preview" => %{"requires_confirmation" => true}
+            }, _} = call_with(token, "publishing.create_post", input)
+
+    assert created.() == 0
+
+    swapped =
+      input
+      |> Map.put("content", "<script>other</script>")
+      |> Map.put("confirm_token", code)
+
+    assert {409, %{"code" => "confirm_token_invalid"}, _} =
+             call_with(token, "publishing.create_post", swapped)
+
+    assert created.() == 0
+
+    assert {200, %{"action" => "created"}, _} =
+             call_with(token, "publishing.create_post", Map.put(input, "confirm_token", code))
+
+    assert created.() == 1
+
+    assert {409, %{"context" => %{"reason" => "used"}}, _} =
+             call_with(token, "publishing.create_post", Map.put(input, "confirm_token", code))
+
+    assert created.() == 1
+  end
+
   test "a 51-item category_ids list is refused by the schema limit, 50 reaches the handler",
        ctx do
     token = issue_token(ctx.user, scopes())

@@ -99,7 +99,8 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
     assert {:error, :validation_failed, _, %{errors: [%{reason: "slug_taken"} = e]} = ctx} =
              create(g, %{"slug" => "taken"})
 
-    assert ctx[:trashed] == true or e[:trashed] == true
+    assert ctx.trashed == true
+    assert e.trashed == true
   end
 
   test "title rules: blank title is title_required; over 500 is refused by the schema", %{g: g} do
