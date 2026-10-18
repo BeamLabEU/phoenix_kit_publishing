@@ -15,7 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
          {:ok, version} <- resolve_version(hit.db_post, input["version"]) |> Refs.version_error(),
          contents = DBStorage.list_contents(version.uuid),
          :ok <- Common.check_revision(input, hit.db_post, version, Refs.primary_row(contents)),
-         :ok <- Refs.require_primary_title(version) do
+         :ok <- Refs.require_primary_title(contents) do
       live? = hit.db_post.active_version_uuid == version.uuid
 
       cond do
@@ -91,9 +91,7 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
       "warnings" => warnings
     }
 
-    term =
-      {:publish_post, Common.post_state(hit.db_post, hit.group, [version], contents),
-       version.version_number}
+    term = {:publish_post, Common.post_state(hit.db_post, hit.group, [version], contents)}
 
     Common.preview([row], %{"requires_confirmation" => true}, term)
   end

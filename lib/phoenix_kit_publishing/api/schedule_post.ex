@@ -22,7 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
          :ok <- future(date, time),
          same? = same_slot?(hit.db_post, date, time),
          :ok <- free(hit, date, time, same?),
-         :ok <- Refs.require_primary_title(version) do
+         :ok <- Refs.require_primary_title(contents) do
       live? = hit.db_post.active_version_uuid == version.uuid
 
       cond do

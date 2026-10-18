@@ -160,6 +160,36 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPostTest do
     assert [%{"code" => "empty_translation", "language" => "de-DE"}] = row["warnings"]
   end
 
+  test "the preview caps head at 300 characters, counts body bytes, gives each language its public path and caps HTML findings at 20 per language",
+       ctx do
+    long = String.duplicate("a", 350)
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], long <> String.duplicate("<br>\n", 30))
+
+    Fx.translation!(
+      ctx.g["slug"],
+      ctx.post[:uuid],
+      "de-DE",
+      "Hallo",
+      "ééé " <> String.duplicate("<br>\n", 30)
+    )
+
+    assert {:preview, %{"rows" => [row]}, _} = publish(ctx, %{}, %{dry_run?: true})
+    assert %{"goes_live" => %{"languages" => [de, en]}} = row
+
+    assert String.length(en["head"]) == 300 and en["head"] == String.duplicate("a", 300)
+    assert en["body_bytes"] == byte_size(Fx.content(ctx.post[:uuid], "en-US").content)
+    assert de["body_bytes"] == byte_size(Fx.content(ctx.post[:uuid], "de-DE").content)
+    assert de["body_bytes"] > String.length(Fx.content(ctx.post[:uuid], "de-DE").content)
+    assert de["head"] =~ "ééé"
+
+    assert en["public_path"] == "/en/#{ctx.g["slug"]}/hello"
+    assert de["public_path"] == "/de/#{ctx.g["slug"]}/hello"
+
+    findings = Enum.group_by(row["contains_raw_html"], & &1["language"])
+    assert length(findings["en-US"]) == 20
+    assert length(findings["de-DE"]) == 20
+  end
+
   test "the preview of a future timestamp post has scheduled_until" do
     ts = Fx.group!(mode: "timestamp")
     p = Fx.post!(ts["slug"], %{title: "Soon"})
@@ -187,6 +217,13 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPostTest do
 
     assert Fx.table_state() == before
     assert fingerprint =~ ~r/\A[0-9a-f]{64}\z/
+  end
+
+  test "an if_revision taken from get_post lets the publish through", ctx do
+    {:ok, %{"revision" => revision}} =
+      ApiCase.call("publishing.get_post", %{"post" => Fx.ref(ctx.post)})
+
+    assert {:ok, %{"action" => "published"}} = publish(ctx, %{"if_revision" => revision})
   end
 
   test "if_revision mismatch is revision_mismatch with current_revision", ctx do

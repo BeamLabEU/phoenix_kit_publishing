@@ -157,8 +157,10 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
   end
 
   @doc "The rule of `Versions.validate_primary_title!/…` (versions.ex), including its legacy base-code fallback."
-  def primary_title_ok?(version) do
-    contents = DBStorage.list_contents(version.uuid)
+  def primary_title_ok?(version), do: version.uuid |> DBStorage.list_contents() |> title_ok?()
+
+  @doc "The rule of `primary_title_ok?/1` over content rows the caller has already loaded."
+  def title_ok?(contents) do
     primary = LanguageHelpers.get_primary_language()
 
     row =
@@ -175,9 +177,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
 
   # The module's own check rolls the transaction back with a bare atom; checking up front gives
   # the caller a reason and keeps a refused publish out of the failed-mutation log.
-  @doc "`:ok`, or the handler error `title_required` when `primary_title_ok?/1` is false."
-  def require_primary_title(version) do
-    if primary_title_ok?(version),
+  @doc "`:ok`, or the handler error `title_required` when the primary title of the loaded `contents` is not publishable (`title_ok?/1`)."
+  def require_primary_title(contents) do
+    if title_ok?(contents),
       do: :ok,
       else:
         Common.invalid(
