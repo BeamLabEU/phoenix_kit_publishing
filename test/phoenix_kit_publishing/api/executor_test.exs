@@ -837,6 +837,94 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
+  describe "upsert_groups" do
+    setup ctx do
+      %{token: issue_token(ctx.user, scopes())}
+    end
+
+    defp group_rows(count),
+      do: for(i <- 1..count, do: %{"slug" => "grp#{i}", "name" => "G#{i}", "mode" => "slug"})
+
+    test "creating a group runs at once", ctx do
+      input = %{"groups" => [%{"slug" => "fresh", "name" => "Fresh", "mode" => "slug"}]}
+
+      assert {200, %{"summary" => %{"created" => 1}, "results" => [%{"id" => id}]}, _} =
+               call_with(ctx.token, "publishing.upsert_groups", input)
+
+      assert {:ok, %{"uuid" => ^id, "mode" => "slug"}} = Publishing.Groups.fetch_group("fresh")
+    end
+
+    test "changing an existing group answers confirmation_required and the code applies it",
+         ctx do
+      input = %{"groups" => [%{"slug" => ctx.g["slug"], "name" => "Renamed"}]}
+
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"action" => "updated"}]
+                }
+              }, _} = call_with(ctx.token, "publishing.upsert_groups", input)
+
+      assert {:ok, %{"name" => "Executor Group"}} = Publishing.Groups.fetch_group(ctx.g["slug"])
+
+      assert {200, %{"summary" => %{"updated" => 1}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.upsert_groups",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert {:ok, %{"name" => "Renamed"}} = Publishing.Groups.fetch_group(ctx.g["slug"])
+    end
+
+    test "a code cannot be redeemed after the group changed in between", ctx do
+      input = %{"groups" => [%{"slug" => ctx.g["slug"], "name" => "Renamed"}]}
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(ctx.token, "publishing.upsert_groups", input)
+
+      {:ok, _} = Publishing.Groups.update_group(ctx.g["slug"], %{"show_breadcrumbs" => true})
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.upsert_groups",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert {:ok, %{"name" => "Executor Group"}} = Publishing.Groups.fetch_group(ctx.g["slug"])
+    end
+
+    test "20 rows are accepted and 21 are refused by max_items", ctx do
+      assert {200, %{"summary" => %{"created" => 20}}, _} =
+               call_with(ctx.token, "publishing.upsert_groups", %{"groups" => group_rows(20)})
+
+      assert {422, _, _} =
+               call_with(ctx.token, "publishing.upsert_groups", %{
+                 "groups" =>
+                   group_rows(21) |> Enum.map(&Map.update!(&1, "slug", fn s -> s <> "x" end))
+               })
+
+      assert {:error, :not_found} = Publishing.Groups.fetch_group("grp1x")
+    end
+
+    test "a key without the groups write scope is refused with 403", ctx do
+      token = issue_token(ctx.user, ["publishing.groups:read"])
+
+      assert {403,
+              %{
+                "code" => "forbidden",
+                "context" => %{"required_scope" => "publishing.groups:write"}
+              }, _} = call_with(token, "publishing.upsert_groups", %{"groups" => group_rows(1)})
+
+      assert {:error, :not_found} = Publishing.Groups.fetch_group("grp1")
+    end
+  end
+
   describe "delete_categories" do
     setup ctx do
       cat = Fx.category!(ctx.g["slug"], "Doomed", %{slug: "doomed"})

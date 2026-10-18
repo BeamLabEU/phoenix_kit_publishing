@@ -6,6 +6,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
   # itself: a field a tool does not declare (status, published_at, tags, url_slug, force) is a
   # validation error at any depth.
 
+  alias PhoenixKit.Modules.Publishing.GroupSettings
+
   @uuid %{"type" => "string", "minLength" => 36, "maxLength" => 36}
   @revision_chars 200
 
@@ -356,6 +358,43 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
   end
 
   def delete_categories_output, do: batch_output()
+
+  # --- group writes ---------------------------------------------------------------------------
+
+  # A CLOSED object with one property per GroupSettings key: the vocabulary of upsert_groups.settings.
+  def group_settings do
+    properties =
+      Map.new(GroupSettings.schema(), fn
+        %{key: key, type: :boolean} ->
+          {key, %{"type" => "boolean"}}
+
+        %{key: key, type: :enum, allowed: allowed} ->
+          {key, %{"type" => "string", "enum" => Enum.map(allowed, &to_string/1)}}
+      end)
+
+    object(properties)
+  end
+
+  def upsert_groups do
+    row =
+      object(%{
+        "slug" => row_text(200),
+        "name" => row_text(500),
+        "name_i18n" => %{"type" => "object"},
+        "mode" => row_text(20),
+        "type" => row_text(50),
+        "item_singular" => row_text(100),
+        "item_plural" => row_text(100),
+        "settings" => group_settings()
+      })
+
+    object(
+      %{"groups" => %{"type" => "array", "minItems" => 1, "maxItems" => 20, "items" => row}},
+      ["groups"]
+    )
+  end
+
+  def upsert_groups_output, do: batch_output()
 
   @doc "The answer of a batch tool: one row per input row and a count per action."
   def batch_output do

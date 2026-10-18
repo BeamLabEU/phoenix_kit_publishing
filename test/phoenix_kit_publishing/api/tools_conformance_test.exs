@@ -6,8 +6,10 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.API
   alias PhoenixKit.Modules.Publishing.API.Danger
+  alias PhoenixKit.Modules.Publishing.API.Schemas
   alias PhoenixKit.Modules.Publishing.API.Tools
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.GroupSettings
 
   # Tool names in the order of spec §6.2, by phase. @phase is the last COMPLETED phase; the
   # task that closes a phase bumps it. Inside a phase the declared tools must be a prefix of
@@ -145,6 +147,21 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     for tool <- Tools.all(),
         %{"maxLength" => max} <- [get_in(tool.input_schema, ["properties", "title"])] do
       assert max == max_title, tool.name
+    end
+  end
+
+  test "the settings object of upsert_groups mirrors GroupSettings: its keys, types and allowed values" do
+    schema = Schemas.group_settings()
+    entries = Map.new(GroupSettings.schema(), &{&1.key, &1})
+
+    assert Enum.sort(Map.keys(schema["properties"])) == Enum.sort(GroupSettings.keys())
+    assert schema["additionalProperties"] == false
+
+    for {key, property} <- schema["properties"] do
+      case entries[key] do
+        %{type: :boolean} -> assert property == %{"type" => "boolean"}, key
+        %{type: :enum, allowed: allowed} -> assert property["enum"] == allowed, key
+      end
     end
   end
 

@@ -39,7 +39,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       trash_posts(),
       restore_posts(),
       upsert_categories(),
-      delete_categories()
+      delete_categories(),
+      upsert_groups()
     ]
   end
 
@@ -388,6 +389,34 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       danger: :always,
       max_items: 100,
       annotations: %{destructive: true, idempotent: true}
+    )
+  end
+
+  defp upsert_groups do
+    Tool.new!(
+      name: "publishing.upsert_groups",
+      audience: :admin,
+      scope: "publishing.groups:write",
+      permission: @permission,
+      title: "Create or update groups",
+      description:
+        "Creates or updates up to 20 publishing groups, each named by slug. A slug that does not exist is " <>
+          "created (name is required; mode, type, item_singular and item_plural are fixed at creation and " <>
+          "default as the admin form does); a slug that exists is updated: name, name_i18n and settings only, " <>
+          "never the slug. settings is a closed object with one property per key of " <>
+          "get_group_settings_schema; a value outside its allowed values is an invalid_setting row. name_i18n " <>
+          "MERGES per language and a blank value removes that language. Repeating mode, type or the item names " <>
+          "of an existing group is ignored when they equal the stored ones (so a retried call is unchanged), " <>
+          "and a different value is a mode_locked or immutable_field row. A group in the trash is a " <>
+          "group_trashed row (restore it first). Creating groups runs at once; changing an existing group " <>
+          "needs a confirmation, and the preview shows each change as from and to with the group's post " <>
+          "count. Rows that change nothing answer unchanged; one bad row never stops the others.",
+      input_schema: Schemas.upsert_groups(),
+      output_schema: Schemas.upsert_groups_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.UpsertGroups, :call},
+      danger: {PhoenixKit.Modules.Publishing.API.Danger, :upsert_groups},
+      max_items: 20,
+      annotations: %{idempotent: true}
     )
   end
 

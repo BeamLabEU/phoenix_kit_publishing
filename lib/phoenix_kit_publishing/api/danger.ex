@@ -8,7 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
   #   3. each function body is wrapped in `guard/1`, `rescue _ -> true`.
   # The per-tool functions are added by the task that adds the tool.
 
-  alias PhoenixKit.Modules.Publishing.API.{Refs, TextScan, UpsertCategories}
+  alias PhoenixKit.Modules.Publishing.API.{Refs, TextScan, UpsertCategories, UpsertGroups}
   alias PhoenixKit.Modules.Publishing.DBStorage
 
   @doc false
@@ -64,6 +64,18 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
         _unresolvable ->
           true
       end
+    end)
+  end
+
+  @doc """
+  upsert_groups: some row UPDATES an existing group and effectively changes it. Creating a group is
+  never dangerous. Unprovable means true: a malformed request and a failing group read.
+  """
+  def upsert_groups(input, _ctx) do
+    guard(fn ->
+      input["groups"]
+      |> UpsertGroups.plan()
+      |> UpsertGroups.dangerous?()
     end)
   end
 
