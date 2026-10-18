@@ -3,6 +3,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
 
   import PhoenixKitPublishing.ActivityLogAssertions
 
+  alias PhoenixKit.Modules.Publishing.API.CreatePost
   alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, Groups, Posts}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
@@ -111,15 +112,15 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
 
   test "the title limit counts characters, not bytes", %{g: g} do
     limit = Constants.max_title_length()
-    # "ж" is two bytes: 500 characters are 1000 bytes.
+    # "é" is two bytes: 500 characters are 1000 bytes.
     assert {:ok, %{"post" => %{"id" => id}}} =
-             create(g, %{"title" => String.duplicate("ж", limit)})
+             create(g, %{"title" => String.duplicate("é", limit)})
 
     [content] = DBStorage.list_contents(DBStorage.get_version(id, 1).uuid)
     assert String.length(content.title) == limit
 
     assert {:error, :validation_failed, _, %{errors: [%{path: "title", limit: ^limit}]}} =
-             create(g, %{"title" => String.duplicate("ж", limit + 1)})
+             create(g, %{"title" => String.duplicate("é", limit + 1)})
   end
 
   test "a non-string slug reaching the handler is invalid_slug, not a crash", %{g: g} do
@@ -127,7 +128,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
     input = %{"group" => g["slug"], "title" => "Hello", "slug" => 5}
 
     assert {:error, :validation_failed, _, %{errors: [%{path: "slug", reason: "invalid_slug"}]}} =
-             PhoenixKit.Modules.Publishing.API.CreatePost.call(input, ApiCase.ctx())
+             CreatePost.call(input, ApiCase.ctx())
   end
 
   test "a NUL byte or invalid text is a validation error, not a 500 (Review Focus 1)", %{g: g} do

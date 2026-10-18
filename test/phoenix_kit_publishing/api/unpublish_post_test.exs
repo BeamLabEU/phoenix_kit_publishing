@@ -3,8 +3,8 @@ defmodule PhoenixKit.Modules.Publishing.API.UnpublishPostTest do
 
   import PhoenixKitPublishing.ActivityLogAssertions
 
-  alias PhoenixKit.Modules.Publishing.{Groups, Posts}
   alias PhoenixKit.Modules.Publishing.API.Danger
+  alias PhoenixKit.Modules.Publishing.{Groups, Posts}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
 

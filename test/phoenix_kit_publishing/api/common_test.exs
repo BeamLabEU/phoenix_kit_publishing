@@ -777,10 +777,10 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
 
   describe "check_text/3 character limit" do
     test ":max_chars counts characters, not bytes, and still refuses NUL and invalid UTF-8" do
-      assert :ok = Common.check_text("title", String.duplicate("ж", 10), max_chars: 10)
+      assert :ok = Common.check_text("title", String.duplicate("é", 10), max_chars: 10)
 
       assert {:error, :validation_failed, "is longer than 10 characters", %{errors: [error]}} =
-               Common.check_text("title", String.duplicate("ж", 11), max_chars: 10)
+               Common.check_text("title", String.duplicate("é", 11), max_chars: 10)
 
       assert error.path == "title" and error.limit == 10
       refute Map.has_key?(error, :reason)

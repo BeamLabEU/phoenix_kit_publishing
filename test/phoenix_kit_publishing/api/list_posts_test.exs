@@ -1,9 +1,10 @@
 defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
   use PhoenixKit.DataCase, async: false
 
-  alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.{Groups, Posts}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
+  alias PhoenixKitPublishing.Test.Repo
 
   setup do
     Fx.languages!()
@@ -97,7 +98,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
     assert {:ok, %{"posts" => page3, "next_cursor" => nil}} =
              list(g, %{"limit" => 100, "cursor" => c2})
 
-    assert length(page3) >= 1
+    assert page3 != []
   end
 
   test "limit above 100 is trimmed with a warning", %{g: g} do
@@ -123,7 +124,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
 
     g = Fx.group!()
     Fx.post!(g["slug"], %{title: "T", slug: "t"})
-    {:ok, _} = PhoenixKit.Modules.Publishing.Groups.trash_group(g["slug"])
+    {:ok, _} = Groups.trash_group(g["slug"])
     assert {:ok, %{"count" => 1}} = ApiCase.call("publishing.list_posts", %{"group" => g["slug"]})
   end
 
@@ -161,7 +162,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
 
       :telemetry.attach(
         handler,
-        PhoenixKitPublishing.Test.Repo.config()[:telemetry_prefix] ++ [:query],
+        Repo.config()[:telemetry_prefix] ++ [:query],
         fn _e, _m, meta, _c ->
           if meta.source in ["phoenix_kit_publishing_versions", "phoenix_kit_publishing_contents"],
             do: Agent.update(agent, &(&1 + 1))

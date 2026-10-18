@@ -14,6 +14,9 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
 
   alias PhoenixKit.API.{Approvals, Auth, Executor, Keys}
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.API, as: PublishingAPI
+  alias PhoenixKit.Modules.Publishing.API.Tools
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Settings
   alias PhoenixKit.Users.Auth.Scope
   alias PhoenixKit.Users.{Permissions, Roles}
@@ -41,7 +44,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
 
   # Core offers only the scopes that a declared tool carries; while the tool tasks are still growing
   # the set, the key asks for the intersection.
-  defp scopes_declared, do: PhoenixKit.Modules.Publishing.API.Tools.all() |> Enum.map(& &1.scope)
+  defp scopes_declared, do: Tools.all() |> Enum.map(& &1.scope)
 
   defp scopes, do: Enum.filter(@every_scope, &(&1 in scopes_declared()))
 
@@ -339,7 +342,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     assert get_resp_header(replay, "idempotent-replayed") == ["true"]
 
     assert Enum.count(
-             PhoenixKit.Modules.Publishing.DBStorage.list_posts(g["slug"]),
+             DBStorage.list_posts(g["slug"]),
              &(&1.slug == "once")
            ) == 1
   end
@@ -691,8 +694,8 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     six =
       ~w(publishing.create_version publishing.get_group_settings_schema publishing.get_post publishing.list_categories publishing.list_groups publishing.list_posts)
 
-    declared = PhoenixKit.Modules.Publishing.API.Tools.all() |> Enum.map(& &1.name)
-    names = PhoenixKit.Modules.Publishing.API.tools(false) |> Enum.map(& &1.name) |> Enum.sort()
+    declared = Tools.all() |> Enum.map(& &1.name)
+    names = PublishingAPI.tools(false) |> Enum.map(& &1.name) |> Enum.sort()
     expected = six |> Enum.filter(&(&1 in declared)) |> Enum.sort()
 
     assert expected != []
