@@ -38,7 +38,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       schedule_post(),
       trash_posts(),
       restore_posts(),
-      upsert_categories()
+      upsert_categories(),
+      delete_categories()
     ]
   end
 
@@ -359,6 +360,31 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       danger: {PhoenixKit.Modules.Publishing.API.Danger, :upsert_categories},
       max_items: 100,
       annotations: %{idempotent: true}
+    )
+  end
+
+  defp delete_categories do
+    Tool.new!(
+      name: "publishing.delete_categories",
+      audience: :admin,
+      scope: "publishing.categories:delete",
+      permission: @permission,
+      title: "Delete categories",
+      description:
+        "Permanently deletes categories. There is no trash and no undo. Posts, their versions and content " <>
+          "stay; only their filing under the category is removed from every version of the group, and child " <>
+          "categories move to the top level. refs is up to 100 {id} or {slug} entries of one group. Always " <>
+          "needs a confirmation; the preview lists for each category the children that move up, the live " <>
+          "posts filed in it and the versions that name it. A category that is already gone answers a " <>
+          "not_found row, the same category twice is an invalid_ref row, and one bad row never stops the " <>
+          "others. If the unfiling of some version failed after the delete, the row carries an " <>
+          "unfile_incomplete warning with the count.",
+      input_schema: Schemas.delete_categories(),
+      output_schema: Schemas.delete_categories_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.DeleteCategories, :call},
+      danger: :always,
+      max_items: 100,
+      annotations: %{destructive: true, idempotent: true}
     )
   end
 

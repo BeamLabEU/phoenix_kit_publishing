@@ -340,6 +340,23 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
 
   def upsert_categories_output, do: batch_output()
 
+  def delete_categories do
+    object(
+      %{
+        "group" => row_text(200),
+        "refs" => %{
+          "type" => "array",
+          "minItems" => 1,
+          "maxItems" => 100,
+          "items" => category_ref()
+        }
+      },
+      ["group", "refs"]
+    )
+  end
+
+  def delete_categories_output, do: batch_output()
+
   @doc "The answer of a batch tool: one row per input row and a count per action."
   def batch_output do
     object_output(%{

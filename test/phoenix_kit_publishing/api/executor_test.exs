@@ -837,6 +837,91 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
+  describe "delete_categories" do
+    setup ctx do
+      cat = Fx.category!(ctx.g["slug"], "Doomed", %{slug: "doomed"})
+
+      %{
+        token: issue_token(ctx.user, scopes()),
+        cat: cat,
+        input: %{"group" => ctx.g["slug"], "refs" => [%{"id" => cat.uuid}]}
+      }
+    end
+
+    defp file_under(ctx, category) do
+      {:ok, p} = Publishing.Posts.read_post_by_uuid(ctx.post[:uuid])
+
+      {:ok, _} =
+        Publishing.Posts.update_post(
+          ctx.g["slug"],
+          p,
+          %{"category_uuids" => [category.uuid]},
+          publish: false
+        )
+    end
+
+    test "always answers confirmation_required, even for an empty category; the code deletes once",
+         ctx do
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"action" => "removed", "irreversible" => true}]
+                }
+              }, _} = call_with(ctx.token, "publishing.delete_categories", ctx.input)
+
+      assert {:ok, _} = Publishing.Categories.fetch_category(ctx.cat.uuid)
+
+      assert {200, %{"summary" => %{"removed" => 1}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.delete_categories",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert {:error, :not_found} = Publishing.Categories.fetch_category(ctx.cat.uuid)
+
+      assert {409, %{"context" => %{"reason" => "used"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.delete_categories",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+    end
+
+    test "a categories:write-only key is refused with 403 and the delete scope", ctx do
+      token = issue_token(ctx.user, ["publishing.categories:write"])
+
+      assert {403,
+              %{
+                "code" => "forbidden",
+                "context" => %{"required_scope" => "publishing.categories:delete"}
+              }, _} = call_with(token, "publishing.delete_categories", ctx.input)
+
+      assert {:ok, _} = Publishing.Categories.fetch_category(ctx.cat.uuid)
+    end
+
+    test "the code is refused with reason changed when a post is filed under the category in between",
+         ctx do
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(ctx.token, "publishing.delete_categories", ctx.input)
+
+      file_under(ctx, ctx.cat)
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.delete_categories",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert {:ok, _} = Publishing.Categories.fetch_category(ctx.cat.uuid)
+    end
+  end
+
   test "every scope the declared tools carry is a known publishing scope, and the key gets all of them" do
     declared = scopes_declared() |> Enum.uniq() |> Enum.sort()
 
