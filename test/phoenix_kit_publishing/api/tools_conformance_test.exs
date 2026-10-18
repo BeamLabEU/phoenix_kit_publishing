@@ -161,6 +161,35 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     end
   end
 
+  # The literal reason of every `invalid(path, message, reason, ...)` call and the literal code of
+  # every `row_error(ref, code, ...)` call, read from the syntax tree so a comma in the message or
+  # a multi-line call cannot hide one.
+  defp call_reasons(source) do
+    {:ok, ast} = Code.string_to_quoted(source)
+
+    {_ast, found} =
+      Macro.prewalk(ast, [], fn
+        {name, _, [_path, _message, reason | _]} = node, acc
+        when name == :invalid and is_binary(reason) ->
+          {node, [reason | acc]}
+
+        {{:., _, [_module, :invalid]}, _, [_path, _message, reason | _]} = node, acc
+        when is_binary(reason) ->
+          {node, [reason | acc]}
+
+        {:row_error, _, [_ref, code | _]} = node, acc when is_binary(code) ->
+          {node, [code | acc]}
+
+        {{:., _, [_module, :row_error]}, _, [_ref, code | _]} = node, acc when is_binary(code) ->
+          {node, [code | acc]}
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    found
+  end
+
   test "every reason string in the handlers is in the contract of spec §6.6" do
     reasons =
       ~w(invalid_ref empty_update no_draft_version version_not_found language_not_enabled group_trashed post_trashed
@@ -180,11 +209,14 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     used =
       Path.wildcard("lib/phoenix_kit_publishing/api/**/*.ex")
       |> Enum.flat_map(fn path ->
-        Regex.scan(
-          ~r/(?:reason|code):\s*"([a-z_]+)"|invalid\([^,]+,[^,]+,\s*"([a-z_]+)"/,
-          File.read!(path)
-        )
-        |> Enum.flat_map(fn [_all | groups] -> Enum.reject(groups, &(&1 == "")) end)
+        source = File.read!(path)
+
+        keyed =
+          ~r/(?:reason|code):\s*"([a-z_]+)"/
+          |> Regex.scan(source)
+          |> Enum.map(fn [_all, reason] -> reason end)
+
+        keyed ++ call_reasons(source)
       end)
 
     assert Enum.reject(used, &MapSet.member?(allowed, &1)) == []
