@@ -23,7 +23,14 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
 
   @spec all() :: [PhoenixKit.API.Tool.t()]
   def all do
-    [list_groups(), get_group_settings_schema(), list_posts(), get_post(), list_categories()]
+    [
+      list_groups(),
+      get_group_settings_schema(),
+      list_posts(),
+      get_post(),
+      list_categories(),
+      create_post()
+    ]
   end
 
   defp list_groups do
@@ -117,6 +124,28 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       output_schema: Schemas.list_categories_output(),
       handler: {PhoenixKit.Modules.Publishing.API.ListCategories, :call},
       annotations: %{read_only: true, idempotent: true}
+    )
+  end
+
+  defp create_post do
+    Tool.new!(
+      name: "publishing.create_post",
+      audience: :admin,
+      scope: "publishing.posts:write",
+      permission: @permission,
+      title: "Create a post",
+      description:
+        "Creates a post: a draft version 1 with the primary-language title and body. title is required; " <>
+          "content is Markdown. HTML, components, post links or non-http link destinations in content make " <>
+          "the call a confirmed write: send it with dry_run first and confirm the preview. A slug is for " <>
+          "slug-mode groups only; a timestamp-mode post has no slug and is addressed by id. The answer " <>
+          "does not carry the slug: read it with get_post. Not idempotent: send an idempotency_key when " <>
+          "retrying.",
+      input_schema: Schemas.create_post(),
+      output_schema: Schemas.create_post_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.CreatePost, :call},
+      danger: {PhoenixKit.Modules.Publishing.API.Danger, :create_post},
+      annotations: %{idempotent: false}
     )
   end
 

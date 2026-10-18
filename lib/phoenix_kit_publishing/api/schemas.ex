@@ -125,6 +125,28 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  # --- post writes ------------------------------------------------------------------------
+
+  def create_post do
+    object(
+      %{
+        "group" => row_text(200),
+        "title" => %{"type" => "string", "minLength" => 1, "maxLength" => 500},
+        "content" => %{"type" => ["string", "null"], "maxLength" => 2_097_152},
+        "slug" => row_text(200)
+      },
+      ["group", "title"]
+    )
+  end
+
+  def create_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "post" => %{"type" => "object"},
+      "changed" => %{"type" => "array", "items" => %{"type" => "string"}}
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end
