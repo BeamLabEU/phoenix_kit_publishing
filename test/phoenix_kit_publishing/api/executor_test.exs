@@ -925,6 +925,111 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
+  describe "trash_groups and restore_groups" do
+    setup ctx do
+      %{
+        token: issue_token(ctx.user, scopes()),
+        input: %{"groups" => [%{"slug" => ctx.g["slug"]}]}
+      }
+    end
+
+    defp group_status(ctx) do
+      {:ok, %{"status" => status}} = Publishing.Groups.fetch_group(ctx.g["slug"])
+      status
+    end
+
+    test "trash_groups always answers confirmation_required, even for an empty group; the code trashes once",
+         ctx do
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"action" => "removed"}]
+                }
+              }, _} = call_with(ctx.token, "publishing.trash_groups", ctx.input)
+
+      assert group_status(ctx) == "active"
+
+      assert {200, %{"summary" => %{"removed" => 1}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.trash_groups",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert group_status(ctx) == "trashed"
+
+      assert {409, _, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.trash_groups",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+    end
+
+    test "restore_groups always answers confirmation_required; the code restores once", ctx do
+      {:ok, _} = Publishing.Groups.trash_group(ctx.g["slug"])
+
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code
+              }, _} = call_with(ctx.token, "publishing.restore_groups", ctx.input)
+
+      assert group_status(ctx) == "trashed"
+
+      assert {200, %{"summary" => %{"restored" => 1}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.restore_groups",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert group_status(ctx) == "active"
+
+      assert {409, _, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.restore_groups",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+    end
+
+    test "a groups:write-only key is refused with 403 and the delete scope", ctx do
+      token = issue_token(ctx.user, ["publishing.groups:write"])
+
+      for tool <- ["publishing.trash_groups", "publishing.restore_groups"] do
+        assert {403,
+                %{
+                  "code" => "forbidden",
+                  "context" => %{"required_scope" => "publishing.groups:delete"}
+                }, _} = call_with(token, tool, ctx.input)
+      end
+
+      assert group_status(ctx) == "active"
+    end
+
+    test "a trash code is refused with reason changed when the group changed in between", ctx do
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(ctx.token, "publishing.trash_groups", ctx.input)
+
+      {:ok, _} = Publishing.Groups.update_group(ctx.g["slug"], %{"show_breadcrumbs" => true})
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.trash_groups",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert group_status(ctx) == "active"
+    end
+  end
+
   describe "delete_categories" do
     setup ctx do
       cat = Fx.category!(ctx.g["slug"], "Doomed", %{slug: "doomed"})

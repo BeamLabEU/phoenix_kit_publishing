@@ -40,7 +40,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       restore_posts(),
       upsert_categories(),
       delete_categories(),
-      upsert_groups()
+      upsert_groups(),
+      trash_groups(),
+      restore_groups()
     ]
   end
 
@@ -415,6 +417,51 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       output_schema: Schemas.upsert_groups_output(),
       handler: {PhoenixKit.Modules.Publishing.API.UpsertGroups, :call},
       danger: {PhoenixKit.Modules.Publishing.API.Danger, :upsert_groups},
+      max_items: 20,
+      annotations: %{idempotent: true}
+    )
+  end
+
+  defp trash_groups do
+    Tool.new!(
+      name: "publishing.trash_groups",
+      audience: :admin,
+      scope: "publishing.groups:delete",
+      permission: @permission,
+      title: "Trash groups",
+      description:
+        "Moves up to 20 publishing groups, each named by slug, to the trash. The whole group and every " <>
+          "post in it disappear from the site; the posts keep their own state and come back with " <>
+          "restore_groups. Always needs a confirmation; the preview lists for each group its post count " <>
+          "and how many posts are live. A group already in the trash answers unchanged, an unknown slug " <>
+          "a not_found row, the same slug twice an invalid_ref row, and one bad row never stops the others.",
+      input_schema: Schemas.group_refs(),
+      output_schema: Schemas.trash_groups_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.TrashGroups, :call},
+      danger: :always,
+      max_items: 20,
+      annotations: %{destructive: true, idempotent: true}
+    )
+  end
+
+  defp restore_groups do
+    Tool.new!(
+      name: "publishing.restore_groups",
+      audience: :admin,
+      scope: "publishing.groups:delete",
+      permission: @permission,
+      title: "Restore groups",
+      description:
+        "Brings up to 20 publishing groups, each named by slug, back from the trash; the group and its " <>
+          "posts become visible on the site again. Always needs a confirmation; the preview lists for " <>
+          "each group its post count and how many posts are live. A group that is not in the trash " <>
+          "answers unchanged, a group whose slug was taken by an active group meanwhile a slug_taken row, " <>
+          "an unknown slug a not_found row, the same slug twice an invalid_ref row, and one bad row never " <>
+          "stops the others.",
+      input_schema: Schemas.group_refs(),
+      output_schema: Schemas.restore_groups_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.RestoreGroups, :call},
+      danger: :always,
       max_items: 20,
       annotations: %{idempotent: true}
     )

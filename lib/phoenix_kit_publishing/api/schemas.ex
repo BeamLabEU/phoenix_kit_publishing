@@ -396,6 +396,23 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
 
   def upsert_groups_output, do: batch_output()
 
+  def group_refs do
+    object(
+      %{
+        "groups" => %{
+          "type" => "array",
+          "minItems" => 1,
+          "maxItems" => 20,
+          "items" => group_ref()
+        }
+      },
+      ["groups"]
+    )
+  end
+
+  def trash_groups_output, do: batch_output()
+  def restore_groups_output, do: batch_output()
+
   @doc "The answer of a batch tool: one row per input row and a count per action."
   def batch_output do
     object_output(%{
