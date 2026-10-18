@@ -8,7 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
   #   3. each function body is wrapped in `guard/1`, `rescue _ -> true`.
   # The per-tool functions are added by the task that adds the tool.
 
-  alias PhoenixKit.Modules.Publishing.API.{Refs, TextScan}
+  alias PhoenixKit.Modules.Publishing.API.{Refs, TextScan, UpsertCategories}
   alias PhoenixKit.Modules.Publishing.DBStorage
 
   @doc false
@@ -46,6 +46,25 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
   @doc "restore_posts: any resolved, currently trashed post has an active version (it would become visible); unprovable means true."
   def restore_posts(input, _ctx) do
     guard(fn -> input["posts"] |> List.wrap() |> Enum.any?(&restore_dangerous?/1) end)
+  end
+
+  @doc """
+  upsert_categories: some row UPDATES an existing category and effectively changes it. A category
+  created earlier in the same request does not count. Unprovable means true: an unresolvable
+  group, a malformed request and a failing category read.
+  """
+  def upsert_categories(input, _ctx) do
+    guard(fn ->
+      case Refs.resolve_group(input["group"]) do
+        {:ok, group} ->
+          group.slug
+          |> UpsertCategories.plan(input["categories"])
+          |> UpsertCategories.dangerous?()
+
+        _unresolvable ->
+          true
+      end
+    end)
   end
 
   defp restore_dangerous?(ref) do

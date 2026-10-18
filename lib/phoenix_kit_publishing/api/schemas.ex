@@ -315,6 +315,31 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
 
   def restore_posts_output, do: batch_output()
 
+  # --- category writes ------------------------------------------------------------------------
+
+  def upsert_categories do
+    row =
+      object(%{
+        "id" => row_id(),
+        "slug" => row_text(200),
+        "name" => row_text(200),
+        "description" => %{"type" => ["string", "null"], "maxLength" => 5000},
+        "name_i18n" => %{"type" => "object"},
+        "parent" => %{"type" => ["object", "null"]},
+        "position" => %{"type" => "integer"}
+      })
+
+    object(
+      %{
+        "group" => row_text(200),
+        "categories" => %{"type" => "array", "minItems" => 1, "maxItems" => 100, "items" => row}
+      },
+      ["group", "categories"]
+    )
+  end
+
+  def upsert_categories_output, do: batch_output()
+
   @doc "The answer of a batch tool: one row per input row and a count per action."
   def batch_output do
     object_output(%{

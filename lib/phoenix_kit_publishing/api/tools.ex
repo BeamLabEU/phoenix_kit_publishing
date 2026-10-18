@@ -37,7 +37,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       unpublish_post(),
       schedule_post(),
       trash_posts(),
-      restore_posts()
+      restore_posts(),
+      upsert_categories()
     ]
   end
 
@@ -332,6 +333,31 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       handler: {PhoenixKit.Modules.Publishing.API.RestorePosts, :call},
       danger: {PhoenixKit.Modules.Publishing.API.Danger, :restore_posts},
       max_items: 50,
+      annotations: %{idempotent: true}
+    )
+  end
+
+  defp upsert_categories do
+    Tool.new!(
+      name: "publishing.upsert_categories",
+      audience: :admin,
+      scope: "publishing.categories:write",
+      permission: @permission,
+      title: "Create or update categories",
+      description:
+        "Creates or updates up to 100 categories of one group. A row names its category by id or slug: " <>
+          "found, it is updated; a slug that does not exist is created (name is required, the slug is " <>
+          "lowercase letters, digits and single hyphens and never changes later). parent is {id} or {slug} " <>
+          "of a category of the same group, or null for the top level; a later row may name a category " <>
+          "created earlier in the same request as its parent. name_i18n REPLACES the stored map: send " <>
+          "every language you want to keep. Creating categories runs at once; changing an existing one " <>
+          "(name, name_i18n, description, parent or position) needs a confirmation, and so does a request " <>
+          "of more than 50 rows. Rows that change nothing answer unchanged; one bad row never stops the others.",
+      input_schema: Schemas.upsert_categories(),
+      output_schema: Schemas.upsert_categories_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.UpsertCategories, :call},
+      danger: {PhoenixKit.Modules.Publishing.API.Danger, :upsert_categories},
+      max_items: 100,
       annotations: %{idempotent: true}
     )
   end

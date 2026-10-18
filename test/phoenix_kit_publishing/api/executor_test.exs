@@ -15,7 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
   alias PhoenixKit.API.{Approvals, Auth, Executor, Keys}
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.API, as: PublishingAPI
-  alias PhoenixKit.Modules.Publishing.API.Tools
+  alias PhoenixKit.Modules.Publishing.API.{Common, Tools}
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Settings
   alias PhoenixKit.Users.Auth.Scope
@@ -731,6 +731,109 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
               }, _} = call_with(token, "publishing.restore_posts", ctx.input)
 
       assert Fx.db_post(ctx.post[:uuid]).trashed_at != nil
+    end
+  end
+
+  describe "upsert_categories" do
+    setup ctx do
+      %{token: issue_token(ctx.user, scopes())}
+    end
+
+    defp rows(count), do: for(i <- 1..count, do: %{"slug" => "c#{i}", "name" => "C#{i}"})
+
+    defp category_slugs(ctx),
+      do: Common.categories!(ctx.g["slug"]) |> Enum.map(& &1.slug)
+
+    test "creating categories runs at once", ctx do
+      input = %{"group" => ctx.g["slug"], "categories" => rows(2)}
+
+      assert {200, %{"summary" => %{"created" => 2}}, _} =
+               call_with(ctx.token, "publishing.upsert_categories", input)
+
+      assert Enum.sort(category_slugs(ctx)) == ["c1", "c2"]
+    end
+
+    test "updating an existing category answers confirmation_required and the code applies it",
+         ctx do
+      old = Fx.category!(ctx.g["slug"], "Old", %{slug: "old"})
+      input = %{"group" => ctx.g["slug"], "categories" => [%{"slug" => "old", "name" => "New"}]}
+
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"action" => "updated"}]
+                }
+              }, _} = call_with(ctx.token, "publishing.upsert_categories", input)
+
+      assert {:ok, %{name: "Old"}} = Publishing.Categories.fetch_category(old.uuid)
+
+      assert {200, %{"summary" => %{"updated" => 1}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.upsert_categories",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert {:ok, %{name: "New"}} = Publishing.Categories.fetch_category(old.uuid)
+    end
+
+    test "51 creates are held by core's batch rule and the code writes them", ctx do
+      input = %{"group" => ctx.g["slug"], "categories" => rows(51)}
+
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code
+              }, _} =
+               call_with(ctx.token, "publishing.upsert_categories", input)
+
+      assert category_slugs(ctx) == []
+
+      assert {200, %{"summary" => %{"created" => 51}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.upsert_categories",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert length(category_slugs(ctx)) == 51
+    end
+
+    test "100 rows are accepted and 101 are refused by max_items", ctx do
+      assert {200, %{"status" => "confirmation_required"}, _} =
+               call_with(ctx.token, "publishing.upsert_categories", %{
+                 "group" => ctx.g["slug"],
+                 "categories" => rows(100)
+               })
+
+      assert {422, _, _} =
+               call_with(ctx.token, "publishing.upsert_categories", %{
+                 "group" => ctx.g["slug"],
+                 "categories" => rows(101)
+               })
+
+      assert category_slugs(ctx) == []
+    end
+
+    test "a key without the categories write scope is refused with 403", ctx do
+      token = issue_token(ctx.user, ["publishing.posts:write"])
+
+      assert {403,
+              %{
+                "code" => "forbidden",
+                "context" => %{"required_scope" => "publishing.categories:write"}
+              }, _} =
+               call_with(token, "publishing.upsert_categories", %{
+                 "group" => ctx.g["slug"],
+                 "categories" => rows(1)
+               })
+
+      assert category_slugs(ctx) == []
     end
   end
 
