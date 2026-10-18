@@ -922,6 +922,144 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
+  describe "set_translation" do
+    setup ctx do
+      %{
+        token: issue_token(ctx.user, scopes()),
+        input: %{
+          "post" => ref(ctx),
+          "version" => 1,
+          "language" => "de-DE",
+          "title" => "Hallo",
+          "content" => "Inhalt"
+        }
+      }
+    end
+
+    defp german(ctx), do: Fx.content(ctx.post[:uuid], "de-DE")
+
+    test "a draft version runs at once, without a confirmation", ctx do
+      assert {200, %{"action" => "created", "language" => "de-DE"}, _} =
+               call_with(ctx.token, "publishing.set_translation", ctx.input)
+
+      assert %{title: "Hallo", content: "Inhalt"} = german(ctx)
+    end
+
+    test "the live version: the first call previews and writes no row; the code writes once; a spent code is refused",
+         ctx do
+      Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"action" => "add", "live" => true}]
+                }
+              }, _} = call_with(ctx.token, "publishing.set_translation", ctx.input)
+
+      assert german(ctx) == nil
+      confirmed = Map.put(ctx.input, "confirm_token", code)
+
+      assert {200, %{"action" => "created"}, _} =
+               call_with(ctx.token, "publishing.set_translation", confirmed)
+
+      assert %{title: "Hallo"} = german(ctx)
+
+      assert {409, %{"context" => %{"reason" => "used"}}, _} =
+               call_with(ctx.token, "publishing.set_translation", confirmed)
+    end
+
+    test "a code cannot be redeemed for different text", ctx do
+      Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(ctx.token, "publishing.set_translation", ctx.input)
+
+      swapped = ctx.input |> Map.put("content", "Anderer Text") |> Map.put("confirm_token", code)
+
+      assert {409, %{"code" => "confirm_token_invalid"}, _} =
+               call_with(ctx.token, "publishing.set_translation", swapped)
+
+      assert german(ctx) == nil
+    end
+
+    test "the code is refused with reason changed after another write to the post", ctx do
+      Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(ctx.token, "publishing.set_translation", ctx.input)
+
+      Fx.body!(ctx.g["slug"], ctx.post[:uuid], "someone else edited", 1)
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.set_translation",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert german(ctx) == nil
+    end
+
+    test "an unconfirmed draft write whose version goes live in the window is refused as went_live",
+         ctx do
+      flag = make_ref()
+      me = self()
+      handler = "executor-set-translation-#{System.unique_integer([:positive])}"
+      repo = PhoenixKitPublishing.Test.Repo
+
+      :telemetry.attach(
+        handler,
+        repo.config()[:telemetry_prefix] ++ [:query],
+        fn _event, _measurements, meta, _config ->
+          if meta.source == "phoenix_kit_publishing_contents" and meta.query =~ ~r/^INSERT/ and
+               Process.get(flag) == nil do
+            Process.put(flag, true)
+            :ok = Publishing.Versions.publish_version(ctx.g["slug"], ctx.post[:uuid], 1, [])
+            send(me, :interleaved)
+          end
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      assert {409, %{"context" => %{"reason" => "went_live"}}, _} =
+               call_with(ctx.token, "publishing.set_translation", ctx.input)
+
+      assert_received :interleaved
+      assert %{content: content} = german(ctx)
+      assert content in [nil, ""]
+    end
+
+    test "a requires_approval key is queued; the approver's decision writes, with the approver in the log metadata",
+         ctx do
+      Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+      token = issue_token(ctx.user, scopes(), %{requires_approval: true})
+
+      assert {200, %{"executed" => false, "status" => "pending_approval", "approval_id" => id}, _} =
+               call_with(token, "publishing.set_translation", ctx.input)
+
+      assert german(ctx) == nil
+
+      assert {:ok, %{status: "executed"}} =
+               Approvals.approve(id, Scope.for_user(ctx.user, narrow: false))
+
+      assert %{title: "Hallo"} = german(ctx)
+
+      row =
+        Enum.find(
+          list_activities(),
+          &(&1.action == "publishing.post.updated" and &1.mode == "auto")
+        )
+
+      assert row.metadata["approved_by_uuid"] == ctx.user.uuid
+    end
+  end
+
   test "every scope the declared tools carry is a known publishing scope, and the key gets all of them" do
     declared = scopes_declared() |> Enum.uniq() |> Enum.sort()
 
