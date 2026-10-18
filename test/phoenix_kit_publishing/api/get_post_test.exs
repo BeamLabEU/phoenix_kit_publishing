@@ -172,6 +172,25 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
              get(%{"id" => post[:uuid]}, %{"version" => 9})
   end
 
+  test "an explicit draft version with an extra language leaves the summary on the live version",
+       %{
+         g: g,
+         post: post
+       } do
+    Fx.publish!(g["slug"], post[:uuid], 1)
+    {:ok, _} = Versions.create_new_version(g["slug"], post, %{}, %{})
+    Fx.translation!(g["slug"], post[:uuid], "de-DE", "Hallo", "Inhalt", 2)
+
+    assert {:ok, draft} = get(%{"id" => post[:uuid]}, %{"version" => 2, "language" => "de-DE"})
+    assert {:ok, live} = get(%{"id" => post[:uuid]})
+
+    assert draft["version"] == 2 and draft["language"] == "de-DE" and draft["title"] == "Hallo"
+    assert draft["status"] == "published"
+    assert draft["languages"] == ["en-US"] and draft["languages"] == live["languages"]
+    assert draft["public_paths"] == live["public_paths"]
+    assert Map.keys(draft["public_paths"]) == ["en-US"]
+  end
+
   test "a trashed post by id is not_found with context.trashed; list_posts shows it", %{
     g: g,
     post: post

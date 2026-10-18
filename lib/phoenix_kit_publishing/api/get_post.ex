@@ -114,9 +114,27 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPost do
         else: Map.put(detail, "markdown", post[:content] || "")
 
     hit.db_post
-    |> Presenter.post_summary(hit.group, versions, contents)
+    |> Presenter.post_summary(
+      hit.group,
+      versions,
+      summary_contents(hit.db_post, versions, version, contents)
+    )
     |> Map.merge(detail)
     |> Common.with_warnings(warnings(shown, requested, input["language"]))
+  end
+
+  # The summary describes the post as list_posts does: the rows of the live version, else the latest.
+  # An explicitly requested version only supplies the body, the fields, the revision and the title.
+  defp summary_contents(db_post, versions, version, contents) do
+    shown =
+      Enum.find(versions, &(&1.uuid == db_post.active_version_uuid)) ||
+        Enum.max_by(versions, & &1.version_number, fn -> nil end)
+
+    cond do
+      is_nil(shown) -> contents
+      shown.uuid == version.uuid -> contents
+      true -> DBStorage.list_contents(shown.uuid)
+    end
   end
 
   # The module falls back silently to another language: never present that text as the requested one.
