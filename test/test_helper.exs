@@ -152,7 +152,10 @@ if repo_available do
   {:ok, _} = PhoenixKitPublishing.Test.DispatchEndpoint.start_link()
 end
 
-# Exclude integration tests when DB is not available
-exclude = if repo_available, do: [], else: [:integration]
+# Exclude integration tests when DB is not available; the tests that drive a tool through
+# core's executor need a core that has the API.
+exclude =
+  if(repo_available, do: [], else: [:integration]) ++
+    if Code.ensure_loaded?(PhoenixKit.API.Executor), do: [], else: [:core_api]
 
 ExUnit.start(exclude: exclude)
