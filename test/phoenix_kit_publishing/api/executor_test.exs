@@ -398,6 +398,31 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
                call_with(token, "publishing.publish_post", Map.put(input, "confirm_token", code))
     end
 
+    test "a retry with no version after a success answers unchanged, not no_draft_version", ctx do
+      token = issue_token(ctx.user, scopes())
+      input = %{"post" => ref(ctx)}
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(token, "publishing.publish_post", input)
+
+      assert {200, %{"action" => "published"}, _} =
+               call_with(token, "publishing.publish_post", Map.put(input, "confirm_token", code))
+
+      assert {200,
+              %{
+                "status" => "confirmation_required",
+                "confirm_token" => retry_code,
+                "preview" => %{"rows" => [%{"action" => "unchanged"}]}
+              }, _} = call_with(token, "publishing.publish_post", input)
+
+      assert {200, %{"action" => "unchanged", "version" => 1}, _} =
+               call_with(
+                 token,
+                 "publishing.publish_post",
+                 Map.put(input, "confirm_token", retry_code)
+               )
+    end
+
     test "a posts:write-only key is refused with 403 and the publish scope", ctx do
       token = issue_token(ctx.user, ["publishing.posts:write"])
 

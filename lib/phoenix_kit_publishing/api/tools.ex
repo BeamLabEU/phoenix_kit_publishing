@@ -238,7 +238,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
         "Makes a version the live one: the highest draft by default, or any existing version (a rollback " <>
           "to an archived one). Always needs a confirmation; the preview lists the languages that go live " <>
           "with the first 300 characters of each body, the version that is archived, any HTML in the " <>
-          "stored text, and an empty-language warning. A version already live answers unchanged.",
+          "stored text, and an empty-language warning. A version already live answers unchanged, also when " <>
+          "no version is named and the post has no draft.",
       input_schema: Schemas.publish_post(),
       output_schema: Schemas.publish_post_output(),
       handler: {PhoenixKit.Modules.Publishing.API.PublishPost, :call},

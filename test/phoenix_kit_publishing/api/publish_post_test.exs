@@ -4,7 +4,16 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPostTest do
   import Ecto.Query
   import PhoenixKitPublishing.ActivityLogAssertions
 
-  alias PhoenixKit.Modules.Publishing.{Constants, Groups, Posts, PublishingContent, Versions}
+  alias PhoenixKit.Modules.Publishing.{
+    Constants,
+    Groups,
+    Posts,
+    PublishingContent,
+    PublishingPost,
+    PublishingVersion,
+    Versions
+  }
+
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
@@ -85,8 +94,26 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPostTest do
     assert {:ok, %{"action" => "published"}} = publish(ctx, %{"version" => 1})
   end
 
-  test "no_draft_version and version_not_found", ctx do
+  test "with no version named, a live post with no draft answers unchanged and writes nothing",
+       ctx do
     Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+    n = length(list_activities())
+
+    assert {:ok, %{"action" => "unchanged", "version" => 1}} = publish(ctx)
+    assert length(list_activities()) == n
+  end
+
+  test "no_draft_version and version_not_found", ctx do
+    # the only version is archived and nothing is live: there is nothing to default to
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    TestRepo.update_all(from(p in PublishingPost, where: p.uuid == ^ctx.post[:uuid]),
+      set: [active_version_uuid: nil]
+    )
+
+    TestRepo.update_all(from(v in PublishingVersion, where: v.post_uuid == ^ctx.post[:uuid]),
+      set: [status: "archived"]
+    )
 
     assert {:error, :validation_failed, _, %{errors: [%{reason: "no_draft_version"}]}} =
              publish(ctx)
