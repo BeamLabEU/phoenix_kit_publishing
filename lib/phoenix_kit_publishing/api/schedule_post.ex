@@ -16,7 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
          :ok <- timestamp_group(hit.group),
          {:ok, version} <-
-           Refs.resolve_version(hit.db_post, input["version"], :write) |> Refs.version_error(),
+           Refs.resolve_version_or_live(hit.db_post, input["version"]) |> Refs.version_error(),
          contents = DBStorage.list_contents(version.uuid),
          :ok <- Common.check_revision(input, hit.db_post, version, Refs.primary_row(contents)),
          :ok <- future(date, time),

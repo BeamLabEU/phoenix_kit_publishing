@@ -4,7 +4,15 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
   import Ecto.Query, only: [from: 2]
   import PhoenixKitPublishing.ActivityLogAssertions
 
-  alias PhoenixKit.Modules.Publishing.{Constants, Groups, Posts, PublishingContent, Versions}
+  alias PhoenixKit.Modules.Publishing.{
+    Constants,
+    Groups,
+    Posts,
+    PublishingContent,
+    PublishingPost,
+    Versions
+  }
+
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
@@ -86,12 +94,21 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
   test "rescheduling to the post's own minute is unchanged and a retry is safe", ctx do
     assert {:ok, %{"action" => "scheduled"}} = schedule(ctx, at(10))
     n = length(list_activities())
+
+    # A plain retry names no version: the only draft went live, so the live version is the one.
+    assert {:ok, %{"action" => "unchanged", "version" => 1}} = schedule(ctx, at(10))
     assert {:ok, %{"action" => "unchanged"}} = schedule(ctx, at(10), %{"version" => 1})
     assert length(list_activities()) == n
+  end
 
-    # Without a version the default is the highest draft, and the only version is live.
-    assert {:error, :validation_failed, _, %{errors: [%{reason: "no_draft_version"}]}} =
-             schedule(ctx, at(10))
+  test "a plain call on a live post with no draft acts on the live version", ctx do
+    assert {:ok, %{"action" => "scheduled"}} = schedule(ctx, at(10))
+
+    assert {:ok, %{"action" => "scheduled", "version" => 1, "publish_at" => later}} =
+             schedule(ctx, at(11))
+
+    assert later == at(11)
+    assert Fx.db_post(ctx.post[:uuid]).post_date == Date.add(Date.utc_today(), 11)
   end
 
   test "malformed publish_at values are refused with the path", ctx do
@@ -148,6 +165,11 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
     refute Map.has_key?(context, :left_behind)
     assert stamp(ctx) == old
     assert Fx.db_post(ctx.post[:uuid]).active_version_uuid == nil
+
+    # The undo goes through update_post, which also writes the version's published_at: it follows
+    # the restored date and time, not the scheduled value step 1 had written.
+    {date, time} = old
+    assert Fx.version(ctx.post[:uuid]).published_at == DateTime.new!(date, time, "Etc/UTC")
   end
 
   test "when the old date cannot be put back the error says what is left behind", ctx do
@@ -163,13 +185,34 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
     refute stamp(ctx) == old
   end
 
+  test "a minute taken between the check and the move answers slot_taken and moves nothing",
+       ctx do
+    other = Fx.post!(ctx.g["slug"], %{title: "Other"})
+    old = stamp(ctx)
+    date = Date.add(Date.utc_today(), 10)
+
+    # Right after the slot check, another writer takes the minute.
+    after_query(~r/^SELECT TRUE/, nil, fn ->
+      TestRepo.update_all(from(p in PublishingPost, where: p.uuid == ^other[:uuid]),
+        set: [post_date: date, post_time: ~T[09:30:00]]
+      )
+    end)
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "slot_taken"}]} = context} =
+             schedule(ctx, at(10))
+
+    refute Map.has_key?(context, :left_behind)
+    assert stamp(ctx) == old
+    assert Fx.db_post(ctx.post[:uuid]).active_version_uuid == nil
+  end
+
   test "the preview states the URL change, the time zone and that a live post disappears until then",
        ctx do
     Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
     before = Fx.table_state()
 
     assert {:preview, %{"requires_confirmation" => true, "rows" => [row]}, _} =
-             schedule(ctx, at(10), %{"version" => 1}, %{dry_run?: true})
+             schedule(ctx, at(10), %{}, %{dry_run?: true})
 
     assert Fx.table_state() == before
 
@@ -182,7 +225,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
     assert {:ok, %{"action" => "scheduled"}} = schedule(ctx, at(10))
 
     assert {:preview, %{"rows" => [row]}, _} =
-             schedule(ctx, at(11), %{"version" => 1}, %{dry_run?: true})
+             schedule(ctx, at(11), %{}, %{dry_run?: true})
 
     assert row["disappears_until"] == nil and row["from"] == at(10)
   end

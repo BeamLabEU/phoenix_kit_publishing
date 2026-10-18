@@ -90,6 +90,21 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
     end
   end
 
+  @doc """
+  Like `resolve_version/3` in `:write` mode, but with no draft and no version named a post that is
+  already live resolves to its live version. A plain retry of a publish or schedule call after a
+  lost response then finds the live version and answers `unchanged` instead of `no_draft_version`.
+  """
+  def resolve_version_or_live(db_post, number) do
+    case resolve_version(db_post, number, :write) do
+      {:error, :no_draft_version} when is_nil(number) ->
+        found(DBStorage.get_active_version(db_post), :no_draft_version)
+
+      other ->
+        other
+    end
+  end
+
   defp read_default(versions, db_post) do
     Enum.find(versions, &(&1.uuid == db_post.active_version_uuid)) ||
       Enum.max_by(versions, & &1.version_number, fn -> nil end)

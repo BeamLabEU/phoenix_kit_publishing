@@ -12,7 +12,8 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
   def call(input, ctx) do
     with {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(),
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
-         {:ok, version} <- resolve_version(hit.db_post, input["version"]) |> Refs.version_error(),
+         {:ok, version} <-
+           Refs.resolve_version_or_live(hit.db_post, input["version"]) |> Refs.version_error(),
          contents = DBStorage.list_contents(version.uuid),
          :ok <- Common.check_revision(input, hit.db_post, version, Refs.primary_row(contents)),
          :ok <- Refs.require_primary_title(contents) do
@@ -23,21 +24,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
         live? -> {:ok, answer("unchanged", hit, version)}
         true -> execute(hit, version, ctx)
       end
-    end
-  end
-
-  # With no draft and no version named, a post that is already live resolves to its live version,
-  # so a plain retry after a lost response answers `unchanged` instead of `no_draft_version`.
-  defp resolve_version(db_post, number) do
-    case Refs.resolve_version(db_post, number, :write) do
-      {:error, :no_draft_version} when is_nil(number) ->
-        case DBStorage.get_active_version(db_post) do
-          nil -> {:error, :no_draft_version}
-          version -> {:ok, version}
-        end
-
-      other ->
-        other
     end
   end
 
