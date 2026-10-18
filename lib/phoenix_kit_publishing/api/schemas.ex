@@ -184,6 +184,25 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def create_version do
+    object(
+      %{
+        "post" => post_ref(),
+        "from_version" => %{"type" => "integer", "minimum" => 1},
+        "blank" => %{"type" => "boolean"}
+      },
+      ["post"]
+    )
+  end
+
+  def create_version_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end

@@ -30,7 +30,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       get_post(),
       list_categories(),
       create_post(),
-      update_post()
+      update_post(),
+      create_version()
     ]
   end
 
@@ -174,6 +175,25 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       handler: {PhoenixKit.Modules.Publishing.API.UpdatePost, :call},
       danger: {PhoenixKit.Modules.Publishing.API.Danger, :update_post},
       annotations: %{idempotent: true}
+    )
+  end
+
+  defp create_version do
+    Tool.new!(
+      name: "publishing.create_version",
+      audience: :admin,
+      scope: "publishing.posts:write",
+      permission: @permission,
+      title: "Create a version",
+      description:
+        "Creates a new DRAFT version of a post. By default it is a copy of the latest version with every " <>
+          "language; from_version copies that version instead; blank true builds an empty draft with only " <>
+          "the primary-language row (publishing it needs a title). blank and from_version exclude each " <>
+          "other. It never changes which version is live. Not idempotent.",
+      input_schema: Schemas.create_version(),
+      output_schema: Schemas.create_version_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.CreateVersion, :call},
+      annotations: %{idempotent: false}
     )
   end
 
