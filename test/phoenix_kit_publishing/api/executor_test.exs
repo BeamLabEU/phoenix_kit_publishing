@@ -58,7 +58,6 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     :persistent_term.put(@registry_key, [Publishing])
     admin_enabled = Settings.get_boolean_setting("api_admin_enabled", false)
     publishing_enabled = Settings.get_boolean_setting("publishing_enabled", false)
-    batch_over = Settings.get_setting("api_confirm_batch_over")
 
     on_exit(fn ->
       case previous do
@@ -72,7 +71,6 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
 
       Settings.update_boolean_setting("api_admin_enabled", admin_enabled)
       Settings.update_boolean_setting("publishing_enabled", publishing_enabled)
-      Settings.update_setting("api_confirm_batch_over", batch_over || "50")
     end)
 
     # The module is enabled and registered BEFORE the key is created: core only offers scopes that
@@ -272,7 +270,10 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
                       "content" => %{
                         "raw_html" => %{
                           "dangerous" => true,
-                          "findings" => [%{"kind" => "html", "line" => 3} | _]
+                          "findings" => [
+                            %{"kind" => "html", "line" => 3},
+                            %{"kind" => "html", "line" => 3}
+                          ]
                         }
                       }
                     }
@@ -343,15 +344,37 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
            ) == 1
   end
 
-  test "a 51-item category_ids list is refused by maxItems", ctx do
+  test "a 51-item category_ids list is refused by the schema limit, 50 reaches the handler",
+       ctx do
     token = issue_token(ctx.user, scopes())
-    ids = for _ <- 1..51, do: Ecto.UUID.generate()
 
-    assert {422, %{"code" => "validation_failed"}, _} =
+    over = for _ <- 1..51, do: Ecto.UUID.generate()
+
+    assert {422, %{"code" => "validation_failed", "context" => %{"errors" => errors}}, _} =
              call_with(token, "publishing.update_post", %{
                "post" => ref(ctx),
-               "category_ids" => ids
+               "category_ids" => over
              })
+
+    assert Enum.any?(errors, &(&1["path"] == "category_ids" and &1["limit"] == 50))
+
+    # 50 passes the schema and is refused by the handler, not by the limit.
+    exact = Enum.take(over, 50)
+
+    assert {422, %{"code" => "validation_failed", "context" => %{"errors" => errors}}, _} =
+             call_with(token, "publishing.update_post", %{
+               "post" => ref(ctx),
+               "category_ids" => exact
+             })
+
+    assert [%{"path" => "category_ids", "reason" => "unknown_category"}] = errors
+  end
+
+  test "the key scopes this file relies on are declared by the tools" do
+    assert MapSet.subset?(
+             MapSet.new(~w(publishing.posts:read publishing.posts:write)),
+             MapSet.new(scopes())
+           )
   end
 
   test "a core without the confirmation flow exposes only the reads and create_version" do
@@ -360,6 +383,9 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
 
     declared = PhoenixKit.Modules.Publishing.API.Tools.all() |> Enum.map(& &1.name)
     names = PhoenixKit.Modules.Publishing.API.tools(false) |> Enum.map(& &1.name) |> Enum.sort()
-    assert names == six |> Enum.filter(&(&1 in declared)) |> Enum.sort()
+    expected = six |> Enum.filter(&(&1 in declared)) |> Enum.sort()
+
+    assert expected != []
+    assert names == expected
   end
 end
