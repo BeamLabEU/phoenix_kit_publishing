@@ -811,6 +811,31 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
     end
   end
 
+  describe "canonical_image_id/2" do
+    test "an absent, null or empty value passes untouched" do
+      assert {:ok, %{}} = Common.canonical_image_id(%{}, "og_image_id")
+
+      assert {:ok, %{"og_image_id" => nil}} =
+               Common.canonical_image_id(%{"og_image_id" => nil}, "og_image_id")
+
+      assert {:ok, %{"og_image_id" => ""}} =
+               Common.canonical_image_id(%{"og_image_id" => ""}, "og_image_id")
+    end
+
+    test "a UUID is lower-cased, anything else is a validation error on the field" do
+      id = Ecto.UUID.generate()
+
+      assert {:ok, %{"og_image_id" => ^id}} =
+               Common.canonical_image_id(%{"og_image_id" => String.upcase(id)}, "og_image_id")
+
+      assert {:error, :validation_failed, _, %{errors: [%{path: "og_image_id"}]}} =
+               Common.canonical_image_id(%{"og_image_id" => "nope"}, "og_image_id")
+
+      assert {:error, :validation_failed, _, %{errors: [%{path: "og_image_id"}]}} =
+               Common.canonical_image_id(%{"og_image_id" => 12}, "og_image_id")
+    end
+  end
+
   describe "locked_check/2" do
     test "a trashed locked row is refused whatever the confirmation" do
       check = Common.locked_check(ApiCase.ctx(%{confirmation_uuid: "x"}), fn _, _ -> true end)
