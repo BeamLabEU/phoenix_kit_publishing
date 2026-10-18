@@ -7,6 +7,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
   # validation error at any depth.
 
   @uuid %{"type" => "string", "minLength" => 36, "maxLength" => 36}
+  @revision_chars 200
 
   def uuid, do: @uuid
   def text(max), do: %{"type" => "string", "minLength" => 1, "maxLength" => max}
@@ -153,7 +154,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
         "post" => post_ref(),
         "version" => %{"type" => "integer", "minimum" => 1},
         "language" => row_text(20),
-        "if_revision" => row_text(200),
+        "if_revision" => row_text(@revision_chars),
         "title" => nullable_text(500),
         "content" => nullable_text(2_097_152),
         "description" => nullable_text(5000),
@@ -214,7 +215,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
         "og_title" => nullable_text(5000),
         "og_description" => nullable_text(5000),
         "og_image_id" => nullable_text(200),
-        "if_revision" => row_text(200)
+        "if_revision" => row_text(@revision_chars)
       },
       ["post", "language", "title", "content"]
     )
@@ -234,7 +235,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
       %{
         "post" => post_ref(),
         "version" => %{"type" => "integer", "minimum" => 1},
-        "if_revision" => row_text(100)
+        "if_revision" => row_text(@revision_chars)
       },
       ["post"]
     )
@@ -266,7 +267,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
         "post" => post_ref(),
         "version" => %{"type" => "integer", "minimum" => 1},
         "publish_at" => %{"type" => "string", "minLength" => 16, "maxLength" => 16},
-        "if_revision" => row_text(100)
+        "if_revision" => row_text(@revision_chars)
       },
       ["post", "publish_at"]
     )
