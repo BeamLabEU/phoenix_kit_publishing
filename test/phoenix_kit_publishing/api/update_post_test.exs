@@ -1,6 +1,7 @@
 defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
   use PhoenixKit.DataCase, async: false
 
+  import Ecto.Query, only: [from: 2]
   import PhoenixKitPublishing.ActivityLogAssertions
 
   alias PhoenixKit.Modules.Publishing.{Groups, Posts, PublishingContent, PublishingPost}
@@ -104,6 +105,27 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
              edit(ctx, %{"title" => "X", "language" => "de-DE"})
 
     assert body(ctx) == "# Body"
+  end
+
+  test "a primary row stored under the legacy base code is named as such, and one read repairs it",
+       ctx do
+    TestRepo.update_all(
+      from(c in PublishingContent, where: c.version_uuid == ^Fx.version(ctx.post[:uuid]).uuid),
+      set: [language: "en"]
+    )
+
+    for overrides <- [%{}, %{dry_run?: true}] do
+      assert {:error, :validation_failed, _,
+              %{errors: [%{reason: "language_missing", message: message}]}} =
+               edit(ctx, %{"title" => "X"}, overrides)
+
+      assert message =~ "legacy"
+      refute message =~ "set_translation"
+    end
+
+    assert {:ok, _} = ApiCase.call("publishing.get_post", %{"post" => Fx.ref(ctx.post)})
+    assert {:ok, %{"action" => "updated"}} = edit(ctx, %{"title" => "X"})
+    assert Fx.content(ctx.post[:uuid], "en-US").title == "X"
   end
 
   test "a language that is no longer enabled is language_not_enabled with allowed",

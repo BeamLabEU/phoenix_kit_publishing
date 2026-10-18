@@ -4,7 +4,14 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
   # sends status / published_at / url_slug / tags.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Danger, Presenter, Refs, TextScan}
-  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, Posts, PublishingContent}
+
+  alias PhoenixKit.Modules.Publishing.{
+    Constants,
+    DBStorage,
+    LanguageHelpers,
+    Posts,
+    PublishingContent
+  }
 
   @tool "publishing.update_post"
   @fields ~w(title content description seo_title excerpt featured_image_id featured sitemap_exclude og_title og_description og_image_id category_ids slug)
@@ -127,16 +134,28 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
       {:ok, %{language: ^language} = post} ->
         {:ok, post}
 
-      {:ok, _fallback} ->
-        Common.invalid(
-          "language",
-          "#{language} has no row on this version; use set_translation to create it",
-          "language_missing"
-        )
+      {:ok, fallback} ->
+        missing(language, fallback)
 
       {:error, _reason} ->
         {:error, :not_found, "The post could not be read.", %{}}
     end
+  end
+
+  # The primary language may sit under its legacy base code until a read repairs it; set_translation
+  # refuses the primary language, so the usual advice would be a dead end.
+  defp missing(language, fallback) do
+    legacy? =
+      language == LanguageHelpers.get_primary_language() and
+        fallback.language == LanguageHelpers.url_language_code(language)
+
+    message =
+      if legacy?,
+        do:
+          "#{language} is stored under a legacy language code; read the post once to repair it, then retry",
+        else: "#{language} has no row on this version; use set_translation to create it"
+
+    Common.invalid("language", message, "language_missing")
   end
 
   defp categories(group, %{"category_ids" => ids}) when is_list(ids) do
