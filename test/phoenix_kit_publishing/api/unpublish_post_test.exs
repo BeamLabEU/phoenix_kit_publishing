@@ -47,6 +47,22 @@ defmodule PhoenixKit.Modules.Publishing.API.UnpublishPostTest do
              ApiCase.call("publishing.unpublish_post", %{"post" => %{"id" => fresh[:uuid]}})
   end
 
+  test "the preview of an unpublished or never-published post is not_published", ctx do
+    assert {:ok, _} = unpublish(ctx)
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "not_published"}]}} =
+             unpublish(ctx, %{dry_run?: true})
+
+    fresh = Fx.post!(ctx.g["slug"], %{title: "Fresh", slug: "fresh"})
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "not_published"}]}} =
+             ApiCase.call(
+               "publishing.unpublish_post",
+               %{"post" => %{"id" => fresh[:uuid]}},
+               %{dry_run?: true}
+             )
+  end
+
   test "the preview lists the paths that stop resolving and leaves ALL tables unchanged", ctx do
     before = Fx.table_state()
 

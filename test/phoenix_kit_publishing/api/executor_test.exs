@@ -540,6 +540,22 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
 
       assert Fx.db_post(ctx.post[:uuid]).active_version_uuid != nil
     end
+
+    test "the code is refused with reason changed after the live version changed", ctx do
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(ctx.token, "publishing.unpublish_post", ctx.input)
+
+      Fx.body!(ctx.g["slug"], ctx.post[:uuid], "someone else edited", 1)
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.unpublish_post",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert Fx.db_post(ctx.post[:uuid]).active_version_uuid != nil
+    end
   end
 
   describe "schedule_post" do
