@@ -47,6 +47,10 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
       )
 
     assert updated.metadata["tool"] == "publishing.set_translation"
+
+    for action <- ["publishing.translation.added", "publishing.post.updated"] do
+      assert Enum.count(list_activities(), &(&1.action == action and &1.mode == "auto")) == 1
+    end
   end
 
   test "updating an existing language writes no translation.added row", ctx do
@@ -73,6 +77,26 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
              PhoenixKit.Modules.Publishing.API.SetTranslation.call(input, ApiCase.ctx())
 
     assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
+  test "the same call twice converges: the second answer is unchanged and writes nothing", ctx do
+    assert {:ok, %{"action" => "created"}} =
+             set(ctx, %{"og_title" => "OG", "og_description" => "", "og_image_id" => nil})
+
+    before = Fx.table_state()
+    logged = length(list_activities())
+
+    assert {:ok, %{"action" => "unchanged", "language" => "de-DE"}} =
+             set(ctx, %{"og_title" => "OG", "og_description" => "", "og_image_id" => nil})
+
+    assert {:preview, %{"requires_confirmation" => false, "rows" => [%{"action" => "unchanged"}]},
+            _} =
+             set(ctx, %{"og_title" => "OG"}, %{dry_run?: true})
+
+    assert Fx.table_state() == before
+    assert length(list_activities()) == logged
+
+    assert {:ok, %{"action" => "updated"}} = set(ctx, %{"og_title" => "OG other"})
   end
 
   test "the primary language is refused", ctx do
@@ -137,6 +161,51 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
       PublishingContent.get_og(Fx.content(ctx.post[:uuid], "de-DE"))
 
     assert og["title"] == "OG Titel" and og["description"] == "OG Text"
+  end
+
+  test "a valid og_image_id is stored on the language row", ctx do
+    image = Ecto.UUID.generate()
+    assert {:ok, %{"action" => "created"}} = set(ctx, %{"og_image_id" => image})
+
+    assert PublishingContent.get_og(Fx.content(ctx.post[:uuid], "de-DE"))["image_uuid"] == image
+  end
+
+  test "the dry run shows the og values the call would write", ctx do
+    image = Ecto.UUID.generate()
+
+    assert {:preview, %{"rows" => [%{"changes" => changes}]}, _} =
+             set(
+               ctx,
+               %{"og_title" => "OG Titel", "og_description" => "OG Text", "og_image_id" => image},
+               %{dry_run?: true}
+             )
+
+    assert %{"scope" => "language", "from" => "", "to" => "OG Titel"} = changes["og_title"]
+    assert %{"scope" => "language", "from" => "", "to" => "OG Text"} = changes["og_description"]
+    assert %{"scope" => "language", "from" => "", "to" => ^image} = changes["og_image_id"]
+
+    assert {:preview, %{"rows" => [%{"changes" => no_og}]}, _} = set(ctx, %{}, %{dry_run?: true})
+    refute Map.has_key?(no_og, "og_title")
+  end
+
+  test "a partial og input keeps the og fields of the legacy row it promotes", ctx do
+    {:ok, _} =
+      DBStorage.create_content(%{
+        version_uuid: Fx.version(ctx.post[:uuid]).uuid,
+        language: "de",
+        title: "Alt",
+        content: "alt",
+        data: %{"og" => %{"title" => "Alt OG", "description" => "Alte Beschreibung"}}
+      })
+
+    assert {:preview, %{"rows" => [%{"changes" => %{"og_title" => change}}]}, _} =
+             set(ctx, %{"og_title" => "Neu"}, %{dry_run?: true})
+
+    assert change["from"] == "Alt OG" and change["to"] == "Neu"
+
+    assert {:ok, _} = set(ctx, %{"og_title" => "Neu"})
+    og = PublishingContent.get_og(Fx.content(ctx.post[:uuid], "de-DE"))
+    assert og["title"] == "Neu" and og["description"] == "Alte Beschreibung"
   end
 
   test "NUL byte in title or content is a validation error", ctx do
@@ -209,6 +278,18 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
 
     assert {:preview, %{"rows" => [%{"action" => "update"}]}, _} =
              set(ctx, %{"content" => "anders"}, %{dry_run?: true})
+  end
+
+  test "a matching if_revision lets the call through", ctx do
+    {:ok, _} = set(ctx)
+
+    {:ok, %{"revision" => rev}} =
+      ApiCase.call("publishing.get_post", %{"post" => Fx.ref(ctx.post), "language" => "de-DE"})
+
+    assert {:ok, %{"action" => "updated"}} =
+             set(ctx, %{"content" => "Neuer Inhalt", "if_revision" => rev})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE").content == "Neuer Inhalt"
   end
 
   test "if_revision mismatch, trashed post and trashed group", ctx do
@@ -333,7 +414,21 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     assert %{title: "Gestempelt"} = Fx.content(p[:uuid], "de-DE")
   end
 
-  test "a draft that is not the live version is a plain write; the same text again previews as a no-op change",
+  test "the handler refuses a title over the character limit with no row", ctx do
+    input = %{
+      "post" => Fx.ref(ctx.post),
+      "language" => "de-DE",
+      "title" => String.duplicate("a", 501),
+      "content" => "Inhalt"
+    }
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "title"}]}} =
+             PhoenixKit.Modules.Publishing.API.SetTranslation.call(input, ApiCase.ctx())
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
+  test "a draft that is not the live version is a plain write; the same text again is unchanged",
        ctx do
     Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
 
@@ -344,12 +439,8 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     assert %{content: "Inhalt"} = Fx.content(ctx.post[:uuid], "de-DE", 2)
     assert Fx.content(ctx.post[:uuid], "de-DE", 1) == nil
 
-    assert {:preview,
-            %{
-              "requires_confirmation" => false,
-              "rows" => [%{"action" => "update", "changes" => %{"content" => change}}]
-            }, _} = set(ctx, %{"version" => 2}, %{dry_run?: true})
-
-    assert change["from_sha256"] == change["to_sha256"]
+    assert {:preview, %{"requires_confirmation" => false, "rows" => [%{"action" => "unchanged"}]},
+            _} =
+             set(ctx, %{"version" => 2}, %{dry_run?: true})
   end
 end

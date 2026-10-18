@@ -2,12 +2,18 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
   @moduledoc false
   # Tool `publishing.set_translation`: add or update one non-primary language of a version.
 
+  alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing.API.{Common, Danger, Presenter, Refs, TextScan}
   alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, LanguageHelpers}
-  alias PhoenixKit.Modules.Publishing.{Posts, TranslationManager}
+  alias PhoenixKit.Modules.Publishing.{Posts, PublishingContent, TranslationManager}
 
   @tool "publishing.set_translation"
   @og_fields ~w(og_title og_description og_image_id)
+  @og_keys %{
+    "og_title" => "title",
+    "og_description" => "description",
+    "og_image_id" => "image_uuid"
+  }
 
   @spec call(map(), map()) ::
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
@@ -21,9 +27,22 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
          {:ok, language} <- language(input["language"]),
          row = DBStorage.get_content(version.uuid, language),
          :ok <- Common.check_revision(input, hit.db_post, version, row) do
-      t = %{input: input, hit: hit, version: version, language: language, row: row}
+      t = %{
+        input: input,
+        hit: hit,
+        version: version,
+        language: language,
+        row: row,
+        og_row: og_row(version, language, row)
+      }
 
-      if Map.get(ctx, :dry_run?, false), do: preview(t, ctx), else: execute(t, ctx)
+      dry? = Map.get(ctx, :dry_run?, false)
+
+      cond do
+        unchanged?(t) -> unchanged(t, dry?)
+        dry? -> preview(t, ctx)
+        true -> execute(t, ctx)
+      end
     end
   end
 
@@ -70,6 +89,59 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
     end
   end
 
+  # A legacy base-code row ("de" for "de-DE") is promoted by the first write, so its og values
+  # are the current ones for the target language.
+  defp og_row(_version, _language, %{} = row), do: row
+
+  defp og_row(version, language, nil) do
+    case DialectMapper.extract_base(language) do
+      ^language -> nil
+      base -> DBStorage.get_content(version.uuid, base)
+    end
+  end
+
+  defp current_og(t), do: (t.og_row && PublishingContent.get_og(t.og_row)) || %{}
+
+  # The og fields the call sends that differ from the stored ones (nil and "" are equal).
+  defp og_changes(t) do
+    og = current_og(t)
+
+    for {field, key} <- Enum.sort(@og_keys),
+        Map.has_key?(t.input, field),
+        from = og[key] || "",
+        to = t.input[field] || "",
+        from != to,
+        into: %{} do
+      {field, %{"scope" => "language", "from" => clip(from), "to" => clip(to)}}
+    end
+  end
+
+  defp unchanged?(%{row: nil}), do: false
+
+  defp unchanged?(t) do
+    t.row.title == t.input["title"] and t.row.content == t.input["content"] and
+      og_changes(t) == %{}
+  end
+
+  defp unchanged(t, true) do
+    row = %{
+      "action" => "unchanged",
+      "language" => t.language,
+      "version" => t.version.version_number
+    }
+
+    contents = DBStorage.list_contents(t.version.uuid)
+
+    Common.preview(
+      [row],
+      %{"requires_confirmation" => false},
+      {:set_translation, :unchanged,
+       Common.post_state(t.hit.db_post, t.hit.group, [t.version], contents)}
+    )
+  end
+
+  defp unchanged(t, false), do: {:ok, answer(t.hit, t.version, t.language, "unchanged")}
+
   # --- dry run -----------------------------------------------------------------------------
 
   defp preview(t, ctx) do
@@ -81,14 +153,15 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
       "version" => version.version_number,
       "live" => hit.db_post.active_version_uuid == version.uuid,
       "public" => Presenter.public_state(hit.db_post, version),
-      "changes" => %{
-        "title" => %{
-          "scope" => "language",
-          "from" => clip((row && row.title) || ""),
-          "to" => clip(input["title"])
-        },
-        "content" => Common.content_change((row && row.content) || "", input["content"])
-      }
+      "changes" =>
+        Map.merge(og_changes(t), %{
+          "title" => %{
+            "scope" => "language",
+            "from" => clip((row && row.title) || ""),
+            "to" => clip(input["title"])
+          },
+          "content" => Common.content_change((row && row.content) || "", input["content"])
+        })
     }
 
     contents = DBStorage.list_contents(version.uuid)
@@ -96,7 +169,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
     term =
       {:set_translation, Common.post_state(hit.db_post, hit.group, [version], contents), language,
        Common.sha256(input["title"]), Common.sha256(input["content"]),
-       Common.fingerprint(Common.og_params(input, row))}
+       Common.fingerprint(Common.og_params(input, t.og_row))}
 
     Common.preview([out], %{"requires_confirmation" => Danger.set_translation(input, ctx)}, term)
   end
@@ -118,14 +191,14 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
   end
 
   defp write(t, post, created?, ctx) do
-    %{input: input, hit: hit, version: version, language: language, row: row} = t
+    %{input: input, hit: hit, version: version, language: language} = t
 
     check = Common.locked_check(ctx, fn locked, v -> Danger.live_condition(locked, v, nil) end)
 
     params =
       Map.merge(
         %{"title" => input["title"], "content" => input["content"]},
-        Common.og_params(input, row)
+        Common.og_params(input, t.og_row)
       )
 
     fields = ["content", "title"] ++ Enum.filter(@og_fields, &Map.has_key?(input, &1))
@@ -135,7 +208,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
       |> Common.put_log_fields(Enum.sort(fields))
 
     case Posts.update_post(hit.group.slug, post, params, opts) do
-      {:ok, _post} -> {:ok, answer(hit, version, language, created?)}
+      {:ok, _post} -> {:ok, answer(hit, version, language, action(created?))}
       {:error, reason} -> left_behind(Common.error(reason), created?, language)
     end
   end
@@ -174,11 +247,14 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
 
   defp left_behind(error, false, _language), do: error
 
-  defp answer(hit, version, language, created?) do
+  defp action(true), do: "created"
+  defp action(false), do: "updated"
+
+  defp answer(hit, version, language, action) do
     db = DBStorage.get_post_by_uuid(hit.db_post.uuid, [:group])
 
     %{
-      "action" => if(created?, do: "created", else: "updated"),
+      "action" => action,
       "language" => language,
       "version" => version.version_number,
       "post" =>
