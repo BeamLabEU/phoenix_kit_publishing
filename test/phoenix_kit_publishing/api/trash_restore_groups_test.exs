@@ -91,6 +91,18 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashRestoreGroupsTest do
     assert {:error, :validation_failed, _, _} = trash(for(n <- 1..21, do: "g#{n}"))
   end
 
+  test "a slug with a NUL byte is a not_found row, in the preview and in the real run" do
+    nul = ["a" <> <<0>> <> "b"]
+
+    for tool <- [&trash/2, &restore/2] do
+      assert {:preview, %{"rows" => [%{"error" => %{"code" => "not_found"}}]}, _} =
+               tool.(nul, %{dry_run?: true})
+
+      assert {:ok, %{"results" => [%{"error" => %{"code" => "not_found"}}]}} =
+               tool.(nul, %{})
+    end
+  end
+
   test "previews list post_count and live_posts and leave ALL tables unchanged", %{g: g} do
     before = Fx.table_state()
 

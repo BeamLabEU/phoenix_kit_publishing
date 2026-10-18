@@ -2,7 +2,7 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashGroups do
   @moduledoc false
   # Tool `publishing.trash_groups` (spec §9.17): move groups to the trash (reversible with restore_groups).
 
-  alias PhoenixKit.Modules.Publishing.API.Common
+  alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups}
 
   @tool "publishing.trash_groups"
@@ -24,7 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashGroups do
 
             {{:error, ref, row}, seen}
           else
-            {classify(ref, DBStorage.get_group_by_slug(slug)), MapSet.put(seen, slug)}
+            {classify(ref, Refs.resolve_group(slug)), MapSet.put(seen, slug)}
           end
 
         ref, seen ->
@@ -34,11 +34,11 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashGroups do
     entries
   end
 
-  defp classify(ref, nil),
+  defp classify(ref, {:error, :not_found}),
     do: {:error, ref, Common.row_error(ref, "not_found", "The group does not exist.")}
 
-  defp classify(ref, %{status: "trashed"} = group), do: {:already, ref, group}
-  defp classify(ref, group), do: {:trash, ref, group}
+  defp classify(ref, {:ok, %{status: "trashed"} = group}), do: {:already, ref, group}
+  defp classify(ref, {:ok, group}), do: {:trash, ref, group}
 
   defp execute(plan, ctx) do
     opts = Common.write_opts(ctx, @tool)
