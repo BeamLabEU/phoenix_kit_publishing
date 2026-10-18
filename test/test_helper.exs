@@ -162,8 +162,9 @@ if Code.ensure_loaded?(PhoenixKit.Users.RateLimiter.Backend) do
   end
 end
 
-# Exclude integration tests when DB is not available; the tests that drive a tool through
-# core's executor need a core that has the API.
+# Exclude integration tests when DB is not available. The `:core_api` tag marks only the tests
+# that run through core's executor; the library itself needs a core that has `PhoenixKit.API` to
+# compile, so the other API tests are not tagged.
 exclude =
   if(repo_available, do: [], else: [:integration]) ++
     if Code.ensure_loaded?(PhoenixKit.API.Executor), do: [], else: [:core_api]

@@ -326,7 +326,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   defp stringify(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
 
-  @spec summary([map()]) :: %{optional(String.t() | nil) => pos_integer()}
+  @spec summary([map()]) :: %{optional(String.t()) => pos_integer()}
   def summary(rows), do: Enum.frequencies_by(rows, & &1["action"])
   @spec batch_result([map()]) :: {:ok, map()}
   def batch_result(rows), do: {:ok, %{"results" => rows, "summary" => summary(rows)}}
