@@ -4,6 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   # store an answer containing a string that starts with `pk_` or a key named token/secret, so free
   # text must stay out of a write answer (a retry of a post titled `pk_sale` must still be replayed).
 
+  alias PhoenixKit.Modules.Publishing.API.TextScan
   alias PhoenixKit.Modules.Publishing.{Constants, LanguageHelpers, PublishingVersion}
   alias PhoenixKit.Modules.Publishing.Web.HTML
 
@@ -24,6 +25,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
         "draft"
     end
   end
+
+  @head_chars 300
+  @raw_html_per_language 20
 
   # Constants.scheduled_ahead?/3 reads :mode, :date and :time of a post-like map.
   defp scheduled?(db_post, now, tz),
@@ -147,6 +151,36 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
       db_post
       |> post_summary(group, versions, contents)
       |> Map.drop(["title", "slug", "public_paths"])
+
+  @doc """
+  The languages a publish or schedule preview shows: code, title, the first 300 characters of the
+  body and its size; with `paths` (a `%{language => path}` map) each row also carries its public path.
+  """
+  def goes_live_languages(contents, paths \\ nil) do
+    for c <- Enum.sort_by(contents, & &1.language) do
+      row = %{
+        "code" => c.language,
+        "title" => c.title,
+        "head" => String.slice(c.content || "", 0, @head_chars),
+        "body_bytes" => byte_size(c.content || "")
+      }
+
+      if paths, do: Map.put(row, "public_path", Map.get(paths, c.language)), else: row
+    end
+  end
+
+  @doc "HTML found in the stored bodies, at most 20 findings per language: `[{language, kind, line, fragment}]`."
+  def raw_html(contents) do
+    for c <- contents,
+        f <- Enum.take(TextScan.scan(c.content || "")["findings"], @raw_html_per_language) do
+      %{
+        "language" => c.language,
+        "kind" => f["kind"],
+        "line" => f["line"],
+        "fragment" => f["fragment"]
+      }
+    end
+  end
 
   @doc "ISO 8601 for the DateTime / NaiveDateTime fields the schemas use; nil stays nil."
   def iso(nil), do: nil

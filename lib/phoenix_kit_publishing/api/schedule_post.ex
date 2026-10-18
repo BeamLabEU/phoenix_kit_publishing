@@ -2,12 +2,11 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
   @moduledoc false
   # Tool `publishing.schedule_post` (spec §9.11): publish at a future time in a timestamp-mode group.
 
-  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, LanguageHelpers, Posts, Versions}
-  alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs, TextScan}
+  alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
+  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, Posts, Versions}
 
   @tool "publishing.schedule_post"
   @format ~r/\A(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})\z/
-  @head_chars 300
 
   @spec call(map(), map()) ::
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
@@ -19,11 +18,11 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
          {:ok, version} <-
            Refs.resolve_version(hit.db_post, input["version"], :write) |> Refs.version_error(),
          contents = DBStorage.list_contents(version.uuid),
-         :ok <- Common.check_revision(input, hit.db_post, version, primary_row(contents)),
+         :ok <- Common.check_revision(input, hit.db_post, version, Refs.primary_row(contents)),
          :ok <- future(date, time),
          same? = same_slot?(hit.db_post, date, time),
          :ok <- free(hit, date, time, same?),
-         :ok <- title(version) do
+         :ok <- Refs.require_primary_title(version) do
       live? = hit.db_post.active_version_uuid == version.uuid
 
       cond do
@@ -54,9 +53,6 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
   end
 
   defp parse(_other), do: Common.invalid("publish_at", "must be a string")
-
-  defp primary_row(contents),
-    do: Enum.find(contents, &(&1.language == LanguageHelpers.get_primary_language()))
 
   defp timestamp_group(%{mode: "timestamp"}), do: :ok
 
@@ -93,17 +89,6 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
     if DBStorage.timestamp_slot_taken?(hit.group.slug, date, time),
       do: Common.invalid("publish_at", "another post holds that minute", "slot_taken"),
       else: :ok
-  end
-
-  defp title(version) do
-    if Refs.primary_title_ok?(version),
-      do: :ok,
-      else:
-        Common.invalid(
-          "version",
-          "the primary-language title is empty or the default title",
-          "title_required"
-        )
   end
 
   # --- write: two non-atomic steps ----------------------------------------------------------
@@ -196,8 +181,11 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
       "public_url_changes_with_date" => not same?,
       "archived" => previous && %{"version" => previous.version_number},
       "disappears_until" => if(visible_now?(hit.db_post), do: input["publish_at"], else: nil),
-      "goes_live" => %{"version" => version.version_number, "languages" => languages(contents)},
-      "contains_raw_html" => raw_html(contents)
+      "goes_live" => %{
+        "version" => version.version_number,
+        "languages" => Presenter.goes_live_languages(contents)
+      },
+      "contains_raw_html" => Presenter.raw_html(contents)
     }
 
     term =
@@ -216,27 +204,5 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
       date: db_post.post_date,
       time: db_post.post_time
     })
-  end
-
-  defp languages(contents) do
-    for c <- Enum.sort_by(contents, & &1.language) do
-      %{
-        "code" => c.language,
-        "title" => c.title,
-        "head" => String.slice(c.content || "", 0, @head_chars),
-        "body_bytes" => byte_size(c.content || "")
-      }
-    end
-  end
-
-  defp raw_html(contents) do
-    for c <- contents, f <- Enum.take(TextScan.scan(c.content || "")["findings"], 20) do
-      %{
-        "language" => c.language,
-        "kind" => f["kind"],
-        "line" => f["line"],
-        "fragment" => f["fragment"]
-      }
-    end
   end
 end

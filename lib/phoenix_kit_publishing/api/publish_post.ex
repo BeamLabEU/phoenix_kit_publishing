@@ -2,11 +2,10 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
   @moduledoc false
   # Tool `publishing.publish_post` (spec §9.10): make a version the live one.
 
-  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, LanguageHelpers, Versions}
-  alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs, TextScan}
+  alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
+  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, Versions}
 
   @tool "publishing.publish_post"
-  @head_chars 300
 
   @spec call(map(), map()) ::
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
@@ -15,8 +14,8 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
          {:ok, version} <- resolve_version(hit.db_post, input["version"]) |> Refs.version_error(),
          contents = DBStorage.list_contents(version.uuid),
-         :ok <- Common.check_revision(input, hit.db_post, version, primary_row(contents)),
-         :ok <- title(version) do
+         :ok <- Common.check_revision(input, hit.db_post, version, Refs.primary_row(contents)),
+         :ok <- Refs.require_primary_title(version) do
       live? = hit.db_post.active_version_uuid == version.uuid
 
       cond do
@@ -41,22 +40,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
         other
     end
   end
-
-  # The module's own check rolls the transaction back with a bare atom; checking up front gives
-  # the caller a reason and keeps a refused publish out of the failed-mutation log.
-  defp title(version) do
-    if Refs.primary_title_ok?(version),
-      do: :ok,
-      else:
-        Common.invalid(
-          "version",
-          "the primary-language title is empty or the default title",
-          "title_required"
-        )
-  end
-
-  defp primary_row(contents),
-    do: Enum.find(contents, &(&1.language == LanguageHelpers.get_primary_language()))
 
   defp execute(hit, version, ctx) do
     case Versions.publish_version(
@@ -88,26 +71,7 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
     paths = Presenter.public_paths(hit.db_post, contents)
     previous = if live?, do: nil, else: DBStorage.get_active_version(hit.db_post)
 
-    languages =
-      for c <- Enum.sort_by(contents, & &1.language) do
-        %{
-          "code" => c.language,
-          "title" => c.title,
-          "head" => String.slice(c.content || "", 0, @head_chars),
-          "body_bytes" => byte_size(c.content || ""),
-          "public_path" => Map.get(paths, c.language)
-        }
-      end
-
-    raw_html =
-      for c <- contents, f <- Enum.take(TextScan.scan(c.content || "")["findings"], 20) do
-        %{
-          "language" => c.language,
-          "kind" => f["kind"],
-          "line" => f["line"],
-          "fragment" => f["fragment"]
-        }
-      end
+    languages = Presenter.goes_live_languages(contents, paths)
 
     warnings =
       for c <- contents, String.trim(c.content || "") == "" do
@@ -123,7 +87,7 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
       "goes_live" => %{"version" => version.version_number, "languages" => languages},
       "archived" => previous && %{"version" => previous.version_number},
       "scheduled_until" => scheduled_until(hit.db_post),
-      "contains_raw_html" => raw_html,
+      "contains_raw_html" => Presenter.raw_html(contents),
       "warnings" => warnings
     }
 

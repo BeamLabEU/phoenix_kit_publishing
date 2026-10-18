@@ -169,6 +169,24 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
     is_binary(title) and String.trim(title) != "" and title != Constants.default_title()
   end
 
+  @doc "The content row of the primary language, if the version has one."
+  def primary_row(contents),
+    do: Enum.find(contents, &(&1.language == LanguageHelpers.get_primary_language()))
+
+  # The module's own check rolls the transaction back with a bare atom; checking up front gives
+  # the caller a reason and keeps a refused publish out of the failed-mutation log.
+  @doc "`:ok`, or the handler error `title_required` when `primary_title_ok?/1` is false."
+  def require_primary_title(version) do
+    if primary_title_ok?(version),
+      do: :ok,
+      else:
+        Common.invalid(
+          "version",
+          "the primary-language title is empty or the default title",
+          "title_required"
+        )
+  end
+
   # --- handler errors for failed resolutions (shared by every tool) ---------------------------
 
   @doc "Handler error for a failed `resolve_post/2`: `{:ok, hit}` passes through."

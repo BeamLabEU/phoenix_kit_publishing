@@ -109,4 +109,20 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashPostsTest do
                "status" => "trashed"
              })
   end
+
+  test "the preview lists no public paths for a post that is scheduled ahead: nothing resolves yet" do
+    ts = Fx.group!(mode: "timestamp")
+    p = Fx.post!(ts["slug"], %{title: "Soon"})
+    Fx.body!(ts["slug"], p[:uuid], "x")
+
+    {:ok, _} =
+      ApiCase.call("publishing.schedule_post", %{
+        "post" => %{"id" => p[:uuid]},
+        "publish_at" => "#{Date.utc_today() |> Date.add(10)}T09:30"
+      })
+
+    assert {:preview, %{"rows" => [row]}, _} = trash([%{"id" => p[:uuid]}], %{dry_run?: true})
+    assert row["changes"]["status"] == %{"from" => "scheduled", "to" => "trashed"}
+    assert row["public_paths"] == []
+  end
 end
