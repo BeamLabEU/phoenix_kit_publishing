@@ -23,7 +23,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
 
   @spec all() :: [PhoenixKit.API.Tool.t()]
   def all do
-    [list_groups(), get_group_settings_schema()]
+    [list_groups(), get_group_settings_schema(), list_posts()]
   end
 
   defp list_groups do
@@ -56,6 +56,25 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       input_schema: Schemas.get_group_settings_schema(),
       output_schema: Schemas.get_group_settings_schema_output(),
       handler: {PhoenixKit.Modules.Publishing.API.GetGroupSettingsSchema, :call},
+      annotations: %{read_only: true, idempotent: true}
+    )
+  end
+
+  defp list_posts do
+    Tool.new!(
+      name: "publishing.list_posts",
+      audience: :admin,
+      scope: "publishing.posts:read",
+      permission: @permission,
+      title: "List posts",
+      description:
+        "Lists the posts of one group, paginated. status is all (default, not trashed), published (live now), " <>
+          "scheduled (live but dated ahead), draft or trashed. category_id limits the list to a category and its " <>
+          "subtree. limit defaults to 20 and is trimmed to 100; next_cursor is opaque, pass it back as cursor. " <>
+          "A timestamp-mode post has no slug: address it by the id of its row.",
+      input_schema: Schemas.list_posts(),
+      output_schema: Schemas.list_posts_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.ListPosts, :call},
       annotations: %{read_only: true, idempotent: true}
     )
   end

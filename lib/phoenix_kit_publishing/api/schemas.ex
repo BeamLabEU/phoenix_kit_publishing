@@ -58,6 +58,30 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  # --- post reads -------------------------------------------------------------------------
+
+  def list_posts do
+    object(
+      %{
+        "group" => row_text(200),
+        "status" => %{"type" => "string", "enum" => ~w(all published scheduled draft trashed)},
+        "category_id" => %{"type" => "string", "maxLength" => 200},
+        "limit" => %{"type" => "integer", "minimum" => 1},
+        "cursor" => %{"type" => "string", "maxLength" => 300}
+      },
+      ["group"]
+    )
+  end
+
+  def list_posts_output do
+    object_output(%{
+      "posts" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "count" => %{"type" => "integer"},
+      "next_cursor" => %{"type" => ["string", "null"]},
+      "warnings" => warnings_output()
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end
