@@ -138,7 +138,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   defp hour_minute(nil), do: nil
   defp hour_minute(%Time{} = time), do: Calendar.strftime(time, "%H:%M")
 
-  defp title_row(contents) do
+  @doc "The content row whose title stands for the post: the primary language's, else the first titled one."
+  def title_row(contents) do
     primary = LanguageHelpers.get_primary_language()
 
     Enum.find(contents, &(&1.language == primary)) ||

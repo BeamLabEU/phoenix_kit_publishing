@@ -3,9 +3,11 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashPostsTest do
 
   import PhoenixKitPublishing.ActivityLogAssertions
 
+  alias Ecto.Adapters.SQL
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
+  alias PhoenixKitPublishing.Test.Repo
 
   setup do
     Fx.languages!()
@@ -124,5 +126,80 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashPostsTest do
     assert {:preview, %{"rows" => [row]}, _} = trash([%{"id" => p[:uuid]}], %{dry_run?: true})
     assert row["changes"]["status"] == %{"from" => "scheduled", "to" => "trashed"}
     assert row["public_paths"] == []
+  end
+
+  test "the preview of an already-trashed post and of a post in a trashed group: row actions, nothing written",
+       ctx do
+    {:ok, _} = trash([Fx.ref(ctx.draft)])
+    other = Fx.group!()
+    stuck = Fx.post!(other["slug"], %{title: "Stuck", slug: "stuck"})
+    {:ok, _} = Groups.trash_group(other["slug"])
+    before = Fx.table_state()
+
+    assert {:preview, %{"rows" => [already, group_trashed, live], "summary" => summary}, _} =
+             trash([Fx.ref(ctx.draft), Fx.ref(stuck), Fx.ref(ctx.live)], %{dry_run?: true})
+
+    assert Fx.table_state() == before
+    assert already["action"] == "unchanged" and already["id"] == ctx.draft[:uuid]
+    assert group_trashed["action"] == "error"
+    assert group_trashed["error"]["code"] == "group_trashed"
+    assert live["action"] == "removed"
+    assert summary["unchanged"] == 1 and summary["removed"] == 1
+  end
+
+  test "the fingerprint follows which rows are errors and which refs they carry", ctx do
+    preview = fn refs ->
+      assert {:preview, _, fingerprint} = trash(refs, %{dry_run?: true})
+      fingerprint
+    end
+
+    live = Fx.ref(ctx.live)
+    missing = %{"id" => Ecto.UUID.generate()}
+
+    by_code = [preview.([%{}, live]), preview.([missing, live])]
+    assert length(Enum.uniq(by_code)) == 2
+
+    by_ref = [preview.([missing, live]), preview.([%{"id" => Ecto.UUID.generate()}, live])]
+    assert length(Enum.uniq(by_ref)) == 2
+
+    assert preview.([missing, live]) == preview.([missing, live])
+  end
+
+  test "the title of a preview row is the primary-language title, not the first language by code",
+       ctx do
+    Fx.translation!(ctx.g["slug"], ctx.live[:uuid], "de-DE", "Lebendig", "Inhalt")
+
+    assert {:preview, %{"rows" => [row]}, _} = trash([Fx.ref(ctx.live)], %{dry_run?: true})
+    assert row["title"] == "Live"
+    assert row["languages"] == ["de-DE", "en-US"]
+  end
+
+  test "a post that disappears between the plan and its write is a not_found row; the others still run",
+       ctx do
+    SQL.query!(Repo, """
+    CREATE FUNCTION pg_temp.drop_live_post() RETURNS trigger AS $$
+    BEGIN
+      DELETE FROM phoenix_kit_publishing_posts WHERE uuid = '#{ctx.live[:uuid]}';
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql
+    """)
+
+    SQL.query!(Repo, """
+    CREATE TRIGGER drop_live_post AFTER UPDATE OF trashed_at ON phoenix_kit_publishing_posts
+    FOR EACH ROW WHEN (NEW.uuid = '#{ctx.draft[:uuid]}') EXECUTE FUNCTION pg_temp.drop_live_post()
+    """)
+
+    assert {:ok,
+            %{
+              "results" => [
+                %{"action" => "removed"},
+                %{"action" => "error", "error" => %{"code" => "not_found"}}
+              ],
+              "summary" => %{"removed" => 1, "error" => 1}
+            }} = trash([Fx.ref(ctx.draft), Fx.ref(ctx.live)])
+
+    assert Fx.db_post(ctx.draft[:uuid]).trashed_at != nil
+    assert Fx.db_post(ctx.live[:uuid]) == nil
   end
 end

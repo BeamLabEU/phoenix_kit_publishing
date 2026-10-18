@@ -35,28 +35,7 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashPosts do
   end
 
   defp preview(plan) do
-    entries =
-      Enum.map(plan, fn
-        {kind, ref, hit} when kind in [:trash, :already] -> {kind, ref, hit, PostBatch.shown(hit)}
-        error -> error
-      end)
-
-    rows =
-      Enum.map(entries, fn
-        {:trash, ref, hit, shown} ->
-          Common.row_ok(ref, "removed", hit.db_post.uuid, describe(hit, shown))
-
-        {:already, ref, hit, _shown} ->
-          Common.row_ok(ref, "unchanged", hit.db_post.uuid)
-
-        {:error, _ref, row} ->
-          row
-      end)
-
-    term =
-      for {kind, _ref, hit, {versions, shown_contents}} <- entries,
-          kind in [:trash, :already],
-          do: {kind, Common.post_state(hit.db_post, hit.group, versions, shown_contents)}
+    {rows, term} = plan |> Enum.map(&preview_entry/1) |> Enum.unzip()
 
     Common.preview(
       rows,
@@ -65,6 +44,24 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashPosts do
     )
   end
 
+  # {row, fingerprint term}: the term binds a post's state, and an error row's ref and code.
+  defp preview_entry({:trash, ref, hit}) do
+    {versions, contents} = shown = PostBatch.shown(hit)
+
+    {Common.row_ok(ref, "removed", hit.db_post.uuid, describe(hit, shown)),
+     {:trash, Common.post_state(hit.db_post, hit.group, versions, contents)}}
+  end
+
+  defp preview_entry({:already, ref, hit}) do
+    {versions, contents} = PostBatch.shown(hit)
+
+    {Common.row_ok(ref, "unchanged", hit.db_post.uuid),
+     {:already, Common.post_state(hit.db_post, hit.group, versions, contents)}}
+  end
+
+  defp preview_entry({:error, ref, row}),
+    do: {row, {:error, row["error"]["code"], Common.fingerprint(ref)}}
+
   defp describe(hit, {_versions, contents}) do
     published? = Presenter.status(hit.db_post) == "published"
 
@@ -72,7 +69,7 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashPosts do
       "changes" => %{
         "status" => %{"from" => Presenter.status(hit.db_post), "to" => "trashed"}
       },
-      "title" => contents |> Enum.find(&(&1.title not in [nil, ""])) |> then(&(&1 && &1.title)),
+      "title" => title_of(contents),
       "languages" => contents |> Enum.map(& &1.language) |> Enum.sort(),
       "public_paths" =>
         if(published?,
@@ -80,5 +77,12 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashPosts do
           else: []
         )
     }
+  end
+
+  defp title_of(contents) do
+    case Presenter.title_row(contents) do
+      nil -> nil
+      row -> row.title
+    end
   end
 end
