@@ -298,6 +298,22 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
 
   def trash_posts_output, do: batch_output()
 
+  def restore_posts do
+    object(
+      %{
+        "posts" => %{
+          "type" => "array",
+          "minItems" => 1,
+          "maxItems" => 50,
+          "items" => post_ref()
+        }
+      },
+      ["posts"]
+    )
+  end
+
+  def restore_posts_output, do: batch_output()
+
   @doc "The answer of a batch tool: one row per input row and a count per action."
   def batch_output do
     object_output(%{

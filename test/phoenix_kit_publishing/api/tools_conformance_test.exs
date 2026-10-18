@@ -21,7 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     p5: ~w(upsert_groups trash_groups restore_groups),
     p6: ~w(translate_post)
   ]
-  @phase :p2
+  @phase :p3
 
   # name => {scope, read_only?, max_items, danger kind}. :always | :fn | nil
   @table %{

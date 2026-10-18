@@ -590,6 +590,71 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
+  describe "restore_posts" do
+    setup ctx do
+      {:ok, _} = Publishing.Posts.trash_post(ctx.g["slug"], ctx.post[:uuid])
+      %{token: issue_token(ctx.user, scopes()), input: %{"posts" => [ref(ctx)]}}
+    end
+
+    test "a trashed draft restores at once, without a confirmation", ctx do
+      assert {200, %{"summary" => %{"restored" => 1}}, _} =
+               call_with(ctx.token, "publishing.restore_posts", ctx.input)
+
+      assert Fx.db_post(ctx.post[:uuid]).trashed_at == nil
+    end
+
+    test "a trashed live post asks for a confirmation first; the code restores it", ctx do
+      live = Fx.post!(ctx.g["slug"], %{title: "Live", slug: "live"})
+      Fx.body!(ctx.g["slug"], live[:uuid], "# Live")
+      Fx.publish!(ctx.g["slug"], live[:uuid])
+      {:ok, _} = Publishing.Posts.trash_post(ctx.g["slug"], live[:uuid])
+      input = %{"posts" => [%{"id" => live[:uuid]}]}
+
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"action" => "restored", "becomes_visible" => true}]
+                }
+              }, _} = call_with(ctx.token, "publishing.restore_posts", input)
+
+      assert Fx.db_post(live[:uuid]).trashed_at != nil
+
+      assert {200, %{"summary" => %{"restored" => 1}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.restore_posts",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert Fx.db_post(live[:uuid]).trashed_at == nil
+
+      # The post is out of the trash now, so the call is no longer dangerous: repeating it with
+      # the spent code is a harmless no-op.
+      assert {200, %{"summary" => %{"unchanged" => 1}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.restore_posts",
+                 Map.put(input, "confirm_token", code)
+               )
+    end
+
+    test "a posts:write-only key is refused with 403 and the delete scope", ctx do
+      token = issue_token(ctx.user, ["publishing.posts:write"])
+
+      assert {403,
+              %{
+                "code" => "forbidden",
+                "context" => %{"required_scope" => "publishing.posts:delete"}
+              }, _} = call_with(token, "publishing.restore_posts", ctx.input)
+
+      assert Fx.db_post(ctx.post[:uuid]).trashed_at != nil
+    end
+  end
+
   test "the key scopes this file relies on are declared by the tools" do
     assert MapSet.subset?(
              MapSet.new(~w(publishing.posts:read publishing.posts:write)),

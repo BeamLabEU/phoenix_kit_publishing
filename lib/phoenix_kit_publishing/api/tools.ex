@@ -36,7 +36,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       publish_post(),
       unpublish_post(),
       schedule_post(),
-      trash_posts()
+      trash_posts(),
+      restore_posts()
     ]
   end
 
@@ -310,6 +311,28 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       danger: :always,
       max_items: 50,
       annotations: %{destructive: true, idempotent: true}
+    )
+  end
+
+  defp restore_posts do
+    Tool.new!(
+      name: "publishing.restore_posts",
+      audience: :admin,
+      scope: "publishing.posts:delete",
+      permission: @permission,
+      title: "Restore posts",
+      description:
+        "Restores up to 50 posts from the trash, by id or {group, slug}. A restored post that has a live " <>
+          "version becomes visible again and needs a confirmation; the preview says for each post whether " <>
+          "it becomes visible and what its status will be. A post that is not in the trash answers " <>
+          "unchanged, a post in a trashed group is a group_trashed row (restore the group first), and " <>
+          "the same post twice in one request is an invalid_ref row; one bad row never stops the others.",
+      input_schema: Schemas.restore_posts(),
+      output_schema: Schemas.restore_posts_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.RestorePosts, :call},
+      danger: {PhoenixKit.Modules.Publishing.API.Danger, :restore_posts},
+      max_items: 50,
+      annotations: %{idempotent: true}
     )
   end
 

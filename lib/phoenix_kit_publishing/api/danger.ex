@@ -43,6 +43,21 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
     guard(fn -> text_dangerous?(input) or live?(input["post"], input["version"], nil) end)
   end
 
+  @doc "restore_posts: any resolved, currently trashed post has an active version (it would become visible); unprovable means true."
+  def restore_posts(input, _ctx) do
+    guard(fn -> input["posts"] |> List.wrap() |> Enum.any?(&restore_dangerous?/1) end)
+  end
+
+  defp restore_dangerous?(ref) do
+    case Refs.resolve_post(ref, include_trashed: true) do
+      {:ok, %{db_post: db_post}} ->
+        db_post.trashed_at != nil and db_post.active_version_uuid != nil
+
+      _unresolvable ->
+        true
+    end
+  end
+
   @doc false
   def live?(ref, version_number, requested_slug) do
     case Refs.resolve_post(ref, include_trashed: true) do
