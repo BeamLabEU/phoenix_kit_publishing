@@ -15,17 +15,31 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
       doc = generate()
       refute String.contains?(doc, "<"), "generator bug (seed #{@seed}, doc #{n})"
 
-      refute TextScan.dangerous?(doc),
-             "generator produced a dangerous document (seed #{@seed}, doc #{n}): #{inspect(doc)}"
+      if TextScan.dangerous?(doc) do
+        flunk(
+          "generator produced a dangerous document (seed #{@seed}, doc #{n}): #{inspect(doc)}"
+        )
+      end
 
       html = render(doc)
-      refute html =~ ~r/<script/i, failure(n, doc, html)
-      refute html =~ ~r/\son[a-z]+\s*=/i, failure(n, doc, html)
-      refute html =~ ~r/(javascript|vbscript|data):/i, failure(n, doc, html)
+      check_html(n, doc, html)
+    end
+  end
 
-      for [_, url] <- Regex.scan(~r/(?:href|src)="([^"]*)"/i, html) do
-        assert safe_url?(url), failure(n, doc, html) <> " url=" <> url
-      end
+  # The messages are built only when an assertion fails.
+  defp check_html(n, doc, html) do
+    if html =~ ~r/<script/i, do: flunk("<script in output. " <> failure(n, doc, html))
+
+    if html =~ ~r/\son[a-z]+\s*=/i,
+      do: flunk("event attribute in output. " <> failure(n, doc, html))
+
+    # Deliberately strict: it matches the scheme words anywhere in the output, not only in
+    # a URL, so a piece must never put them in plain text (e.g. "metadata:").
+    if html =~ ~r/(javascript|vbscript|data):/i,
+      do: flunk("active scheme in output. " <> failure(n, doc, html))
+
+    for [_, url] <- Regex.scan(~r/(?:href|src)="([^"]*)"/i, html) do
+      if not safe_url?(url), do: flunk("unsafe url=" <> url <> ". " <> failure(n, doc, html))
     end
   end
 
@@ -70,10 +84,46 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
     "---",
     "***",
     "Hard  \nbreak",
-    "word&nbsp;word"
+    "word&nbsp;word",
+    "[c]: mailto:x@y.z\n[c2]: tel:+123456789",
+    "[call](tel:+123456789) and [mailto](mailto:a@b.c) and [c]",
+    "[proto](//example.com/x) and [rel](../up/x.md) and [frag](#anchor)",
+    "para text\n[adj]: https://example.com/adj\n[adj]",
+    "[amp](https://h/?a=1&amp;b=2) and [dec](https://h/&#47;x)",
+    "![alt](https://h/i.png \"title\") [t](/p 'title')",
+    "https://h/p?a=1&b=2#frag, www.example.com/p. (https://h/paren)",
+    "1) paren list\n2) second",
+    "+ plus\n+ list\n\n* star\n* list",
+    "Setext\n======\n\nSub\n---",
+    "- a\n\n  para in item\n\n  > quote in item\n\n      code in item",
+    "| a |\n|:-:|\n| `x \\| y` |",
+    "\u00e9\u00fc \u4e2d\u6587 \u{1F600} \u200b zero width"
   ]
 
+  # No brackets, parentheses or colons: junk must not form a link or a definition by itself
+  # (the rule rejects those fail-closed), but it may sit next to the pieces that do.
+  @junk_chars ~c"abcXYZ 019!@#$%^&*_+-={};'\",.>?/\\|~`\t"
+
+  defp junk do
+    count = :rand.uniform(30)
+    for _ <- 1..count, into: "", do: <<Enum.random(@junk_chars)>>
+  end
+
+  defp piece do
+    case :rand.uniform(10) do
+      1 -> junk()
+      2 -> Enum.random(@pieces) <> " " <> junk()
+      _ -> Enum.random(@pieces)
+    end
+  end
+
+  defp separator, do: Enum.random(["\n\n", "\n", " ", "\n\n\n"])
+
   defp generate do
-    1..(:rand.uniform(8) + 1) |> Enum.map_join("\n\n", fn _ -> Enum.random(@pieces) end)
+    count = :rand.uniform(8) + 1
+
+    1..count
+    |> Enum.map(fn _ -> piece() end)
+    |> Enum.reduce(fn next, acc -> acc <> separator() <> next end)
   end
 end
