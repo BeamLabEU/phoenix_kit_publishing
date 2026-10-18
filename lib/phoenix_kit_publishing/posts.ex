@@ -358,6 +358,11 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     * `:source_id` — passed to the publish broadcast, so the sender can
       ignore its own message.
     * `:skip_broadcast` — do not broadcast the update.
+    * `:locked_check` — `fn locked_post, version -> :ok | {:error, term}`. Runs
+      inside the transaction, after the post row lock and the fresh version
+      read, before the slug is resolved. `{:error, reason}` rolls the save back
+      and is returned as `{:error, reason}`; if the post row is gone the answer
+      is `{:error, :not_found}` and the hook does not run. It must not raise.
   """
   @spec update_post(String.t(), map(), map(), map() | keyword()) ::
           {:ok, map()} | {:error, any()}
@@ -370,7 +375,9 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       |> Shared.get_option(:scope)
       |> Shared.audit_metadata(:update)
 
-    result = update_post_in_db(group_slug, post, params, audit_meta)
+    locked_check = Shared.get_option(opts_map, :locked_check)
+
+    result = update_post_in_db(group_slug, post, params, audit_meta, locked_check)
 
     case result do
       {:ok, updated_post} ->
@@ -1106,7 +1113,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   # Updates a post in the database.
   # Writes title + content to the content row, version-level metadata to version.data.
-  defp update_post_in_db(group_slug, post, params, audit_meta) do
+  defp update_post_in_db(group_slug, post, params, audit_meta, locked_check) do
     db_post = find_db_post_for_update(group_slug, post)
 
     cond do
@@ -1114,7 +1121,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         {:error, :not_found}
 
       post[:mode] in @timestamp_modes || db_post.mode == "timestamp" ->
-        do_update_post_in_db(db_post, post, params, group_slug, nil, audit_meta)
+        do_update_post_in_db(db_post, post, params, group_slug, nil, audit_meta, locked_check)
 
       true ->
         # The slug used to be written here, before the transaction below — so a
@@ -1123,7 +1130,16 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         # old URL had already stopped working, and the redirect that would have
         # covered it is recorded by the part that rolled back.
         desired_slug = Map.get(params, "slug", post.slug)
-        do_update_post_in_db(db_post, post, params, group_slug, desired_slug, audit_meta)
+
+        do_update_post_in_db(
+          db_post,
+          post,
+          params,
+          group_slug,
+          desired_slug,
+          audit_meta,
+          locked_check
+        )
     end
   rescue
     e ->
@@ -1197,7 +1213,15 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  defp do_update_post_in_db(db_post, post, params, group_slug, desired_slug, audit_meta) do
+  defp do_update_post_in_db(
+         db_post,
+         post,
+         params,
+         group_slug,
+         desired_slug,
+         audit_meta,
+         locked_check
+       ) do
     version_number = post[:version] || 1
     version = DBStorage.get_version(db_post.uuid, version_number)
 
@@ -1224,7 +1248,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         audit_meta: audit_meta,
         legacy_promotions: legacy_promotions,
         desired_slug: desired_slug,
-        group_slug: group_slug
+        group_slug: group_slug,
+        locked_check: locked_check
       }
 
       with :ok <- validate_title_for_publish(language, new_status, new_title),
@@ -1253,10 +1278,15 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       # and the version.data merge below read-modify-wrote a
       # pre-transaction snapshot — parallel AI translation jobs lost each
       # other's tags and legacy promotions.
-      DBStorage.lock_post_row!(repo, ctx.db_post.uuid)
+      locked = DBStorage.lock_post_row!(repo, ctx.db_post.uuid)
 
       # Fresh read under the lock — the caller's struct predates it.
       version = DBStorage.get_version_by_uuid(version.uuid) || version
+
+      case run_locked_check(ctx.locked_check, locked, version) do
+        :ok -> :ok
+        {:error, reason} -> repo.rollback(reason)
+      end
 
       with {:ok, final_slug} <- resolve_slug_in_tx(ctx),
            :ok <-
@@ -1277,6 +1307,12 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       end
     end)
   end
+
+  # `fun` is the optional :locked_check hook (see update_post/4). A nil lock with a hook
+  # means the post row is gone; the hook never runs on a missing row.
+  defp run_locked_check(nil, _locked, _version), do: :ok
+  defp run_locked_check(_fun, nil, _version), do: {:error, :not_found}
+  defp run_locked_check(fun, locked, version) when is_function(fun, 2), do: fun.(locked, version)
 
   # Timestamp-mode posts have no slug to move; slug-mode ones rename here so
   # the rename shares the fate of everything else in the save.
