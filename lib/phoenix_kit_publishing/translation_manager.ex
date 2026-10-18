@@ -130,7 +130,8 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
           "post_uuid" => post_uuid,
           "language" => language_code,
           "version" => version
-        }
+        },
+        opts
       )
     end
 
@@ -146,7 +147,8 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
             "post_uuid" => post_uuid,
             "language" => language_code,
             "reason" => ActivityLog.reason_string(reason)
-          }
+          },
+          opts
         )
 
       _ ->

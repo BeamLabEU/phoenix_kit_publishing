@@ -199,7 +199,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
             "group_slug" => group_slug,
             "slug" => post[:slug],
             "mode" => to_string(post[:mode] || "")
-          }
+          },
+          opts
         )
 
         result
@@ -210,7 +211,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
           ActivityLog.actor_uuid(opts),
           "publishing_post",
           nil,
-          %{"group_slug" => group_slug}
+          %{"group_slug" => group_slug},
+          opts
         )
 
         other
@@ -387,7 +389,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
             "group_slug" => group_slug,
             "slug" => updated_post[:slug] || post[:slug],
             "language" => updated_post[:language] || post[:language]
-          }
+          },
+          opts_map
         )
 
       _ ->
@@ -400,7 +403,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
             "group_slug" => group_slug,
             "slug" => post[:slug],
             "language" => post[:language]
-          }
+          },
+          opts_map
         )
     end
 
@@ -485,7 +489,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
           ActivityLog.actor_uuid(opts),
           "publishing_post",
           post_uuid,
-          %{"group_slug" => group_slug, "reason" => "not_found"}
+          %{"group_slug" => group_slug, "reason" => "not_found"},
+          opts
         )
 
         {:error, :not_found}
@@ -501,7 +506,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
               ActivityLog.actor_uuid(opts),
               "publishing_post",
               db_post.uuid,
-              %{"group_slug" => group_slug, "slug" => db_post.slug}
+              %{"group_slug" => group_slug, "slug" => db_post.slug},
+              opts
             )
 
             {:ok, post_uuid}
@@ -512,7 +518,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
               ActivityLog.actor_uuid(opts),
               "publishing_post",
               db_post.uuid,
-              %{"group_slug" => group_slug, "slug" => db_post.slug}
+              %{"group_slug" => group_slug, "slug" => db_post.slug},
+              opts
             )
 
             {:error, reason}
@@ -535,7 +542,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
           ActivityLog.actor_uuid(opts),
           "publishing_post",
           post_uuid,
-          %{"group_slug" => group_slug, "reason" => "not_found"}
+          %{"group_slug" => group_slug, "reason" => "not_found"},
+          opts
         )
 
         {:error, :not_found}
@@ -552,7 +560,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
               ActivityLog.actor_uuid(opts),
               "publishing_post",
               db_post.uuid,
-              %{"group_slug" => group_slug, "slug" => db_post.slug}
+              %{"group_slug" => group_slug, "slug" => db_post.slug},
+              opts
             )
 
             {:ok, post_uuid}
@@ -563,7 +572,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
               ActivityLog.actor_uuid(opts),
               "publishing_post",
               db_post.uuid,
-              %{"group_slug" => group_slug, "slug" => db_post.slug}
+              %{"group_slug" => group_slug, "slug" => db_post.slug},
+              opts
             )
 
             {:error, reason}
