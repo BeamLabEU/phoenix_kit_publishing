@@ -3,10 +3,11 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
   # Tool `publishing.schedule_post` (spec §9.11): publish at a future time in a timestamp-mode group.
 
   alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, LanguageHelpers, Posts, Versions}
-  alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
+  alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs, TextScan}
 
   @tool "publishing.schedule_post"
   @format ~r/\A(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})\z/
+  @head_chars 300
 
   @spec call(map(), map()) ::
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
@@ -17,7 +18,8 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
          :ok <- timestamp_group(hit.group),
          {:ok, version} <-
            Refs.resolve_version(hit.db_post, input["version"], :write) |> Refs.version_error(),
-         :ok <- Common.check_revision(input, hit.db_post, version, primary_row(version)),
+         contents = DBStorage.list_contents(version.uuid),
+         :ok <- Common.check_revision(input, hit.db_post, version, primary_row(contents)),
          :ok <- future(date, time),
          same? = same_slot?(hit.db_post, date, time),
          :ok <- free(hit, date, time, same?),
@@ -25,9 +27,14 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
       live? = hit.db_post.active_version_uuid == version.uuid
 
       cond do
-        Map.get(ctx, :dry_run?, false) -> preview(input, hit, version, date, time, same?, live?)
-        same? and live? -> {:ok, answer("unchanged", input, hit, version)}
-        true -> execute(input, hit, version, date, time, same?, ctx)
+        Map.get(ctx, :dry_run?, false) ->
+          preview(input, hit, version, contents, date, time, same?, live?)
+
+        same? and live? ->
+          {:ok, answer("unchanged", input, hit, version)}
+
+        true ->
+          execute(input, hit, version, same?, ctx)
       end
     end
   end
@@ -48,12 +55,8 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
 
   defp parse(_other), do: Common.invalid("publish_at", "must be a string")
 
-  defp primary_row(version),
-    do:
-      Enum.find(
-        DBStorage.list_contents(version.uuid),
-        &(&1.language == LanguageHelpers.get_primary_language())
-      )
+  defp primary_row(contents),
+    do: Enum.find(contents, &(&1.language == LanguageHelpers.get_primary_language()))
 
   defp timestamp_group(%{mode: "timestamp"}), do: :ok
 
@@ -74,10 +77,15 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
          )
   end
 
-  defp same_slot?(db_post, date, time) do
-    db_post.post_date == date and db_post.post_time != nil and
-      db_post.post_time.hour == time.hour and db_post.post_time.minute == time.minute
-  end
+  defp same_slot?(db_post, date, time), do: current_stamp(db_post) == stamp(date, time)
+
+  defp stamp(%Date{} = date, %Time{} = time),
+    do: Date.to_iso8601(date) <> "T" <> Calendar.strftime(time, "%H:%M")
+
+  defp current_stamp(%{post_date: %Date{} = date, post_time: %Time{} = time}),
+    do: stamp(date, time)
+
+  defp current_stamp(_db_post), do: nil
 
   defp free(_hit, _date, _time, true), do: :ok
 
@@ -100,11 +108,9 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
 
   # --- write: two non-atomic steps ----------------------------------------------------------
 
-  defp execute(input, hit, version, date, time, same?, ctx) do
-    publish_at = Date.to_iso8601(date) <> "T" <> Calendar.strftime(time, "%H:%M")
-
-    with :ok <- move(hit, version, publish_at, same?, ctx),
-         :ok <- publish(hit, version, ctx) do
+  defp execute(input, hit, version, same?, ctx) do
+    with :ok <- move(hit, version, input["publish_at"], same?, ctx),
+         :ok <- publish(hit, version, same?, ctx) do
       {:ok, answer("scheduled", input, hit, version)}
     end
   end
@@ -130,7 +136,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
     end
   end
 
-  defp publish(hit, version, ctx) do
+  defp publish(hit, version, same?, ctx) do
     case Versions.publish_version(
            hit.group.slug,
            hit.db_post.uuid,
@@ -138,28 +144,24 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
            Common.write_opts(ctx, @tool)
          ) do
       :ok -> :ok
+      {:error, reason} when same? -> Common.error(reason)
       {:error, reason} -> rollback(hit, version, ctx, Common.error(reason))
     end
   end
 
-  # Best effort: put the old date and time back, logged like the other API writes. A post that was
-  # already on the slot never moved, so there is nothing to undo.
+  # Best effort: put the old date and time back, logged like the other API writes. Only reached
+  # when step 1 moved the post; a post that was already on the slot never moved.
   defp rollback(hit, version, ctx, error) do
-    original = hit.db_post
-
-    case old_stamp(original) do
+    case current_stamp(hit.db_post) do
       nil ->
         with_left_behind(error)
 
-      stamp ->
-        if set_date(hit, version, stamp, ctx) == :ok, do: error, else: with_left_behind(error)
+      old ->
+        if set_date(hit, version, old <> ":00Z", ctx) == :ok,
+          do: error,
+          else: with_left_behind(error)
     end
   end
-
-  defp old_stamp(%{post_date: %Date{} = date, post_time: %Time{} = time}),
-    do: Date.to_iso8601(date) <> "T" <> Calendar.strftime(time, "%H:%M") <> ":00Z"
-
-  defp old_stamp(_db_post), do: nil
 
   defp with_left_behind({:error, code, message, context}),
     do: {:error, code, message, Map.put(context, :left_behind, ["date", "time"])}
@@ -182,27 +184,59 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
     }
   end
 
-  defp preview(input, hit, version, date, time, same?, live?) do
+  defp preview(input, hit, version, contents, date, time, same?, live?) do
     previous = if live?, do: nil, else: DBStorage.get_active_version(hit.db_post)
 
     row = %{
       "action" => if(same? and live?, do: "unchanged", else: "schedule"),
       "version" => version.version_number,
+      "from" => current_stamp(hit.db_post),
       "publish_at" => input["publish_at"],
       "time_zone" => Constants.site_tz(),
       "public_url_changes_with_date" => not same?,
       "archived" => previous && %{"version" => previous.version_number},
-      "disappears_until" =>
-        if(hit.db_post.active_version_uuid != nil and not same?,
-          do: input["publish_at"],
-          else: nil
-        )
+      "disappears_until" => if(visible_now?(hit.db_post), do: input["publish_at"], else: nil),
+      "goes_live" => %{"version" => version.version_number, "languages" => languages(contents)},
+      "contains_raw_html" => raw_html(contents)
     }
 
     term =
-      {:schedule_post, Common.post_state(hit.db_post, hit.group, [version], []),
-       version.version_number, Date.to_iso8601(date), Calendar.strftime(time, "%H:%M")}
+      {:schedule_post, Common.post_state(hit.db_post, hit.group, [version], contents),
+       version.version_number, stamp(date, time)}
 
     Common.preview([row], %{"requires_confirmation" => true}, term)
+  end
+
+  # Live and not already waiting for a future date: only then does rescheduling hide the post.
+  defp visible_now?(%{active_version_uuid: nil}), do: false
+
+  defp visible_now?(db_post) do
+    not Constants.scheduled_ahead?(%{
+      mode: db_post.mode,
+      date: db_post.post_date,
+      time: db_post.post_time
+    })
+  end
+
+  defp languages(contents) do
+    for c <- Enum.sort_by(contents, & &1.language) do
+      %{
+        "code" => c.language,
+        "title" => c.title,
+        "head" => String.slice(c.content || "", 0, @head_chars),
+        "body_bytes" => byte_size(c.content || "")
+      }
+    end
+  end
+
+  defp raw_html(contents) do
+    for c <- contents, f <- Enum.take(TextScan.scan(c.content || "")["findings"], 20) do
+      %{
+        "language" => c.language,
+        "kind" => f["kind"],
+        "line" => f["line"],
+        "fragment" => f["fragment"]
+      }
+    end
   end
 end

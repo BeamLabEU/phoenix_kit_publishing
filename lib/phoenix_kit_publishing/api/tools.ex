@@ -278,8 +278,10 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "and must be later than now; the minute must be free (another post, also a trashed one, holding " <>
           "it answers slot_taken). The post's date and time move to publish_at, so its public URL " <>
           "changes with its date, and a post that is live now disappears until then. version defaults " <>
-          "to the highest draft. Always needs a confirmation; the preview says all of this. Repeating " <>
-          "the call is safe: a post already scheduled for that minute answers unchanged.",
+          "to the highest draft. Always needs a confirmation; the preview says all of this and shows the " <>
+          "text that goes live. Repeating the call is safe when it names the same version: a post " <>
+          "already scheduled for that minute answers unchanged (without version, the default draft " <>
+          "no longer exists after a success).",
       input_schema: Schemas.schedule_post(),
       output_schema: Schemas.schedule_post_output(),
       handler: {PhoenixKit.Modules.Publishing.API.SchedulePost, :call},

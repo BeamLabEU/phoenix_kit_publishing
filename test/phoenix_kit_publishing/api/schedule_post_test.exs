@@ -4,7 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
   import Ecto.Query, only: [from: 2]
   import PhoenixKitPublishing.ActivityLogAssertions
 
-  alias PhoenixKit.Modules.Publishing.{Constants, Groups, Posts, PublishingContent}
+  alias PhoenixKit.Modules.Publishing.{Constants, Groups, Posts, PublishingContent, Versions}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
@@ -101,8 +101,9 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
     end
   end
 
-  # Runs `fun` once, right after step 1 (the first activity row of the call), in the calling process.
-  defp after_step_one(fun) do
+  # Runs `fun` once, right after the first query of `source` (nil: any) matching `pattern`, in the
+  # calling process.
+  defp after_query(pattern, source, fun) do
     flag = make_ref()
     handler = "schedule-#{System.unique_integer([:positive])}"
 
@@ -110,7 +111,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
       handler,
       TestRepo.config()[:telemetry_prefix] ++ [:query],
       fn _event, _measurements, meta, _config ->
-        if meta.source == "phoenix_kit_activities" and meta.query =~ ~r/^INSERT/ and
+        if (source == nil or meta.source == source) and meta.query =~ pattern and
              Process.get(flag) == nil do
           Process.put(flag, true)
           fun.()
@@ -121,6 +122,9 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
 
     on_exit(fn -> :telemetry.detach(handler) end)
   end
+
+  # Right after step 1 (the first activity row of the call).
+  defp after_step_one(fun), do: after_query(~r/^INSERT/, "phoenix_kit_activities", fun)
 
   defp stamp(ctx) do
     db = Fx.db_post(ctx.post[:uuid])
@@ -171,6 +175,57 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
 
     assert row["public_url_changes_with_date"] == true and row["disappears_until"] == at(10) and
              row["time_zone"] == Constants.site_tz()
+  end
+
+  test "a live post that already waits for a future date does not disappear; the preview shows the old stamp",
+       ctx do
+    assert {:ok, %{"action" => "scheduled"}} = schedule(ctx, at(10))
+
+    assert {:preview, %{"rows" => [row]}, _} =
+             schedule(ctx, at(11), %{"version" => 1}, %{dry_run?: true})
+
+    assert row["disappears_until"] == nil and row["from"] == at(10)
+  end
+
+  test "the preview shows the text that goes live and a body change changes the fingerprint",
+       ctx do
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "line one\n<b>stored html</b>")
+
+    assert {:preview, %{"rows" => [row]}, first} = schedule(ctx, at(10), %{}, %{dry_run?: true})
+
+    assert %{"goes_live" => %{"version" => 1, "languages" => [language]}} = row
+    assert language["head"] =~ "line one" and language["body_bytes"] > 0
+    assert [%{"language" => "en-US", "kind" => "html"} | _] = row["contains_raw_html"]
+
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "<script>alert(1)</script>")
+    assert {:preview, %{"rows" => [row2]}, second} = schedule(ctx, at(10), %{}, %{dry_run?: true})
+
+    assert first != second
+    assert hd(row2["goes_live"]["languages"])["head"] =~ "<script>"
+  end
+
+  test "a failing publish step on a post that already sits on the slot undoes nothing", ctx do
+    assert {:ok, %{"action" => "scheduled"}} = schedule(ctx, at(10))
+    {:ok, _} = Versions.create_new_version(ctx.g["slug"], ctx.post, %{}, %{})
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "second", 2)
+    v2 = Fx.version(ctx.post[:uuid], 2)
+    old = stamp(ctx)
+    updates = fn -> Enum.count(list_activities(), &(&1.action == "publishing.post.updated")) end
+    n = updates.()
+
+    # The publish locks the post row first; the title is emptied right after, before it is checked.
+    after_query(~r/FOR UPDATE/, "phoenix_kit_publishing_posts", fn ->
+      TestRepo.update_all(from(c in PublishingContent, where: c.version_uuid == ^v2.uuid),
+        set: [title: ""]
+      )
+    end)
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "title_required"}]} = context} =
+             schedule(ctx, at(10), %{"version" => 2})
+
+    refute Map.has_key?(context, :left_behind)
+    assert stamp(ctx) == old
+    assert updates.() == n
   end
 
   test "a trashed post and a trashed group are refused; if_revision is checked", ctx do
