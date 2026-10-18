@@ -370,6 +370,63 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     assert [%{"path" => "category_ids", "reason" => "unknown_category"}] = errors
   end
 
+  describe "publish_post" do
+    test "always answers confirmation_required first; the code publishes once", ctx do
+      token = issue_token(ctx.user, scopes())
+      input = %{"post" => ref(ctx)}
+
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"goes_live" => %{"version" => 1}}]
+                }
+              }, _} = call_with(token, "publishing.publish_post", input)
+
+      assert Fx.db_post(ctx.post[:uuid]).active_version_uuid == nil
+
+      assert {200, %{"action" => "published", "version" => 1}, _} =
+               call_with(token, "publishing.publish_post", Map.put(input, "confirm_token", code))
+
+      assert Fx.db_post(ctx.post[:uuid]).active_version_uuid ==
+               Fx.version(ctx.post[:uuid]).uuid
+
+      assert {409, %{"context" => %{"reason" => "used"}}, _} =
+               call_with(token, "publishing.publish_post", Map.put(input, "confirm_token", code))
+    end
+
+    test "a posts:write-only key is refused with 403 and the publish scope", ctx do
+      token = issue_token(ctx.user, ["publishing.posts:write"])
+
+      assert {403,
+              %{
+                "code" => "forbidden",
+                "context" => %{"required_scope" => "publishing.posts:publish"}
+              }, _} = call_with(token, "publishing.publish_post", %{"post" => ref(ctx)})
+
+      assert Fx.db_post(ctx.post[:uuid]).active_version_uuid == nil
+    end
+
+    test "the code is refused with reason changed after a content row of the version changed",
+         ctx do
+      token = issue_token(ctx.user, scopes())
+      input = %{"post" => ref(ctx)}
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(token, "publishing.publish_post", input)
+
+      Fx.body!(ctx.g["slug"], ctx.post[:uuid], "someone else edited", 1)
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(token, "publishing.publish_post", Map.put(input, "confirm_token", code))
+
+      assert Fx.db_post(ctx.post[:uuid]).active_version_uuid == nil
+    end
+  end
+
   test "the key scopes this file relies on are declared by the tools" do
     assert MapSet.subset?(
              MapSet.new(~w(publishing.posts:read publishing.posts:write)),

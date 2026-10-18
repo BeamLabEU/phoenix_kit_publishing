@@ -32,7 +32,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       create_post(),
       update_post(),
       create_version(),
-      set_translation()
+      set_translation(),
+      publish_post()
     ]
   end
 
@@ -218,6 +219,26 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       output_schema: Schemas.set_translation_output(),
       handler: {PhoenixKit.Modules.Publishing.API.SetTranslation, :call},
       danger: {PhoenixKit.Modules.Publishing.API.Danger, :set_translation},
+      annotations: %{idempotent: true}
+    )
+  end
+
+  defp publish_post do
+    Tool.new!(
+      name: "publishing.publish_post",
+      audience: :admin,
+      scope: "publishing.posts:publish",
+      permission: @permission,
+      title: "Publish a post",
+      description:
+        "Makes a version the live one: the highest draft by default, or any existing version (a rollback " <>
+          "to an archived one). Always needs a confirmation; the preview lists the languages that go live " <>
+          "with the first 300 characters of each body, the version that is archived, any HTML in the " <>
+          "stored text, and an empty-language warning. A version already live answers unchanged.",
+      input_schema: Schemas.publish_post(),
+      output_schema: Schemas.publish_post_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.PublishPost, :call},
+      danger: :always,
       annotations: %{idempotent: true}
     )
   end

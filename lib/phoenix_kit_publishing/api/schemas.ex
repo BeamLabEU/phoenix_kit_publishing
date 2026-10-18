@@ -229,6 +229,25 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def publish_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "if_revision" => row_text(100)
+      },
+      ["post"]
+    )
+  end
+
+  def publish_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end
