@@ -8,7 +8,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
   #   3. each function body is wrapped in `guard/1`, `rescue _ -> true`.
   # The per-tool functions are added by the task that adds the tool.
 
-  alias PhoenixKit.Modules.Publishing.API.TextScan
+  alias PhoenixKit.Modules.Publishing.API.{Refs, TextScan}
+  alias PhoenixKit.Modules.Publishing.DBStorage
 
   @doc false
   def guard(fun) when is_function(fun, 0) do
@@ -21,6 +22,74 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
 
   @doc "create_post: the text rule on `content` only (a new post has no live version)."
   def create_post(input, _ctx), do: guard(fn -> text_dangerous?(input) end)
+
+  @doc """
+  update_post: the text rule on `content`; OR the post is not trashed, has an active version and
+  the target version is the active one or has status published / archived; OR `slug` is given,
+  differs from the current slug and the post has an active version (the rename moves the live
+  URL even when the written version is a draft). Unprovable means true.
+  """
+  def update_post(input, _ctx) do
+    guard(fn ->
+      text_dangerous?(input) or live?(input["post"], input["version"], input["slug"])
+    end)
+  end
+
+  @doc """
+  set_translation: the text rule on `content`; OR the post is not trashed, has an active version
+  and the target version is the active one or has status published / archived (no slug clause).
+  """
+  def set_translation(input, _ctx) do
+    guard(fn -> text_dangerous?(input) or live?(input["post"], input["version"], nil) end)
+  end
+
+  @doc false
+  def live?(ref, version_number, requested_slug) do
+    case Refs.resolve_post(ref, include_trashed: true) do
+      {:ok, %{db_post: %{trashed_at: nil} = db_post}} ->
+        case Refs.resolve_version(db_post, version_number, :write) do
+          {:ok, version} -> live_condition(db_post, version, requested_slug)
+          _unprovable -> true
+        end
+
+      {:ok, _trashed} ->
+        false
+
+      _unresolvable ->
+        true
+    end
+  end
+
+  @doc """
+  The live-version condition on two FRESH rows (the post row returned by the lock and the
+  re-read version): used by the handler's recheck and by the `:locked_check` closure.
+  """
+  def live_condition(locked_post, version, requested_slug) do
+    locked_post.active_version_uuid != nil and
+      (version.uuid == locked_post.active_version_uuid or
+         version.status in ["published", "archived"] or
+         (is_binary(requested_slug) and requested_slug != locked_post.slug))
+  end
+
+  @doc """
+  The recheck just before the write, on fresh rows, for unconfirmed calls only. A condition that
+  became true is `revision_mismatch` with the reason `went_live`.
+  """
+  def recheck(db_post, version, requested_slug, ctx) do
+    if Map.get(ctx, :confirmation_uuid) == nil do
+      fresh_post = DBStorage.get_post_by_uuid(db_post.uuid)
+      fresh_version = DBStorage.get_version_by_uuid(version.uuid)
+
+      if fresh_post && fresh_version && live_condition(fresh_post, fresh_version, requested_slug),
+        do:
+          {:error, :revision_mismatch,
+           "The version went live; repeat the call to get a confirmation.",
+           %{reason: "went_live"}},
+        else: :ok
+    else
+      :ok
+    end
+  end
 
   @doc false
   # `null` content means "clear": the empty text is not dangerous. Any other non-string fails closed.

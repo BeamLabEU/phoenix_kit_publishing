@@ -29,7 +29,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       list_posts(),
       get_post(),
       list_categories(),
-      create_post()
+      create_post(),
+      update_post()
     ]
   end
 
@@ -146,6 +147,32 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       handler: {PhoenixKit.Modules.Publishing.API.CreatePost, :call},
       danger: {PhoenixKit.Modules.Publishing.API.Danger, :create_post},
       annotations: %{idempotent: false}
+    )
+  end
+
+  defp update_post do
+    Tool.new!(
+      name: "publishing.update_post",
+      audience: :admin,
+      scope: "publishing.posts:write",
+      permission: @permission,
+      title: "Update a post",
+      description:
+        "Edits ONE version of a post in ONE language; it never publishes and never renames unless slug is " <>
+          "sent. version defaults to the highest draft; language defaults to the primary language and must " <>
+          "already have text (use set_translation to add a language). description, seo_title, excerpt, " <>
+          "featured_image_id, featured, sitemap_exclude and category_ids apply to every language of the " <>
+          "version (language de with description also changes English); title, content and og_* are per " <>
+          "language; slug is post-level. null clears a text field; an absent field is kept. Tags come from " <>
+          "#hashtags in the body and cannot be set. Edits to the live or an archived version, a slug change " <>
+          "on a live post, and body text with HTML, components, post links or link destinations other than " <>
+          "http, https, mailto or tel need a confirmation: send dry_run first and confirm the preview. " <>
+          "if_revision is the revision of get_post.",
+      input_schema: Schemas.update_post(),
+      output_schema: Schemas.update_post_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.UpdatePost, :call},
+      danger: {PhoenixKit.Modules.Publishing.API.Danger, :update_post},
+      annotations: %{idempotent: true}
     )
   end
 

@@ -147,6 +147,43 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def update_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "language" => row_text(20),
+        "if_revision" => row_text(200),
+        "title" => nullable_text(500),
+        "content" => nullable_text(2_097_152),
+        "description" => nullable_text(5000),
+        "seo_title" => nullable_text(5000),
+        "excerpt" => nullable_text(5000),
+        "featured_image_id" => nullable_text(200),
+        "featured" => %{"type" => "boolean"},
+        "sitemap_exclude" => %{"type" => "boolean"},
+        "og_title" => nullable_text(5000),
+        "og_description" => nullable_text(5000),
+        "og_image_id" => nullable_text(200),
+        "category_ids" => %{
+          "type" => "array",
+          "maxItems" => 50,
+          "items" => %{"type" => "string", "maxLength" => 200}
+        },
+        "slug" => row_text(200)
+      },
+      ["post"]
+    )
+  end
+
+  def update_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "post" => %{"type" => "object"},
+      "changed" => %{"type" => "array", "items" => %{"type" => "object"}}
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end
