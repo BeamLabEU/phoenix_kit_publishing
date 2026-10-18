@@ -35,7 +35,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       set_translation(),
       publish_post(),
       unpublish_post(),
-      schedule_post()
+      schedule_post(),
+      trash_posts()
     ]
   end
 
@@ -287,6 +288,28 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       handler: {PhoenixKit.Modules.Publishing.API.SchedulePost, :call},
       danger: :always,
       annotations: %{idempotent: true}
+    )
+  end
+
+  defp trash_posts do
+    Tool.new!(
+      name: "publishing.trash_posts",
+      audience: :admin,
+      scope: "publishing.posts:delete",
+      permission: @permission,
+      title: "Trash posts",
+      description:
+        "Moves up to 50 posts to the trash; restore_posts brings them back, and a live post keeps its " <>
+          "live version, so a restore shows the same text again. Always needs a confirmation; the preview " <>
+          "lists each post's title, languages and the public paths that stop resolving. A post already " <>
+          "in the trash answers unchanged. The same post twice in one request is an invalid_ref row; one " <>
+          "bad row never stops the others.",
+      input_schema: Schemas.trash_posts(),
+      output_schema: Schemas.trash_posts_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.TrashPosts, :call},
+      danger: :always,
+      max_items: 50,
+      annotations: %{destructive: true, idempotent: true}
     )
   end
 

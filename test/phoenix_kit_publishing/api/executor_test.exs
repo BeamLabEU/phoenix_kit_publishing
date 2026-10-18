@@ -540,6 +540,56 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
+  describe "trash_posts" do
+    setup ctx do
+      %{token: issue_token(ctx.user, scopes()), input: %{"posts" => [ref(ctx)]}}
+    end
+
+    test "always answers confirmation_required, even for one draft post; the code trashes once",
+         ctx do
+      assert {200,
+              %{
+                "executed" => false,
+                "status" => "confirmation_required",
+                "confirm_token" => code,
+                "preview" => %{
+                  "requires_confirmation" => true,
+                  "rows" => [%{"action" => "removed"}]
+                }
+              }, _} = call_with(ctx.token, "publishing.trash_posts", ctx.input)
+
+      assert Fx.db_post(ctx.post[:uuid]).trashed_at == nil
+
+      assert {200, %{"summary" => %{"removed" => 1}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.trash_posts",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert Fx.db_post(ctx.post[:uuid]).trashed_at != nil
+
+      assert {409, %{"context" => %{"reason" => "used"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.trash_posts",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+    end
+
+    test "a posts:write-only key is refused with 403 and the delete scope", ctx do
+      token = issue_token(ctx.user, ["publishing.posts:write"])
+
+      assert {403,
+              %{
+                "code" => "forbidden",
+                "context" => %{"required_scope" => "publishing.posts:delete"}
+              }, _} = call_with(token, "publishing.trash_posts", ctx.input)
+
+      assert Fx.db_post(ctx.post[:uuid]).trashed_at == nil
+    end
+  end
+
   test "the key scopes this file relies on are declared by the tools" do
     assert MapSet.subset?(
              MapSet.new(~w(publishing.posts:read publishing.posts:write)),

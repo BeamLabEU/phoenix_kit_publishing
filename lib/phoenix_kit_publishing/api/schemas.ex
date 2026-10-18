@@ -282,6 +282,30 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def trash_posts do
+    object(
+      %{
+        "posts" => %{
+          "type" => "array",
+          "minItems" => 1,
+          "maxItems" => 50,
+          "items" => post_ref()
+        }
+      },
+      ["posts"]
+    )
+  end
+
+  def trash_posts_output, do: batch_output()
+
+  @doc "The answer of a batch tool: one row per input row and a count per action."
+  def batch_output do
+    object_output(%{
+      "results" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "summary" => %{"type" => "object"}
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end
