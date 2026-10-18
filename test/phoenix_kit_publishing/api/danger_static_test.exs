@@ -44,11 +44,35 @@ defmodule PhoenixKit.Modules.Publishing.API.DangerStaticTest do
       source = File.read!(path)
 
       refute source =~
-               ~r/DBStorage\.(create|update|delete|insert|upsert|set|trash|restore|publish|archive)[a-z_]*\(/,
+               ~r/DBStorage\.(create|update|delete|insert|upsert|set|trash|restore|publish|archive|lock)[a-z_!]*\(/,
              "#{path}: DBStorage write"
 
-      refute source =~ ~r/repo\(\)\.(insert|update|delete)[a-z_!]*\(/, "#{path}: Repo write"
+      refute source =~ ~r/repo\(\)\.(insert|update|delete|transaction)[a-z_!]*\(/,
+             "#{path}: Repo write"
+
       refute source =~ ~r/ListingCache|PubSub|Phoenix\.PubSub/, "#{path}: cache or pubsub"
+    end
+  end
+
+  test "api/ runs raw SQL only as a named SELECT statement" do
+    for path <- Path.wildcard("lib/phoenix_kit_publishing/api/**/*.ex") do
+      source = File.read!(path)
+
+      for [_all, first_arg] <- Regex.scan(~r/\.query!?\(\s*([^,)\s]+)/, source) do
+        assert first_arg == "sql", "#{path}: query called with #{first_arg}, not a named sql"
+      end
+
+      if source =~ ~r/\.query!?\(/ do
+        statements = Regex.scan(~r/\bsql =\s*(?:"""\s*|")\s*(\w+)/, source)
+        assert statements != [], "#{path}: no sql statement found to check"
+
+        for [_all, verb] <- statements,
+            do:
+              assert(
+                String.upcase(verb) in ["SELECT", "WITH"],
+                "#{path}: sql starts with #{verb}"
+              )
+      end
     end
   end
 end
