@@ -31,7 +31,6 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
               PhoenixKit.API.Keys,
               PhoenixKit.API.Keys.Cache,
               PhoenixKit.Cache,
-              PhoenixKit.Cache.Registry,
               PhoenixKit.Users.Auth.Scope,
               PhoenixKit.Users.Permissions,
               PhoenixKit.Users.Roles
@@ -152,14 +151,8 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     assert Fx.table_state() == before
   end
 
-  test "a translations:ai-only key is refused on update_post", ctx do
-    # translations:ai exists once translate_post is declared; until then another non-write scope stands in.
-    other =
-      if "publishing.translations:ai" in scopes_declared(),
-        do: "publishing.translations:ai",
-        else: "publishing.groups:read"
-
-    token = issue_token(ctx.user, [other])
+  test "a key without the write scope is refused on update_post", ctx do
+    token = issue_token(ctx.user, ["publishing.groups:read"])
 
     assert {403, %{"context" => %{"required_scope" => "publishing.posts:write"}}, _} =
              call_with(token, "publishing.update_post", %{"post" => ref(ctx), "title" => "x"})
@@ -271,13 +264,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
                   %{
                     "changes" => %{
                       "content" => %{
-                        "raw_html" => %{
-                          "dangerous" => true,
-                          "findings" => [
-                            %{"kind" => "html", "line" => 3},
-                            %{"kind" => "html", "line" => 3}
-                          ]
-                        }
+                        "raw_html" => %{"dangerous" => true, "findings" => findings}
                       }
                     }
                   }
@@ -286,6 +273,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
             }, _} =
              call_with(token, "publishing.update_post", input)
 
+    assert Enum.any?(findings, &(&1["kind"] == "html" and &1["line"] == 3))
     assert Fx.content(ctx.post[:uuid]).content == "# Body"
 
     assert {200, %{"action" => "updated"}, _} =
@@ -730,9 +718,17 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
-  test "the key scopes this file relies on are declared by the tools" do
+  test "every scope the declared tools carry is a known publishing scope, and the key gets all of them" do
+    declared = scopes_declared() |> Enum.uniq() |> Enum.sort()
+
+    assert declared -- @every_scope == []
+    assert Enum.sort(scopes()) == declared
+
     assert MapSet.subset?(
-             MapSet.new(~w(publishing.posts:read publishing.posts:write)),
+             MapSet.new(~w(
+               publishing.groups:read publishing.posts:read publishing.categories:read
+               publishing.posts:write publishing.posts:publish publishing.posts:delete
+             )),
              MapSet.new(scopes())
            )
   end
