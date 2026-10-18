@@ -33,7 +33,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       update_post(),
       create_version(),
       set_translation(),
-      publish_post()
+      publish_post(),
+      unpublish_post()
     ]
   end
 
@@ -240,6 +241,26 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       handler: {PhoenixKit.Modules.Publishing.API.PublishPost, :call},
       danger: :always,
       annotations: %{idempotent: true}
+    )
+  end
+
+  defp unpublish_post do
+    Tool.new!(
+      name: "publishing.unpublish_post",
+      audience: :admin,
+      scope: "publishing.posts:publish",
+      permission: @permission,
+      title: "Unpublish a post",
+      description:
+        "Takes the live version down: its public URLs stop resolving and the version returns to draft " <>
+          "(it keeps its published date). Always needs a confirmation; the preview lists the paths that " <>
+          "stop resolving. A post with nothing live is refused with not_published, so a second call is " <>
+          "an error.",
+      input_schema: Schemas.unpublish_post(),
+      output_schema: Schemas.unpublish_post_output(),
+      handler: {PhoenixKit.Modules.Publishing.API.UnpublishPost, :call},
+      danger: :always,
+      annotations: %{destructive: true, idempotent: true}
     )
   end
 

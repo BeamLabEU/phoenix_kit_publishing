@@ -248,6 +248,18 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
     })
   end
 
+  def unpublish_post do
+    object(%{"post" => post_ref()}, ["post"])
+  end
+
+  def unpublish_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
   @doc "An output schema (open: core does not validate answers strictly)."
   def object_output(properties), do: %{"type" => "object", "properties" => properties}
 end
