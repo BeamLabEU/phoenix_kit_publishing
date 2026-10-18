@@ -145,7 +145,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreateVersionTest do
     assert Fx.table_state() == before
   end
 
-  test "a dry run refuses a trashed post and a trashed group like the real call", ctx do
+  test "a dry run refuses a trashed post and a trashed group like the real call" do
     g2 = Fx.group!()
     p2 = Fx.post!(g2["slug"], %{title: "T", slug: "t"})
     {:ok, _} = Posts.trash_post(g2["slug"], p2[:uuid])
