@@ -161,9 +161,9 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     end
   end
 
-  # The literal reason of every `invalid(path, message, reason, ...)` call and the literal code of
-  # every `row_error(ref, code, ...)` call, read from the syntax tree so a comma in the message or
-  # a multi-line call cannot hide one.
+  # The literal reason of every `invalid(path, message, reason, ...)` call, the literal code of
+  # every `row_error(ref, code, ...)` call and of every `{:error, "code", message}` tuple, read from
+  # the syntax tree so a comma in the message or a multi-line call cannot hide one.
   defp call_reasons(source) do
     {:ok, ast} = Code.string_to_quoted(source)
 
@@ -176,6 +176,9 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
         {{:., _, [_module, :invalid]}, _, [_path, _message, reason | _]} = node, acc
         when is_binary(reason) ->
           {node, [reason | acc]}
+
+        {:{}, _, [:error, code, _message]} = node, acc when is_binary(code) ->
+          {node, [code | acc]}
 
         {:row_error, _, [_ref, code | _]} = node, acc when is_binary(code) ->
           {node, [code | acc]}
