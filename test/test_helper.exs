@@ -152,6 +152,16 @@ if repo_available do
   {:ok, _} = PhoenixKitPublishing.Test.DispatchEndpoint.start_link()
 end
 
+# Core's API (keys, rate limits) and `Auth.register_user/2` count hits in the Hammer ETS table
+# this backend owns; without it the table is absent and the executor tests die at
+# `:ets.update_counter/4`.
+if Code.ensure_loaded?(PhoenixKit.Users.RateLimiter.Backend) do
+  case PhoenixKit.Users.RateLimiter.Backend.start_link([]) do
+    {:ok, _} -> :ok
+    {:error, {:already_started, _}} -> :ok
+  end
+end
+
 # Exclude integration tests when DB is not available; the tests that drive a tool through
 # core's executor need a core that has the API.
 exclude =
