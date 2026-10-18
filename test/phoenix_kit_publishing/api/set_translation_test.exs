@@ -5,6 +5,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
 
   import Ecto.Query, only: [from: 2]
 
+  alias PhoenixKit.Modules.Publishing.API.SetTranslation
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts, PublishingContent, Versions}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
@@ -74,7 +75,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     }
 
     assert {:error, :validation_failed, _, %{errors: [%{reason: "empty_translation"}]}} =
-             PhoenixKit.Modules.Publishing.API.SetTranslation.call(input, ApiCase.ctx())
+             SetTranslation.call(input, ApiCase.ctx())
 
     assert Fx.content(ctx.post[:uuid], "de-DE") == nil
   end
@@ -423,7 +424,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     }
 
     assert {:error, :validation_failed, _, %{errors: [%{path: "title"}]}} =
-             PhoenixKit.Modules.Publishing.API.SetTranslation.call(input, ApiCase.ctx())
+             SetTranslation.call(input, ApiCase.ctx())
 
     assert Fx.content(ctx.post[:uuid], "de-DE") == nil
   end
