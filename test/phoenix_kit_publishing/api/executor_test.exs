@@ -1028,6 +1028,24 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
 
       assert group_status(ctx) == "active"
     end
+
+    test "a restore code is refused with reason changed when the group changed in between", ctx do
+      {:ok, _} = Publishing.Groups.trash_group(ctx.g["slug"])
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(ctx.token, "publishing.restore_groups", ctx.input)
+
+      {:ok, _} = Publishing.Groups.update_group(ctx.g["slug"], %{"show_breadcrumbs" => true})
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.restore_groups",
+                 Map.put(ctx.input, "confirm_token", code)
+               )
+
+      assert group_status(ctx) == "trashed"
+    end
   end
 
   describe "delete_categories" do

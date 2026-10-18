@@ -62,33 +62,45 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashGroups do
   end
 
   defp preview(plan) do
+    plan = Enum.map(plan, &with_counts/1)
+
     rows =
       Enum.map(plan, fn
-        {:trash, ref, group} ->
-          posts = DBStorage.list_posts(group.slug)
+        {{:trash, ref, group}, counts} ->
+          Common.row_ok(ref, "removed", group.uuid, counts)
 
-          Common.row_ok(ref, "removed", group.uuid, %{
-            "post_count" => length(posts),
-            "live_posts" => Enum.count(posts, &(&1.active_version_uuid != nil))
-          })
-
-        {:already, ref, group} ->
+        {{:already, ref, group}, _counts} ->
           Common.row_ok(ref, "unchanged", group.uuid)
 
         {:error, _ref, row} ->
           row
       end)
 
-    # The fingerprint binds every entry: a group's state, and the ref and code of an error row
-    # (a group that appears after the preview must not ride in on the old confirmation).
+    # The fingerprint binds every entry: a group's state, the post counts the owner saw, and the
+    # ref and code of an error row (a group that appears after the preview must not ride in on
+    # the old confirmation).
     term = Enum.map(plan, &fingerprint_entry/1)
 
     Common.preview(rows, %{"requires_confirmation" => true}, {:trash_groups, term})
   end
 
+  defp with_counts({:trash, ref, group}) do
+    posts = DBStorage.list_posts(group.slug)
+
+    counts = %{
+      "post_count" => length(posts),
+      "live_posts" => Enum.count(posts, &(&1.active_version_uuid != nil))
+    }
+
+    {{:trash, ref, group}, counts}
+  end
+
+  defp with_counts({:already, ref, group}), do: {{:already, ref, group}, nil}
+  defp with_counts({:error, _ref, _row} = entry), do: entry
+
   defp fingerprint_entry({:error, ref, row}),
     do: {:error, row["error"]["code"], Common.fingerprint(ref)}
 
-  defp fingerprint_entry({kind, _ref, group}),
-    do: {kind, group.uuid, group.status, group.slug, Common.fingerprint(group.data)}
+  defp fingerprint_entry({{kind, _ref, group}, counts}),
+    do: {kind, group.uuid, group.status, group.slug, Common.fingerprint(group.data), counts}
 end

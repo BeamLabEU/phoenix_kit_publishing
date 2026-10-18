@@ -103,8 +103,11 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashRestoreGroupsTest do
     assert Fx.table_state() == before
     {:ok, _} = trash([g["slug"]])
 
-    assert {:preview, %{"requires_confirmation" => true, "rows" => [%{"action" => "restored"}]},
-            _} = restore([g["slug"]], %{dry_run?: true})
+    assert {:preview,
+            %{
+              "requires_confirmation" => true,
+              "rows" => [%{"action" => "restored", "post_count" => 2, "live_posts" => 1}]
+            }, _} = restore([g["slug"]], %{dry_run?: true})
   end
 
   test "the preview fingerprint is stable and binds the group state and the error rows", %{g: g} do
@@ -120,6 +123,40 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashRestoreGroupsTest do
     {:ok, _} = Groups.add_group("Late", slug: "late", mode: "slug")
     assert {:preview, _, appeared} = trash(["late"], dry)
     assert appeared != missing
+  end
+
+  test "the restore fingerprint is stable and binds the group state and the error rows", %{g: g} do
+    dry = %{dry_run?: true}
+    {:ok, _} = trash([g["slug"]])
+    {:preview, _, first} = restore([g["slug"]], dry)
+    assert {:preview, _, ^first} = restore([g["slug"]], dry)
+
+    {:ok, _} = Groups.update_group(g["slug"], %{"show_breadcrumbs" => true})
+    assert {:preview, _, changed} = restore([g["slug"]], dry)
+    assert changed != first
+
+    {:preview, _, missing} = restore(["late"], dry)
+    {:ok, _} = Groups.add_group("Late", slug: "late", mode: "slug")
+    assert {:preview, _, appeared} = restore(["late"], dry)
+    assert appeared != missing
+  end
+
+  test "both fingerprints bind the post counts the owner was shown", %{g: g} do
+    dry = %{dry_run?: true}
+    {:preview, _, trash_before} = trash([g["slug"]], dry)
+    {:ok, _} = trash([g["slug"]])
+    {:preview, _, restore_before} = restore([g["slug"]], dry)
+    {:ok, _} = restore([g["slug"]])
+
+    draft = Fx.post!(g["slug"], %{title: "Late draft", slug: "late-draft"})
+    assert {:preview, _, trash_more} = trash([g["slug"]], dry)
+    assert trash_more != trash_before
+
+    Fx.body!(g["slug"], draft[:uuid], "y")
+    Fx.publish!(g["slug"], draft[:uuid])
+    {:ok, _} = trash([g["slug"]])
+    assert {:preview, _, restore_more} = restore([g["slug"]], dry)
+    assert restore_more != restore_before
   end
 
   test "both tools are always confirmed, in the groups:delete scope" do

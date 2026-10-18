@@ -455,9 +455,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
         "Brings up to 20 publishing groups, each named by slug, back from the trash; the group and its " <>
           "posts become visible on the site again. Always needs a confirmation; the preview lists for " <>
           "each group its post count and how many posts are live. A group that is not in the trash " <>
-          "answers unchanged, a group whose slug was taken by an active group meanwhile a slug_taken row, " <>
-          "an unknown slug a not_found row, the same slug twice an invalid_ref row, and one bad row never " <>
-          "stops the others.",
+          "answers unchanged, an unknown slug a not_found row, the same slug twice an invalid_ref row, " <>
+          "and one bad row never stops the others.",
       input_schema: Schemas.group_refs(),
       output_schema: Schemas.restore_groups_output(),
       handler: {PhoenixKit.Modules.Publishing.API.RestoreGroups, :call},
