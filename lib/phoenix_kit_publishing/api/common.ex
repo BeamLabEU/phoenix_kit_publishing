@@ -7,6 +7,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   import Ecto.Query, only: [from: 2]
 
   alias PhoenixKit.Modules.Publishing.API.TextScan
+  alias PhoenixKit.Modules.Publishing.Errors
 
   alias PhoenixKit.Modules.Publishing.{
     DBStorage,
@@ -53,6 +54,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   defp put_approver(meta, _none), do: meta
 
   @doc "The acting user's full-union scope (created_by / updated_by come from it), or nil when the user is gone."
+  @spec scope(map()) :: Scope.t() | nil
   def scope(ctx) do
     case Auth.get_user(ctx.actor.user_uuid) do
       nil -> nil
@@ -63,6 +65,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   # --- errors ----------------------------------------------------------------------------
 
   @doc "A request-level validation error in the executor's shape; `reason` is this module's convention."
+  @spec invalid(String.t(), String.t(), String.t() | nil, map()) ::
+          {:error, :validation_failed, String.t(), map()}
   def invalid(path, message, reason \\ nil, extra \\ %{}) do
     error = Map.merge(%{path: path, message: message}, extra)
     error = if reason, do: Map.put(error, :reason, reason), else: error
@@ -70,6 +74,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc "A module error as a handler error tuple."
+  @spec error(term()) :: {:error, atom(), String.t(), map()}
   def error(reason) do
     {code, _reason, message, context} = classify(reason)
     {:error, code, message, context}
@@ -89,6 +94,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   reason (nil for none). Unclassified errors are `:internal_error` and the reason is logged,
   never returned.
   """
+  @spec classify(term()) :: {atom(), String.t() | nil, String.t(), map()}
   def classify(reason) when reason in @not_found,
     do: {:not_found, nil, "The record does not exist.", %{}}
 
@@ -118,6 +124,12 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
       {:revision_mismatch, nil, "The version went live; repeat the call to get a confirmation.",
        %{reason: "went_live"}}
 
+  def classify(:locked_check_failed) do
+    require Logger
+    Logger.warning("[Publishing.API] the locked check raised; the write was refused")
+    {:internal_error, nil, "The request could not be completed.", %{}}
+  end
+
   def classify(%Ecto.Changeset{} = changeset) do
     names = constraint_names(changeset)
 
@@ -137,12 +149,28 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   def classify(other) do
     require Logger
 
-    Logger.warning(
-      "[Publishing.API] unclassified error: #{inspect(other, limit: 5, printable_limit: 200)}"
-    )
+    Logger.warning("[Publishing.API] unclassified error: #{log_tag(other)}")
 
     {:internal_error, nil, "The request could not be completed.", %{}}
   end
+
+  # What may be logged about an unknown error: its shape and tag, never its payload (it can hold
+  # request text or an upstream response body).
+  defp log_tag(reason) when is_atom(reason),
+    do: Errors.truncate_for_log(Atom.to_string(reason), 80)
+
+  defp log_tag(reason) when is_tuple(reason) and tuple_size(reason) > 0 do
+    case elem(reason, 0) do
+      tag when is_atom(tag) -> "{" <> Errors.truncate_for_log(Atom.to_string(tag), 80) <> ", ...}"
+      _other -> "tuple"
+    end
+  end
+
+  defp log_tag(%module{}), do: "%" <> Errors.truncate_for_log(inspect(module), 80) <> "{}"
+  defp log_tag(reason) when is_binary(reason), do: "string"
+  defp log_tag(reason) when is_map(reason), do: "map"
+  defp log_tag(reason) when is_list(reason), do: "list"
+  defp log_tag(_reason), do: "term"
 
   defp reasoned(reason, message),
     do:
@@ -167,16 +195,27 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc ~S|A changeset's errors as `[%{path: field, message: text}]`, options interpolated, never `inspect`.|
+  @spec changeset_errors(Ecto.Changeset.t()) :: [%{path: String.t(), message: String.t()}]
   def changeset_errors(%Ecto.Changeset{} = changeset) do
     changeset
     |> Ecto.Changeset.traverse_errors(&interpolate_error/1)
-    |> Enum.flat_map(fn {field, messages} ->
-      messages
-      |> List.wrap()
-      |> List.flatten()
-      |> Enum.map(&%{path: to_string(field), message: &1})
-    end)
+    |> flatten_errors(nil)
   end
+
+  # Nested embeds and associations give maps (and lists of maps) of messages; the path of a
+  # nested error is the dotted field chain.
+  defp flatten_errors(errors, path) when is_map(errors) do
+    Enum.flat_map(errors, fn {field, value} -> flatten_errors(value, join_path(path, field)) end)
+  end
+
+  defp flatten_errors(errors, path) when is_list(errors),
+    do: Enum.flat_map(errors, &flatten_errors(&1, path))
+
+  defp flatten_errors(message, path) when is_binary(message),
+    do: [%{path: path || "", message: message}]
+
+  defp join_path(nil, field), do: to_string(field)
+  defp join_path(path, field), do: path <> "." <> to_string(field)
 
   defp interpolate_error({message, opts}) do
     Regex.replace(~r"%{(\w+)}", message, fn _, key ->
@@ -191,9 +230,13 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   the write would surface as a 500), at most `:max` bytes (`:reason` names the reason of the
   over-long case, e.g. "content_too_large"). `nil` passes.
   """
+  @spec check_text(String.t(), term(), keyword()) ::
+          :ok | {:error, :validation_failed, String.t(), map()}
   def check_text(_path, nil, _opts), do: :ok
 
   def check_text(path, value, opts) when is_binary(value) do
+    max = Keyword.get(opts, :max, TextScan.max_body_bytes())
+
     cond do
       not String.valid?(value) ->
         invalid(path, "must be valid UTF-8 text")
@@ -201,13 +244,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
       String.contains?(value, <<0>>) ->
         invalid(path, "must not contain a NUL byte")
 
-      byte_size(value) > Keyword.get(opts, :max, TextScan.max_body_bytes()) ->
-        invalid(
-          path,
-          "is longer than #{Keyword.get(opts, :max)} bytes",
-          Keyword.get(opts, :reason),
-          %{limit: Keyword.get(opts, :max)}
-        )
+      byte_size(value) > max ->
+        invalid(path, "is longer than #{max} bytes", Keyword.get(opts, :reason), %{limit: max})
 
       true ->
         :ok
@@ -218,9 +256,11 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   # --- batch rows and previews -----------------------------------------------------------
 
+  @spec row_ok(term(), String.t(), term(), map()) :: map()
   def row_ok(ref, action, id, extra \\ %{}),
     do: Map.merge(%{"ref" => ref, "action" => action, "id" => id}, extra)
 
+  @spec row_error(term(), atom() | String.t(), String.t(), map()) :: map()
   def row_error(ref, code, message, context \\ %{}),
     do: %{
       "ref" => ref,
@@ -229,14 +269,24 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     }
 
   @doc "A batch row error from a module error: the row's code is the reason when there is one, else the core code."
+  @spec row_from_error(term(), term()) :: map()
   def row_from_error(ref, reason) do
     {code, why, message, context} = classify(reason)
-    row_error(ref, why || code, message, stringify(Map.delete(context, :errors)))
+    {errors, context} = Map.pop(context, :errors, [])
+
+    context =
+      if why == nil and errors != [],
+        do: Map.put(context, :errors, Enum.map(errors, &stringify/1)),
+        else: context
+
+    row_error(ref, why || code, message, stringify(context))
   end
 
   defp stringify(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
 
+  @spec summary([map()]) :: %{optional(String.t() | nil) => pos_integer()}
   def summary(rows), do: Enum.frequencies_by(rows, & &1["action"])
+  @spec batch_result([map()]) :: {:ok, map()}
   def batch_result(rows), do: {:ok, %{"results" => rows, "summary" => summary(rows)}}
 
   @doc """
@@ -244,12 +294,14 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   The fingerprint covers `fingerprint_term` when given (state plus hashes of the new values: it
   must never depend on the diff text, spec §9.12) and the rows otherwise.
   """
+  @spec preview([map()], map(), term()) :: {:preview, map(), String.t()}
   def preview(rows, extra \\ %{}, fingerprint_term \\ nil),
     do:
       {:preview, Map.merge(extra, %{"rows" => rows, "summary" => summary(rows)}),
        fingerprint(fingerprint_term || rows)}
 
   @doc "The state of a post a tool depends on (spec §9.12): feeds the fingerprint of the post tools."
+  @spec post_state(map(), map() | nil, [map()], [map()]) :: tuple()
   def post_state(db_post, group, versions, contents) do
     {db_post.uuid, db_post.slug, db_post.trashed_at, db_post.active_version_uuid,
      db_post.post_date, db_post.post_time, group && group.status,
@@ -258,16 +310,20 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc "Adds the NAMES (never the values) of the changed fields to the API log metadata."
+  @spec put_log_fields(keyword(), [String.t()]) :: keyword()
   def put_log_fields(opts, names),
     do: Keyword.update!(opts, :log_metadata, &Map.put(&1, "fields", names))
 
   @doc "A safe string for an error reason inside an answer: atoms by name, anything else a fixed word. Never `inspect`."
+  @spec reason_text(term()) :: String.t()
   def reason_text(reason) when is_atom(reason), do: Atom.to_string(reason)
   def reason_text(_reason), do: "failed"
 
-  @doc "The `if_revision` check (spec §9.12): the `revision` string of get_post must still be current."
+  @doc "The `if_revision` check (spec §9.12): the `revision` string of get_post must still be current. A value that is not that string (any other type) never matches."
+  @spec check_revision(map(), map(), map() | nil, map() | nil) ::
+          :ok | {:error, :revision_mismatch, String.t(), map()}
   def check_revision(%{"if_revision" => expected}, db_post, version, content)
-      when is_binary(expected) do
+      when not is_nil(expected) do
     current = post_revision(db_post, version, content)
 
     if current == expected,
@@ -280,6 +336,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   def check_revision(_input, _db_post, _version, _content), do: :ok
 
   @doc "`SlugHelpers.validate_slug/1` as a handler error whose path is `path` (reasons: invalid_slug, reserved_language_code, reserved_route_word)."
+  @spec validate_slug(term(), String.t()) ::
+          {:ok, String.t()} | {:error, atom(), String.t(), map()}
   def validate_slug(slug, path \\ "slug") do
     case SlugHelpers.validate_slug(slug) do
       {:ok, slug} ->
@@ -295,6 +353,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   The og_* params of a write (F9): when ANY of og_title / og_description / og_image_id is present all
   three are sent, the unspecified ones taken from the current og of `content_row`; null clears.
   """
+  @spec og_params(map(), map() | nil) :: map()
   def og_params(input, content_row) do
     keys = ~w(og_title og_description og_image_id)
 
@@ -314,20 +373,25 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   defp og_value(input, key, current),
     do: if(Map.has_key?(input, key), do: input[key] || "", else: current || "")
 
+  @spec with_warnings(map(), list()) :: map()
   def with_warnings(body, []), do: body
   def with_warnings(body, warnings), do: Map.put(body, "warnings", warnings)
 
   @doc "64 lowercase hex characters (core's cap). `updated_at` is never an input."
+  @spec fingerprint(term()) :: String.t()
   def fingerprint(term), do: sha256(:erlang.term_to_binary(term, [:deterministic]))
+  @spec sha256(binary()) :: String.t()
   def sha256(binary), do: :sha256 |> :crypto.hash(binary) |> Base.encode16(case: :lower)
 
   @doc ~S|A content row's digest; the length prefix keeps ("ab", "c") and ("a", "bc") apart.|
+  @spec digest(String.t() | nil, String.t() | nil) :: String.t()
   def digest(title, content) do
     title = title || ""
     sha256(Integer.to_string(byte_size(title)) <> ":" <> title <> (content || ""))
   end
 
   @doc "The `if_revision` value (spec §9.4): values only, never `updated_at`."
+  @spec post_revision(map(), map() | nil, map() | nil) :: String.t()
   def post_revision(db_post, version, content) do
     fingerprint({
       db_post.uuid,
@@ -345,6 +409,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   # --- strict reads (they raise on a database error, spec §8) -----------------------------
 
   @doc "All categories of a group in the module's order. The query of Categories.list_categories/1 WITHOUT its rescue."
+  @spec categories!(String.t()) :: [PublishingCategory.t()]
   def categories!(group_slug) do
     from(c in PublishingCategory,
       join: g in PublishingGroup,
@@ -356,6 +421,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc "`[{category, depth}]` in tree order, computed in memory over `categories!/1` (the algorithm of Categories.list_tree/1)."
+  @spec category_tree!(String.t()) :: [{PublishingCategory.t(), non_neg_integer()}]
   def category_tree!(group_slug) do
     categories = categories!(group_slug)
     by_parent = Enum.group_by(categories, & &1.parent_uuid)
@@ -387,6 +453,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc "Published-post counts per category: the query of Categories.published_post_counts/1 WITHOUT its rescue."
+  @spec published_post_counts!(String.t()) :: %{optional(String.t()) => pos_integer()}
   def published_post_counts!(group_slug) do
     from(p in PublishingPost,
       join: g in PublishingGroup,
@@ -407,11 +474,14 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc "`%{category_uuid => number of versions of the group that name it}`, one query for all uuids."
+  @spec filed_versions_counts!(String.t(), [String.t()]) :: %{
+          optional(String.t()) => pos_integer()
+        }
   def filed_versions_counts!(_group_slug, []), do: %{}
 
   def filed_versions_counts!(group_slug, uuids) do
     sql = """
-    SELECT c.uuid_text, count(*)
+    SELECT c.uuid_text, count(DISTINCT v.uuid)
     FROM phoenix_kit_publishing_versions v
     JOIN phoenix_kit_publishing_posts p ON p.uuid = v.post_uuid
     JOIN phoenix_kit_publishing_groups g ON g.uuid = p.group_uuid,
@@ -425,17 +495,27 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc "`false`, or `{true, :live | :trashed}`. Raises on a database error, unlike SlugHelpers.slug_exists?/2 (F21)."
+  @spec slug_taken?(String.t(), String.t()) :: false | {true, :live | :trashed}
   def slug_taken?(group_slug, slug) do
     cond do
       DBStorage.get_post(group_slug, slug) ->
         {true, :live}
 
-      Enum.any?(DBStorage.list_posts(group_slug, "trashed"), &(&1.slug == slug)) ->
+      trashed_slug?(group_slug, slug) ->
         {true, :trashed}
 
       true ->
         false
     end
+  end
+
+  defp trashed_slug?(group_slug, slug) do
+    from(p in PublishingPost,
+      join: g in PublishingGroup,
+      on: g.uuid == p.group_uuid,
+      where: g.slug == ^group_slug and p.slug == ^slug and not is_nil(p.trashed_at)
+    )
+    |> repo().exists?()
   end
 
   # --- the :locked_check closure (spec §8) -------------------------------------------------
@@ -444,8 +524,10 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   The hook `Posts.update_post/4` runs under the post row lock. `live_fun.(locked_post, version)`
   recomputes the live-version condition of spec §8 from the two fresh rows. A trashed locked row
   is refused whatever the confirmation; an unconfirmed, non-dry call is refused with `:went_live`
-  when the condition now holds; any exception fails closed.
+  unless the function answers exactly `false` (any doubtful answer counts as live); any exception
+  or throw fails closed.
   """
+  @spec locked_check(map(), (map(), map() -> term())) :: (map(), map() -> :ok | {:error, atom()})
   def locked_check(ctx, live_fun) do
     confirmed? = Map.get(ctx, :confirmation_uuid) != nil
     dry? = Map.get(ctx, :dry_run?, false)
@@ -454,8 +536,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
       try do
         cond do
           locked.trashed_at != nil -> {:error, :post_trashed}
-          not confirmed? and not dry? and live_fun.(locked, version) -> {:error, :went_live}
-          true -> :ok
+          confirmed? or dry? -> :ok
+          live_fun.(locked, version) == false -> :ok
+          true -> {:error, :went_live}
         end
       rescue
         _ -> {:error, :locked_check_failed}
@@ -478,6 +561,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   sizes, hashes, head, tail, the bounded line diff, and facts computed over the WHOLE new body
   (`added_urls`, `raw_html`), because a coarse or truncated diff can miss a harmful hunk.
   """
+  @spec content_change(String.t(), String.t()) :: map()
   def content_change(old, new) do
     %{
       "scope" => "language",
@@ -508,34 +592,63 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     do: new |> hosts() |> MapSet.difference(hosts(old)) |> Enum.sort() |> Enum.take(50)
 
   @doc ~S|A unified line diff, bounded (see spec §9.12): `%{"mode", "text", "hunks", "truncated"}` (+ line counts when coarse).|
+  @spec line_diff(String.t(), String.t()) :: map()
   def line_diff(old, new) do
-    old_lines = String.split(old, "\n")
-    new_lines = String.split(new, "\n")
+    old_lines = split_lines(old)
+    new_lines = split_lines(new)
     {prefix, old_rest, new_rest} = common_prefix(old_lines, new_lines, 0)
     {suffix, rev_old, rev_new} = common_prefix(Enum.reverse(old_rest), Enum.reverse(new_rest), 0)
     old_mid = Enum.reverse(rev_old)
     new_mid = Enum.reverse(rev_new)
+    before = old_lines |> Enum.take(prefix) |> Enum.take(-@context)
+    after_ = if suffix == 0, do: [], else: old_lines |> Enum.take(-suffix) |> Enum.take(@context)
+    first_line = prefix - length(before) + 1
 
     cond do
       old_mid == [] and new_mid == [] ->
         line_result([])
 
-      old_mid == [] or new_mid == [] or
-          (length(old_mid) <= @myers_cap and length(new_mid) <= @myers_cap) ->
-        before = old_lines |> Enum.take(prefix) |> Enum.take(-@context)
-        after_ = old_lines |> Enum.take(-suffix) |> Enum.take(@context)
+      old_mid == [] or new_mid == [] ->
+        line_result([one_sided_hunk(before, old_mid, new_mid, after_, first_line)])
 
+      length(old_mid) <= @myers_cap and length(new_mid) <= @myers_cap ->
         ops =
           Enum.map(before, &{:eq, &1}) ++
-            middle_ops(old_mid, new_mid) ++
-            if(suffix == 0, do: [], else: Enum.map(after_, &{:eq, &1}))
+            middle_ops(old_mid, new_mid) ++ Enum.map(after_, &{:eq, &1})
 
-        ops |> hunks(prefix - length(before) + 1) |> line_result()
+        ops |> hunks(first_line) |> line_result()
 
       true ->
         coarse_result(old_mid, new_mid)
     end
   end
+
+  # An empty body has no lines (String.split("", "\n") is [""], a phantom empty line).
+  defp split_lines(""), do: []
+  defp split_lines(text), do: String.split(text, "\n")
+
+  # A pure insertion or deletion is ONE hunk. Only as many changed lines as can fit the output cap
+  # are built (every line costs at least two bytes), so a body of 260,000 new lines is not
+  # turned into 260,000 strings; the header carries the real counts.
+  defp one_sided_hunk(before, old_mid, new_mid, after_, first_line) do
+    {tag, changed} = if old_mid == [], do: {:ins, new_mid}, else: {:del, old_mid}
+    shown = Enum.take(changed, div(@diff_bytes, 2) + 1)
+
+    entries =
+      Enum.map(before, &{:eq, &1}) ++
+        Enum.map(shown, &{tag, &1}) ++ Enum.map(after_, &{:eq, &1})
+
+    context = length(before) + length(after_)
+    old_len = context + length(old_mid)
+    new_len = context + length(new_mid)
+
+    {"@@ -#{hunk_start(first_line, old_len)},#{old_len} +#{hunk_start(first_line, new_len)},#{new_len} @@",
+     Enum.map(entries, fn {tag, line} -> prefix(tag) <> clip(line) end)}
+  end
+
+  # An empty range is positioned at the line before it (unified diff convention).
+  defp hunk_start(first_line, 0), do: first_line - 1
+  defp hunk_start(first_line, _len), do: first_line
 
   # Both middles are too big for a diff: the edges of each, with the omitted count between.
   defp coarse_result(old_mid, new_mid) do
@@ -565,9 +678,6 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   defp common_prefix([h | a], [h | b], n), do: common_prefix(a, b, n + 1)
   defp common_prefix(a, b, n), do: {n, a, b}
-
-  defp middle_ops([], new), do: Enum.map(new, &{:ins, &1})
-  defp middle_ops(old, []), do: Enum.map(old, &{:del, &1})
 
   defp middle_ops(old, new) do
     old

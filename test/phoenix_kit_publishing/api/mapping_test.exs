@@ -1,6 +1,8 @@
 defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias PhoenixKit.Modules.Publishing.API.Common
 
   # code, reason (nil = none), for each module error of spec §6.6
@@ -64,17 +66,47 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
   end
 
   test "mapped atoms classify as the table says" do
-    for {atom, {code, reason}} <- @mapped do
-      assert {^code, ^reason, _message, _context} = Common.classify(atom), inspect(atom)
-    end
+    capture_log(fn ->
+      for {atom, {code, reason}} <- @mapped do
+        assert {^code, ^reason, _message, _context} = Common.classify(atom), inspect(atom)
+      end
+    end)
+  end
+
+  test "locked_check_failed is mapped by name, not through the catch-all" do
+    log =
+      capture_log(fn ->
+        assert {:internal_error, nil, _, %{}} = Common.classify(:locked_check_failed)
+      end)
+
+    assert log =~ "locked check"
+    refute log =~ "unclassified"
+  end
+
+  test "the log line of an unclassified error names the shape and tag, never the payload" do
+    log =
+      capture_log(fn ->
+        Common.classify({:ai_request_failed, "secret upstream body"})
+        Common.classify("secret string reason")
+        Common.classify(%{secret: "secret map value"})
+        Common.classify(:odd_tag)
+        Common.classify(%ArgumentError{message: "secret struct message"})
+      end)
+
+    refute log =~ "secret"
+    assert log =~ "{ai_request_failed, ...}"
+    assert log =~ "odd_tag"
+    assert log =~ "ArgumentError"
   end
 
   test "unclassified atoms and odd shapes are internal_error, and the reason is never returned" do
-    for reason <- @internal ++ [:something_new, {:publish_failed, :x}, "string", nil, %{}] do
-      assert {:internal_error, nil, message, context} = Common.classify(reason)
-      refute message =~ "something_new"
-      assert context == %{}
-    end
+    capture_log(fn ->
+      for reason <- @internal ++ [:something_new, {:publish_failed, :x}, "string", nil, %{}] do
+        assert {:internal_error, nil, message, context} = Common.classify(reason)
+        refute message =~ "something_new"
+        assert context == %{}
+      end
+    end)
   end
 
   test "went_live carries its reason in the context" do

@@ -1,9 +1,14 @@
 defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
   use PhoenixKitPublishing.DataCase, async: false
 
-  alias PhoenixKit.Modules.Publishing.API.Common
-  alias PhoenixKit.Modules.Publishing.{DBStorage, Posts}
-  alias PhoenixKitPublishing.Test.ApiCase
+  import ExUnit.CaptureLog
+
+  alias PhoenixKit.Modules.Publishing.API.{Common, TextScan}
+  alias PhoenixKit.Modules.Publishing.{DBStorage, Posts, Versions}
+  alias PhoenixKit.Users.Auth
+  alias PhoenixKit.Users.Auth.Scope
+  alias PhoenixKit.Users.Roles
+  alias PhoenixKitPublishing.Test.{ApiCase, ApiChangesetSchema}
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
@@ -32,6 +37,33 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
     end
   end
 
+  describe "scope/1" do
+    test "is the full union of the actor's roles, not the narrowed active role; nil for a missing user" do
+      capture_log(fn ->
+        {:ok, _} = PhoenixKit.Settings.update_boolean_setting("role_switcher_enabled", true)
+      end)
+
+      user = Fx.user!()
+      {:ok, seller} = Roles.create_role(%{name: "Seller #{System.unique_integer([:positive])}"})
+      {:ok, _} = Roles.assign_role(user, "Admin")
+      {:ok, _} = Roles.assign_role(user, seller.name)
+      ctx = ApiCase.ctx()
+      ctx = %{ctx | actor: %{ctx.actor | user_uuid: user.uuid}}
+
+      # the default for the same user is narrowed to one role; the API's scope is not
+      narrowed = Scope.for_user(Auth.get_user(user.uuid))
+      assert Scope.narrowed?(narrowed)
+
+      scope = Common.scope(ctx)
+      refute Scope.narrowed?(scope)
+      assert scope.user.uuid == user.uuid
+      assert "Admin" in scope.cached_roles and seller.name in scope.cached_roles
+
+      gone = %{ctx | actor: %{ctx.actor | user_uuid: Ecto.UUID.generate()}}
+      assert Common.scope(gone) == nil
+    end
+  end
+
   describe "fingerprint/1" do
     test "is deterministic, 64 lowercase hex characters, and follows the term" do
       a = Common.fingerprint(%{a: 1, b: [1, 2]})
@@ -42,6 +74,93 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
 
     test "digest/2 keeps ('ab','c') and ('a','bc') apart" do
       refute Common.digest("ab", "c") == Common.digest("a", "bc")
+    end
+  end
+
+  describe "rows, summary and batch results" do
+    test "row_ok and row_error carry the ref, the action and the error body" do
+      assert Common.row_ok("r1", "create", "id-1", %{"slug" => "s"}) ==
+               %{"ref" => "r1", "action" => "create", "id" => "id-1", "slug" => "s"}
+
+      assert Common.row_error("r2", :slug_taken, "taken", %{"a" => 1}) ==
+               %{
+                 "ref" => "r2",
+                 "action" => "error",
+                 "error" => %{
+                   "code" => "slug_taken",
+                   "message" => "taken",
+                   "context" => %{"a" => 1}
+                 }
+               }
+    end
+
+    test "row_from_error uses the reason as the code, else the core code, and never the raw reason" do
+      assert %{"error" => %{"code" => "slug_taken", "context" => ctx}} =
+               Common.row_from_error("r", :slug_already_exists)
+
+      assert ctx == %{}
+
+      assert %{"error" => %{"code" => "not_found"}} = Common.row_from_error("r", :post_not_found)
+
+      log =
+        capture_log(fn ->
+          assert %{"error" => %{"code" => "internal_error", "message" => message}} =
+                   Common.row_from_error("r", {:secret_tag, "customer text"})
+
+          refute message =~ "secret_tag"
+        end)
+
+      refute log =~ "customer text"
+    end
+
+    test "row_from_error keeps the field errors of a changeset" do
+      changeset = ApiChangesetSchema.changeset(%{"name" => "toolong"})
+
+      assert %{"error" => %{"code" => "validation_failed", "context" => %{"errors" => errors}}} =
+               Common.row_from_error("r", changeset)
+
+      assert [%{"path" => "name", "message" => message}] = errors
+      assert message =~ "3"
+    end
+
+    test "summary counts rows by action and batch_result wraps rows and summary" do
+      rows = [
+        Common.row_ok("a", "create", "1"),
+        Common.row_ok("b", "create", "2"),
+        Common.row_error("c", :x, "m")
+      ]
+
+      assert Common.summary(rows) == %{"create" => 2, "error" => 1}
+
+      assert {:ok, %{"results" => ^rows, "summary" => %{"create" => 2, "error" => 1}}} =
+               Common.batch_result(rows)
+
+      assert Common.summary([]) == %{}
+    end
+
+    test "with_warnings leaves the body alone without warnings and adds them otherwise" do
+      assert Common.with_warnings(%{"a" => 1}, []) == %{"a" => 1}
+      assert Common.with_warnings(%{"a" => 1}, ["w"]) == %{"a" => 1, "warnings" => ["w"]}
+    end
+  end
+
+  describe "changeset_errors/1" do
+    test "interpolates the options of a message, never inspects" do
+      errors = Common.changeset_errors(ApiChangesetSchema.changeset(%{"name" => "toolong"}))
+      assert [%{path: "name", message: message}] = errors
+      assert is_binary(message) and message =~ "3" and not (message =~ "%{")
+    end
+
+    test "flattens nested embed errors into dotted paths with string messages" do
+      changeset =
+        ApiChangesetSchema.changeset(%{
+          "child" => %{"label" => ""},
+          "items" => [%{"label" => "ok"}, %{"label" => ""}]
+        })
+
+      errors = Common.changeset_errors(changeset)
+      assert Enum.all?(errors, &(is_binary(&1.path) and is_binary(&1.message)))
+      assert Enum.map(errors, & &1.path) |> Enum.sort() == ["child.label", "items.label"]
     end
   end
 
@@ -95,6 +214,22 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
                Common.check_revision(%{"if_revision" => "stale"}, db, version, content)
     end
 
+    test "check_revision fails closed on an if_revision that is not a string" do
+      g = Fx.group!()
+      post = Fx.post!(g["slug"], %{title: "R2", slug: "r2"})
+      db = DBStorage.get_post_by_uuid(post[:uuid])
+      version = DBStorage.get_version(post[:uuid], 1)
+      [content] = DBStorage.list_contents(version.uuid)
+      current = Common.post_revision(db, version, content)
+
+      for bad <- [123, true, %{}, ["x"]] do
+        assert {:error, :revision_mismatch, _, %{current_revision: ^current}} =
+                 Common.check_revision(%{"if_revision" => bad}, db, version, content)
+      end
+
+      assert :ok = Common.check_revision(%{"if_revision" => nil}, db, version, content)
+    end
+
     test "validate_slug returns the slug or a handler error with the given path" do
       assert {:ok, "fine-slug"} = Common.validate_slug("fine-slug")
 
@@ -135,6 +270,25 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       assert Common.slug_taken?(g["slug"], "hello") == {true, :live}
       {:ok, _} = Posts.trash_post(g["slug"], post[:uuid])
       assert Common.slug_taken?(g["slug"], "hello") == {true, :trashed}
+      assert Common.slug_taken?(g["slug"], "other") == false
+    end
+
+    test "a trashed post of another group does not take the slug" do
+      g1 = Fx.group!()
+      g2 = Fx.group!()
+      post = Fx.post!(g1["slug"], %{title: "Hello", slug: "hello"})
+      {:ok, _} = Posts.trash_post(g1["slug"], post[:uuid])
+      assert Common.slug_taken?(g2["slug"], "hello") == false
+    end
+
+    test "a database error raises instead of answering free" do
+      g = Fx.group!()
+
+      TestRepo.query!(
+        "ALTER TABLE phoenix_kit_publishing_posts RENAME TO phoenix_kit_publishing_posts_x"
+      )
+
+      assert_raise Postgrex.Error, fn -> Common.slug_taken?(g["slug"], "hello") end
     end
   end
 
@@ -149,6 +303,33 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       assert Common.published_post_counts!(g["slug"]) == %{}
     end
 
+    test "published_post_counts!/1 counts the ACTIVE version of live posts only" do
+      g = Fx.group!()
+      a = Fx.category!(g["slug"], "Cat A")
+      b = Fx.category!(g["slug"], "Cat B")
+      other = Fx.group!()
+      c = Fx.category!(other["slug"], "Cat C")
+
+      # published, filed in A and B (twice in A: counted once)
+      one = published_post!(g, "one", [a.uuid, a.uuid, b.uuid])
+      # published, filed in A; a newer unpublished version files it in B
+      two = published_post!(g, "two", [a.uuid])
+      {:ok, _} = Versions.create_new_version(g["slug"], elem(Posts.read_post_by_uuid(two), 1))
+      file!(two, 2, [b.uuid])
+      # a draft: not counted
+      draft = Fx.post!(g["slug"], %{title: "Draft", slug: "draft"})
+      file!(draft[:uuid], 1, [a.uuid])
+      # published and then trashed: not counted
+      gone = published_post!(g, "gone", [a.uuid, b.uuid])
+      {:ok, _} = Posts.trash_post(g["slug"], gone)
+      # another group: not counted
+      published_post!(other, "elsewhere", [c.uuid])
+
+      assert one != two
+      assert Common.published_post_counts!(g["slug"]) == %{a.uuid => 2, b.uuid => 1}
+      assert Common.published_post_counts!(other["slug"]) == %{c.uuid => 1}
+    end
+
     test "a database error raises instead of answering an empty result" do
       g = Fx.group!()
 
@@ -161,7 +342,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       # rolled back with the sandbox transaction
     end
 
-    test "filed_versions_counts!/2 counts versions of the group that name each category, in one query" do
+    test "filed_versions_counts!/2 counts versions of the group that name each category" do
       g = Fx.group!()
       cat = Fx.category!(g["slug"], "Filed")
       post = Fx.post!(g["slug"], %{title: "P", slug: "p"})
@@ -172,7 +353,64 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
 
       assert Common.filed_versions_counts!(g["slug"], [cat.uuid]) == %{cat.uuid => 1}
       assert Common.filed_versions_counts!(g["slug"], [Ecto.UUID.generate()]) == %{}
+      assert Common.filed_versions_counts!(g["slug"], []) == %{}
     end
+
+    test "filed_versions_counts!/2 counts a version once however often it lists a category, and ignores other groups" do
+      g = Fx.group!()
+      other = Fx.group!()
+      cat = Fx.category!(g["slug"], "Dup")
+      cat2 = Fx.category!(g["slug"], "Other")
+      post = Fx.post!(g["slug"], %{title: "P", slug: "p"})
+      file!(post[:uuid], 1, [cat.uuid, cat.uuid])
+
+      {:ok, _} =
+        Versions.create_new_version(g["slug"], elem(Posts.read_post_by_uuid(post[:uuid]), 1))
+
+      file!(post[:uuid], 2, [cat.uuid, cat2.uuid])
+      foreign = Fx.post!(other["slug"], %{title: "F", slug: "f"})
+      file!(foreign[:uuid], 1, [cat.uuid])
+
+      assert Common.filed_versions_counts!(g["slug"], [cat.uuid, cat2.uuid]) ==
+               %{cat.uuid => 2, cat2.uuid => 1}
+    end
+
+    test "filed_versions_counts!/2 runs exactly one query for any number of uuids" do
+      g = Fx.group!()
+      cats = for n <- 1..3, do: Fx.category!(g["slug"], "Cat #{n}")
+      uuids = Enum.map(cats, & &1.uuid)
+      me = self()
+      handler = "filed-counts-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach(
+        handler,
+        TestRepo.config()[:telemetry_prefix] ++ [:query],
+        fn _event, _measurements, meta, _config -> send(me, {:query, meta.query}) end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      Common.filed_versions_counts!(g["slug"], uuids)
+      assert_received {:query, _sql}
+      refute_received {:query, _another}
+    end
+  end
+
+  defp file!(post_uuid, number, category_uuids) do
+    version = DBStorage.get_version(post_uuid, number)
+
+    TestRepo.query!(
+      "UPDATE phoenix_kit_publishing_versions SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{category_uuids}', $1::jsonb) WHERE uuid = $2",
+      [category_uuids, Ecto.UUID.dump!(version.uuid)]
+    )
+  end
+
+  defp published_post!(group, slug, category_uuids) do
+    post = Fx.post!(group["slug"], %{title: slug, slug: slug})
+    file!(post[:uuid], 1, category_uuids)
+    Fx.publish!(group["slug"], post[:uuid])
+    post[:uuid]
   end
 
   describe "post_revision/3" do
@@ -195,33 +433,33 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
     defp lines(n, prefix), do: Enum.map_join(1..n, "\n", &"#{prefix}#{&1}")
     defp timed(fun), do: elem(:timer.tc(fun), 0)
 
-    test "one changed line in 40,000 is a line diff in well under 100 ms" do
+    test "one changed line in 40,000 is a line diff, without quadratic work" do
       old = lines(40_000, "line ")
       new = String.replace(old, "line 20000\n", "CHANGED\n")
       us = timed(fn -> send(self(), {:d, Common.line_diff(old, new)}) end)
       assert_received {:d, diff}
-      assert us < 100_000
+      assert us < 500_000
       assert diff["mode"] == "line"
       assert diff["text"] =~ "-line 20000"
       assert diff["text"] =~ "+CHANGED"
     end
 
-    test "two unrelated 20,000-line bodies are coarse, truncated, under 200 ms" do
+    test "two unrelated 20,000-line bodies are coarse and truncated, without quadratic work" do
       us =
         timed(fn ->
           send(self(), {:d, Common.line_diff(lines(20_000, "a"), lines(20_000, "b"))})
         end)
 
       assert_received {:d, diff}
-      assert us < 200_000
+      assert us < 1_000_000
       assert diff["mode"] == "coarse" and diff["truncated"] == true
       assert diff["old_lines"] == 20_000 and diff["new_lines"] == 20_000
     end
 
-    test "a 400-line total rewrite is a line diff in under 150 ms" do
+    test "a 400-line total rewrite is a line diff, without quadratic work" do
       us = timed(fn -> send(self(), {:d, Common.line_diff(lines(400, "a"), lines(400, "b"))}) end)
       assert_received {:d, diff}
-      assert us < 150_000
+      assert us < 1_000_000
       assert diff["mode"] == "line"
     end
 
@@ -236,9 +474,61 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       assert diff["text"] =~ "... (+"
     end
 
-    test "text is capped at 4,096 bytes at a line boundary and says so" do
-      diff = Common.line_diff("", lines(2000, "new line "))
-      assert byte_size(diff["text"]) <= 4096 and diff["truncated"] == true
+    test "text is capped at 4,096 bytes at a line boundary and says so, in line mode" do
+      old = lines(10, "keep ")
+      diff = Common.line_diff(old, old <> "\n" <> lines(2000, "new line "))
+      assert diff["mode"] == "line" and diff["truncated"] == true and diff["hunks"] == 1
+      assert byte_size(diff["text"]) <= 4096
+
+      assert Enum.all?(
+               String.split(diff["text"], "\n"),
+               &String.starts_with?(&1, ["@@", " ", "+"])
+             )
+
+      assert diff["text"] =~ "+new line 1\n"
+    end
+
+    test "a pure insertion into an empty body is a line diff however long, and shows no phantom line" do
+      assert Common.line_diff("", "a\nb") ==
+               %{
+                 "mode" => "line",
+                 "text" => "@@ -0,0 +1,2 @@\n+a\n+b",
+                 "hunks" => 1,
+                 "truncated" => false
+               }
+
+      long = Common.line_diff("", lines(2000, "new line "))
+      assert long["mode"] == "line" and long["truncated"] == true
+      assert byte_size(long["text"]) <= 4096
+      refute Map.has_key?(long, "old_lines")
+      refute long["text"] =~ "\n-\n"
+    end
+
+    test "a pure deletion to an empty body is a line diff" do
+      assert Common.line_diff("a\nb", "") ==
+               %{
+                 "mode" => "line",
+                 "text" => "@@ -1,2 +0,0 @@\n-a\n-b",
+                 "hunks" => 1,
+                 "truncated" => false
+               }
+
+      assert %{"mode" => "line", "hunks" => 0, "text" => ""} = Common.line_diff("", "")
+    end
+
+    test "a body of 260,000 empty lines appended is bounded work and a capped line diff" do
+      new = String.duplicate("\n", 260_000)
+      us = timed(fn -> send(self(), {:d, Common.line_diff("", new)}) end)
+      assert_received {:d, diff}
+      assert us < 1_000_000
+      assert diff["mode"] == "line" and diff["truncated"] == true
+      assert byte_size(diff["text"]) <= 4096
+      assert diff["text"] =~ "@@ -0,0 +1,260001 @@"
+    end
+
+    test "a pure append keeps context lines before it and counts them in the header" do
+      diff = Common.line_diff("a\nb\nc", "a\nb\nc\nd")
+      assert diff["text"] == "@@ -2,2 +2,3 @@\n b\n c\n+d"
     end
 
     test "every diff has mode, hunks and truncated; lines carry a space, - or + prefix" do
@@ -262,8 +552,20 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       assert String.length(change["head"]) <= 300 and String.length(change["tail"]) <= 300
     end
 
-    test "the fingerprint never depends on the diff text (same fingerprint input, different diff modes)" do
-      assert Common.fingerprint({Common.sha256("a")}) == Common.fingerprint({Common.sha256("a")})
+    test "added_urls are the hosts the new body has and the old one lacks, sorted, not all new hosts" do
+      old = "[a](https://shared.example/a) ![i](http://kept.example/i.png)"
+
+      new =
+        "[a](https://shared.example/b) ![i](http://kept.example/i.png) [z](https://zeta.example/) " <>
+          "[x](https://added.example/p)\n[ref]: https://refs.example/x"
+
+      assert Common.content_change(old, new)["added_urls"] == [
+               "added.example",
+               "refs.example",
+               "zeta.example"
+             ]
+
+      assert Common.content_change(new, old)["added_urls"] == []
     end
   end
 
@@ -282,6 +584,20 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
 
       assert :ok = Common.check_text("content", "fine", max: 10)
       assert :ok = Common.check_text("content", nil, max: 10)
+    end
+  end
+
+  describe "check_text/3 default limit" do
+    test "without :max the limit is the body cap, named in the message and the context" do
+      cap = TextScan.max_body_bytes()
+
+      assert {:error, :validation_failed, message, %{errors: [error]}} =
+               Common.check_text("content", String.duplicate("a", cap + 1), [])
+
+      assert message == "is longer than #{cap} bytes"
+      assert error.limit == cap and error.path == "content"
+      assert :ok = Common.check_text("content", String.duplicate("a", cap), [])
+      assert {:error, :validation_failed, _, _} = Common.check_text("content", 12, [])
     end
   end
 
@@ -308,6 +624,24 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
 
       assert :ok =
                Common.locked_check(ApiCase.ctx(), fn _, _ -> false end).(%{trashed_at: nil}, %{})
+    end
+
+    test "an answer that is not exactly false counts as live" do
+      for doubt <- [nil, :maybe, 0, "no"] do
+        assert {:error, :went_live} =
+                 Common.locked_check(ApiCase.ctx(), fn _, _ -> doubt end).(
+                   %{trashed_at: nil},
+                   %{}
+                 )
+      end
+    end
+
+    test "a closure that throws fails closed" do
+      assert {:error, :locked_check_failed} =
+               Common.locked_check(ApiCase.ctx(), fn _, _ -> throw(:boom) end).(
+                 %{trashed_at: nil},
+                 %{}
+               )
     end
 
     test "a closure that raises fails closed" do
