@@ -53,6 +53,10 @@ defmodule PhoenixKit.Modules.Publishing.API.PostsLockedCheckApiTest do
   # versions come before it. @fire_on is the 1-based number of that statement among the SELECTs on
   # versions in the whole call. @fire_before_recheck is the SELECT just before the handler's own recheck, so a
   # publish landing there is caught by the recheck, before Posts.update_post is called at all.
+  # The SELECTs on versions in one update_post call, in order: 1 Refs.resolve_version; 2 and 3 the two
+  # reads of UpdatePost.read (Refs.read_post_for_preview); 4 Danger.recheck; 5 the first read of
+  # Posts.update_post (@fire_on); later ones follow inside the transaction. @fire_before_recheck is 3,
+  # the last read before the recheck.
   # CALIBRATE both if a change moves the statements: print `meta.query` for every versions SELECT.
   @fire_on 5
   @fire_before_recheck 3
@@ -125,6 +129,37 @@ defmodule PhoenixKit.Modules.Publishing.API.PostsLockedCheckApiTest do
     assert_received :interleaved
     assert {:error, :revision_mismatch, _, %{reason: "went_live"}} = result
     assert Fx.content(post[:uuid]).title == before
+    assert failed_update_rows() == []
+  end
+
+  # A rename of a post that goes live in the window, while the written version stays a draft: only
+  # the slug clause of the live condition can refuse it (v1 gets published, v2 is the draft written).
+  defp rename_with_draft_beside(g, post, fire_on) do
+    {:ok, _} = Versions.create_new_version(g["slug"], post, %{}, %{})
+    publish_on_select(g, post, fire_on)
+
+    result =
+      ApiCase.call("publishing.update_post", %{"post" => Fx.ref(post), "slug" => "renamed"})
+
+    assert_received :interleaved
+    result
+  end
+
+  test "an unconfirmed rename of a post that goes live inside the window is refused under the lock and renames nothing",
+       %{g: g, post: post} do
+    assert {:error, :revision_mismatch, _, %{reason: "went_live"}} =
+             rename_with_draft_beside(g, post, @fire_on)
+
+    assert Fx.db_post(post[:uuid]).slug == "t"
+    assert [%{mode: "auto"}] = failed_update_rows()
+  end
+
+  test "an unconfirmed rename of a post that goes live before the handler's recheck is refused there",
+       %{g: g, post: post} do
+    assert {:error, :revision_mismatch, _, %{reason: "went_live"}} =
+             rename_with_draft_beside(g, post, @fire_before_recheck)
+
+    assert Fx.db_post(post[:uuid]).slug == "t"
     assert failed_update_rows() == []
   end
 end

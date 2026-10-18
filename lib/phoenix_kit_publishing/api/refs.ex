@@ -24,6 +24,14 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
 
   def resolve_post(%{"group" => group, "slug" => slug} = ref, opts)
       when map_size(ref) == 2 and is_binary(group) and is_binary(slug) do
+    if storable?(group) and storable?(slug),
+      do: lookup_by_slug(group, slug, opts),
+      else: {:error, :invalid_ref}
+  end
+
+  def resolve_post(_other, _opts), do: {:error, :invalid_ref}
+
+  defp lookup_by_slug(group, slug, opts) do
     with %{} = group_row <- DBStorage.get_group_by_slug(group),
          %{} = db_post <- find_by_slug(group, slug, Keyword.get(opts, :include_trashed, false)) do
       {:ok, %{db_post: %{db_post | group: group_row}, group: group_row}}
@@ -32,7 +40,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
     end
   end
 
-  def resolve_post(_other, _opts), do: {:error, :invalid_ref}
+  # Postgres refuses a NUL byte and invalid UTF-8 in a query parameter by raising.
+  defp storable?(text), do: String.valid?(text) and not String.contains?(text, <<0>>)
 
   defp find_by_slug(group, slug, include_trashed?) do
     DBStorage.get_post(group, slug) ||
@@ -49,9 +58,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
 
   @spec resolve_group(term()) :: {:ok, struct()} | {:error, :not_found}
   def resolve_group(slug) when is_binary(slug) do
-    case DBStorage.get_group_by_slug(slug) do
-      nil -> {:error, :not_found}
-      group -> {:ok, group}
+    case storable?(slug) && DBStorage.get_group_by_slug(slug) do
+      %{} = group -> {:ok, group}
+      _ -> {:error, :not_found}
     end
   end
 

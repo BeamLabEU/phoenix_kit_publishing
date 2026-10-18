@@ -173,10 +173,105 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
 
   test "a NUL byte in any text field is a validation error with the path, never a 500",
        ctx do
-    for field <- ~w(title content description seo_title excerpt og_title og_description) do
+    for field <-
+          ~w(title content description seo_title excerpt og_title og_description featured_image_id og_image_id) do
       assert {:error, :validation_failed, _, %{errors: [%{path: ^field}]}} =
-               edit(ctx, %{field => "a\u0000b"})
+               edit(ctx, %{field => "a\u0000b"}),
+             field
     end
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "slug"}]}} =
+             edit(ctx, %{"slug" => "a\u0000b"})
+  end
+
+  test "a NUL byte in the post ref is invalid_ref, never a raise", ctx do
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "invalid_ref"}]}} =
+             ApiCase.call("publishing.update_post", %{
+               "post" => %{"group" => ctx.g["slug"], "slug" => "a\u0000b"},
+               "title" => "X"
+             })
+  end
+
+  test "an empty or blank title is refused like create_post does, null included", ctx do
+    for title <- [nil, "", "   "] do
+      assert {:error, :validation_failed, _,
+              %{errors: [%{path: "title", reason: "title_required"}]}} =
+               edit(ctx, %{"title" => title}),
+             inspect(title)
+    end
+
+    assert Fx.content(ctx.post[:uuid]).title == "Hello"
+  end
+
+  test "image ids must be UUIDs or null: junk is refused, a UUID is stored canonical, null clears",
+       ctx do
+    for field <- ~w(featured_image_id og_image_id) do
+      assert {:error, :validation_failed, _, %{errors: [%{path: ^field}]}} =
+               edit(ctx, %{field => "not-a-uuid"}),
+             field
+    end
+
+    image = Ecto.UUID.generate()
+
+    assert {:ok, %{"changed" => [%{"field" => "featured_image_id", "scope" => "version"}]}} =
+             edit(ctx, %{"featured_image_id" => String.upcase(image)})
+
+    assert Fx.version(ctx.post[:uuid]).data["featured_image_uuid"] == image
+
+    assert {:ok, %{"changed" => [%{"field" => "featured_image_id"}]}} =
+             edit(ctx, %{"featured_image_id" => nil})
+
+    assert Fx.version(ctx.post[:uuid]).data["featured_image_uuid"] in [nil, ""]
+  end
+
+  test "featured, sitemap_exclude and featured_image_id are written to the version data with scope version",
+       ctx do
+    image = Ecto.UUID.generate()
+
+    assert {:ok, %{"action" => "updated", "changed" => changed}} =
+             edit(ctx, %{
+               "featured" => true,
+               "sitemap_exclude" => true,
+               "featured_image_id" => image
+             })
+
+    assert changed |> Enum.map(& &1["field"]) |> Enum.sort() ==
+             ["featured", "featured_image_id", "sitemap_exclude"]
+
+    assert Enum.all?(changed, &(&1["scope"] == "version"))
+    data = Fx.version(ctx.post[:uuid]).data
+    assert data["featured"] == true and data["sitemap_exclude"] == true
+    assert data["featured_image_uuid"] == image
+
+    assert {:ok, %{"action" => "unchanged"}} =
+             edit(ctx, %{"featured" => true, "sitemap_exclude" => true})
+  end
+
+  test "a dry run on the live version requires the confirmation; HTML in the body does too; a plain draft edit does not",
+       ctx do
+    assert {:preview, %{"requires_confirmation" => true}, _} =
+             edit(ctx, %{"content" => "<div>raw html</div>"}, %{dry_run?: true})
+
+    assert {:preview, %{"requires_confirmation" => false}, _} =
+             edit(ctx, %{"content" => "plain"}, %{dry_run?: true})
+
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    assert {:preview, %{"requires_confirmation" => true, "rows" => [row]}, _} =
+             edit(ctx, %{"title" => "X", "version" => 1}, %{dry_run?: true})
+
+    assert row["live"] == true and row["public"] != "none"
+  end
+
+  test "the preview clips long text to 500 characters and labels version-level fields", ctx do
+    long = String.duplicate("é", 600)
+
+    assert {:preview, %{"rows" => [%{"changes" => changes}]}, _} =
+             edit(ctx, %{"description" => long, "featured" => true}, %{dry_run?: true})
+
+    assert changes["description"]["to"] == String.duplicate("é", 500)
+    assert changes["description"]["scope"] == "version"
+    assert %{"scope" => "version", "from" => false, "to" => true} = changes["featured"]
   end
 
   test "content: 262,144 bytes is accepted, 262,145 is content_too_large", ctx do

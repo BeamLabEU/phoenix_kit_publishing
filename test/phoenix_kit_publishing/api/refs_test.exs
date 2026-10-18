@@ -60,6 +60,20 @@ defmodule PhoenixKit.Modules.Publishing.API.RefsTest do
       end
     end
 
+    test "a NUL byte or invalid UTF-8 in the group or slug is invalid_ref, never a raise", %{
+      g: g
+    } do
+      for bad <- ["a\u0000b", <<0xFF, 0xFE>>] do
+        assert {:error, :invalid_ref} =
+                 Refs.resolve_post(%{"group" => g["slug"], "slug" => bad}, [])
+
+        assert {:error, :invalid_ref} =
+                 Refs.resolve_post(%{"group" => bad, "slug" => "t"}, include_trashed: true)
+
+        assert {:error, :not_found} = Refs.resolve_group(bad)
+      end
+    end
+
     test "a trashed post: the slug form needs include_trashed, the id form reports post_trashed",
          %{g: g, post: post} do
       {:ok, _} = Posts.trash_post(g["slug"], post[:uuid])

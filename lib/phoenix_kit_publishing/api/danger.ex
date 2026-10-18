@@ -73,7 +73,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Danger do
 
   @doc """
   The recheck just before the write, on fresh rows, for unconfirmed calls only. A condition that
-  became true is `revision_mismatch` with the reason `went_live`.
+  became true is `revision_mismatch` with the reason `went_live`. A row that vanished is left
+  for the write to report as not found.
   """
   def recheck(db_post, version, requested_slug, ctx) do
     if Map.get(ctx, :confirmation_uuid) == nil do

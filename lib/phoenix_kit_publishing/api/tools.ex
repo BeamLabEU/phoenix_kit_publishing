@@ -163,7 +163,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "already have text (use set_translation to add a language). description, seo_title, excerpt, " <>
           "featured_image_id, featured, sitemap_exclude and category_ids apply to every language of the " <>
           "version (language de with description also changes English); title, content and og_* are per " <>
-          "language; slug is post-level. null clears a text field; an absent field is kept. Tags come from " <>
+          "language; slug is post-level. null clears a text field other than title; an absent field is kept. " <>
+          "featured_image_id and og_image_id are media file ids (UUID) or null. Tags come from " <>
           "#hashtags in the body and cannot be set. Edits to the live or an archived version, a slug change " <>
           "on a live post, and body text with HTML, components, post links or link destinations other than " <>
           "http, https, mailto or tel need a confirmation: send dry_run first and confirm the preview. " <>

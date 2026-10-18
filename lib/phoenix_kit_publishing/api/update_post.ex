@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
   @tool "publishing.update_post"
   @fields ~w(title content description seo_title excerpt featured_image_id featured sitemap_exclude og_title og_description og_image_id category_ids slug)
   @text_fields ~w(title content description seo_title excerpt og_title og_description)
+  @image_fields ~w(featured_image_id og_image_id)
   @scope %{
     "title" => "language",
     "content" => "language",
@@ -34,6 +35,8 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
 
     with :ok <- not_empty(input),
          :ok <- texts(input),
+         :ok <- title_present(input),
+         {:ok, input} <- images(input),
          {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(),
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
          {:ok, version} <-
@@ -80,6 +83,44 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
         error -> error
       end
     end)
+  end
+
+  # create_post refuses a blank title; clearing one here would leave a post that cannot be published.
+  defp title_present(%{"title" => title}) do
+    if is_binary(title) and String.trim(title) != "",
+      do: :ok,
+      else: Common.invalid("title", "must not be blank", "title_required")
+  end
+
+  defp title_present(_input), do: :ok
+
+  # Image ids are media file UUIDs; null or "" clears. Stored in canonical (lowercase) form.
+  defp images(input) do
+    Enum.reduce_while(@image_fields, {:ok, input}, fn field, {:ok, acc} ->
+      case image(field, acc) do
+        {:ok, acc} -> {:cont, {:ok, acc}}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp image(field, input) do
+    case Map.fetch(input, field) do
+      :error ->
+        {:ok, input}
+
+      {:ok, empty} when empty in [nil, ""] ->
+        {:ok, input}
+
+      {:ok, value} when is_binary(value) ->
+        case Ecto.UUID.cast(value) do
+          {:ok, uuid} -> {:ok, Map.put(input, field, uuid)}
+          :error -> Common.invalid(field, "must be a media file id (UUID) or null")
+        end
+
+      {:ok, _other} ->
+        Common.invalid(field, "must be a string")
+    end
   end
 
   defp text_opts("content"), do: [max: TextScan.max_body_bytes(), reason: "content_too_large"]
