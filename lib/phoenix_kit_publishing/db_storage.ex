@@ -166,22 +166,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc """
-  Gets a TRASHED post by group slug and post slug (the newest when several share the slug).
-  Preloads like `get_post/2`.
-  """
-  @spec get_trashed_post(String.t(), String.t()) :: PublishingPost.t() | nil
-  def get_trashed_post(group_slug, post_slug) do
-    from(p in PublishingPost,
-      join: g in assoc(p, :group),
-      where: g.slug == ^group_slug and p.slug == ^post_slug and not is_nil(p.trashed_at),
-      order_by: [desc: p.trashed_at],
-      limit: 1,
-      preload: [group: g, active_version: :post]
-    )
-    |> repo().one()
-  end
-
-  @doc """
   Gets a timestamp-mode post by date and time.
 
   Truncates seconds from the input time since URLs use HH:MM format only,

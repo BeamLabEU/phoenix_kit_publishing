@@ -107,8 +107,10 @@ defmodule PhoenixKit.Modules.Publishing.API.RefsTest do
                Refs.resolve_post(%{"group" => g["slug"], "slug" => "live"}, include_trashed: true)
 
       assert live_uuid == live[:uuid]
-      assert DBStorage.get_trashed_post(g["slug"], "live") == nil
-      assert %{uuid: trashed_uuid} = DBStorage.get_trashed_post(g["slug"], "t")
+
+      assert {:ok, %{db_post: %{uuid: trashed_uuid}}} =
+               Refs.resolve_post(%{"group" => g["slug"], "slug" => "t"}, include_trashed: true)
+
       assert trashed_uuid == post[:uuid]
     end
 

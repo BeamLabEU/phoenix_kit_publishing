@@ -3,8 +3,17 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
   # Resolution of post / group / version / language / category references (spec §6.4).
   # Only calls that RAISE on a database error are used here (spec §8, F25).
 
+  import Ecto.Query, only: [from: 2]
+
   alias PhoenixKit.Modules.Publishing.API.Common
-  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, GroupSettings, LanguageHelpers}
+
+  alias PhoenixKit.Modules.Publishing.{
+    Constants,
+    DBStorage,
+    GroupSettings,
+    LanguageHelpers,
+    PublishingPost
+  }
 
   @type post_hit :: %{db_post: struct(), group: struct()}
 
@@ -45,7 +54,19 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
 
   defp find_by_slug(group, slug, include_trashed?) do
     DBStorage.get_post(group, slug) ||
-      if include_trashed?, do: DBStorage.get_trashed_post(group, slug)
+      if include_trashed?, do: get_trashed_post(group, slug)
+  end
+
+  # The newest trashed post of the slug (the same slug can be trashed more than once).
+  defp get_trashed_post(group_slug, post_slug) do
+    from(p in PublishingPost,
+      join: g in assoc(p, :group),
+      where: g.slug == ^group_slug and p.slug == ^post_slug and not is_nil(p.trashed_at),
+      order_by: [desc: p.trashed_at],
+      limit: 1,
+      preload: [group: g, active_version: :post]
+    )
+    |> PhoenixKit.RepoHelper.repo().one()
   end
 
   defp cast_uuid(id) do
