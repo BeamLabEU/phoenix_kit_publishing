@@ -100,6 +100,73 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     assert Fx.version(ctx.post[:uuid]).data["description"] == ""
   end
 
+  test "null or an empty string on a field that was never set is unchanged and writes no activity row",
+       ctx do
+    n = length(list_activities())
+
+    for fields <- [
+          %{"description" => nil},
+          %{"description" => ""},
+          %{"og_title" => nil},
+          %{"og_title" => ""},
+          %{"seo_title" => nil, "excerpt" => "", "og_description" => nil}
+        ] do
+      assert {:ok, %{"action" => "unchanged"}} = edit(ctx, fields), inspect(fields)
+    end
+
+    assert length(list_activities()) == n
+  end
+
+  test "title: 500 characters is accepted, 501 is refused; the limit counts characters, not bytes",
+       ctx do
+    assert {:ok, %{"action" => "updated"}} =
+             edit(ctx, %{"title" => String.duplicate("é", 300)})
+
+    assert Fx.content(ctx.post[:uuid]).title == String.duplicate("é", 300)
+
+    assert {:ok, %{"action" => "updated"}} = edit(ctx, %{"title" => String.duplicate("a", 500)})
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "title", limit: 500}]}} =
+             edit(ctx, %{"title" => String.duplicate("a", 501)})
+
+    assert Fx.content(ctx.post[:uuid]).title == String.duplicate("a", 500)
+  end
+
+  test "category_ids compare as a set and duplicates are stored once", ctx do
+    a = Fx.category!(ctx.g["slug"], "Cat A")
+    b = Fx.category!(ctx.g["slug"], "Cat B")
+
+    assert {:ok, %{"action" => "updated"}} = edit(ctx, %{"category_ids" => [a.uuid, b.uuid]})
+
+    assert {:ok, %{"action" => "unchanged"}} = edit(ctx, %{"category_ids" => [b.uuid, a.uuid]})
+
+    assert {:ok, %{"action" => "updated"}} =
+             edit(ctx, %{"category_ids" => [a.uuid, a.uuid]})
+
+    assert Fx.version(ctx.post[:uuid]).data["category_uuids"] == [a.uuid]
+
+    assert {:ok, %{"action" => "unchanged"}} = edit(ctx, %{"category_ids" => [a.uuid, a.uuid]})
+  end
+
+  test "a post of a timestamp group is edited by id: title and content change", _ctx do
+    ts = Fx.group!(mode: "timestamp")
+    stamp = Fx.post!(ts["slug"], %{title: "Stamp"})
+    Fx.body!(ts["slug"], stamp[:uuid], "old stamp body")
+
+    assert {:ok, %{"action" => "updated", "changed" => changed, "post" => post}} =
+             ApiCase.call("publishing.update_post", %{
+               "post" => %{"id" => stamp[:uuid]},
+               "title" => "Stamp 2",
+               "content" => "new stamp body"
+             })
+
+    assert changed |> Enum.map(& &1["field"]) |> Enum.sort() == ["content", "title"]
+    assert post["id"] == stamp[:uuid]
+    assert Fx.content(stamp[:uuid]).title == "Stamp 2"
+    assert Fx.content(stamp[:uuid]).content == "new stamp body"
+    assert Fx.db_post(stamp[:uuid]).slug in [nil, ""]
+  end
+
   test "a language with no row is language_missing and the primary body is untouched", ctx do
     assert {:error, :validation_failed, _, %{errors: [%{reason: "language_missing"}]}} =
              edit(ctx, %{"title" => "X", "language" => "de-DE"})
@@ -163,6 +230,21 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
                "post" => %{"id" => stamp[:uuid]},
                "slug" => "x"
              })
+  end
+
+  test "a dry run of a rename onto a taken slug is slug_taken, for live and trashed posts alike",
+       ctx do
+    other = Fx.post!(ctx.g["slug"], %{title: "Other", slug: "other"})
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "slug_taken"}]}} =
+             edit(ctx, %{"slug" => "other"}, %{dry_run?: true})
+
+    {:ok, _} = Posts.trash_post(ctx.g["slug"], other[:uuid])
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "slug_taken"}]}} =
+             edit(ctx, %{"slug" => "other"}, %{dry_run?: true})
+
+    assert {:preview, _, _} = edit(ctx, %{"slug" => "free-slug"}, %{dry_run?: true})
   end
 
   test "no draft and no explicit version is no_draft_version; an explicit live version needs the confirmation context",
@@ -350,6 +432,17 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     assert changes["content"]["diff"]["text"] =~ "+added line"
     assert preview["requires_confirmation"] == false
     assert fingerprint =~ ~r/\A[0-9a-f]{64}\z/
+  end
+
+  test "a dry run that changes nothing previews an unchanged row and writes nothing", ctx do
+    {:ok, _} = edit(ctx, %{"title" => "Same"})
+    before = Fx.table_state()
+
+    assert {:preview, %{"rows" => [%{"action" => "unchanged"}], "requires_confirmation" => false},
+            fingerprint} = edit(ctx, %{"title" => "Same"}, %{dry_run?: true})
+
+    assert fingerprint =~ ~r/\A[0-9a-f]{64}\z/
+    assert Fx.table_state() == before
   end
 
   test "a dry run does not heal a stale post, while the module's own read does", ctx do
