@@ -52,15 +52,8 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertGroups do
       {:error, ref,
        Common.row_error(ref, "group_trashed", "the group is in the trash; restore it first")}
 
-  defp classify(row, ref, {:ok, db_group}) do
-    case Groups.fetch_group(db_group.slug) do
-      {:ok, group} ->
-        update_entry(row, ref, group)
-
-      {:error, :not_found} ->
-        {:error, ref, Common.row_error(ref, "not_found", "The group does not exist.")}
-    end
-  end
+  defp classify(row, ref, {:ok, db_group}),
+    do: update_entry(row, ref, Refs.group_map(db_group))
 
   defp create_entry(row, ref) do
     with {:ok, _slug} <- slug_error(Common.validate_slug(row["slug"])),
@@ -360,11 +353,13 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertGroups do
 
   defp write_update(ref, group, params, confirmed?, opts) do
     # Read again: an earlier row cannot touch this group (a slug appears once), but another request can.
-    case Groups.fetch_group(group["slug"]) do
+    case Refs.resolve_group(group["slug"]) do
       {:error, :not_found} ->
         Common.row_error(ref, "not_found", "The group does not exist.")
 
-      {:ok, current} ->
+      {:ok, db_group} ->
+        current = Refs.group_map(db_group)
+
         case changed_fields(params, current) do
           [] -> Common.row_ok(ref, "unchanged", current["uuid"])
           _fields when not confirmed? -> flipped(ref)

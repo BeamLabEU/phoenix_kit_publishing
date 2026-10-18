@@ -10,7 +10,9 @@ defmodule PhoenixKit.Modules.Publishing.API.DangerStaticTest do
     "Categories.categories_by_uuids(",
     "Categories.list_tree(",
     "Posts.read_post_by_uuid(",
-    "SlugHelpers.slug_exists?("
+    "SlugHelpers.slug_exists?(",
+    "Groups.fetch_group(",
+    "Groups.get_group("
   ]
 
   test "guard/1 fails closed: a raise, a throw and an exit all answer true" do

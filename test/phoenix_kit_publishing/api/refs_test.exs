@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.API.RefsTest do
     Groups,
     Posts,
     PublishingContent,
+    PublishingGroup,
     PublishingPost,
     Versions
   }
@@ -193,6 +194,30 @@ defmodule PhoenixKit.Modules.Publishing.API.RefsTest do
 
     test "an unknown post is not_found" do
       assert {:error, :not_found} = Refs.read_post_for_preview(Ecto.UUID.generate(), nil, nil)
+    end
+  end
+
+  describe "group_map/1" do
+    test "is the map Groups.fetch_group/1 builds for a group that needs no repair", %{g: g} do
+      {:ok, _} = Groups.update_group(g["slug"], %{"show_breadcrumbs" => true})
+      {:ok, fetched} = Groups.fetch_group(g["slug"])
+      assert {:ok, db_group} = Refs.resolve_group(g["slug"])
+
+      assert Refs.group_map(db_group) == fetched
+    end
+
+    test "reads a stale group as stored, without healing it", %{g: g} do
+      TestRepo.update_all(from(r in PublishingGroup, where: r.slug == ^g["slug"]),
+        set: [mode: "bogus"]
+      )
+
+      assert {:ok, db_group} = Refs.resolve_group(g["slug"])
+      assert %{"mode" => "bogus", "slug" => slug} = Refs.group_map(db_group)
+      assert slug == g["slug"]
+      assert DBStorage.get_group_by_slug(g["slug"]).mode == "bogus", "the read must not heal"
+
+      {:ok, healed} = Groups.fetch_group(g["slug"])
+      refute healed["mode"] == "bogus", "the fixture is not stale: this test would be vacuous"
     end
   end
 

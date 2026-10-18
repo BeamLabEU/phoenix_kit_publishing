@@ -4,7 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
   # Only calls that RAISE on a database error are used here (spec §8, F25).
 
   alias PhoenixKit.Modules.Publishing.API.Common
-  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, LanguageHelpers}
+  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, GroupSettings, LanguageHelpers}
 
   @type post_hit :: %{db_post: struct(), group: struct()}
 
@@ -64,6 +64,36 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
   end
 
   def resolve_group(_other), do: {:error, :not_found}
+
+  @doc """
+  A group row as the string-key map `Groups.fetch_group/1` builds, MINUS the stale fixer: a dry
+  run and a danger check must not write. A stale legacy group reads as stored.
+  """
+  @spec group_map(struct()) :: map()
+  def group_map(db_group) do
+    data = db_group.data || %{}
+
+    GroupSettings.default_config()
+    |> Map.merge(Map.take(data, GroupSettings.keys()))
+    |> Map.merge(%{
+      "uuid" => db_group.uuid,
+      "name" => db_group.name,
+      "slug" => db_group.slug,
+      "mode" => db_group.mode || Constants.default_mode(),
+      "status" => db_group.status || "active",
+      "type" => Map.get(data, "type", Constants.default_type()),
+      "item_singular" => Map.get(data, "item_singular", "item"),
+      "item_plural" => Map.get(data, "item_plural", "items"),
+      "name_i18n" => name_i18n(data)
+    })
+  end
+
+  defp name_i18n(data) do
+    case Map.get(data, "name_i18n") do
+      map when is_map(map) -> map
+      _ -> %{}
+    end
+  end
 
   @spec ensure_group_active(struct()) :: :ok | {:error, :group_trashed}
   def ensure_group_active(%{status: "trashed"}), do: {:error, :group_trashed}

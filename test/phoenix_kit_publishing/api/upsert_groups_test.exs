@@ -1,10 +1,11 @@
 defmodule PhoenixKit.Modules.Publishing.API.UpsertGroupsTest do
   use PhoenixKit.DataCase, async: false
 
+  import Ecto.Query
   import PhoenixKitPublishing.ActivityLogAssertions
 
   alias PhoenixKit.Modules.Publishing.API.{Danger, Schemas, Tools, UpsertGroups}
-  alias PhoenixKit.Modules.Publishing.{Constants, Groups, GroupSettings}
+  alias PhoenixKit.Modules.Publishing.{Constants, Groups, GroupSettings, PublishingGroup}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
@@ -366,5 +367,21 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertGroupsTest do
 
     assert {:ok, %{"summary" => %{"created" => 20}}} =
              upsert(for(n <- 1..20, do: %{"slug" => "g#{n}", "name" => "G", "mode" => "slug"}))
+  end
+
+  test "the dry run writes nothing, not even the repair of a stale group" do
+    g = Fx.group!(name: "Stale")
+
+    TestRepo.update_all(
+      from(r in PublishingGroup, where: r.slug == ^g["slug"]),
+      set: [mode: "bogus"]
+    )
+
+    before = Fx.table_state()
+
+    assert {:preview, %{"rows" => [%{"action" => "updated"}]}, _} =
+             upsert([%{"slug" => g["slug"], "name" => "Renamed"}], %{dry_run?: true})
+
+    assert Fx.table_state() == before
   end
 end
