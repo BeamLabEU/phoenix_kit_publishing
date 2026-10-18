@@ -94,18 +94,20 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
   # --- write: two non-atomic steps ----------------------------------------------------------
 
   defp execute(input, hit, version, same?, ctx) do
-    with :ok <- move(hit, version, input["publish_at"], same?, ctx),
-         :ok <- publish(hit, version, same?, ctx) do
+    opts = Common.write_opts(ctx, @tool)
+
+    with :ok <- move(hit, version, input["publish_at"], same?, opts),
+         :ok <- publish(hit, version, same?, opts) do
       {:ok, answer("scheduled", input, hit, version)}
     end
   end
 
-  defp move(_hit, _version, _publish_at, true, _ctx), do: :ok
+  defp move(_hit, _version, _publish_at, true, _opts), do: :ok
 
-  defp move(hit, version, publish_at, false, ctx),
-    do: set_date(hit, version, publish_at <> ":00Z", ctx)
+  defp move(hit, version, publish_at, false, opts),
+    do: set_date(hit, version, publish_at <> ":00Z", opts)
 
-  defp set_date(hit, version, published_at, ctx) do
+  defp set_date(hit, version, published_at, opts) do
     with {:ok, post} <-
            Refs.read_post_for_preview(hit.db_post.uuid, nil, version.version_number),
          {:ok, _} <-
@@ -113,7 +115,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
              hit.group.slug,
              post,
              %{"published_at" => published_at},
-             Common.write_opts(ctx, @tool, publish: false)
+             Keyword.merge(opts, publish: false)
            ) do
       :ok
     else
@@ -121,28 +123,28 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
     end
   end
 
-  defp publish(hit, version, same?, ctx) do
+  defp publish(hit, version, same?, opts) do
     case Versions.publish_version(
            hit.group.slug,
            hit.db_post.uuid,
            version.version_number,
-           Common.write_opts(ctx, @tool)
+           opts
          ) do
       :ok -> :ok
       {:error, reason} when same? -> Common.error(reason)
-      {:error, reason} -> rollback(hit, version, ctx, Common.error(reason))
+      {:error, reason} -> rollback(hit, version, opts, Common.error(reason))
     end
   end
 
   # Best effort: put the old date and time back, logged like the other API writes. Only reached
   # when step 1 moved the post; a post that was already on the slot never moved.
-  defp rollback(hit, version, ctx, error) do
+  defp rollback(hit, version, opts, error) do
     case current_stamp(hit.db_post) do
       nil ->
         with_left_behind(error)
 
       old ->
-        if set_date(hit, version, old <> ":00Z", ctx) == :ok,
+        if set_date(hit, version, old <> ":00Z", opts) == :ok,
           do: error,
           else: with_left_behind(error)
     end

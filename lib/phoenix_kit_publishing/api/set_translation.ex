@@ -180,17 +180,18 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
 
   defp execute(t, ctx) do
     %{hit: hit, version: version, language: language} = t
+    base_opts = Common.write_opts(ctx, @tool)
 
     with :ok <- Danger.recheck(hit.db_post, version, nil, ctx),
-         {:ok, created?} <- ensure_row(t, ctx) do
+         {:ok, created?} <- ensure_row(t, base_opts) do
       case reread(t) do
-        {:ok, post} -> write(t, post, created?, ctx)
+        {:ok, post} -> write(t, post, created?, base_opts, ctx)
         error -> left_behind(error, created?, language)
       end
     end
   end
 
-  defp write(t, post, created?, ctx) do
+  defp write(t, post, created?, base_opts, ctx) do
     %{input: input, hit: hit, version: version, language: language} = t
 
     check = Common.locked_check(ctx, fn locked, v -> Danger.live_condition(locked, v, nil) end)
@@ -204,7 +205,8 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
     fields = ["content", "title"] ++ Enum.filter(@og_fields, &Map.has_key?(input, &1))
 
     opts =
-      Common.write_opts(ctx, @tool, publish: false, locked_check: check)
+      base_opts
+      |> Keyword.merge(publish: false, locked_check: check)
       |> Common.put_log_fields(Enum.sort(fields))
 
     case Posts.update_post(hit.group.slug, post, params, opts) do
@@ -215,15 +217,15 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
 
   # An existing row skips the call: add_language_to_post logs translation.added unconditionally on
   # success, which for an update would be a misleading row. It also promotes a legacy base-code row.
-  defp ensure_row(%{row: %{}}, _ctx), do: {:ok, false}
+  defp ensure_row(%{row: %{}}, _opts), do: {:ok, false}
 
-  defp ensure_row(%{row: nil} = t, ctx) do
+  defp ensure_row(%{row: nil} = t, opts) do
     case TranslationManager.add_language_to_post(
            t.hit.group.slug,
            t.hit.db_post.uuid,
            t.language,
            t.version.version_number,
-           Common.write_opts(ctx, @tool)
+           opts
          ) do
       {:ok, _} -> {:ok, true}
       {:error, reason} -> Common.error(reason)
