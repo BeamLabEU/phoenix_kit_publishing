@@ -27,7 +27,8 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
   end
 
   defp check(input) do
-    with :ok <- Common.check_text("title", input["title"], max: Constants.max_title_length()),
+    with :ok <-
+           Common.check_text("title", input["title"], max_chars: Constants.max_title_length()),
          :ok <- title_present(input["title"]) do
       Common.check_text("content", input["content"],
         max: TextScan.max_body_bytes(),
@@ -46,6 +47,9 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
 
   # nil: the module generates a unique slug from the title (slug mode) or there is none (timestamp mode).
   defp slug(_group, nil), do: {:ok, nil}
+
+  defp slug(%{mode: "slug"}, slug) when not is_binary(slug),
+    do: Common.invalid("slug", "must be a string", "invalid_slug")
 
   defp slug(%{mode: "slug"} = group, slug) do
     with {:ok, slug} <- Common.validate_slug(slug) do
@@ -91,6 +95,8 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
       "content" => Common.content_change("", content)
     }
 
+    row = Map.reject(row, fn {_key, value} -> is_nil(value) end)
+
     term = {:create_post, group.slug, group.status, input["title"], slug, Common.sha256(content)}
     Common.preview([row], %{"requires_confirmation" => Danger.create_post(input, ctx)}, term)
   end
@@ -104,20 +110,25 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
 
     case Posts.create_post(group.slug, attrs ++ Common.write_opts(ctx, @tool)) do
       {:ok, post} ->
-        db = DBStorage.get_post_by_uuid(post[:uuid], [:group])
-        versions = DBStorage.list_versions(db.uuid)
-        contents = DBStorage.list_contents(hd(versions).uuid)
-        changed = ["title"] ++ if(input["content"] in [nil, ""], do: [], else: ["content"])
-
-        {:ok,
-         %{
-           "action" => "created",
-           "post" => Presenter.write_summary(db, db.group, versions, contents),
-           "changed" => changed
-         }}
+        case DBStorage.get_post_by_uuid(post[:uuid], [:group]) do
+          nil -> Common.error(:not_found)
+          db -> {:ok, created(db, input)}
+        end
 
       {:error, reason} ->
         Common.error(reason)
     end
+  end
+
+  defp created(db, input) do
+    versions = DBStorage.list_versions(db.uuid)
+    contents = DBStorage.list_contents(hd(versions).uuid)
+    changed = ["title"] ++ if(input["content"] in [nil, ""], do: [], else: ["content"])
+
+    %{
+      "action" => "created",
+      "post" => Presenter.write_summary(db, db.group, versions, contents),
+      "changed" => changed
+    }
   end
 end

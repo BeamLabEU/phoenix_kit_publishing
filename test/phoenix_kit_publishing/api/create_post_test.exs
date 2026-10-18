@@ -3,7 +3,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
 
   import PhoenixKitPublishing.ActivityLogAssertions
 
-  alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts}
+  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, Groups, Posts}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
 
@@ -23,7 +23,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
     user = Fx.user!()
     g = Fx.group!()
 
-    assert {:ok, %{"action" => "created", "post" => post}} =
+    assert {:ok, %{"action" => "created", "post" => post, "changed" => changed}} =
              ApiCase.call(
                "publishing.create_post",
                %{
@@ -34,6 +34,8 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
                },
                %{actor: %{ApiCase.ctx().actor | user_uuid: user.uuid}}
              )
+
+    assert changed == ["title", "content"]
 
     assert post["status"] == "draft" and post["latest_version"] == 1 and
              post["languages"] == ["en-US"]
@@ -48,6 +50,12 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
     row = assert_activity_logged("publishing.post.created", resource_uuid: post["id"])
     assert row.mode == "auto" and row.metadata["via"] == "api"
     assert row.metadata["tool"] == "publishing.create_post"
+  end
+
+  test "changed lists only the title when the content is absent, null or empty", %{g: g} do
+    for extra <- [%{}, %{"content" => nil}, %{"content" => ""}] do
+      assert {:ok, %{"changed" => ["title"]}} = create(g, extra)
+    end
   end
 
   test "a title like pk_sale does not put free text into the answer" do
@@ -101,6 +109,27 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
              create(g, %{"title" => String.duplicate("a", 501)})
   end
 
+  test "the title limit counts characters, not bytes", %{g: g} do
+    limit = Constants.max_title_length()
+    # "ж" is two bytes: 500 characters are 1000 bytes.
+    assert {:ok, %{"post" => %{"id" => id}}} =
+             create(g, %{"title" => String.duplicate("ж", limit)})
+
+    [content] = DBStorage.list_contents(DBStorage.get_version(id, 1).uuid)
+    assert String.length(content.title) == limit
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "title", limit: ^limit}]}} =
+             create(g, %{"title" => String.duplicate("ж", limit + 1)})
+  end
+
+  test "a non-string slug reaching the handler is invalid_slug, not a crash", %{g: g} do
+    # The executor's schema refuses it first; this calls the handler directly.
+    input = %{"group" => g["slug"], "title" => "Hello", "slug" => 5}
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "slug", reason: "invalid_slug"}]}} =
+             PhoenixKit.Modules.Publishing.API.CreatePost.call(input, ApiCase.ctx())
+  end
+
   test "a NUL byte or invalid text is a validation error, not a 500 (Review Focus 1)", %{g: g} do
     assert {:error, :validation_failed, _, %{errors: [%{path: "title"}]}} =
              create(g, %{"title" => "a\u0000b"})
@@ -151,6 +180,30 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePostTest do
              )
 
     assert plain["requires_confirmation"] == false
+  end
+
+  test "the dry-run fingerprint depends on the content, title, slug and group and on nothing else",
+       %{g: g} do
+    dry = fn extra ->
+      {:preview, _preview, fp} =
+        ApiCase.call(
+          "publishing.create_post",
+          Map.merge(
+            %{"group" => g["slug"], "title" => "T", "content" => "a", "slug" => "s"},
+            extra
+          ),
+          %{dry_run?: true}
+        )
+
+      fp
+    end
+
+    base = dry.(%{})
+    assert base == dry.(%{})
+    refute base == dry.(%{"content" => "b"})
+    refute base == dry.(%{"title" => "U"})
+    refute base == dry.(%{"slug" => "t"})
+    refute base == dry.(%{"group" => Fx.group!()["slug"]})
   end
 
   test "idempotent only with a key: two plain calls make two posts", %{g: g} do

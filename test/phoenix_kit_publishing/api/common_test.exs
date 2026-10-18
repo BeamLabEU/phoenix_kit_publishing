@@ -775,6 +775,27 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
     end
   end
 
+  describe "check_text/3 character limit" do
+    test ":max_chars counts characters, not bytes, and still refuses NUL and invalid UTF-8" do
+      assert :ok = Common.check_text("title", String.duplicate("ж", 10), max_chars: 10)
+
+      assert {:error, :validation_failed, "is longer than 10 characters", %{errors: [error]}} =
+               Common.check_text("title", String.duplicate("ж", 11), max_chars: 10)
+
+      assert error.path == "title" and error.limit == 10
+      refute Map.has_key?(error, :reason)
+
+      assert {:error, :validation_failed, _, %{errors: [%{reason: "too_long"}]}} =
+               Common.check_text("title", "abc", max_chars: 2, reason: "too_long")
+
+      assert {:error, :validation_failed, _, _} =
+               Common.check_text("title", "a\u0000b", max_chars: 10)
+
+      assert {:error, :validation_failed, _, _} =
+               Common.check_text("title", <<0xFF>>, max_chars: 10)
+    end
+  end
+
   describe "check_text/3 default limit" do
     test "without :max the limit is the body cap, named in the message and the context" do
       cap = TextScan.max_body_bytes()

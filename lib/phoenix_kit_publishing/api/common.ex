@@ -228,41 +228,48 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   @doc """
   Checks a text field before any write: valid UTF-8, no NUL byte (Postgres would reject it and
-  the write would surface as a 500), at most `:max` bytes (default: the body cap, whose
-  over-long reason is "content_too_large"; `:reason` overrides the reason). `nil` passes.
+  the write would surface as a 500), and a length limit. `:max_chars` limits the length in
+  characters (short fields such as titles); otherwise `:max` limits it in bytes (default: the
+  body cap, whose over-long reason is "content_too_large"). `:reason` overrides the reason of an
+  over-long value. `nil` passes.
   """
   @spec check_text(String.t(), term(), keyword()) ::
           :ok | {:error, :validation_failed, String.t(), map()}
   def check_text(_path, nil, _opts), do: :ok
 
   def check_text(path, value, opts) when is_binary(value) do
-    {max, default_reason} =
-      case Keyword.fetch(opts, :max) do
-        {:ok, max} -> {max, nil}
-        :error -> {TextScan.max_body_bytes(), "content_too_large"}
-      end
-
     cond do
-      not String.valid?(value) ->
-        invalid(path, "must be valid UTF-8 text")
-
-      String.contains?(value, <<0>>) ->
-        invalid(path, "must not contain a NUL byte")
-
-      byte_size(value) > max ->
-        invalid(
-          path,
-          "is longer than #{max} bytes",
-          Keyword.get(opts, :reason, default_reason),
-          %{limit: max}
-        )
-
-      true ->
-        :ok
+      not String.valid?(value) -> invalid(path, "must be valid UTF-8 text")
+      String.contains?(value, <<0>>) -> invalid(path, "must not contain a NUL byte")
+      true -> check_length(path, value, opts)
     end
   end
 
   def check_text(path, _other, _opts), do: invalid(path, "must be a string")
+
+  defp check_length(path, value, opts) do
+    {size, max, unit, default_reason} =
+      case Keyword.fetch(opts, :max_chars) do
+        {:ok, max} ->
+          {String.length(value), max, "characters", nil}
+
+        :error ->
+          case Keyword.fetch(opts, :max) do
+            {:ok, max} -> {byte_size(value), max, "bytes", nil}
+            :error -> {byte_size(value), TextScan.max_body_bytes(), "bytes", "content_too_large"}
+          end
+      end
+
+    if size > max,
+      do:
+        invalid(
+          path,
+          "is longer than #{max} #{unit}",
+          Keyword.get(opts, :reason, default_reason),
+          %{limit: max}
+        ),
+      else: :ok
+  end
 
   # --- batch rows and previews -----------------------------------------------------------
 
