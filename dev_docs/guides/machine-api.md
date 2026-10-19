@@ -241,7 +241,7 @@ Request-level errors are core's problem documents; this module uses these codes:
 | `internal_error` | 500 | `db_update_failed` and every module error without a mapping; the reason is logged, never returned |
 | `confirm_token_invalid`, `forbidden`, `rate_limited`, ... | | core's, unchanged |
 
-**The `reason` convention.** `context.errors[].reason` is this module's own field (core's validator and the catalogue use `path`, `message`, `limit`, `allowed`). It is a stable machine-readable string; `message` is for people. In a batch the row's `error.code` is the reason when there is one (`slug_taken`), else a core code (`not_found`, `internal_error`, `revision_mismatch`). No tool emits a reason outside these lists.
+**The `reason` convention.** `context.errors[].reason` is this module's own field (core's validator and the catalogue use `path`, `message`, `limit`, `allowed`). It is a stable machine-readable string; `message` is for people. In a batch the row's `error.code` is the reason when there is one (`slug_taken`), else a core code (`not_found`, `internal_error`, `revision_mismatch`, `validation_failed`). No tool emits a reason outside these lists.
 
 Reasons:
 
@@ -281,7 +281,7 @@ Reasons:
 | `empty_translation` | a blank `set_translation` title or body, or an empty primary body in `translate_post` |
 | `language_missing` | `update_post` was asked to edit a language the version has no row for |
 
-Warnings (`warnings: [{code, message}]` in an answer): `language_missing` (`get_post` fell back to another language), `limit_trimmed` (`list_posts` trimmed the limit) and `unfile_incomplete` (on a `delete_categories` row: the category is gone but some versions still name it; `count` says how many).
+Warnings (`warnings: [{code, message}]` in an answer): `language_missing` (`get_post` fell back to another language), `limit_trimmed` (`list_posts` trimmed the limit), `empty_translation` (a `publish_post` preview: a language whose body is empty) and `unfile_incomplete` (on a `delete_categories` row: the category is gone but some versions still name it; `count` says how many).
 
 Writes that fail half-way say what stays: `set_translation` creates the language row first, and when the body write then fails an empty "Untitled" row stays (the API deletes nothing) and the error carries `context.left_behind`; the next `publish_post` preview warns about the empty language. `schedule_post` moves the post's date and time first and publishes second; if the publish fails the date is put back, and if that fails too the error carries `context.left_behind: ["date", "time"]`.
 

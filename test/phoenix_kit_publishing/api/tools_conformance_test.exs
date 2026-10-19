@@ -238,7 +238,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
       immutable_field invalid_setting parent_not_found parent_wrong_group category_cycle ai_not_configured nothing_to_translate
       cursor_stale empty_translation language_missing)
 
-    warnings = ~w(language_missing limit_trimmed unfile_incomplete)
+    warnings = ~w(language_missing limit_trimmed unfile_incomplete empty_translation)
 
     allowed =
       MapSet.new(
@@ -252,7 +252,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
         source = File.read!(path)
 
         keyed =
-          ~r/(?:reason|code):\s*"([a-z_]+)"/
+          ~r/(?:(?:reason|code):|"code"\s*=>)\s*"([a-z_]+)"/
           |> Regex.scan(source)
           |> Enum.map(fn [_all, reason] -> reason end)
 
