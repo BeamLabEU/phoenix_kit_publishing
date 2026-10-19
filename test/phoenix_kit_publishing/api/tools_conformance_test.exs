@@ -161,6 +161,10 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     end
   end
 
+  test "every object of every input schema is closed, at any depth" do
+    for tool <- Tools.all(), do: assert_closed(tool.input_schema, "input", tool.name)
+  end
+
   test "a title property carries the module's length limit" do
     max_title = Constants.max_title_length()
 
@@ -290,4 +294,26 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
   end
 
   defp assert_keywords(_other, _allowed, _name), do: :ok
+
+  # Properties that are maps from a language code to a text: their keys are free, the handler
+  # checks the codes and the values.
+  @free_key_maps ~w(name_i18n)
+
+  # Every object node of an input schema, at any depth, is closed.
+  defp assert_closed(%{} = schema, path, name) do
+    if schema["type"] == "object" or Map.has_key?(schema, "properties"),
+      do: assert(schema["additionalProperties"] == false, "#{name}: #{path} is open")
+
+    Enum.each(schema["properties"] || %{}, fn
+      {property, _sub} when property in @free_key_maps ->
+        :ok
+
+      {property, sub} ->
+        assert_closed(sub, path <> "." <> property, name)
+    end)
+
+    if is_map(schema["items"]), do: assert_closed(schema["items"], path <> "[]", name)
+  end
+
+  defp assert_closed(_other, _path, _name), do: :ok
 end
