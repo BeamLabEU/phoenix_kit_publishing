@@ -1,7 +1,15 @@
+defmodule PhoenixKit.Modules.Publishing.API.PresenterTest.Resolver do
+  @moduledoc false
+  def host_for("en"), do: "en.example.test"
+  def host_for("de"), do: "de.example.test"
+  def host_for(_), do: nil
+end
+
 defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
   use PhoenixKitPublishing.DataCase, async: false
 
   alias PhoenixKit.Modules.Publishing.API.Presenter
+  alias PhoenixKit.Modules.Publishing.API.PresenterTest.Resolver
   alias PhoenixKit.Modules.Publishing.{DBStorage, Posts, Versions}
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
 
@@ -83,6 +91,63 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
     {:ok, _} = PhoenixKit.Settings.update_setting("site_url", "https://example.test")
     {db, _versions, contents} = load(post[:uuid])
     assert %{"en-US" => "https://example.test" <> _} = Presenter.public_paths(db, contents)
+  end
+
+  describe "public_paths on language domains" do
+    setup %{g: g, post: post} do
+      Fx.languages!(["en-US", "en-GB", "de-DE", "fr-FR"])
+      Fx.translation!(g["slug"], post[:uuid], "en-GB", "Hello UK", "Body")
+      Fx.translation!(g["slug"], post[:uuid], "de-DE", "Hallo", "Inhalt")
+      Fx.translation!(g["slug"], post[:uuid], "fr-FR", "Salut", "Contenu")
+      Fx.publish!(g["slug"], post[:uuid])
+      {:ok, _} = PhoenixKit.Settings.update_setting("site_url", "https://example.test")
+      on_exit(fn -> Application.delete_env(:phoenix_kit, :canonical_host_resolver) end)
+
+      {db, _versions, contents} = load(post[:uuid])
+      %{db: db, contents: contents}
+    end
+
+    defp resolver!,
+      do: Application.put_env(:phoenix_kit, :canonical_host_resolver, {Resolver, :host_for})
+
+    test "without a resolver every language keeps the site origin and its prefix",
+         %{db: db, contents: contents} do
+      assert Presenter.public_paths(db, contents) == %{
+               "en-US" => "https://example.test/en/#{db.group.slug}/hello",
+               "en-GB" => "https://example.test/en-gb/#{db.group.slug}/hello",
+               "de-DE" => "https://example.test/de/#{db.group.slug}/hello",
+               "fr-FR" => "https://example.test/fr/#{db.group.slug}/hello"
+             }
+    end
+
+    @tag :canonical_origin
+    test "a language with a domain gets it, without the language segment",
+         %{db: db, contents: contents} do
+      resolver!()
+      slug = db.group.slug
+
+      paths = Presenter.public_paths(db, contents)
+      assert paths["de-DE"] == "https://de.example.test/#{slug}/hello"
+      assert paths["en-US"] == "https://en.example.test/#{slug}/hello"
+    end
+
+    @tag :canonical_origin
+    test "a sibling dialect loses its own segment, not the base one",
+         %{db: db, contents: contents} do
+      resolver!()
+
+      assert Presenter.public_paths(db, contents)["en-GB"] ==
+               "https://en.example.test/#{db.group.slug}/hello"
+    end
+
+    @tag :canonical_origin
+    test "a language without a domain falls back to the site origin and the prefix",
+         %{db: db, contents: contents} do
+      resolver!()
+
+      assert Presenter.public_paths(db, contents)["fr-FR"] ==
+               "https://example.test/fr/#{db.group.slug}/hello"
+    end
   end
 
   test "write_summary has no title, slug or public_paths and nothing that starts with pk_ (a post titled pk_sale)",

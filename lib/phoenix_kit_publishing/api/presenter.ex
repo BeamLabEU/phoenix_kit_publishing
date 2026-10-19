@@ -52,7 +52,11 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
     end
   end
 
-  @doc "`%{language => public path}` for every language row, built with the module's own URL helper and the site origin."
+  @doc """
+  `%{language => public URL}` for every language row, built with the module's own URL helper.
+  A language served from its own domain (core's `:canonical_host_resolver`) gets that domain and no
+  language segment; any other language gets the site origin and the prefixed path.
+  """
   def public_paths(db_post, contents, date_counts \\ nil) do
     post = path_post(db_post, contents)
 
@@ -61,7 +65,10 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
     |> Enum.uniq()
     |> Map.new(fn language ->
       {language,
-       with_origin(HTML.build_post_url(db_post.group.slug, post, language, date_counts))}
+       with_origin(
+         HTML.build_post_url(db_post.group.slug, post, language, date_counts),
+         language
+       )}
     end)
   end
 
@@ -78,8 +85,33 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
 
   defp blank_to(value, default), do: if(value in [nil, ""], do: default, else: value)
 
-  # The origin is the site's configured one, never core's ctx.base_url (which follows the Host header).
-  defp with_origin(path) do
+  # A language with a domain of its own: that domain, without the language segment (`segment:` is
+  # the one this module built the path with, so a sibling dialect such as `/en-gb` is stripped too).
+  # Everything else (no resolver, no domain for the language, an older core): the site's configured
+  # origin, never core's ctx.base_url (which follows the Host header), and the prefixed path.
+  defp with_origin(path, language) do
+    routes = routes_module()
+
+    if language_domain?(routes, language) do
+      routes.canonical_absolute(path, language,
+        segment: LanguageHelpers.public_url_segment(language)
+      )
+    else
+      site_origin(path)
+    end
+  end
+
+  defp language_domain?(routes, language) do
+    Code.ensure_loaded?(routes) and function_exported?(routes, :canonical_origin, 1) and
+      function_exported?(routes, :canonical_absolute, 3) and
+      routes.canonical_origin(language) != nil
+  end
+
+  # Core's language-domain helpers arrived after the Hex 2.63.0 core this module still builds on. The
+  # module is built at runtime so the compiler cannot flag a call to them as undefined on that core.
+  defp routes_module, do: Module.concat(["PhoenixKit", "Utils", "Routes"])
+
+  defp site_origin(path) do
     case HTML.public_origin() do
       origin when is_binary(origin) and origin != "" -> origin <> path
       _none -> path
