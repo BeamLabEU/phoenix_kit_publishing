@@ -87,8 +87,9 @@ defmodule PhoenixKit.Modules.Publishing.PostsLockedCheckTest do
       :ok
     end
 
-    result = Posts.update_post(g, stale, %{"title" => "X"}, locked_check: hook, publish: false)
-    assert {:error, _} = result
+    assert {:error, :not_found} =
+             Posts.update_post(g, stale, %{"title" => "X"}, locked_check: hook, publish: false)
+
     refute_received :hook_ran
   end
 
