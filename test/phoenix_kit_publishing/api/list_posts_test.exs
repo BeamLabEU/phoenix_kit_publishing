@@ -1,7 +1,7 @@
 defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
   use PhoenixKit.DataCase, async: false
 
-  alias PhoenixKit.Modules.Publishing.{Groups, Posts}
+  alias PhoenixKit.Modules.Publishing.{Groups, Posts, Versions}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo
@@ -151,6 +151,116 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
 
     assert {:error, :validation_failed, _, %{errors: [%{reason: "unknown_category"}]}} =
              list(g, %{"category_id" => foreign.uuid})
+  end
+
+  defp file!(g, post, version, category_uuids) do
+    {:ok, p} = Posts.read_post_by_uuid(post[:uuid], nil, version)
+
+    {:ok, _} =
+      Posts.update_post(g["slug"], p, %{"category_uuids" => category_uuids}, publish: false)
+  end
+
+  test "without a limit a page holds 20 posts and says there are more", %{g: g} do
+    for i <- 1..21, do: Fx.post!(g["slug"], %{title: "P#{i}", slug: "p#{i}"})
+
+    assert {:ok, %{"posts" => posts, "count" => 21, "next_cursor" => cursor}} = list(g)
+    assert length(posts) == 20 and is_binary(cursor)
+  end
+
+  test "the category filter follows the live version when there is one, even when a newer draft is filed elsewhere",
+       %{g: g} do
+    a = Fx.category!(g["slug"], "Alpha")
+    b = Fx.category!(g["slug"], "Beta")
+    post = Fx.post!(g["slug"], %{title: "Moving", slug: "moving"})
+    file!(g, post, 1, [a.uuid])
+    Fx.publish!(g["slug"], post[:uuid])
+    {:ok, _} = Versions.create_new_version(g["slug"], post, %{}, %{})
+    file!(g, post, 2, [b.uuid])
+
+    assert {:ok, %{"posts" => [%{"slug" => "moving"}]}} = list(g, %{"category_id" => a.uuid})
+    assert {:ok, %{"posts" => [], "count" => 0}} = list(g, %{"category_id" => b.uuid})
+  end
+
+  test "the category filter follows the latest version when nothing is live", %{g: g} do
+    a = Fx.category!(g["slug"], "Alpha")
+    b = Fx.category!(g["slug"], "Beta")
+    post = Fx.post!(g["slug"], %{title: "Drafty", slug: "drafty"})
+    file!(g, post, 1, [a.uuid])
+    {:ok, _} = Versions.create_new_version(g["slug"], post, %{}, %{})
+    file!(g, post, 2, [b.uuid])
+
+    assert {:ok, %{"posts" => [%{"slug" => "drafty"}]}} = list(g, %{"category_id" => b.uuid})
+    assert {:ok, %{"posts" => [], "count" => 0}} = list(g, %{"category_id" => a.uuid})
+  end
+
+  # Runs `fun` and returns the SQL texts of the queries it issued (the raw category query has no source).
+  defp queries(fun) do
+    agent = start_supervised!({Agent, fn -> [] end}, id: make_ref())
+    handler = "lp-q-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      Repo.config()[:telemetry_prefix] ++ [:query],
+      fn _e, _m, meta, _c -> Agent.update(agent, &[meta.query | &1]) end,
+      nil
+    )
+
+    fun.()
+    :telemetry.detach(handler)
+    Agent.get(agent, & &1)
+  end
+
+  test "the category filter is one query, however deep the subtree", %{g: g} do
+    parent = Fx.category!(g["slug"], "Parent")
+    child = Fx.category!(g["slug"], "Child", %{parent_uuid: parent.uuid})
+    grandchild = Fx.category!(g["slug"], "Grandchild", %{parent_uuid: child.uuid})
+    post = Fx.post!(g["slug"], %{title: "Deep", slug: "deep"})
+    file!(g, post, 1, [grandchild.uuid])
+
+    sql =
+      queries(fn -> assert {:ok, %{"count" => 1}} = list(g, %{"category_id" => parent.uuid}) end)
+
+    assert Enum.count(sql, &(&1 =~ "jsonb_exists_any")) == 1
+  end
+
+  test "the date counts of a timestamp group are computed once per page, not once per post" do
+    g = Fx.group!(mode: "timestamp")
+
+    for i <- 1..5 do
+      post = Fx.post!(g["slug"], %{title: "P#{i}"})
+      Fx.publish!(g["slug"], post[:uuid])
+    end
+
+    mfa = {PhoenixKit.Modules.Publishing.Web.Controller.Listing, :group_date_counts, 1}
+    :erlang.trace_pattern(mfa, true, [:call_count])
+    on_exit(fn -> :erlang.trace_pattern(mfa, false, [:call_count]) end)
+
+    assert {:ok, %{"posts" => posts}} =
+             ApiCase.call("publishing.list_posts", %{"group" => g["slug"]})
+
+    assert length(posts) == 5
+    assert {:call_count, 1} = :erlang.trace_info(mfa, :call_count)
+  end
+
+  test "a page of a timestamp group issues the same number of queries in a 30-post and a 60-post group" do
+    count_queries = fn n ->
+      g = Fx.group!(mode: "timestamp")
+
+      for i <- 1..n do
+        post = Fx.post!(g["slug"], %{title: "P#{i}"})
+        Fx.publish!(g["slug"], post[:uuid])
+      end
+
+      queries(fn ->
+        assert {:ok, %{"posts" => posts}} =
+                 ApiCase.call("publishing.list_posts", %{"group" => g["slug"], "limit" => 20})
+
+        assert length(posts) == 20
+      end)
+      |> length()
+    end
+
+    assert count_queries.(30) == count_queries.(60)
   end
 
   test "a page of 20 issues the same number of version and content queries in a 30-post and a 60-post group" do
