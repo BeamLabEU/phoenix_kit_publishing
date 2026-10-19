@@ -360,7 +360,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     {db_post.uuid, db_post.slug, db_post.trashed_at, db_post.active_version_uuid,
      db_post.post_date, db_post.post_time, group && group.status,
      Enum.map(versions, &{&1.version_number, &1.status, &1.published_at, fingerprint(&1.data)}),
-     Enum.map(contents, &{&1.language, digest(&1.title, &1.content)})}
+     Enum.map(contents, &{&1.language, &1.url_slug, digest(&1.title, &1.content)})}
   end
 
   @doc "Adds the NAMES (never the values) of the changed fields to the API log metadata."

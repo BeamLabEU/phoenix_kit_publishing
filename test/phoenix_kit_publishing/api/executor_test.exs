@@ -490,6 +490,43 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
     end
   end
 
+  describe "a public path shown in a preview" do
+    test "publish_post refuses the code after the url_slug of a language changed", ctx do
+      token = issue_token(ctx.user, scopes())
+      input = %{"post" => ref(ctx)}
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(token, "publishing.publish_post", input)
+
+      {:ok, _} = DBStorage.update_content(Fx.content(ctx.post[:uuid]), %{url_slug: "moved"})
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(token, "publishing.publish_post", Map.put(input, "confirm_token", code))
+
+      assert Fx.db_post(ctx.post[:uuid]).active_version_uuid == nil
+    end
+
+    test "unpublish_post refuses the code after the url_slug of a language changed", ctx do
+      token = issue_token(ctx.user, scopes())
+      Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+      input = %{"post" => ref(ctx)}
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(token, "publishing.unpublish_post", input)
+
+      {:ok, _} = DBStorage.update_content(Fx.content(ctx.post[:uuid]), %{url_slug: "moved"})
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 token,
+                 "publishing.unpublish_post",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert Fx.db_post(ctx.post[:uuid]).active_version_uuid != nil
+    end
+  end
+
   describe "unpublish_post" do
     setup ctx do
       Fx.publish!(ctx.g["slug"], ctx.post[:uuid])

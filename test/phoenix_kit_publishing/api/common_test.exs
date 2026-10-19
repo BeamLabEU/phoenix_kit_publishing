@@ -275,6 +275,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
         Common.post_state(db, group, [%{version | data: %{"x" => 1}}], [content]),
         Common.post_state(db, group, [], [content]),
         Common.post_state(db, group, [version], [%{content | language: "de"}]),
+        Common.post_state(db, group, [version], [%{content | url_slug: "another-path"}]),
         Common.post_state(db, group, [version], [])
       ]
 
