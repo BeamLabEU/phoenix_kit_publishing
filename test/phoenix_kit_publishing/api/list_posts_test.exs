@@ -101,6 +101,54 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
     assert page3 != []
   end
 
+  defp walk(g, extra, limit) do
+    Stream.unfold(nil, fn
+      :done ->
+        nil
+
+      cursor ->
+        input = Map.merge(extra, %{"limit" => limit})
+        input = if cursor, do: Map.put(input, "cursor", cursor), else: input
+        assert {:ok, %{"posts" => posts, "next_cursor" => next}} = list(g, input)
+        {posts, next || :done}
+    end)
+    |> Enum.to_list()
+    |> List.flatten()
+    |> Enum.map(& &1["id"])
+  end
+
+  test "walking the pages gives every post once, in the order of a single page, ties included",
+       %{g: g} do
+    for i <- 1..12, do: Fx.post!(g["slug"], %{title: "P#{i}", slug: "p#{i}"})
+    ts = Fx.group!(mode: "timestamp")
+    for i <- 1..8, do: Fx.post!(ts["slug"], %{title: "T#{i}"})
+
+    for group <- [g, ts] do
+      assert {:ok, %{"posts" => all, "count" => count}} = list(group, %{"limit" => 100})
+      ids = Enum.map(all, & &1["id"])
+      assert length(ids) == count and length(Enum.uniq(ids)) == count
+      assert walk(group, %{}, 3) == ids
+      assert walk(group, %{"status" => "draft"}, 5) == ids
+    end
+  end
+
+  test "the posts of a page are cut in the query: no query loads more than limit + 1 post rows",
+       %{g: g} do
+    for i <- 1..25, do: Fx.post!(g["slug"], %{title: "P#{i}", slug: "p#{i}"})
+    {:ok, %{"next_cursor" => cursor}} = list(g, %{"limit" => 5})
+
+    for extra <- [%{}, %{"status" => "draft"}, %{"status" => "all", "cursor" => cursor}] do
+      rows =
+        queries_with_rows(fn ->
+          assert {:ok, %{"posts" => posts}} = list(g, Map.merge(%{"limit" => 5}, extra))
+          assert length(posts) == 5
+        end)
+
+      post_rows = for {"phoenix_kit_publishing_posts", n} <- rows, do: n
+      assert post_rows != [] and Enum.max(post_rows) <= 6, inspect(extra)
+    end
+  end
+
   test "limit above 100 is trimmed with a warning", %{g: g} do
     assert {:error, :validation_failed, _, _} = list(g, %{"limit" => 0})
     assert {:ok, %{"warnings" => [%{"code" => "limit_trimmed"}]}} = list(g, %{"limit" => 500})
@@ -210,6 +258,28 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
     Agent.get(agent, & &1)
   end
 
+  # Runs `fun` and returns `{source, rows returned}` of every query it issued.
+  defp queries_with_rows(fun) do
+    agent = start_supervised!({Agent, fn -> [] end}, id: make_ref())
+    handler = "lp-r-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      Repo.config()[:telemetry_prefix] ++ [:query],
+      fn _e, _m, meta, _c ->
+        case meta.result do
+          {:ok, %{num_rows: n}} -> Agent.update(agent, &[{meta.source, n} | &1])
+          _ -> :ok
+        end
+      end,
+      nil
+    )
+
+    fun.()
+    :telemetry.detach(handler)
+    Agent.get(agent, & &1)
+  end
+
   test "the category filter is one query, however deep the subtree", %{g: g} do
     parent = Fx.category!(g["slug"], "Parent")
     child = Fx.category!(g["slug"], "Child", %{parent_uuid: parent.uuid})
@@ -232,14 +302,35 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
     end
 
     mfa = {PhoenixKit.Modules.Publishing.Web.Controller.Listing, :group_date_counts, 1}
-    :erlang.trace_pattern(mfa, true, [:call_count])
-    on_exit(fn -> :erlang.trace_pattern(mfa, false, [:call_count]) end)
+    test_pid = self()
+
+    tracer =
+      spawn_link(fn ->
+        forward = fn forward ->
+          receive do
+            {:trace, _pid, :call, {_module, :group_date_counts, _args}} ->
+              send(test_pid, :date_counts_computed)
+              forward.(forward)
+          end
+        end
+
+        forward.(forward)
+      end)
+
+    # a module that is not loaded yet takes no trace pattern
+    {:module, _} = Code.ensure_loaded(elem(mfa, 0))
+    :erlang.trace_pattern(mfa, true, [:local])
+    :erlang.trace(self(), true, [:call, {:tracer, tracer}])
+
+    on_exit(fn -> :erlang.trace_pattern(mfa, false, [:local]) end)
 
     assert {:ok, %{"posts" => posts}} =
              ApiCase.call("publishing.list_posts", %{"group" => g["slug"]})
 
+    :erlang.trace(self(), false, [:call])
     assert length(posts) == 5
-    assert {:call_count, 1} = :erlang.trace_info(mfa, :call_count)
+    assert_receive :date_counts_computed, 1000
+    refute_receive :date_counts_computed, 100
   end
 
   test "a page of a timestamp group issues the same number of queries in a 30-post and a 60-post group" do

@@ -3,7 +3,7 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashGroups do
   # Tool `publishing.trash_groups`: move groups to the trash (reversible with restore_groups).
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
-  alias PhoenixKit.Modules.Publishing.{DBStorage, Groups}
+  alias PhoenixKit.Modules.Publishing.Groups
 
   @tool "publishing.trash_groups"
 
@@ -84,16 +84,8 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashGroups do
     Common.preview(rows, %{"requires_confirmation" => true}, {:trash_groups, term})
   end
 
-  defp with_counts({:trash, ref, group}) do
-    posts = DBStorage.list_posts(group.slug)
-
-    counts = %{
-      "post_count" => length(posts),
-      "live_posts" => Enum.count(posts, &(&1.active_version_uuid != nil))
-    }
-
-    {{:trash, ref, group}, counts}
-  end
+  defp with_counts({:trash, ref, group}),
+    do: {{:trash, ref, group}, Common.group_post_counts!(group.slug)}
 
   defp with_counts({:already, ref, group}), do: {{:already, ref, group}, nil}
   defp with_counts({:error, _ref, _row} = entry), do: entry

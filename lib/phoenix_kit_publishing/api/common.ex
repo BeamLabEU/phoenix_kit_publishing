@@ -16,7 +16,6 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     PublishingContent,
     PublishingGroup,
     PublishingPost,
-    PublishingVersion,
     SlugHelpers
   }
 
@@ -506,25 +505,45 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     end)
   end
 
-  @doc "Published-post counts per category: the query of Categories.published_post_counts/1 WITHOUT its rescue."
+  @doc """
+  Published-post counts per category (a post counts once per category, by its live version), the
+  numbers of Categories.published_post_counts/1 WITHOUT its rescue, grouped in the database: one
+  row per category comes back, not one per post.
+  """
   @spec published_post_counts!(String.t()) :: %{optional(String.t()) => pos_integer()}
   def published_post_counts!(group_slug) do
-    from(p in PublishingPost,
-      join: g in PublishingGroup,
-      on: g.uuid == p.group_uuid,
-      join: v in PublishingVersion,
-      on: v.uuid == p.active_version_uuid,
-      where: g.slug == ^group_slug and is_nil(p.trashed_at),
-      select: {p.uuid, fragment("? -> 'category_uuids'", v.data)}
-    )
-    |> repo().all()
-    |> Enum.reduce(%{}, fn {_post, uuids}, acc ->
-      uuids
-      |> List.wrap()
-      |> Enum.filter(&is_binary/1)
-      |> Enum.uniq()
-      |> Enum.reduce(acc, fn uuid, inner -> Map.update(inner, uuid, 1, &(&1 + 1)) end)
-    end)
+    sql = """
+    SELECT c.item #>> '{}', count(DISTINCT p.uuid)
+    FROM phoenix_kit_publishing_posts p
+    JOIN phoenix_kit_publishing_groups g ON g.uuid = p.group_uuid
+    JOIN phoenix_kit_publishing_versions v ON v.uuid = p.active_version_uuid,
+    jsonb_array_elements(CASE jsonb_typeof(v.data -> 'category_uuids')
+                           WHEN 'array' THEN v.data -> 'category_uuids'
+                           WHEN 'string' THEN jsonb_build_array(v.data -> 'category_uuids')
+                           ELSE '[]'::jsonb END) AS c(item)
+    WHERE g.slug = $1 AND p.trashed_at IS NULL AND jsonb_typeof(c.item) = 'string'
+    GROUP BY c.item #>> '{}'
+    """
+
+    repo().query!(sql, [group_slug]).rows |> Map.new(fn [uuid, count] -> {uuid, count} end)
+  end
+
+  @doc """
+  `%{"post_count" => posts that are not trashed, "live_posts" => those with a live version}` of a
+  group, counted in one query.
+  """
+  @spec group_post_counts!(String.t()) :: %{String.t() => non_neg_integer()}
+  def group_post_counts!(group_slug) do
+    {posts, live} =
+      from(p in PublishingPost,
+        join: g in PublishingGroup,
+        on: g.uuid == p.group_uuid,
+        where: g.slug == ^group_slug and is_nil(p.trashed_at),
+        select: {count(p.uuid), count(p.active_version_uuid)}
+      )
+      |> repo().one()
+
+    %{"post_count" => posts, "live_posts" => live}
   end
 
   @doc "`%{category_uuid => number of versions of the group that name it}`, one query for all uuids."

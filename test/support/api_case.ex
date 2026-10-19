@@ -90,6 +90,7 @@ defmodule PhoenixKitPublishing.Test.ApiCase do
         end
       end)
 
+    {:module, _} = Code.ensure_loaded(Posts)
     :erlang.trace_pattern({Posts, :update_post, 4}, true, [:local])
     :erlang.trace(:processes, true, [:call, {:tracer, tracer}])
 

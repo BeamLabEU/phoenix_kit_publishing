@@ -12,6 +12,28 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
+  # `{result, [{sql, rows returned}]}` of the queries `fun` issued.
+  defp queries_with_rows(fun) do
+    agent = start_supervised!({Agent, fn -> [] end}, id: make_ref())
+    handler = "common-q-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      TestRepo.config()[:telemetry_prefix] ++ [:query],
+      fn _e, _m, meta, _c ->
+        case meta.result do
+          {:ok, %{num_rows: n}} -> Agent.update(agent, &[{meta.query, n} | &1])
+          _ -> :ok
+        end
+      end,
+      nil
+    )
+
+    result = fun.()
+    :telemetry.detach(handler)
+    {result, agent |> Agent.get(& &1) |> Enum.reverse()}
+  end
+
   describe "write_opts/3" do
     test "carries actor, auto mode, scope and the API metadata, never :mode" do
       ctx = ApiCase.ctx(%{approved_by_uuid: "00000000-0000-7000-8000-0000000000aa"})
@@ -396,6 +418,45 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       assert one != two
       assert Common.published_post_counts!(g["slug"]) == %{a.uuid => 2, b.uuid => 1}
       assert Common.published_post_counts!(other["slug"]) == %{c.uuid => 1}
+    end
+
+    test "published_post_counts!/1 aggregates in one query that returns a row per category, not per post" do
+      g = Fx.group!()
+      a = Fx.category!(g["slug"], "Cat A")
+      b = Fx.category!(g["slug"], "Cat B")
+      for i <- 1..6, do: published_post!(g, "p#{i}", [a.uuid, b.uuid])
+
+      {counts, queries} = queries_with_rows(fn -> Common.published_post_counts!(g["slug"]) end)
+
+      assert counts == %{a.uuid => 6, b.uuid => 6}
+      assert [{_sql, 2}] = queries
+    end
+
+    test "published_post_counts!/1 ignores entries that are not strings and reads a lone string like the list of one" do
+      g = Fx.group!()
+      a = Fx.category!(g["slug"], "Cat A")
+      published_post!(g, "mixed", [a.uuid, 7, nil, true, %{"x" => 1}])
+      published_post!(g, "lone", a.uuid)
+      published_post!(g, "odd", 5)
+
+      assert Common.published_post_counts!(g["slug"]) == %{a.uuid => 2}
+    end
+
+    test "group_post_counts!/1 counts the posts that are not trashed and the live ones in one query" do
+      g = Fx.group!()
+      assert Common.group_post_counts!(g["slug"]) == %{"post_count" => 0, "live_posts" => 0}
+
+      live = published_post!(g, "live", [])
+      Fx.post!(g["slug"], %{title: "Draft", slug: "draft"})
+      gone = published_post!(g, "gone", [])
+      {:ok, _} = Posts.trash_post(g["slug"], gone)
+      other = Fx.group!()
+      published_post!(other, "elsewhere", [])
+
+      {counts, queries} = queries_with_rows(fn -> Common.group_post_counts!(g["slug"]) end)
+      assert counts == %{"post_count" => 2, "live_posts" => 1}
+      assert [{_sql, 1}] = queries
+      _ = live
     end
 
     test "a database error raises instead of answering an empty result" do
