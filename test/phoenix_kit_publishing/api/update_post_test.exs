@@ -149,6 +149,23 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     assert Fx.content(ctx.post[:uuid]).title == String.duplicate("a", 500)
   end
 
+  for {kind, overrides} <- [{"write", %{}}, {"dry run", %{dry_run?: true}}] do
+    test "with the categories table broken the category_ids check of a #{kind} raises, never unknown_category",
+         ctx do
+      own = Fx.category!(ctx.g["slug"], "Own")
+
+      TestRepo.query!(
+        "ALTER TABLE phoenix_kit_publishing_categories RENAME TO phoenix_kit_publishing_categories_x"
+      )
+
+      assert_raise Postgrex.Error, fn ->
+        edit(ctx, %{"category_ids" => [own.uuid]}, unquote(Macro.escape(overrides)))
+      end
+
+      # rolled back with the sandbox transaction
+    end
+  end
+
   test "category_ids compare as a set and duplicates are stored once", ctx do
     a = Fx.category!(ctx.g["slug"], "Cat A")
     b = Fx.category!(ctx.g["slug"], "Cat B")
