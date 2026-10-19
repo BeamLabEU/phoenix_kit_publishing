@@ -282,7 +282,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
     Common.preview(
       [row],
       %{"requires_confirmation" => false},
-      {:update_post, :unchanged,
+      {:update_post, :unchanged, t.language,
        Common.post_state(t.hit.db_post, t.hit.group, [t.version], t.contents)}
     )
   end
@@ -312,8 +312,8 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
           do: {field, c["scope"], Common.sha256(:erlang.term_to_binary(c["to"]))}
 
     term =
-      {:update_post, Common.post_state(t.hit.db_post, t.hit.group, [t.version], t.contents),
-       new_values}
+      {:update_post, t.language,
+       Common.post_state(t.hit.db_post, t.hit.group, [t.version], t.contents), new_values}
 
     Common.preview([row], %{"requires_confirmation" => Danger.update_post(t.input, ctx)}, term)
   end

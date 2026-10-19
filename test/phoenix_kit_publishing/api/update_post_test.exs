@@ -166,6 +166,23 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     end
   end
 
+  test "the fingerprint pins the language the write lands in, also when the language is omitted",
+       ctx do
+    Fx.translation!(ctx.g["slug"], ctx.post[:uuid], "de-DE", "Hallo", "Inhalt")
+
+    preview = fn ->
+      assert {:preview, _, fingerprint} = edit(ctx, %{"title" => "New"}, %{dry_run?: true})
+      fingerprint
+    end
+
+    before = preview.()
+    assert before == preview.()
+
+    # the primary language, which an omitted language means, changes between preview and confirm
+    Fx.languages!(["de-DE", "en-US"])
+    refute preview.() == before
+  end
+
   test "category_ids compare as a set and duplicates are stored once", ctx do
     a = Fx.category!(ctx.g["slug"], "Cat A")
     b = Fx.category!(ctx.g["slug"], "Cat B")
