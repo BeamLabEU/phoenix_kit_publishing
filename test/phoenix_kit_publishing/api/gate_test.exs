@@ -1,6 +1,8 @@
 defmodule PhoenixKit.Modules.Publishing.API.GateTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias PhoenixKit.Modules.Publishing.API
   alias PhoenixKit.Modules.Publishing.API.{Gate, Tools}
 
@@ -18,6 +20,11 @@ defmodule PhoenixKit.Modules.Publishing.API.GateTest do
     assert API.tools(true) == Tools.all()
   end
 
+  test "an open gate logs nothing" do
+    :persistent_term.erase({API, :withheld_logged})
+    assert capture_log([level: :warning], fn -> API.tools(true) end) == ""
+  end
+
   test "the gate asks for exactly the two functions of the confirmation flow" do
     assert Gate.markers() == [{PhoenixKit.API.Keys, :active?, 1}, {PhoenixKit.API.Flow, :gate, 1}]
   end
@@ -32,6 +39,17 @@ defmodule PhoenixKit.Modules.Publishing.API.GateTest do
     setup do
       Application.put_env(:phoenix_kit_publishing, :gate_extra_markers, [{NoSuchModule, :x, 0}])
       on_exit(fn -> Application.delete_env(:phoenix_kit_publishing, :gate_extra_markers) end)
+    end
+
+    test "warns once that tools are withheld and names the missing function" do
+      :persistent_term.erase({API, :withheld_logged})
+      on_exit(fn -> :persistent_term.erase({API, :withheld_logged}) end)
+
+      log = capture_log([level: :warning], fn -> API.tools() end)
+      assert log =~ "withheld"
+      assert log =~ "NoSuchModule"
+
+      assert capture_log([level: :warning], fn -> API.tools() end) == ""
     end
 
     test "closes the gate and tools/0 withholds every tool with a danger" do
