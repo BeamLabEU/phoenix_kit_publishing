@@ -279,6 +279,20 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
     assert hd(row2["goes_live"]["languages"])["head"] =~ "<script>"
   end
 
+  test "the fingerprint follows the scheduled minute and the version", ctx do
+    fingerprint = fn extra, publish_at ->
+      assert {:preview, _, fingerprint} = schedule(ctx, publish_at, extra, %{dry_run?: true})
+      fingerprint
+    end
+
+    assert fingerprint.(%{}, at(10)) == fingerprint.(%{}, at(10))
+    refute fingerprint.(%{}, at(10)) == fingerprint.(%{}, at(11))
+    refute fingerprint.(%{}, at(10, "09:30")) == fingerprint.(%{}, at(10, "09:31"))
+
+    {:ok, _} = Versions.create_new_version(ctx.g["slug"], ctx.post, %{}, %{})
+    refute fingerprint.(%{"version" => 1}, at(10)) == fingerprint.(%{"version" => 2}, at(10))
+  end
+
   test "a failing publish step on a post that already sits on the slot undoes nothing", ctx do
     assert {:ok, %{"action" => "scheduled"}} = schedule(ctx, at(10))
     {:ok, _} = Versions.create_new_version(ctx.g["slug"], ctx.post, %{}, %{})

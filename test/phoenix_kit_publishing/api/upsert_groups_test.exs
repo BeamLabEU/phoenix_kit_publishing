@@ -340,6 +340,20 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertGroupsTest do
     assert f2 != f3
   end
 
+  test "the fingerprint follows the new values of an update, not only the stored group" do
+    {:ok, _} = upsert([%{"slug" => "docs", "name" => "Docs", "mode" => "slug"}])
+
+    preview = fn name ->
+      assert {:preview, _, fingerprint} =
+               upsert([%{"slug" => "docs", "name" => name}], %{dry_run?: true})
+
+      fingerprint
+    end
+
+    assert preview.("One") == preview.("One")
+    refute preview.("One") == preview.("Two")
+  end
+
   test "a dry run of a create does not require a confirmation and writes nothing" do
     before = Fx.table_state()
 
