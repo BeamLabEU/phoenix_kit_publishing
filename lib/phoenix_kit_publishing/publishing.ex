@@ -711,9 +711,8 @@ defmodule PhoenixKit.Modules.Publishing do
   @spec media_reorganizer() :: module()
   def media_reorganizer, do: PhoenixKit.Modules.Publishing.MediaReorganizer
 
-  # The machine API's admin tools (`PhoenixKit.Modules.Publishing.API`). `api_tools/0` is an
-  # optional `PhoenixKit.Module` callback. No `@impl`: the core floor predates the callback,
-  # where `@impl` would warn.
+  # The machine API's admin tools (`PhoenixKit.Modules.Publishing.API`).
+  @impl PhoenixKit.Module
   @spec api_tools() :: [PhoenixKit.API.Tool.t()]
   def api_tools, do: API.tools()
 
