@@ -5,7 +5,7 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
   # text is dangerous when the text holds raw HTML or a component (`<` + letter, `/`, `!`,
   # `?`), the `[[post:` token, `javascript:` / `vbscript:` / `data:` (whitespace removed, any
   # case), a markdown link / image destination outside http, https, mailto, tel and
-  # relative, or a bare `scheme://` (or `xmpp:`) in the text: the renderer enables the GFM
+  # relative (`//host` is another site, not relative), or a bare `scheme://` (or `xmpp:`) in the text: the renderer enables the GFM
   # autolink extension, which turns those into live links. O(n) time and memory.
 
   @max_body_bytes 262_144
@@ -201,6 +201,10 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
     zone = dest |> :binary.split(["/", "?", "#"]) |> hd()
 
     cond do
+      # `//host/path` is not a path of this site: the visitor lands on another host
+      String.starts_with?(dest, ["//", "<//"]) ->
+        true
+
       String.contains?(zone, ["&", "\\"]) or control?(zone) ->
         true
 

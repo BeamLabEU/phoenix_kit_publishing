@@ -139,7 +139,7 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
     "word&nbsp;word",
     "[c]: mailto:x@y.z\n[c2]: tel:+123456789",
     "[call](tel:+123456789) and [mailto](mailto:a@b.c) and [c]",
-    "[proto](//example.com/x) and [rel](../up/x.md) and [frag](#anchor)",
+    "[rel](../up/x.md) and [frag](#anchor)",
     "para text\n[adj]: https://example.com/adj\n[adj]",
     "[amp](https://h/?a=1&amp;b=2) and [dec](https://h/&#47;x)",
     "![alt](https://h/i.png \"title\") [t](/p 'title')",

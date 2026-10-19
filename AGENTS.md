@@ -64,8 +64,8 @@ Deliberate non-features, so nobody adds them assuming they were missed.
   `html_sanitize_ex` in front of it. See `render_markdown_html/1` in
   `renderer.ex`. The machine API does not sanitise either: a write whose body
   text holds HTML, components, post links or link destinations outside http,
-  https, mailto, tel and relative is a confirmed write (`API.TextScan`); AI jobs
-  and the editor bypass that rule.
+  https, mailto, tel and relative (`//host` is not relative) is a confirmed write
+  (`API.TextScan`); AI jobs and the editor bypass that rule.
 - **No hard delete, stale fixer or media reorganizer in the machine API.** It
   never deletes a group, post, version or language (trashing is the removal it
   offers) and exposes neither `StaleFixer` nor `MediaReorganizer`. The one
@@ -440,7 +440,7 @@ fail-closed: unprovable or raising means dangerous):
 The text rule is `API.TextScan.dangerous?/1`: `<` followed by a letter, `/`, `!`
 or `?`; the token `[[post:`; `javascript:` / `vbscript:` / `data:` after removing
 whitespace; a markdown link or image destination outside http, https, mailto, tel
-and relative. It scans the submitted string only (no rendering), applies to draft
+and relative (`//host` is not relative). It scans the submitted string only (no rendering), applies to draft
 writes too, and caps a body field at 262,144 bytes. Tools exist only when the
 loaded core can enforce the flow (`API.Gate`): otherwise every tool with a
 `danger` is withheld.
