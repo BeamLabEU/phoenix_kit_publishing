@@ -4,7 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
   import Ecto.Query, only: [from: 2]
   import PhoenixKitPublishing.ActivityLogAssertions
 
-  alias PhoenixKit.Modules.Publishing.API.Danger
+  alias PhoenixKit.Modules.Publishing.API.{Danger, TextScan}
   alias PhoenixKit.Modules.Publishing.{Groups, Posts, PublishingContent, PublishingPost}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
@@ -76,7 +76,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
   test "a body of 262,144 bytes of brackets, which the text rule lets through, saves in bounded time",
        ctx do
     body = String.duplicate("[", 262_144)
-    refute PhoenixKit.Modules.Publishing.API.TextScan.dangerous?(body)
+    refute TextScan.dangerous?(body)
 
     {us, result} = :timer.tc(fn -> edit(ctx, %{"content" => body}) end)
 

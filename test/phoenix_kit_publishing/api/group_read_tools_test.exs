@@ -1,11 +1,13 @@
 defmodule PhoenixKit.Modules.Publishing.API.GroupReadToolsTest do
   use PhoenixKit.DataCase, async: false
 
+  alias Ecto.Adapters.SQL
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.GroupSettings
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
+  alias PhoenixKitPublishing.Test.Repo
 
   describe "publishing.list_groups" do
     test "lists active groups with settings and post counts; trashed ones by status" do
@@ -34,8 +36,8 @@ defmodule PhoenixKit.Modules.Publishing.API.GroupReadToolsTest do
     test "reads a stale group as stored: the row is not repaired by the read" do
       g = Fx.group!()
 
-      Ecto.Adapters.SQL.query!(
-        PhoenixKitPublishing.Test.Repo,
+      SQL.query!(
+        Repo,
         "UPDATE phoenix_kit_publishing_groups SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{type}', '\"bogus\"') WHERE slug = $1",
         [g["slug"]]
       )
