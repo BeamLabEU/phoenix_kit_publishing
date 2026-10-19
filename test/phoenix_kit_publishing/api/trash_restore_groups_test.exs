@@ -59,6 +59,16 @@ defmodule PhoenixKit.Modules.Publishing.API.TrashRestoreGroupsTest do
     assert {:ok, %{"summary" => %{"restored" => 1}}} = restore([g["slug"]])
     assert g["slug"] in slugs("active")
 
+    restored = assert_activity_logged("publishing.group.restored", resource_uuid: g["uuid"])
+    assert restored.mode == "auto"
+
+    assert Map.take(restored.metadata, ~w(via key_prefix request_id tool)) == %{
+             "via" => "api",
+             "key_prefix" => "abcd1234",
+             "request_id" => "req-test",
+             "tool" => "publishing.restore_groups"
+           }
+
     assert {:ok, %{"action" => "created"}} =
              ApiCase.call("publishing.create_post", %{"group" => g["slug"], "title" => "x"})
   end

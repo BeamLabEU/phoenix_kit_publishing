@@ -53,6 +53,34 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
     assert db.active_version_uuid == Fx.version(ctx.post[:uuid]).uuid
   end
 
+  defp assert_attributed(row) do
+    assert row.mode == "auto"
+
+    assert Map.take(row.metadata, ~w(via key_prefix request_id tool)) == %{
+             "via" => "api",
+             "key_prefix" => "abcd1234",
+             "request_id" => "req-test",
+             "tool" => "publishing.schedule_post"
+           }
+  end
+
+  # The rows the tool wrote (fixtures write their own, unattributed ones).
+  defp rows(action),
+    do:
+      Enum.filter(
+        list_activities(),
+        &(&1.action == action and &1.metadata["tool"] == "publishing.schedule_post")
+      )
+
+  test "both writes of a schedule, the move and the publish, are attributed to the key", ctx do
+    assert {:ok, %{"action" => "scheduled"}} = schedule(ctx, at(10))
+
+    assert [moved] = rows("publishing.post.updated")
+    assert [published] = rows("publishing.version.published")
+    assert_attributed(moved)
+    assert_attributed(published)
+  end
+
   test "a slug-mode group cannot schedule" do
     slug_group = Fx.group!(mode: "slug")
     p = Fx.post!(slug_group["slug"], %{title: "T", slug: "t"})
@@ -165,6 +193,10 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
     refute Map.has_key?(context, :left_behind)
     assert stamp(ctx) == old
     assert Fx.db_post(ctx.post[:uuid]).active_version_uuid == nil
+
+    # the move and its undo are both attributed
+    assert [_move, _undo] = moves = rows("publishing.post.updated")
+    Enum.each(moves, &assert_attributed/1)
 
     # The undo goes through update_post, which also writes the version's published_at: it follows
     # the restored date and time, not the scheduled value step 1 had written.
