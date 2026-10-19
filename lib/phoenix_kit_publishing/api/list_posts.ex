@@ -110,15 +110,15 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
 
   defp subtree(root, categories) do
     by_parent = Enum.group_by(categories, & &1.parent_uuid, & &1.uuid)
-    walk([root], by_parent, MapSet.new()) |> MapSet.to_list()
+    walk([root], by_parent, %{}) |> Map.keys()
   end
 
   defp walk([], _by_parent, seen), do: seen
 
   defp walk([uuid | rest], by_parent, seen) do
-    if MapSet.member?(seen, uuid),
+    if Map.has_key?(seen, uuid),
       do: walk(rest, by_parent, seen),
-      else: walk(Map.get(by_parent, uuid, []) ++ rest, by_parent, MapSet.put(seen, uuid))
+      else: walk(Map.get(by_parent, uuid, []) ++ rest, by_parent, Map.put(seen, uuid, true))
   end
 
   # --- cursor ------------------------------------------------------------------------------
