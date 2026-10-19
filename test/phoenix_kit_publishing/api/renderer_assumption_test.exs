@@ -1,5 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
-  # Tests the assumption of spec §14.2, it does not prove it. A failure is a bug in the rule.
+  # Tests the assumption that the text rule covers what the renderer turns into markup;
+  # it does not prove it. A failure is a bug in the rule.
   use ExUnit.Case, async: true
 
   alias PhoenixKit.Modules.Publishing.API.TextScan
@@ -24,6 +25,52 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
       html = render(doc)
       check_html(n, doc, html)
     end
+  end
+
+  # Bare URLs are turned into links by the autolink extension; every document the renderer
+  # turns into an active link must be flagged by the rule.
+  @autolink_pieces [
+    "ftp://evil.example/x",
+    "FTP://E.X/y",
+    "file:///etc/passwd",
+    "intent://scan/#Intent;scheme=zxing;end",
+    "irc://x and ssh://x and git://x",
+    "chrome://settings",
+    "svn+ssh://h/p",
+    "x-scheme+1.2://h",
+    "1ftp://x",
+    "a_ftp://x",
+    "(ftp://x)",
+    "javascript://x%0aalert(1)",
+    "xmpp:a@b.c",
+    "text\nxmpp:a@b.c.d",
+    "https://example.com/ok then ftp://x"
+  ]
+
+  test "a document the renderer turns into an unsafe link is flagged when it holds a bare URL" do
+    :rand.seed(:exsss, {@seed, @seed, @seed})
+
+    unsafe =
+      for n <- 1..2_000, reduce: 0 do
+        count ->
+          doc =
+            generate() <>
+              separator() <> Enum.random(@autolink_pieces) <> separator() <> generate()
+
+          refute String.contains?(doc, "<"), "generator bug (seed #{@seed}, doc #{n})"
+          html = render(doc)
+
+          unsafe? =
+            Regex.scan(~r/(?:href|src)="([^"]*)"/i, html)
+            |> Enum.any?(fn [_, url] -> not safe_url?(url) end)
+
+          if unsafe? and not TextScan.dangerous?(doc),
+            do: flunk("unflagged unsafe link. " <> failure(n, doc, html))
+
+          if unsafe?, do: count + 1, else: count
+      end
+
+    assert unsafe > 1_000, "the pieces no longer produce unsafe links (#{unsafe} of 2000)"
   end
 
   # The messages are built only when an assertion fails.

@@ -60,7 +60,25 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     {"link_scheme", "[x](java&Tab;script:alert(1))"},
     {"link_scheme", "[x](javascript&colon;alert(1))"},
     {"link_scheme", "[x](jav\\ascript:alert(1))"},
-    {"link_scheme", "[r]: &#106;avascript:alert(1)"}
+    {"link_scheme", "[r]: &#106;avascript:alert(1)"},
+    # autolink_scheme: the renderer autolinks a bare scheme://... of any scheme
+    {"autolink_scheme", "ftp://evil.example/x"},
+    {"autolink_scheme", "FTP://evil.example/x"},
+    {"autolink_scheme", "file:///etc/passwd"},
+    {"autolink_scheme", "intent://scan/#Intent;scheme=zxing;end"},
+    {"autolink_scheme", "irc://x"},
+    {"autolink_scheme", "ssh://x"},
+    {"autolink_scheme", "git://x"},
+    {"autolink_scheme", "chrome://settings"},
+    {"autolink_scheme", "svn+ssh://h/p"},
+    {"autolink_scheme", "1ftp://x"},
+    {"autolink_scheme", "a_ftp://x"},
+    {"autolink_scheme", "see (ftp://x) here"},
+    {"autolink_scheme", "https://h/redirect?to=ftp://x"},
+    {"autolink_scheme", "javascript://x%0aalert(1)"},
+    {"autolink_scheme", "xmpp:a@b.c"},
+    {"autolink_scheme", "XMPP:a@b.c"},
+    {"autolink_scheme", "prose xmpp:a@b.c.d more"}
   ]
 
   @clean [
@@ -76,6 +94,10 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     "[x](mailto:a@b.c) [x](tel:+123)",
     "[x](/path) [x](//host/p) [x](#frag) [x](?a=1&b=2) [x](page.html) [x](../up) [x](a/b:c)",
     "![x](/file/uuid/large/ab12)",
+    "see http://h/p and HTTPS://h/p and https://h/?next=https://other/x",
+    "(https://h/paren) and +http://h/x",
+    # not autolinked by the renderer (checked against it), so not flagged
+    "Hours: 9-5. Note: sms:+123 skype:abc tel:+123 foo:bar ftp:/x ://h",
     "[x](https://h/p?a=1&b=2)",
     "[r]: https://h/p",
     ""
@@ -190,7 +212,12 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
         "java then spaces" => "java" <> String.duplicate(" ", @size - 4),
         ": repeated" => pad(":"),
         "& and backslash" => pad("&\\"),
-        "one long line" => pad("word ")
+        "one long line" => pad("word "),
+        "://  repeated" => pad("://"),
+        "a:// repeated" => pad("a://"),
+        "scheme chars then ://" => binary_part(pad("a1+.-"), 0, @size - 3) <> "://",
+        "scheme chars only" => pad("a1+.-"),
+        "xmpp: repeated" => pad("xmpp:")
       }
 
       for {name, text} <- inputs do

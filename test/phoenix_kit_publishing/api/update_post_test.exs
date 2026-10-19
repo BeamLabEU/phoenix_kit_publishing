@@ -100,10 +100,13 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
 
   test "og_title alone keeps the stored og description and image", ctx do
     image = Ecto.UUID.generate()
-    {:ok, _} = edit(ctx, %{"og_title" => "T1", "og_description" => "D1", "og_image_id" => image})
+
+    {:ok, _} =
+      edit(ctx, %{"og_title" => "T1", "og_description" => "Desc 1", "og_image_id" => image})
+
     {:ok, _} = edit(ctx, %{"og_title" => "T2"})
     og = PublishingContent.get_og(Fx.content(ctx.post[:uuid]))
-    assert og["title"] == "T2" and og["description"] == "D1" and og["image_uuid"] == image
+    assert og["title"] == "T2" and og["description"] == "Desc 1" and og["image_uuid"] == image
   end
 
   test "category_ids of the group are accepted, of another group refused", ctx do
@@ -390,6 +393,16 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
              edit(ctx, %{"title" => "X", "version" => 1}, %{dry_run?: true})
 
     assert row["live"] == true and row["public"] != "none"
+  end
+
+  test "a bare non-http URL in a draft body requires the confirmation", ctx do
+    for url <- ["ftp://evil.example/x", "intent://scan/#Intent;scheme=zxing;end", "xmpp:a@b.c"] do
+      assert {:preview, %{"requires_confirmation" => true}, _} =
+               edit(ctx, %{"content" => "see " <> url}, %{dry_run?: true})
+    end
+
+    assert {:preview, %{"requires_confirmation" => false}, _} =
+             edit(ctx, %{"content" => "see https://example.com/x"}, %{dry_run?: true})
   end
 
   test "the preview clips long text to 500 characters and labels version-level fields", ctx do

@@ -1,11 +1,12 @@
 defmodule PhoenixKit.Modules.Publishing.API.TextScan do
   @moduledoc false
-  # The text danger rule of the Publishing API (spec §14.2, owner decision D8): a fail-closed
+  # The text danger rule of the Publishing API: a fail-closed
   # scan of a SUBMITTED string. It renders nothing and parses no markdown. A write of body
   # text is dangerous when the text holds raw HTML or a component (`<` + letter, `/`, `!`,
   # `?`), the `[[post:` token, `javascript:` / `vbscript:` / `data:` (whitespace removed, any
-  # case), or a markdown link / image destination outside http, https, mailto, tel and
-  # relative. O(n) time and memory.
+  # case), a markdown link / image destination outside http, https, mailto, tel and
+  # relative, or a bare `scheme://` (or `xmpp:`) in the text: the renderer enables the GFM
+  # autolink extension, which turns those into live links. O(n) time and memory.
 
   @max_body_bytes 262_144
   @max_scan_bytes 2_097_152
@@ -13,6 +14,17 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
   @fragment_chars 80
   @schemes ~w(http https mailto tel)
   @scheme_needles ["javascript:", "vbscript:", "data:"]
+  # "xmpp:" in every letter case (`:binary.matches/2` has no caseless mode).
+  @xmpp_needles for mask <- 0..15,
+                    do:
+                      "xmpp:"
+                      |> String.graphemes()
+                      |> Enum.with_index()
+                      |> Enum.map_join(fn {char, i} ->
+                        if Bitwise.band(mask, Bitwise.bsl(1, i)) != 0,
+                          do: String.upcase(char),
+                          else: char
+                      end)
 
   @doc "The cap on one body field the handlers enforce before the scan."
   def max_body_bytes, do: @max_body_bytes
@@ -22,7 +34,8 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
 
   @spec dangerous?(term()) :: boolean()
   def dangerous?(text) when is_binary(text) and byte_size(text) <= @max_scan_bytes do
-    html(text) != [] or post_link(text) != [] or scheme(text) != [] or link_scheme(text) != []
+    html(text) != [] or post_link(text) != [] or scheme(text) != [] or link_scheme(text) != [] or
+      autolink_scheme(text) != []
   end
 
   def dangerous?(_other), do: true
@@ -33,7 +46,8 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
       {"html", html(text)},
       {"post_link", post_link(text)},
       {"scheme", scheme(text)},
-      {"link_scheme", link_scheme(text)}
+      {"link_scheme", link_scheme(text)},
+      {"autolink_scheme", autolink_scheme(text)}
     ]
 
     count = lists |> Enum.map(fn {_kind, offsets} -> length(offsets) end) |> Enum.sum()
@@ -199,6 +213,46 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
   end
 
   defp control?(zone), do: :re.run(zone, "[\\x00-\\x1F\\x7F]", [{:capture, :none}]) == :match
+
+  # --- rule 5: autolink_scheme ------------------------------------------------------
+
+  # The GFM autolink extension links a bare `scheme://...` of ANY scheme (and `xmpp:` addresses),
+  # so a bare URL whose scheme is not http or https is flagged. The scheme is the run of
+  # `[a-z0-9+.-]` before each `://`, trimmed to start at a letter; the runs cannot overlap, so
+  # the scan is linear.
+  defp autolink_scheme(text) do
+    bare =
+      for {pos, _len} <- :binary.matches(text, "://"),
+          {start, scheme} = scheme_before(text, pos),
+          scheme != "" and String.downcase(scheme) not in ["http", "https"],
+          do: start
+
+    xmpp = for {pos, _len} <- :binary.matches(text, @xmpp_needles), do: pos
+    Enum.sort(bare ++ xmpp)
+  end
+
+  defp scheme_before(text, pos) do
+    start = scheme_run_start(text, pos)
+    start = skip_non_letters(text, start, pos)
+    {start, binary_part(text, start, pos - start)}
+  end
+
+  defp scheme_run_start(_text, 0), do: 0
+
+  defp scheme_run_start(text, pos) do
+    if scheme_byte?(:binary.at(text, pos - 1)),
+      do: scheme_run_start(text, pos - 1),
+      else: pos
+  end
+
+  defp skip_non_letters(_text, pos, pos), do: pos
+
+  defp skip_non_letters(text, start, stop) do
+    if letter?(:binary.at(text, start)), do: start, else: skip_non_letters(text, start + 1, stop)
+  end
+
+  defp scheme_byte?(b), do: letter?(b) or b in ?0..?9 or b in [?+, ?., ?-]
+  defp letter?(b), do: b in ?a..?z or b in ?A..?Z
 
   # --- findings ---------------------------------------------------------------------
 
