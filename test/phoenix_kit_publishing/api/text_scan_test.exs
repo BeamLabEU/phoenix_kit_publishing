@@ -61,6 +61,9 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     {"link_scheme", "[x](javascript&colon;alert(1))"},
     {"link_scheme", "[x](jav\\ascript:alert(1))"},
     {"link_scheme", "[r]: &#106;avascript:alert(1)"},
+    {"link_scheme", "[x](a\u0001b)"},
+    {"link_scheme", "[x](a\u007Fb)"},
+    {"link_scheme", "[x](a\\b)"},
     # autolink_scheme: the renderer autolinks a bare scheme://... of any scheme
     {"autolink_scheme", "ftp://evil.example/x"},
     {"autolink_scheme", "FTP://evil.example/x"},
@@ -168,6 +171,12 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
 
       assert [%{"fragment" => f}] = TextScan.scan("<b>a\u0001b\nnext line")["findings"]
       assert f == "<b>a\\x01b"
+    end
+
+    test "fragment: a line ends at LF, CRLF and a bare CR" do
+      for text <- ["<b>x\nnext", "<b>x\r\nnext", "<b>x\rnext"] do
+        assert [%{"fragment" => "<b>x"}] = TextScan.scan(text)["findings"]
+      end
     end
 
     test "at most 20 findings, true count, truncated, text order" do
