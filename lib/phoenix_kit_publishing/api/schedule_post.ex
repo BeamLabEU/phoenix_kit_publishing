@@ -186,9 +186,10 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
       "goes_live" => %{
         "version" => version.version_number,
         "languages" => Presenter.goes_live_languages(contents)
-      },
-      "contains_raw_html" => Presenter.raw_html(contents)
+      }
     }
+
+    row = Map.merge(row, Presenter.raw_html_report(contents))
 
     term =
       {:schedule_post, Common.post_state(hit.db_post, hit.group, [version], contents),

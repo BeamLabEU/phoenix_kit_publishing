@@ -73,9 +73,10 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
       "goes_live" => %{"version" => version.version_number, "languages" => languages},
       "archived" => previous && %{"version" => previous.version_number},
       "scheduled_until" => scheduled_until(hit.db_post),
-      "contains_raw_html" => Presenter.raw_html(contents),
       "warnings" => warnings
     }
+
+    row = Map.merge(row, Presenter.raw_html_report(contents))
 
     term = {:publish_post, Common.post_state(hit.db_post, hit.group, [version], contents)}
 

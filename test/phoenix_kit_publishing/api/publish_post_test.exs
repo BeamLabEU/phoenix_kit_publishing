@@ -188,6 +188,20 @@ defmodule PhoenixKit.Modules.Publishing.API.PublishPostTest do
     findings = Enum.group_by(row["contains_raw_html"], & &1["language"])
     assert length(findings["en-US"]) == 20
     assert length(findings["de-DE"]) == 20
+
+    # the approver is told that 20 is not all of them
+    assert [
+             %{"language" => "de-DE", "count" => 30, "truncated" => true},
+             %{"language" => "en-US", "count" => 30, "truncated" => true}
+           ] = Enum.sort_by(row["raw_html_totals"], & &1["language"])
+  end
+
+  test "the preview totals the findings per language and omits the clean ones", ctx do
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "one <b>x</b>")
+    Fx.translation!(ctx.g["slug"], ctx.post[:uuid], "de-DE", "Hallo", "sauber")
+
+    assert {:preview, %{"rows" => [row]}, _} = publish(ctx, %{}, %{dry_run?: true})
+    assert [%{"language" => "en-US", "count" => 2, "truncated" => false}] = row["raw_html_totals"]
   end
 
   test "the preview of a future timestamp post has scheduled_until" do

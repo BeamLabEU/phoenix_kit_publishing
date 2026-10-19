@@ -170,17 +170,32 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
     end
   end
 
-  @doc "HTML found in the stored bodies, at most 20 findings per language: `[{language, kind, line, fragment}]`."
-  def raw_html(contents) do
-    for c <- contents,
-        f <- Enum.take(TextScan.scan(c.content || "")["findings"], @raw_html_per_language) do
-      %{
-        "language" => c.language,
-        "kind" => f["kind"],
-        "line" => f["line"],
-        "fragment" => f["fragment"]
-      }
-    end
+  @doc """
+  The text-rule scan of the stored bodies, for the preview of a publish or a schedule:
+  `"contains_raw_html"` holds at most 20 findings per language, `[{language, kind, line, fragment}]`;
+  `"raw_html_totals"` holds `[{language, count, truncated}]` for each language with a finding, so a
+  reader can tell that the list is cut.
+  """
+  def raw_html_report(contents) do
+    scans = for c <- contents, do: {c.language, TextScan.scan(c.content || "")}
+
+    findings =
+      for {language, scan} <- scans,
+          f <- Enum.take(scan["findings"], @raw_html_per_language) do
+        %{
+          "language" => language,
+          "kind" => f["kind"],
+          "line" => f["line"],
+          "fragment" => f["fragment"]
+        }
+      end
+
+    totals =
+      for {language, %{"count" => count} = scan} <- scans, count > 0 do
+        %{"language" => language, "count" => count, "truncated" => scan["truncated"]}
+      end
+
+    %{"contains_raw_html" => findings, "raw_html_totals" => totals}
   end
 
   @doc "ISO 8601 for the DateTime / NaiveDateTime fields the schemas use; nil stays nil."

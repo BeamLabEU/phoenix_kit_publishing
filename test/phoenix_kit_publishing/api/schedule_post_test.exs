@@ -271,6 +271,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePostTest do
     assert %{"goes_live" => %{"version" => 1, "languages" => [language]}} = row
     assert language["head"] =~ "line one" and language["body_bytes"] > 0
     assert [%{"language" => "en-US", "kind" => "html"} | _] = row["contains_raw_html"]
+    assert [%{"language" => "en-US", "count" => 2, "truncated" => false}] = row["raw_html_totals"]
 
     Fx.body!(ctx.g["slug"], ctx.post[:uuid], "<script>alert(1)</script>")
     assert {:preview, %{"rows" => [row2]}, second} = schedule(ctx, at(10), %{}, %{dry_run?: true})
