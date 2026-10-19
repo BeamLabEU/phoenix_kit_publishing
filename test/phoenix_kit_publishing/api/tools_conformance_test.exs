@@ -41,6 +41,38 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     "restore_groups" => {"publishing.groups:delete", false, 20, :always}
   }
 
+  # The hints a tool does not state are false.
+  @annotation_defaults %{
+    read_only: false,
+    destructive: false,
+    idempotent: false,
+    open_world: false
+  }
+
+  # name => the annotations the tool states: read-only, destructive, idempotent and open-world hints.
+  @annotations %{
+    "list_groups" => %{read_only: true, idempotent: true},
+    "get_group_settings_schema" => %{read_only: true, idempotent: true},
+    "list_posts" => %{read_only: true, idempotent: true},
+    "get_post" => %{read_only: true, idempotent: true},
+    "list_categories" => %{read_only: true, idempotent: true},
+    "create_post" => %{idempotent: false},
+    "update_post" => %{idempotent: true},
+    "create_version" => %{idempotent: false},
+    "set_translation" => %{idempotent: true},
+    "translate_post" => %{open_world: true, idempotent: false},
+    "publish_post" => %{idempotent: true},
+    "unpublish_post" => %{destructive: true, idempotent: true},
+    "schedule_post" => %{idempotent: true},
+    "trash_posts" => %{destructive: true, idempotent: true},
+    "restore_posts" => %{idempotent: true},
+    "upsert_categories" => %{idempotent: true},
+    "delete_categories" => %{destructive: true, idempotent: true},
+    "upsert_groups" => %{idempotent: true},
+    "trash_groups" => %{destructive: true, idempotent: true},
+    "restore_groups" => %{idempotent: true}
+  }
+
   test "the declared tools are the 20 tools, in the declared order" do
     names = Tools.all() |> Enum.map(&String.replace_prefix(&1.name, "publishing.", ""))
     assert names == @tool_order
@@ -94,6 +126,16 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
                  ),
                  tool.name
       end
+    end
+  end
+
+  test "every tool carries exactly its declared annotations" do
+    assert Enum.sort(Map.keys(@annotations)) == Enum.sort(@tool_order)
+
+    for tool <- Tools.all() do
+      short = String.replace_prefix(tool.name, "publishing.", "")
+      expected = Map.merge(@annotation_defaults, Map.fetch!(@annotations, short))
+      assert tool.annotations == expected, tool.name
     end
   end
 
