@@ -85,17 +85,15 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
 
   defp blank_to(value, default), do: if(value in [nil, ""], do: default, else: value)
 
-  # A language with a domain of its own: that domain, without the language segment (`segment:` is
-  # the one this module built the path with, so a sibling dialect such as `/en-gb` is stripped too).
+  # A language with a domain of its own: that domain, and core drops the language segment when it is
+  # the base code of the language (a sibling dialect such as `/en-gb` keeps its own segment).
   # Everything else (no resolver, no domain for the language, an older core): the site's configured
   # origin, never core's ctx.base_url (which follows the Host header), and the prefixed path.
   defp with_origin(path, language) do
     routes = routes_module()
 
     if language_domain?(routes, language) do
-      routes.canonical_absolute(path, language,
-        segment: LanguageHelpers.public_url_segment(language)
-      )
+      routes.canonical_absolute(path, language)
     else
       site_origin(path)
     end
@@ -103,7 +101,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
 
   defp language_domain?(routes, language) do
     Code.ensure_loaded?(routes) and function_exported?(routes, :canonical_origin, 1) and
-      function_exported?(routes, :canonical_absolute, 3) and
+      function_exported?(routes, :canonical_absolute, 2) and
       routes.canonical_origin(language) != nil
   end
 

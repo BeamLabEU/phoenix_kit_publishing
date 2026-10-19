@@ -1,8 +1,13 @@
 defmodule PhoenixKit.Modules.Publishing.API.PresenterTest.Resolver do
   @moduledoc false
-  def host_for("en"), do: "en.example.test"
-  def host_for("de"), do: "de.example.test"
+  # Core hands the language over as given, so the dialects are mapped here: en-GB shares the en domain.
+  def host_for("en-US"), do: "en.example.test"
+  def host_for("en-GB"), do: "en.example.test"
+  def host_for("de-DE"), do: "de.example.test"
   def host_for(_), do: nil
+
+  def host_for_dialect("en-GB"), do: "gb.example.test"
+  def host_for_dialect(language), do: host_for(language)
 end
 
 defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
@@ -107,8 +112,8 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
       %{db: db, contents: contents}
     end
 
-    defp resolver!,
-      do: Application.put_env(:phoenix_kit, :canonical_host_resolver, {Resolver, :host_for})
+    defp resolver!(fun \\ :host_for),
+      do: Application.put_env(:phoenix_kit, :canonical_host_resolver, {Resolver, fun})
 
     test "without a resolver every language keeps the site origin and its prefix",
          %{db: db, contents: contents} do
@@ -121,7 +126,7 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
     end
 
     @tag :canonical_origin
-    test "a language with a domain gets it, without the language segment",
+    test "a language with a domain gets it, without its base language segment",
          %{db: db, contents: contents} do
       resolver!()
       slug = db.group.slug
@@ -132,12 +137,23 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
     end
 
     @tag :canonical_origin
-    test "a sibling dialect loses its own segment, not the base one",
+    test "a sibling dialect on the base domain keeps its own segment",
          %{db: db, contents: contents} do
       resolver!()
 
       assert Presenter.public_paths(db, contents)["en-GB"] ==
-               "https://en.example.test/#{db.group.slug}/hello"
+               "https://en.example.test/en-gb/#{db.group.slug}/hello"
+    end
+
+    @tag :canonical_origin
+    test "a sibling dialect with a domain of its own gets that domain and keeps its segment",
+         %{db: db, contents: contents} do
+      resolver!(:host_for_dialect)
+      slug = db.group.slug
+
+      paths = Presenter.public_paths(db, contents)
+      assert paths["en-GB"] == "https://gb.example.test/en-gb/#{slug}/hello"
+      assert paths["en-US"] == "https://en.example.test/#{slug}/hello"
     end
 
     @tag :canonical_origin

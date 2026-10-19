@@ -521,9 +521,10 @@ permanent delete is `delete_categories`.
 **Public URLs.** A published post's `public_paths` hold one absolute URL per
 language. On a multi-domain site (host app config
 `:canonical_host_resolver`) a language served from its own domain gets that
-domain and no language segment; any other language gets the site origin and the
-prefixed path, as does every language on a core without
-`PhoenixKit.Utils.Routes.canonical_absolute/3`. See
+domain and no base-language segment (`/de` goes); a sibling dialect keeps its
+own segment (`/en-gb`), so it is `https://<domain>/en-gb/...`. Any other
+language gets the site origin and the prefixed path, as does every language on
+a core without `PhoenixKit.Utils.Routes.canonical_absolute/2`. See
 [dev_docs/guides/machine-api.md](dev_docs/guides/machine-api.md) for references,
 output shapes, previews, the confirmation round trip, error codes and limits.
 

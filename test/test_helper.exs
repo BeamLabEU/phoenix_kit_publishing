@@ -170,7 +170,7 @@ exclude =
   if(repo_available, do: [], else: [:integration]) ++
     if(Code.ensure_loaded?(PhoenixKit.API.Executor), do: [], else: [:core_api]) ++
     if Code.ensure_loaded?(PhoenixKit.Utils.Routes) and
-         function_exported?(PhoenixKit.Utils.Routes, :canonical_absolute, 3),
+         function_exported?(PhoenixKit.Utils.Routes, :canonical_absolute, 2),
        do: [],
        else: [:canonical_origin]
 
