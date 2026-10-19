@@ -164,14 +164,14 @@ end
 
 # Exclude integration tests when DB is not available. The `:core_api` tag marks only the tests
 # that run through core's executor; the library itself needs a core that has `PhoenixKit.API` to
-# compile, so the other API tests are not tagged. `:canonical_origin` marks the tests that need
-# core's language-domain URL helpers, which the Hex 2.63.0 core lacks.
+# compile, so the other API tests are not tagged. `:canonical_urls` marks the tests that need
+# core's `Routes.canonical_absolute_or_nil/2`, which the Hex 2.63.0 core lacks.
 exclude =
   if(repo_available, do: [], else: [:integration]) ++
     if(Code.ensure_loaded?(PhoenixKit.API.Executor), do: [], else: [:core_api]) ++
     if Code.ensure_loaded?(PhoenixKit.Utils.Routes) and
-         function_exported?(PhoenixKit.Utils.Routes, :canonical_absolute, 2),
+         function_exported?(PhoenixKit.Utils.Routes, :canonical_absolute_or_nil, 2),
        do: [],
-       else: [:canonical_origin]
+       else: [:canonical_urls]
 
 ExUnit.start(exclude: exclude)

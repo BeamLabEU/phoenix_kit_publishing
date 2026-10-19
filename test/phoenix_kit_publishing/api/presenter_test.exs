@@ -8,6 +8,11 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest.Resolver do
 
   def host_for_dialect("en-GB"), do: "gb.example.test"
   def host_for_dialect(language), do: host_for(language)
+
+  def host_for_counted(language) do
+    Process.put(:resolver_calls, Process.get(:resolver_calls, 0) + 1)
+    host_for(language)
+  end
 end
 
 defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
@@ -125,7 +130,7 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
              }
     end
 
-    @tag :canonical_origin
+    @tag :canonical_urls
     test "a language with a domain gets it, without its base language segment",
          %{db: db, contents: contents} do
       resolver!()
@@ -136,7 +141,7 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
       assert paths["en-US"] == "https://en.example.test/#{slug}/hello"
     end
 
-    @tag :canonical_origin
+    @tag :canonical_urls
     test "a sibling dialect on the base domain keeps its own segment",
          %{db: db, contents: contents} do
       resolver!()
@@ -145,7 +150,7 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
                "https://en.example.test/en-gb/#{db.group.slug}/hello"
     end
 
-    @tag :canonical_origin
+    @tag :canonical_urls
     test "a sibling dialect with a domain of its own gets that domain and keeps its segment",
          %{db: db, contents: contents} do
       resolver!(:host_for_dialect)
@@ -156,13 +161,51 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
       assert paths["en-US"] == "https://en.example.test/#{slug}/hello"
     end
 
-    @tag :canonical_origin
+    @tag :canonical_urls
     test "a language without a domain falls back to the site origin and the prefix",
          %{db: db, contents: contents} do
       resolver!()
 
       assert Presenter.public_paths(db, contents)["fr-FR"] ==
                "https://example.test/fr/#{db.group.slug}/hello"
+    end
+
+    @tag :canonical_urls
+    test "with no site origin configured a language without a domain stays root-relative",
+         %{db: db, contents: contents} do
+      resolver!()
+      {:ok, _} = PhoenixKit.Settings.update_setting("site_url", "")
+      slug = db.group.slug
+
+      paths = Presenter.public_paths(db, contents)
+      assert paths["fr-FR"] == "/fr/#{slug}/hello"
+      assert paths["de-DE"] == "https://de.example.test/#{slug}/hello"
+    end
+
+    @tag :canonical_urls
+    test "the resolver is asked once per language", %{db: db, contents: contents} do
+      resolver!(:host_for_counted)
+      Process.put(:resolver_calls, 0)
+
+      Presenter.public_paths(db, contents)
+
+      assert Process.get(:resolver_calls) == length(contents)
+    end
+
+    # Pins today's behaviour, not a goal: core cannot tell that the module emitted no language
+    # prefix, so a group slug equal to the prefixless primary language's code loses its segment.
+    @tag :canonical_urls
+    test "a prefixless primary language and a group slugged like its code lose the group segment" do
+      resolver!()
+      {:ok, _} = PhoenixKit.Settings.update_boolean_setting("default_language_no_prefix", true)
+      g = Fx.group!(name: "En")
+      assert g["slug"] == "en"
+      post = Fx.post!("en", %{title: "Hello", slug: "hello"})
+      Fx.publish!("en", post[:uuid])
+      {en_db, _versions, en_contents} = load(post[:uuid])
+
+      assert Presenter.public_paths(en_db, en_contents) ==
+               %{"en-US" => "https://en.example.test/hello"}
     end
   end
 

@@ -516,17 +516,18 @@ curl -s -X POST https://example.com/api/admin/v1/publishing.list_groups \
 ```
 
 The API never hard-deletes a group, post, version or language; the one
-permanent delete is `delete_categories`.
-
-**Public URLs.** A published post's `public_paths` hold one absolute URL per
-language. On a multi-domain site (host app config
-`:canonical_host_resolver`) a language served from its own domain gets that
-domain and no base-language segment (`/de` goes); a sibling dialect keeps its
-own segment (`/en-gb`), so it is `https://<domain>/en-gb/...`. Any other
-language gets the site origin and the prefixed path, as does every language on
-a core without `PhoenixKit.Utils.Routes.canonical_absolute/2`. See
+permanent delete is `delete_categories`. See
 [dev_docs/guides/machine-api.md](dev_docs/guides/machine-api.md) for references,
 output shapes, previews, the confirmation round trip, error codes and limits.
+
+**Public URLs.** A published post's `public_paths` hold one URL per language,
+absolute unless the site has no origin configured (then a language without a
+domain gets the bare root-relative path). On a multi-domain site (host app
+config `:canonical_host_resolver`) a language served from its own domain gets
+that domain and no base-language segment (`/de` goes); a sibling dialect keeps
+its own segment (`/en-gb`), so it is `https://<domain>/en-gb/...`. Any other
+language gets the site origin and the prefixed path, as does every language on
+a core without `PhoenixKit.Utils.Routes.canonical_absolute_or_nil/2`.
 
 ## Removing this module
 

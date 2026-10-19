@@ -89,25 +89,21 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   # the base code of the language (a sibling dialect such as `/en-gb` keeps its own segment).
   # Everything else (no resolver, no domain for the language, an older core): the site's configured
   # origin, never core's ctx.base_url (which follows the Host header), and the prefixed path.
-  defp with_origin(path, language) do
-    routes = routes_module()
+  defp with_origin(path, language), do: language_domain_url(path, language) || site_origin(path)
 
-    if language_domain?(routes, language) do
-      routes.canonical_absolute(path, language)
-    else
-      site_origin(path)
-    end
+  # Core's language-domain helper arrived after the Hex 2.63.0 core this module still builds on. The
+  # module is built at runtime so the compiler cannot flag it as undefined on that core, and
+  # the availability is settled once, at compile time. One resolver call per URL: the helper answers
+  # `nil` for a language without a host, so no probe comes first.
+  @routes_path ["PhoenixKit", "Utils", "Routes"]
+  @routes Module.concat(@routes_path)
+  @language_domain_urls? Code.ensure_loaded?(@routes) and
+                           function_exported?(@routes, :canonical_absolute_or_nil, 2)
+
+  defp language_domain_url(path, language) do
+    if @language_domain_urls?,
+      do: Module.concat(@routes_path).canonical_absolute_or_nil(path, language)
   end
-
-  defp language_domain?(routes, language) do
-    Code.ensure_loaded?(routes) and function_exported?(routes, :canonical_origin, 1) and
-      function_exported?(routes, :canonical_absolute, 2) and
-      routes.canonical_origin(language) != nil
-  end
-
-  # Core's language-domain helpers arrived after the Hex 2.63.0 core this module still builds on. The
-  # module is built at runtime so the compiler cannot flag a call to them as undefined on that core.
-  defp routes_module, do: Module.concat(["PhoenixKit", "Utils", "Routes"])
 
   defp site_origin(path) do
     case HTML.public_origin() do
