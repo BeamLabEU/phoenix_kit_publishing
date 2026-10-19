@@ -116,8 +116,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "language returned: pass it as if_revision together with that same version, because the write " <>
           "tools default to the highest draft, which is not the version a plain read shows when one is live; " <>
           "publish_post and schedule_post compare the primary-language text, so read the primary language " <>
-          "for them. Like the admin editor, a read may repair a stale active-version " <>
-          "pointer, and the answer describes the repaired post. A trashed post is not found here: use " <>
+          "for them. A read never changes anything: a stale post (an active-version pointer to a version that " <>
+          "is not published, a legacy language code) is shown as stored. A trashed post is not found here: use " <>
           "list_posts with status trashed.",
       input_schema: Schemas.get_post(),
       output_schema: Schemas.get_post_output(),

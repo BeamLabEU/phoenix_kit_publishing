@@ -3,7 +3,15 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
 
   import Ecto.Query, only: [from: 2]
 
-  alias PhoenixKit.Modules.Publishing.{Posts, PublishingContent, PublishingVersion, Versions}
+  alias PhoenixKit.Modules.Publishing.{
+    Constants,
+    Posts,
+    PublishingContent,
+    PublishingPost,
+    PublishingVersion,
+    Versions
+  }
+
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo
@@ -126,17 +134,18 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
     assert message =~ "primary language en-US"
   end
 
-  test "no language asked and only a legacy base-code row: the read heals it and the answer is the healed row",
+  test "no language asked and only a legacy base-code row: the row is shown as stored and nothing is repaired",
        %{post: post} do
     Repo.update_all(
       from(c in PublishingContent, where: c.version_uuid == ^Fx.version(post[:uuid]).uuid),
       set: [language: "en"]
     )
 
+    before = Fx.table_state()
     assert {:ok, body} = get(%{"id" => post[:uuid]})
-    assert body["language"] == "en-US" and body["languages"] == ["en-US"]
     assert body["title"] == "Hello" and body["markdown"] =~ "# Body"
-    refute Map.has_key?(body, "warnings")
+    assert Fx.table_state() == before
+    assert Fx.content(post[:uuid], "en") != nil and Fx.content(post[:uuid], "en-US") == nil
   end
 
   test "a language that is not enabled and not present is language_not_enabled with allowed", %{
@@ -222,43 +231,35 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
              get(%{"id" => post[:uuid]}, %{"version" => 1})
   end
 
-  test "a stale active pointer is healed by the read and the answer describes the healed post",
-       %{g: g, post: post} do
+  test "a stale active pointer is shown as stored: the read repairs nothing", %{g: g, post: post} do
     Fx.publish!(g["slug"], post[:uuid], 1)
-    assert {:ok, %{"status" => "published"}} = get(%{"id" => post[:uuid]})
 
-    # The pointer now names a version that is not published: the read path heals it.
+    # The pointer now names a version that is not published; only a write would heal it.
     Repo.update_all(
       from(v in PublishingVersion, where: v.post_uuid == ^post[:uuid]),
       set: [status: "draft"]
     )
 
+    before = Fx.table_state()
     assert {:ok, first} = get(%{"id" => post[:uuid]})
     assert {:ok, second} = get(%{"id" => post[:uuid]})
-    assert Fx.db_post(post[:uuid]).active_version_uuid == nil
-    assert first["status"] == "draft" and first["active_version"] == nil
+    assert Fx.table_state() == before
+    assert Fx.db_post(post[:uuid]).active_version_uuid != nil
     assert first["revision"] == second["revision"]
   end
 
-  test "when the heal moves the default version the answer shows the healed version",
-       %{g: g, post: post} do
-    {:ok, _} = Versions.create_new_version(g["slug"], post, %{}, %{})
-    Fx.body!(g["slug"], post[:uuid], "second version body", 2)
-    Fx.publish!(g["slug"], post[:uuid], 1)
-    assert {:ok, %{"version" => 1, "markdown" => "# Body" <> _}} = get(%{"id" => post[:uuid]})
+  test "an empty post older than the grace period is read, not auto-trashed", %{g: g} do
+    empty = Fx.post!(g["slug"], %{title: Constants.default_title(), slug: "empty-one"})
 
     Repo.update_all(
-      from(v in PublishingVersion,
-        where: v.post_uuid == ^post[:uuid] and v.version_number == 1
-      ),
-      set: [status: "draft"]
+      from(p in PublishingPost, where: p.uuid == ^empty[:uuid]),
+      set: [inserted_at: DateTime.add(DateTime.utc_now(), -3_600, :second)]
     )
 
-    assert {:ok, first} = get(%{"id" => post[:uuid]})
-    assert {:ok, second} = get(%{"id" => post[:uuid]})
-    assert first["version"] == 2 and first["status"] == "draft"
-    assert first["markdown"] == "second version body"
-    assert first["revision"] == second["revision"]
+    before = Fx.table_state()
+    assert {:ok, %{"status" => "draft"}} = get(%{"id" => empty[:uuid]})
+    assert Fx.table_state() == before
+    assert Fx.db_post(empty[:uuid]).trashed_at == nil
   end
 
   test "bad refs: invalid_ref, unknown id, uncastable id", %{post: post} do

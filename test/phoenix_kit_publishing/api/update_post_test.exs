@@ -208,7 +208,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     assert body(ctx) == "# Body"
   end
 
-  test "a primary row stored under the legacy base code is named as such, and one read repairs it",
+  test "a primary row stored under the legacy base code is named as such, and one read of the module repairs it",
        ctx do
     TestRepo.update_all(
       from(c in PublishingContent, where: c.version_uuid == ^Fx.version(ctx.post[:uuid]).uuid),
@@ -224,7 +224,11 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
       refute message =~ "set_translation"
     end
 
+    # the API's own read does not repair; the module's read (the admin editor's) does
     assert {:ok, _} = ApiCase.call("publishing.get_post", %{"post" => Fx.ref(ctx.post)})
+    assert Fx.content(ctx.post[:uuid], "en") != nil
+
+    assert {:ok, _} = Posts.read_post_by_uuid(ctx.post[:uuid])
     assert {:ok, %{"action" => "updated"}} = edit(ctx, %{"title" => "X"})
     assert Fx.content(ctx.post[:uuid], "en-US").title == "X"
   end

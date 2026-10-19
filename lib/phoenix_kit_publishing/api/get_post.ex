@@ -1,40 +1,21 @@
 defmodule PhoenixKit.Modules.Publishing.API.GetPost do
   @moduledoc false
-  # Tool `publishing.get_post`. The ONE handler allowed to use Posts.read_post_by_uuid/3:
-  # it is a read path, not a gate, and a wrong not_found is only a read error. It may self-heal a
-  # stale post exactly as the admin UI's reads do.
+  # Tool `publishing.get_post`. A read never writes: the post is read WITHOUT the stale fixer
+  # (`Posts.read_post_by_uuid/3` would trash an empty post or move a stale active pointer, a visitor-
+  # visible change under a key that holds only the read scope). A stale post is shown as stored.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
-  alias PhoenixKit.Modules.Publishing.{DBStorage, Posts, PublishingContent, PublishingVersion}
+  alias PhoenixKit.Modules.Publishing.{DBStorage, PublishingContent, PublishingVersion}
 
   @spec call(map(), map()) :: {:ok, map()} | {:error, atom(), String.t(), map()}
   def call(input, _ctx) do
     with {:ok, hit} <- resolve(input["post"]),
-         {:ok, state} <- load(hit, input, true) do
-      {:ok, build(state, input)}
-    end
-  end
-
-  # The read may heal the post (move its active pointer, relabel a language row, trash an empty
-  # post), so the answer is built from a snapshot taken AFTER it. When the heal moved the version
-  # the post shows, the read is repeated once for the healed post (a second heal is a no-op).
-  defp load(hit, input, settle?) do
-    with {:ok, version} <- version(hit.db_post, input["version"]),
+         {:ok, version} <- version(hit.db_post, input["version"]),
          {:ok, language} <-
            language(input["language"], DBStorage.list_contents(version.uuid)),
-         {:ok, post} <- read(hit.db_post.uuid, language, version.version_number) do
-      if settle?,
-        do: settle(hit, version, language, post, input),
-        else: snapshot(hit, version, language, post)
-    end
-  end
-
-  defp settle(hit, version, language, post, input) do
-    with {:ok, fresh_hit} <- resolve(%{"id" => hit.db_post.uuid}),
-         {:ok, fresh_version} <- version(fresh_hit.db_post, input["version"]) do
-      if fresh_version.uuid == version.uuid,
-        do: snapshot(fresh_hit, fresh_version, language, post),
-        else: load(fresh_hit, input, false)
+         {:ok, post} <- read(hit.db_post.uuid, language, version.version_number),
+         {:ok, state} <- snapshot(hit, version, language, post) do
+      {:ok, build(state, input)}
     end
   end
 
@@ -87,7 +68,7 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPost do
   end
 
   defp read(uuid, language, number) do
-    case Posts.read_post_by_uuid(uuid, language, number) do
+    case Refs.read_post_for_preview(uuid, language, number) do
       {:ok, post} -> {:ok, post}
       {:error, _reason} -> {:error, :not_found, "The post could not be read.", %{}}
     end

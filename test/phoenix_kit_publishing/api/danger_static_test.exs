@@ -31,9 +31,8 @@ defmodule PhoenixKit.Modules.Publishing.API.DangerStaticTest do
     end
   end
 
-  test "handlers use no banned read on a dry-run path (checked per handler file, outside get_post)" do
-    for path <- Path.wildcard("lib/phoenix_kit_publishing/api/*.ex"),
-        Path.basename(path) != "get_post.ex" do
+  test "no handler uses a banned read (get_post included: a read must not write either)" do
+    for path <- Path.wildcard("lib/phoenix_kit_publishing/api/*.ex") do
       source = File.read!(path)
 
       for banned <- @banned,

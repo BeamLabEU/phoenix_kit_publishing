@@ -142,7 +142,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
     end
   end
 
-  # The primary language may sit under its legacy base code until a read repairs it; set_translation
+  # The primary language may sit under its legacy base code until the admin editor's first read repairs it; set_translation
   # refuses the primary language, so the usual advice would be a dead end.
   defp missing(language, fallback) do
     legacy? =
@@ -152,7 +152,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
     message =
       if legacy?,
         do:
-          "#{language} is stored under a legacy language code; read the post once to repair it, then retry",
+          "#{language} is stored under a legacy language code; open the post in the admin editor once to repair it, then retry",
         else: "#{language} has no row on this version; use set_translation to create it"
 
     Common.invalid("language", message, "language_missing")
