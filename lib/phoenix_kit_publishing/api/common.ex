@@ -731,10 +731,12 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   defp coarse_edge(lines, sign) do
     omitted = max(length(lines) - 2 * @coarse_edge, 0)
-    head = lines |> Enum.take(@coarse_edge) |> Enum.map(&(sign <> &1))
+    head = lines |> Enum.take(@coarse_edge) |> Enum.map(&(sign <> clip(&1)))
 
     tail =
-      if omitted > 0, do: lines |> Enum.take(-@coarse_edge) |> Enum.map(&(sign <> &1)), else: []
+      if omitted > 0,
+        do: lines |> Enum.take(-@coarse_edge) |> Enum.map(&(sign <> clip(&1))),
+        else: []
 
     marker = if omitted > 0, do: [sign <> "... #{omitted} lines omitted"], else: []
     head ++ marker ++ tail

@@ -604,6 +604,20 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
       assert diff["text"] =~ "... (+"
     end
 
+    test "a changed line is clipped to exactly 300 characters plus the omitted count" do
+      diff = Common.line_diff("a\nb\nc", "a\n" <> String.duplicate("x", 1_000) <> "\nc")
+      clipped = diff["text"] |> String.split("\n") |> Enum.find(&String.starts_with?(&1, "+x"))
+      assert clipped == "+" <> String.duplicate("x", 300) <> "... (+700 chars)"
+    end
+
+    test "a coarse diff clips over-long lines, so its text is never emptied by the byte cap" do
+      long = fn tag -> Enum.map_join(1..500, "\n", &(String.duplicate(tag, 5_000) <> "#{&1}")) end
+      diff = Common.line_diff(long.("a"), long.("b"))
+      assert diff["mode"] == "coarse"
+      assert diff["text"] =~ "-" <> String.duplicate("a", 300) <> "... (+"
+      assert byte_size(diff["text"]) <= 4096
+    end
+
     test "text is capped at 4,096 bytes at a line boundary and says so, in line mode" do
       old = lines(10, "keep ")
       diff = Common.line_diff(old, old <> "\n" <> lines(2000, "new line "))
