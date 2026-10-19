@@ -875,6 +875,13 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
                Common.locked_check(ApiCase.ctx(), fn _, _ -> false end).(%{trashed_at: nil}, %{})
     end
 
+    test "a context without :dry_run? is a real run: an unconfirmed call is refused when live" do
+      ctx = Map.delete(ApiCase.ctx(), :dry_run?)
+
+      assert {:error, :went_live} =
+               Common.locked_check(ctx, fn _, _ -> true end).(%{trashed_at: nil}, %{})
+    end
+
     test "an answer that is not exactly false counts as live" do
       for doubt <- [nil, :maybe, 0, "no"] do
         assert {:error, :went_live} =

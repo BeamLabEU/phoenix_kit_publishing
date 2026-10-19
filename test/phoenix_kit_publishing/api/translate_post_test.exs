@@ -141,6 +141,15 @@ defmodule PhoenixKit.Modules.Publishing.API.TranslatePostTest do
     assert job.args["endpoint_uuid"] == expected
   end
 
+  test "a context without :dry_run? is a real run", ctx do
+    assert {:ok, %{"action" => "queued"}} =
+             ApiCase.call_without_dry_run_key("publishing.translate_post", %{
+               "post" => Fx.ref(ctx.post)
+             })
+
+    assert length(all_enqueued(worker: PhoenixKitAI.TranslateWorker)) == 2
+  end
+
   test "the LAST-USED endpoint is never a fallback when the unattended resolution fails", ctx do
     {:ok, _} = Settings.update_setting("publishing_translation_endpoint_uuid", "")
 

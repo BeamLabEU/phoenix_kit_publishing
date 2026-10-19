@@ -27,7 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
       assert body["language"] == "en-US" and body["version"] == 1
       assert %{"og" => %{}, "tags" => [], "category_ids" => []} = body["fields"]
       assert body["revision"] =~ ~r/\A[0-9a-f]{64}\z/
-      assert is_binary(body["content_updated_at"]) or body["content_updated_at"] == nil
+      assert {:ok, %DateTime{}, 0} = DateTime.from_iso8601(body["content_updated_at"])
       refute Map.has_key?(body, "warnings")
     end
   end

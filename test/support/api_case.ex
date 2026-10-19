@@ -101,6 +101,18 @@ defmodule PhoenixKitPublishing.Test.ApiCase do
     :ok
   end
 
+  @doc """
+  Like `call/3`, with a context that has no `:dry_run?` key at all (a core without the
+  confirmation flow never sets it): the handler must treat the call as a real run.
+  """
+  def call_without_dry_run_key(name, input) do
+    tool = tool!(name)
+    input = input |> Jason.encode!() |> Jason.decode!()
+    {:ok, valid} = Executor.validate_input(tool, input)
+    {module, function} = tool.handler
+    apply(module, function, [valid, Map.delete(ctx(), :dry_run?)])
+  end
+
   def call(name, input, overrides \\ %{}) do
     tool = tool!(name)
     input = input |> Jason.encode!() |> Jason.decode!()
