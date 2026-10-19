@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
   alias PhoenixKit.Users.Roles
   alias PhoenixKitPublishing.Test.{ApiCase, ApiChangesetSchema}
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
+  alias PhoenixKitPublishing.Test.MediaFixtures
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   # `{result, [{sql, rows returned}]}` of the queries `fun` issued.
@@ -898,7 +899,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
     end
 
     test "a UUID is lower-cased, anything else is a validation error on the field" do
-      id = PhoenixKitPublishing.Test.MediaFixtures.file!().uuid
+      id = MediaFixtures.file!().uuid
 
       assert {:ok, %{"og_image_id" => ^id}} =
                Common.canonical_image_id(%{"og_image_id" => String.upcase(id)}, "og_image_id")

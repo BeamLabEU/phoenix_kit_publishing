@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   alias PhoenixKit.Modules.Publishing.API.TextScan
   alias PhoenixKit.Modules.Publishing.Errors
+  alias PhoenixKit.Modules.Storage
 
   alias PhoenixKit.Modules.Publishing.{
     PublishingCategory,
@@ -298,7 +299,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   defp existing_file(input, field, uuid) do
-    case PhoenixKit.Modules.Storage.get_file(uuid) do
+    case Storage.get_file(uuid) do
       %{status: status, system_managed: false} when status != "trashed" ->
         {:ok, Map.put(input, field, uuid)}
 

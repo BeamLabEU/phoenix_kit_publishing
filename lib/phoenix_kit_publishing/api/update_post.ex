@@ -142,8 +142,9 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
     end
   end
 
-  # The primary language may sit under its legacy base code until the admin editor's first read repairs it; set_translation
-  # refuses the primary language, so the usual advice would be a dead end.
+  # The primary language may sit under its legacy base code until the admin editor's first
+  # read repairs it; set_translation refuses the primary language, so the usual advice would
+  # be a dead end.
   defp missing(language, fallback) do
     legacy? =
       language == LanguageHelpers.get_primary_language() and
