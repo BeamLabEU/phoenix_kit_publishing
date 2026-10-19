@@ -73,6 +73,17 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     assert length(list_activities()) == n
   end
 
+  test "a body of 262,144 bytes of brackets, which the text rule lets through, saves in bounded time",
+       ctx do
+    body = String.duplicate("[", 262_144)
+    refute PhoenixKit.Modules.Publishing.API.TextScan.dangerous?(body)
+
+    {us, result} = :timer.tc(fn -> edit(ctx, %{"content" => body}) end)
+
+    assert {:ok, %{"action" => "updated"}} = result
+    assert us < 5_000_000
+  end
+
   test "the unchanged preview asks for a confirmation exactly when the gate would", ctx do
     Fx.body!(ctx.g["slug"], ctx.post[:uuid], "plain <b>bold</b>")
     input = %{"post" => Fx.ref(ctx.post), "content" => "plain <b>bold</b>"}
