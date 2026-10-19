@@ -525,7 +525,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
     end
   end
 
-  describe "line_diff/2 bounds (spec §9.12)" do
+  describe "line_diff/2 bounds" do
     defp lines(n, prefix), do: Enum.map_join(1..n, "\n", &"#{prefix}#{&1}")
     defp timed(fun), do: elem(:timer.tc(fun), 0)
 

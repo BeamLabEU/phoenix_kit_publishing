@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
   @moduledoc false
-  # Tool `publishing.upsert_categories` (spec §9.14).
+  # Tool `publishing.upsert_categories`.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
   alias PhoenixKit.Modules.Publishing.Categories
@@ -175,7 +175,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
   end
 
   @doc false
-  # name_i18n is compared as the WHOLE replaced map (F26).
+  # name_i18n is compared as the WHOLE replaced map.
   def drop_unchanged(attrs, category) do
     Map.filter(attrs, fn
       {"parent_uuid", value} -> value != category.parent_uuid

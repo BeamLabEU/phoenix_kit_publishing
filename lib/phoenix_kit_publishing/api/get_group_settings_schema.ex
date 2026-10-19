@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.GetGroupSettingsSchema do
   @moduledoc false
-  # Tool `publishing.get_group_settings_schema` (spec §9.2): the vocabulary for upsert_groups.settings.
+  # Tool `publishing.get_group_settings_schema`: the vocabulary for upsert_groups.settings.
 
   alias PhoenixKit.Modules.Publishing.GroupSettings
 

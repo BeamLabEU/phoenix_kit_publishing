@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.DeleteCategories do
   @moduledoc false
-  # Tool `publishing.delete_categories` (spec §9.15): the ONE permanent delete the API offers.
+  # Tool `publishing.delete_categories`: the ONE permanent delete the API offers.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
   alias PhoenixKit.Modules.Publishing.Categories

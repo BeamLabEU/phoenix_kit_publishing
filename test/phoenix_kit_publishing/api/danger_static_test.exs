@@ -1,7 +1,7 @@
 defmodule PhoenixKit.Modules.Publishing.API.DangerStaticTest do
   use ExUnit.Case, async: true
 
-  # Spec §8 / F25: reads that rescue to an empty or false result are banned from the danger
+  # Reads that rescue to an empty or false result are banned from the danger
   # functions, Refs and every preview path, because a database error must not look "safe".
   @banned [
     "Categories.published_post_counts(",

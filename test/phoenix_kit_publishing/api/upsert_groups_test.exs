@@ -179,7 +179,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertGroupsTest do
         %{"slug" => "Bad Slug", "name" => "x"},
         %{"slug" => "admin", "name" => "x"},
         %{"slug" => "dup", "name" => "D", "mode" => "slug"},
-        %{"slug" => "dup", "name" => "D2"},
+        %{"slug" => "dup", "name" => "Dup 2"},
         %{"name" => "No slug"}
       ])
 

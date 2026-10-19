@@ -1,7 +1,8 @@
 defmodule PhoenixKit.Modules.Publishing.API.Refs do
   @moduledoc false
-  # Resolution of post / group / version / language / category references (spec §6.4).
-  # Only calls that RAISE on a database error are used here (spec §8, F25).
+  # Resolution of post / group / version / language / category references.
+  # Only calls that RAISE on a database error are used here: a read that rescues to an empty
+  # result would make a dry run answer "safe" when the database failed.
 
   import Ecto.Query, only: [from: 2]
 
@@ -198,7 +199,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
 
   @doc """
   The post map exactly as `Posts.read_post_by_uuid/3` builds it, MINUS the stale fixer: a dry
-  run must not write (F20). A stale legacy post may read slightly differently in a preview.
+  run must not write. A stale legacy post may read slightly differently in a preview.
   """
   def read_post_for_preview(uuid, language, version) do
     case DBStorage.get_post_by_uuid(uuid, [:group]) do

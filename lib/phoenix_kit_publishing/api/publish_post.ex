@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.PublishPost do
   @moduledoc false
-  # Tool `publishing.publish_post` (spec §9.10): make a version the live one.
+  # Tool `publishing.publish_post`: make a version the live one.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
   alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, Versions}

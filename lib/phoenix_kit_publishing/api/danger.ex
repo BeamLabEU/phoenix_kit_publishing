@@ -1,12 +1,11 @@
 defmodule PhoenixKit.Modules.Publishing.API.Danger do
   @moduledoc false
-  # `{Module, :function}` danger checks (spec §8). Each is `fun(input, ctx) :: boolean()`, called
+  # `{Module, :function}` danger checks. Each is `fun(input, ctx) :: boolean()`, called
   # by core with a dry-run context, read-only and FAIL CLOSED:
   #   1. unprovable means true (an unresolvable reference, a missing row, a bad id);
   #   2. an error means true, and no read may hide one: only raising reads are used (Refs,
-  #      DBStorage reads, Common.*!), never the banned reads of F25;
+  #      DBStorage reads, Common.*!), never a read that rescues to an empty or false result;
   #   3. each function body is wrapped in `guard/1`, `rescue _ -> true`.
-  # The per-tool functions are added by the task that adds the tool.
 
   alias PhoenixKit.Modules.Publishing.API.{Refs, TextScan, UpsertCategories, UpsertGroups}
   alias PhoenixKit.Modules.Publishing.DBStorage

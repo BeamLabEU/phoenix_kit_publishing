@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.CreateVersion do
   @moduledoc false
-  # Tool `publishing.create_version` (spec §9.8). Never touches the live pointer.
+  # Tool `publishing.create_version`. Never touches the live pointer.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
   alias PhoenixKit.Modules.Publishing.{DBStorage, Versions}

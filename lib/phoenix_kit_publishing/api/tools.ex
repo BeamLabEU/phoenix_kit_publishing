@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.Tools do
   @moduledoc false
-  # The 20 tool declarations of the publishing API (spec §6.2). `Publishing.api_tools/0`
+  # The 20 tool declarations of the Publishing API. `Publishing.api_tools/0`
   # returns them through `API.tools/1`; core's registry validates each struct.
   #
   # Scope -> role permission, all permission "publishing":
@@ -495,8 +495,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
     )
   end
 
-  # Each tool task adds its `defp` below this line and one entry to `all/0`, in the order of
-  # spec §6.2. `permission/0` is the one place the permission string lives.
+  # Each tool task adds its `defp` below this line and one entry to `all/0`, in the declared
+  # order. `permission/0` is the one place the permission string lives.
   @doc false
   def permission, do: @permission
 end

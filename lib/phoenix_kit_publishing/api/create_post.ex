@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
   @moduledoc false
-  # Tool `publishing.create_post` (spec §9.6).
+  # Tool `publishing.create_post`.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Danger, Presenter, Refs, TextScan}
   alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, Posts}

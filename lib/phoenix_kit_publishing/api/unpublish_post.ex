@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.UnpublishPost do
   @moduledoc false
-  # Tool `publishing.unpublish_post` (spec §9.11): take the live version down.
+  # Tool `publishing.unpublish_post`: take the live version down.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
   alias PhoenixKit.Modules.Publishing.{DBStorage, Versions}

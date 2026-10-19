@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.RestorePosts do
   @moduledoc false
-  # Tool `publishing.restore_posts` (spec §9.11): bring posts back from the trash.
+  # Tool `publishing.restore_posts`: bring posts back from the trash.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Danger, PostBatch, Presenter}
   alias PhoenixKit.Modules.Publishing.{Constants, Posts}

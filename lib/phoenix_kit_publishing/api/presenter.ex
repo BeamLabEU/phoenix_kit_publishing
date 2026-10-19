@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   @moduledoc false
-  # Output shapes of spec §6.5. The WRITE summary has no title, slug or public_paths: core does not
+  # Output shapes of the tools. The WRITE summary has no title, slug or public_paths: core does not
   # store an answer containing a string that starts with `pk_` or a key named token/secret, so free
   # text must stay out of a write answer (a retry of a post titled `pk_sale` must still be replayed).
 
@@ -8,7 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   alias PhoenixKit.Modules.Publishing.{Constants, LanguageHelpers, PublishingVersion}
   alias PhoenixKit.Modules.Publishing.Web.HTML
 
-  @doc "trashed | scheduled | published | draft (spec §6.5). `versions` is accepted for symmetry and not read."
+  @doc "trashed | scheduled | published | draft `versions` is accepted for symmetry and not read."
   def status(db_post, _versions \\ [], now \\ nil, tz \\ nil) do
     cond do
       db_post.trashed_at ->
@@ -87,7 +87,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   end
 
   @doc """
-  The post summary of spec §6.5. `contents` are the language rows of the version shown (the live one,
+  The post summary. `contents` are the language rows of the version shown (the live one,
   else the latest). Options: `:now`, `:tz` (hoisted once per page) and `:date_counts`
   (`Listing.group_date_counts/1`, computed once per page).
   """

@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.ListGroups do
   @moduledoc false
-  # Tool `publishing.list_groups` (spec §9.1).
+  # Tool `publishing.list_groups`.
 
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, GroupSettings}
 

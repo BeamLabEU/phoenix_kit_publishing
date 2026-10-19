@@ -5,7 +5,7 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
 
   alias PhoenixKit.Modules.Publishing.API.Common
 
-  # code, reason (nil = none), for each module error of spec §6.6
+  # code, reason (nil = none), for each module error
   @mapped %{
     not_found: {:not_found, nil},
     post_not_found: {:not_found, nil},
@@ -43,12 +43,12 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
     locked_check_failed: {:internal_error, nil}
   }
 
-  # Everything else is internal_error (spec §6.6, last two rows)
+  # Everything else is internal_error
   @internal ~w(db_update_failed content_copy_failed params_not_applied no_uuid cache_miss no_active_version no_version
                invalid_content invalid_path invalid_order invalid_status cannot_delete_live cannot_delete_primary_language
                last_language last_version destination_exists version_access_disabled unpublished)a
 
-  # A literal copy of Errors.error_atom() (lib/phoenix_kit_publishing/errors.ex) plus the extras of spec §6.6.
+  # A literal copy of Errors.error_atom() (lib/phoenix_kit_publishing/errors.ex) plus the extra atoms the API maps.
   @error_atoms ~w(already_exists cache_miss cannot_delete_live category_cycle conflicts_with_post_slug db_update_failed
     destination_exists group_not_found invalid_content invalid_format invalid_mode invalid_name invalid_order invalid_path
     invalid_slug invalid_status invalid_type invalid_version cannot_delete_primary_language last_language last_version no_post

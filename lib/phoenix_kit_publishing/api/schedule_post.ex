@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
   @moduledoc false
-  # Tool `publishing.schedule_post` (spec §9.11): publish at a future time in a timestamp-mode group.
+  # Tool `publishing.schedule_post`: publish at a future time in a timestamp-mode group.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
   alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, Posts, Versions}

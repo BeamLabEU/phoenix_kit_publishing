@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.TrashPosts do
   @moduledoc false
-  # Tool `publishing.trash_posts` (spec §9.11): move posts to the trash (reversible with restore_posts).
+  # Tool `publishing.trash_posts`: move posts to the trash (reversible with restore_posts).
 
   alias PhoenixKit.Modules.Publishing.API.{Common, PostBatch, Presenter}
   alias PhoenixKit.Modules.Publishing.Posts

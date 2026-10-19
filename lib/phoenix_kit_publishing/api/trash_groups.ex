@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.TrashGroups do
   @moduledoc false
-  # Tool `publishing.trash_groups` (spec §9.17): move groups to the trash (reversible with restore_groups).
+  # Tool `publishing.trash_groups`: move groups to the trash (reversible with restore_groups).
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups}

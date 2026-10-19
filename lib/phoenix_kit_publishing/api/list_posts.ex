@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
   @moduledoc false
-  # Tool `publishing.list_posts` (spec §9.3, §6.5): the post rows of one group, filtered and paged
+  # Tool `publishing.list_posts`: the post rows of one group, filtered and paged
   # on LIGHT rows (post rows, one filter query); versions and contents are loaded for the page only.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}

@@ -1,6 +1,6 @@
 defmodule PhoenixKit.Modules.Publishing.API.RestoreGroups do
   @moduledoc false
-  # Tool `publishing.restore_groups` (spec §9.17): bring groups back from the trash.
+  # Tool `publishing.restore_groups`: bring groups back from the trash.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups}

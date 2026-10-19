@@ -1,8 +1,8 @@
 defmodule PhoenixKit.Modules.Publishing.API.Common do
   @moduledoc false
   # Helpers every publishing tool handler shares: write options, errors in the executor's
-  # shape (spec §6.6), batch rows, the preview/fingerprint pair of a dry run, strict reads that
-  # raise on a database error (spec §8), the bounded line diff of §9.12.
+  # shape, batch rows, the preview/fingerprint pair of a dry run, strict reads that raise on a
+  # database error, and the bounded line diff.
 
   import Ecto.Query, only: [from: 2]
 
@@ -334,7 +334,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   @doc """
   A dry run's answer: the would-be rows and a fingerprint (`{:preview, preview, fingerprint}`).
   The fingerprint covers `fingerprint_term` when given (state plus hashes of the new values: it
-  must never depend on the diff text, spec §9.12) and the rows otherwise.
+  must never depend on the diff text) and the rows otherwise.
   """
   @spec preview([map()], map(), term()) :: {:preview, map(), String.t()}
   def preview(rows, extra \\ %{}, fingerprint_term \\ nil),
@@ -342,7 +342,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
       {:preview, Map.merge(extra, %{"rows" => rows, "summary" => summary(rows)}),
        fingerprint(fingerprint_term || rows)}
 
-  @doc "The state of a post a tool depends on (spec §9.12): feeds the fingerprint of the post tools."
+  @doc "The state of a post a tool depends on: feeds the fingerprint of the post tools."
   @spec post_state(map(), map() | nil, [map()], [map()]) :: tuple()
   def post_state(db_post, group, versions, contents) do
     {db_post.uuid, db_post.slug, db_post.trashed_at, db_post.active_version_uuid,
@@ -361,7 +361,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   def reason_text(reason) when is_atom(reason), do: Atom.to_string(reason)
   def reason_text(_reason), do: "failed"
 
-  @doc "The `if_revision` check (spec §9.12): the `revision` string of get_post must still be current. A value that is not that string (any other type) never matches."
+  @doc "The `if_revision` check: the `revision` string of get_post must still be current. A value that is not that string (any other type) never matches."
   @spec check_revision(map(), map(), map() | nil, map() | nil) ::
           :ok | {:error, :revision_mismatch, String.t(), map()}
   def check_revision(%{"if_revision" => expected}, db_post, version, content)
@@ -392,7 +392,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc """
-  The og_* params of a write (F9): when ANY of og_title / og_description / og_image_id is present all
+  The og_* params of a write: when ANY of og_title / og_description / og_image_id is present all
   three are sent, the unspecified ones taken from the current og of `content_row`; null clears.
   """
   @spec og_params(map(), map() | nil) :: map()
@@ -432,7 +432,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     sha256(Integer.to_string(byte_size(title)) <> ":" <> title <> (content || ""))
   end
 
-  @doc "The `if_revision` value (spec §9.4): values only, never `updated_at`."
+  @doc "The `if_revision` value: values only, never `updated_at`."
   @spec post_revision(map(), map() | nil, map() | nil) :: String.t()
   def post_revision(db_post, version, content) do
     fingerprint({
@@ -448,7 +448,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     })
   end
 
-  # --- strict reads (they raise on a database error, spec §8) -----------------------------
+  # --- strict reads (they raise on a database error) -----------------------------
 
   @doc "All categories of a group in the module's order. The query of Categories.list_categories/1 WITHOUT its rescue."
   @spec categories!(String.t()) :: [PublishingCategory.t()]
@@ -536,7 +536,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     repo().query!(sql, [group_slug, uuids]).rows |> Map.new(fn [uuid, count] -> {uuid, count} end)
   end
 
-  @doc "`false`, or `{true, :live | :trashed}`. Raises on a database error, unlike SlugHelpers.slug_exists?/2 (F21)."
+  @doc "`false`, or `{true, :live | :trashed}`. Raises on a database error, unlike SlugHelpers.slug_exists?/2, which rescues to false."
   @spec slug_taken?(String.t(), String.t()) :: false | {true, :live | :trashed}
   def slug_taken?(group_slug, slug) do
     cond do
@@ -562,11 +562,11 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     repo().exists?(query)
   end
 
-  # --- the :locked_check closure (spec §8) -------------------------------------------------
+  # --- the :locked_check closure -------------------------------------------------
 
   @doc """
   The hook `Posts.update_post/4` runs under the post row lock. `live_fun.(locked_post, version)`
-  recomputes the live-version condition of spec §8 from the two fresh rows. A trashed locked row
+  recomputes the live-version condition from the two fresh rows. A trashed locked row
   is refused whatever the confirmation; an unconfirmed, non-dry call is refused with `:went_live`
   unless the function answers exactly `false` (any doubtful answer counts as live); any exception
   or throw fails closed.
@@ -592,7 +592,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     end
   end
 
-  # --- previews of a body change (spec §9.12) ------------------------------------------------
+  # --- previews of a body change ------------------------------------------------
 
   @myers_cap 400
   @diff_bytes 4096
@@ -655,7 +655,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     {Enum.take(added, @max_added_urls), length(added) > @max_added_urls}
   end
 
-  @doc ~S|A unified line diff, bounded (see spec §9.12): `%{"mode", "text", "hunks", "truncated"}` (+ line counts when coarse).|
+  @doc ~S|A unified line diff, bounded: `%{"mode", "text", "hunks", "truncated"}` (+ line counts when coarse).|
   @spec line_diff(String.t(), String.t()) :: map()
   def line_diff(old, new) do
     old_lines = split_lines(old)
