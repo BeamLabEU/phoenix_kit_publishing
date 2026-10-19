@@ -142,7 +142,10 @@ This repo's `precommit` alias also runs `deps.unlock --check-unused` and
 
 The machine API (`lib/phoenix_kit_publishing/api/`) compiles only against a core
 that carries `PhoenixKit.API` (not yet in a Hex release), so the suite needs
-`PHOENIX_KIT_PATH` pointed at such a checkout, as above. The tests that run
+`PHOENIX_KIT_PATH` pointed at such a checkout, as above. Ordering constraint: this
+code must not be merged or released before core ships the machine API, and the
+`phoenix_kit` floor in `mix.exs` (and the line under "Depends on") must be raised
+to that release in the same change. The tests that run
 through core's executor are tagged `:core_api` and `test_helper.exs` excludes
 them when `PhoenixKit.API.Executor` is not loaded; read the `excluded` count in
 the `mix test` summary. The test database name is hard-coded in
