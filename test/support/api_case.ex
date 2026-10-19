@@ -21,6 +21,7 @@ defmodule PhoenixKitPublishing.Test.ApiCase do
   alias PhoenixKit.API.{Actor, Executor}
   alias PhoenixKit.API.MCP.Names
   alias PhoenixKit.Modules.Publishing.API.Tools
+  alias PhoenixKit.Modules.Publishing.Posts
 
   @compile {:no_warn_undefined, [Executor, Names]}
 
@@ -73,6 +74,31 @@ defmodule PhoenixKitPublishing.Test.ApiCase do
         overrides
       )
     )
+  end
+
+  @doc """
+  Traces `Posts.update_post/4` in every process until the test ends. The first call is sent to the
+  test process as `{:traced, [group, post, params, opts]}`.
+  """
+  def trace_update_post! do
+    test_pid = self()
+
+    tracer =
+      spawn_link(fn ->
+        receive do
+          {:trace, _pid, :call, {Posts, :update_post, args}} -> send(test_pid, {:traced, args})
+        end
+      end)
+
+    :erlang.trace_pattern({Posts, :update_post, 4}, true, [:local])
+    :erlang.trace(:processes, true, [:call, {:tracer, tracer}])
+
+    ExUnit.Callbacks.on_exit(fn ->
+      :erlang.trace(:processes, false, [:call])
+      :erlang.trace_pattern({Posts, :update_post, 4}, false, [:local])
+    end)
+
+    :ok
   end
 
   def call(name, input, overrides \\ %{}) do

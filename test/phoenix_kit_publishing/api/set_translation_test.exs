@@ -54,6 +54,20 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     end
   end
 
+  test "the context write is called with publish: false and none of the keys the tool never sends",
+       ctx do
+    ApiCase.trace_update_post!()
+
+    assert {:ok, %{"action" => "created"}} = set(ctx)
+
+    assert_receive {:traced, [_group, _post, params, opts]}, 1000
+    assert Keyword.fetch!(opts, :publish) == false
+
+    for key <- ~w(status published_at url_slug tags) do
+      refute Map.has_key?(params, key), key
+    end
+  end
+
   test "updating an existing language writes no translation.added row", ctx do
     {:ok, _} = set(ctx)
     before = Enum.count(list_activities(), &(&1.action == "publishing.translation.added"))
