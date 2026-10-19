@@ -837,7 +837,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
     end
 
     test "a UUID is lower-cased, anything else is a validation error on the field" do
-      id = Ecto.UUID.generate()
+      id = PhoenixKitPublishing.Test.MediaFixtures.file!().uuid
 
       assert {:ok, %{"og_image_id" => ^id}} =
                Common.canonical_image_id(%{"og_image_id" => String.upcase(id)}, "og_image_id")

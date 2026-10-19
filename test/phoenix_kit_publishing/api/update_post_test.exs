@@ -7,6 +7,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
   alias PhoenixKit.Modules.Publishing.{Groups, Posts, PublishingContent, PublishingPost}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
+  alias PhoenixKitPublishing.Test.MediaFixtures
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   setup do
@@ -88,7 +89,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
   end
 
   test "og_title alone keeps the stored og description and image", ctx do
-    image = Ecto.UUID.generate()
+    image = MediaFixtures.file!().uuid
 
     {:ok, _} =
       edit(ctx, %{"og_title" => "T1", "og_description" => "Desc 1", "og_image_id" => image})
@@ -370,7 +371,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
              field
     end
 
-    image = Ecto.UUID.generate()
+    image = MediaFixtures.file!().uuid
 
     assert {:ok, %{"changed" => [%{"field" => "featured_image_id", "scope" => "version"}]}} =
              edit(ctx, %{"featured_image_id" => String.upcase(image)})
@@ -383,9 +384,27 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     assert Fx.version(ctx.post[:uuid]).data["featured_image_uuid"] in [nil, ""]
   end
 
+  test "an image id must name a usable file of the media library, in a write and in a dry run",
+       ctx do
+    trashed = MediaFixtures.file!(%{status: "trashed"}).uuid
+
+    hidden =
+      MediaFixtures.file!(%{system_managed: true, status: "active"}).uuid
+
+    for field <- ~w(featured_image_id og_image_id),
+        id <- [Ecto.UUID.generate(), trashed, hidden],
+        overrides <- [%{}, %{dry_run?: true}] do
+      assert {:error, :validation_failed, _, %{errors: [%{path: ^field, reason: "unknown_file"}]}} =
+               edit(ctx, %{field => id}, overrides),
+             "#{field} #{id}"
+    end
+
+    assert Fx.version(ctx.post[:uuid]).data["featured_image_uuid"] in [nil, ""]
+  end
+
   test "featured, sitemap_exclude and featured_image_id are written to the version data with scope version",
        ctx do
-    image = Ecto.UUID.generate()
+    image = MediaFixtures.file!().uuid
 
     assert {:ok, %{"action" => "updated", "changed" => changed}} =
              edit(ctx, %{

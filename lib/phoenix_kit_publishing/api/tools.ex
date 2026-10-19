@@ -180,7 +180,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "featured_image_id, featured, sitemap_exclude and category_ids apply to every language of the " <>
           "version (language de with description also changes English); title, content and og_* are per " <>
           "language; slug is post-level. null clears a text field other than title; an absent field is kept. " <>
-          "featured_image_id and og_image_id are media file ids (UUID) or null. Tags come from " <>
+          "featured_image_id and og_image_id are ids of media library files (UUID) or null; an unknown file is " <>
+          "refused with unknown_file. Tags come from " <>
           "#hashtags in the body and cannot be set. Edits to the live or an archived version, a slug change " <>
           "on a live post, and body text with HTML, components, post links or link destinations other than " <>
           "http, https, mailto or tel need a confirmation: send dry_run first and confirm the preview. " <>
@@ -224,7 +225,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "be blank (a published version with an empty language row would show an empty page). The primary " <>
           "language is edited with update_post. version defaults to the highest draft. A new language row " <>
           "is created first; if the write then fails an empty row stays (the API deletes nothing) and the " <>
-          "error says so. og_title, og_description and og_image_id are optional; null clears. Writing to " <>
+          "error says so. og_title, og_description and og_image_id (a media library file, else unknown_file) are " <>
+          "optional; null clears. Writing to " <>
           "the live version or an archived one, or body text with HTML, components, post links or link " <>
           "destinations other than http, https, mailto or tel, needs a confirmation: send dry_run first and " <>
           "confirm the preview. if_revision is the revision of get_post of the same language and version; for " <>

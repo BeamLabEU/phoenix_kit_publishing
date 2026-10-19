@@ -273,7 +273,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
   @doc """
   An image id field (a media file UUID; `null` or "" clears), stored in canonical (lowercase)
-  form. An absent field passes.
+  form. An absent field passes. A file that is not in the media library, is trashed or is a
+  system file (tile chunks, hidden originals) is `unknown_file`: a dangling id would be accepted
+  silently, and any library file could be attached.
   """
   @spec canonical_image_id(map(), String.t()) ::
           {:ok, map()} | {:error, :validation_failed, String.t(), map()}
@@ -287,12 +289,22 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
 
       {:ok, value} when is_binary(value) ->
         case Ecto.UUID.cast(value) do
-          {:ok, uuid} -> {:ok, Map.put(input, field, uuid)}
+          {:ok, uuid} -> existing_file(input, field, uuid)
           :error -> invalid(field, "must be a media file id (UUID) or null")
         end
 
       {:ok, _other} ->
         invalid(field, "must be a string")
+    end
+  end
+
+  defp existing_file(input, field, uuid) do
+    case PhoenixKit.Modules.Storage.get_file(uuid) do
+      %{status: status, system_managed: false} when status != "trashed" ->
+        {:ok, Map.put(input, field, uuid)}
+
+      _missing_or_hidden ->
+        invalid(field, "is not a file of the media library", "unknown_file")
     end
   end
 

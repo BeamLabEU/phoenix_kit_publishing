@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts, PublishingContent, Versions}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
+  alias PhoenixKitPublishing.Test.MediaFixtures
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   setup do
@@ -179,14 +180,23 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
   end
 
   test "a valid og_image_id is stored on the language row", ctx do
-    image = Ecto.UUID.generate()
+    image = MediaFixtures.file!().uuid
     assert {:ok, %{"action" => "created"}} = set(ctx, %{"og_image_id" => image})
 
     assert PublishingContent.get_og(Fx.content(ctx.post[:uuid], "de-DE"))["image_uuid"] == image
   end
 
+  test "an og_image_id that is not a file of the media library is refused and writes no row",
+       ctx do
+    assert {:error, :validation_failed, _,
+            %{errors: [%{path: "og_image_id", reason: "unknown_file"}]}} =
+             set(ctx, %{"og_image_id" => Ecto.UUID.generate()})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
   test "the dry run shows the og values the call would write", ctx do
-    image = Ecto.UUID.generate()
+    image = MediaFixtures.file!().uuid
 
     assert {:preview, %{"rows" => [%{"changes" => changes}]}, _} =
              set(
@@ -411,7 +421,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     refute with_og == fingerprint.(%{"og_title" => "OG", "og_description" => "text"})
 
     refute with_og ==
-             fingerprint.(%{"og_title" => "OG", "og_image_id" => Ecto.UUID.generate()})
+             fingerprint.(%{"og_title" => "OG", "og_image_id" => MediaFixtures.file!().uuid})
 
     Fx.body!(ctx.g["slug"], ctx.post[:uuid], "someone else edited")
     refute base == fingerprint.(%{})

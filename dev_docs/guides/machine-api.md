@@ -203,7 +203,7 @@ What the rule does NOT do:
 - **language-level** (`"scope": "language"`): `title`, `content`, `og_title`, `og_description`, `og_image_id`. When any `og_*` is sent, all three are written, the unspecified ones kept.
 - **post-level** (`"scope": "post"`): `slug`, slug-mode groups only (`slug_not_allowed` otherwise). A rename moves the live URL, so it needs a confirmation on a post with a live version even when the written version is a draft.
 
-A string field accepts `null`, meaning "clear" (stored as an empty string; `title` cannot be cleared). An absent key means "keep". `featured_image_id` and `og_image_id` are media file ids (UUIDs) or `null`; the module does not check the file exists. `category_ids` (up to 50) must be categories of the post's group (`unknown_category`). At least one field is required (`empty_update`). A request that changes nothing answers `unchanged` and writes nothing. `update_post` never publishes (`publish: false` always) and never sends `status`, `published_at` or `url_slug`. The language must already have text on the version; `set_translation` creates a language.
+A string field accepts `null`, meaning "clear" (stored as an empty string; `title` cannot be cleared). An absent key means "keep". `featured_image_id` and `og_image_id` are ids of files of the media library (UUIDs) or `null`; an id that names no file, a trashed file or a system file is `unknown_file`. `category_ids` (up to 50) must be categories of the post's group (`unknown_category`). At least one field is required (`empty_update`). A request that changes nothing answers `unchanged` and writes nothing. `update_post` never publishes (`publish: false` always) and never sends `status`, `published_at` or `url_slug`. The language must already have text on the version; `set_translation` creates a language.
 
 **Tags are derived.** Tags come from `#hashtags` in the body on save; there is no `tags` input.
 
@@ -264,6 +264,7 @@ Reasons:
 | `invalid_type` | a group type is not valid |
 | `title_required` | a blank title, or publishing a post whose primary title is empty or the default "Untitled" |
 | `unknown_category` | a category id is not a category of the group |
+| `unknown_file` | `featured_image_id` or `og_image_id` names no usable file of the media library |
 | `content_too_large` | a body field over 262,144 bytes |
 | `not_published` | nothing is live (`unpublish_post`) |
 | `not_timestamp_group` | `schedule_post` on a slug-mode group |
