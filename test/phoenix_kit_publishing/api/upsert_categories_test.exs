@@ -171,6 +171,49 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategoriesTest do
              ["parent_not_found", "parent_wrong_group", "category_cycle"]
   end
 
+  describe "the dry run detects a cycle itself" do
+    defp dry_codes(g, rows) do
+      assert {:preview, %{"rows" => preview}, _} = upsert(g, rows, %{dry_run?: true})
+      Enum.map(preview, &(get_in(&1, ["error", "code"]) || &1["action"]))
+    end
+
+    test "under itself, under a direct child and under a grandchild", %{g: g} do
+      root = Fx.category!(g["slug"], "Root", %{slug: "root"})
+      kid = Fx.category!(g["slug"], "Kid", %{slug: "kid", parent_uuid: root.uuid})
+      _grandkid = Fx.category!(g["slug"], "Grand", %{slug: "grand", parent_uuid: kid.uuid})
+
+      assert dry_codes(g, [
+               %{"slug" => "root", "parent" => %{"slug" => "root"}},
+               %{"slug" => "root", "parent" => %{"slug" => "kid"}},
+               %{"slug" => "root", "parent" => %{"slug" => "grand"}},
+               %{"slug" => "kid", "parent" => %{"slug" => "grand"}}
+             ]) == ["category_cycle", "category_cycle", "category_cycle", "category_cycle"]
+    end
+
+    test "a move that makes no cycle is a plain update", %{g: g} do
+      root = Fx.category!(g["slug"], "Root", %{slug: "root"})
+      kid = Fx.category!(g["slug"], "Kid", %{slug: "kid", parent_uuid: root.uuid})
+      Fx.category!(g["slug"], "Grand", %{slug: "grand", parent_uuid: kid.uuid})
+      Fx.category!(g["slug"], "Other", %{slug: "other"})
+
+      assert dry_codes(g, [
+               %{"slug" => "grand", "parent" => %{"slug" => "root"}},
+               %{"slug" => "kid", "parent" => %{"slug" => "other"}},
+               %{"slug" => "root", "parent" => nil}
+             ]) == ["updated", "updated", "unchanged"]
+    end
+
+    test "a cycle through a move planned earlier in the same request", %{g: g} do
+      Fx.category!(g["slug"], "A", %{slug: "a"})
+      Fx.category!(g["slug"], "B", %{slug: "b"})
+
+      assert dry_codes(g, [
+               %{"slug" => "b", "parent" => %{"slug" => "a"}},
+               %{"slug" => "a", "parent" => %{"slug" => "b"}}
+             ]) == ["updated", "category_cycle"]
+    end
+  end
+
   test "a later row may name an earlier CREATED category as its parent, in the dry run and in the write",
        %{g: g} do
     rows = [
