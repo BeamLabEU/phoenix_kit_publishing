@@ -141,12 +141,36 @@ defmodule PhoenixKit.Modules.Publishing.API.TranslatePostTest do
     assert job.args["endpoint_uuid"] == expected
   end
 
-  test "with the override set the job uses it", ctx do
+  test "the LAST-USED endpoint is never a fallback when the unattended resolution fails", ctx do
+    {:ok, _} = Settings.update_setting("publishing_translation_endpoint_uuid", "")
+
+    {:ok, _} =
+      PhoenixKitAI.create_request(%{
+        endpoint_uuid: ctx.endpoint.uuid,
+        status: "success",
+        request_type: "chat",
+        model: "x/y"
+      })
+
+    # the module's own default would pick the last-used endpoint, the unattended resolution has none
+    {:ok, _} = Settings.update_boolean_setting("ai_enabled", false)
+    assert PhoenixKitAI.Translations.default_endpoint_uuid() == ctx.endpoint.uuid
+    assert {:error, :not_configured} = PhoenixKitAI.Translations.unattended_endpoint_uuid()
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "ai_not_configured"}]}} =
+             translate(ctx)
+
+    assert all_enqueued(worker: PhoenixKitAI.TranslateWorker) == []
+  end
+
+  test "with the override set the job uses it and logs as the key owner", ctx do
     assert {:ok, _} = translate(ctx)
     [job | _] = all_enqueued(worker: PhoenixKitAI.TranslateWorker)
 
     assert job.args["endpoint_uuid"] == ctx.endpoint.uuid and
              job.args["prompt_uuid"] == ctx.prompt.uuid
+
+    assert job.args["actor_uuid"] == ApiCase.user_uuid()
   end
 
   test "a second identical call is de-duplicated by the AI module, not billed twice", ctx do
@@ -176,8 +200,12 @@ defmodule PhoenixKit.Modules.Publishing.API.TranslatePostTest do
     assert {:error, :validation_failed, _, %{errors: [%{reason: "language_not_enabled"}]}} =
              translate(ctx, %{"languages" => ["xx"]})
 
-    assert {:error, :validation_failed, _, _} =
-             translate(ctx, %{"languages" => for(n <- 1..51, do: "l#{n}")})
+    # real, enabled codes: only the schema cap can refuse these
+    assert {:ok, %{"action" => "queued"}} =
+             translate(ctx, %{"languages" => List.duplicate("de-DE", 50)})
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "languages", limit: 50}]}} =
+             translate(ctx, %{"languages" => List.duplicate("de-DE", 51)})
   end
 
   test "one activity row records the request, attributed; the jobs are not logged by the API",
