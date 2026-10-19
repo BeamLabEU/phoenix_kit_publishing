@@ -489,7 +489,7 @@ request). The scopes:
 confirmation: publishing, unpublishing, scheduling, trashing, restoring a post
 that has a live version, editing a live or archived version, a slug change on a
 live post, changing an existing category or group, a body that holds HTML or a
-component, every AI translation (it costs money) and the permanent
+component, text the renderer turns into a link of another scheme (`ftp://`, `xmpp:`), every AI translation (it costs money) and the permanent
 `delete_categories`. The call answers `confirmation_required` with a preview
 and a `confirm_token`; the agent repeats the same call with the token (and
 should ask its user first), or, when the key requires approval, a person

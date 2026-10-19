@@ -5,9 +5,10 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
   # text is dangerous when the text holds raw HTML or a component (`<` + letter, `/`, `!`,
   # `?`), the `[[post:` token, `javascript:` / `vbscript:` / `data:` (whitespace removed, any
   # case), a markdown link / image destination outside http, https, mailto, tel and
-  # relative (`//host` is another site, not relative), or a bare `scheme://` (or `xmpp:`)
-  # in the text: the renderer enables the GFM autolink extension, which turns those into
-  # live links. O(n) time and memory.
+  # relative (`//host` is another site, not relative), or text the renderer autolinks to
+  # another scheme: a bare `scheme://`, `xmpp:`, or `mailto:` behind an email local-part
+  # character, read with entities for printable ASCII decoded (the renderer enables the GFM
+  # autolink extension and decodes entities first). O(n) time and memory.
 
   @max_body_bytes 262_144
   @max_scan_bytes 2_097_152

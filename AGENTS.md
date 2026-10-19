@@ -12,9 +12,9 @@ the `PhoenixKit.Module` behaviour, so a host app gets it by adding the dependenc
 controller (dead views); the admin side is LiveView.
 
 - **Depends on:** `phoenix_kit` `>= 2.63.0 and < 3.0.0` (Hex — 2.63.0 is the first release
-  that carries the machine API, `PhoenixKit.API`, and with it `PhoenixKitWeb.Actor`,
-  `Activity.log/3` and `Components.TreePicker`; the compound form keeps the ceiling open
-  across later 2.x minors), `phoenix_kit_ai` `~> 0.18`
+  that carries the machine API, `PhoenixKit.API`; `PhoenixKitWeb.Actor`, `Activity.log/3`
+  and `Components.TreePicker` came with 2.38.0, the floor before it; the compound form
+  keeps the ceiling open across later 2.x minors), `phoenix_kit_ai` `~> 0.18`
   (hard — it owns the `Translatable` adapter behaviour, the per-language Oban
   fan-out, the LLM call and `ai_multilang_tabs/1`; publishing contributes only
   the adapters and the editor wiring), `phoenix_kit_comments` `~> 0.3`
@@ -65,12 +65,15 @@ Deliberate non-features, so nobody adds them assuming they were missed.
   `render_markdown/1` (API import, AI prompt-injection on rotating roles), wire
   `html_sanitize_ex` in front of it. See `render_markdown_html/1` in
   `renderer.ex`. The machine API does not sanitise either: a write whose body
-  text holds HTML, components, post links or link destinations outside http,
-  https, mailto, tel and relative (`//host` is not relative) is a confirmed write
-  (`API.TextScan`); AI jobs and the editor bypass that rule.
+  text holds HTML, components, post links, link destinations outside http,
+  https, mailto, tel and relative (`//host` is not relative) or text the renderer
+  autolinks to another scheme is a confirmed write (`API.TextScan`); AI jobs and
+  the editor bypass that rule.
 - **No hard delete, stale fixer or media reorganizer in the machine API.** It
   never deletes a group, post, version or language (trashing is the removal it
-  offers) and exposes neither `StaleFixer` nor `MediaReorganizer`. The one
+  offers) and exposes neither `StaleFixer` nor `MediaReorganizer`. No read tool
+  runs the stale fixer; a write through a context function can self-heal as an
+  editor save does. The one
   permanent delete is `delete_categories` (categories have no trash), which is
   always confirmed and has its own scope.
 - **No outbound HTTP from this module.** AI translation dispatches via
@@ -386,13 +389,15 @@ Self-healing actions (`mode: "auto"`, no actor):
 ### Machine API
 
 `lib/phoenix_kit_publishing/api/` declares 20 admin tools (`API.Tools`, handed to
-core by `Publishing.api_tools/0`, which has no `@impl` because the core floor
-predates the optional callback). Core owns keys, scopes, validation, rate limits
+core by `Publishing.api_tools/0`, an optional `PhoenixKit.Module` callback that
+the 2.63.0 floor declares). Core owns keys, scopes, validation, rate limits
 and the confirmation flow; the module owns the tools and the data rules. Guide:
 [dev_docs/guides/machine-api.md](dev_docs/guides/machine-api.md).
 
 - **Never call a `DBStorage` write, an `Ecto.Repo` write, `ListingCache`,
-  `PubSub` or the render cache from `api/`.** Writes go through `Posts`,
+  `PubSub` or the render cache from `api/`.** (`list_posts` reads the per-day
+  counts through `Listing.group_date_counts/1`, which may fill the listing cache
+  on a miss.) Writes go through `Posts`,
   `Versions`, `Groups`, `Categories` and `TranslationManager` with
   `Common.write_opts/3`, so caches, broadcasts and activity entries behave as for
   an admin click.
@@ -406,7 +411,9 @@ and the confirmation flow; the module owns the tools and the data rules. Guide:
   `published_post_counts!/1`, `DBStorage` reads); the banned reads that rescue to
   an empty result (`Categories.published_post_counts/1`, `list_categories/1`,
   `by_slug/2`, `categories_by_uuids/2`, `list_tree/1`, `Posts.read_post_by_uuid/3`,
-  `SlugHelpers.slug_exists?/2`) are pinned out by `danger_static_test.exs`.
+  `SlugHelpers.slug_exists?/2`) and the reads that run the stale fixer
+  (`Groups.fetch_group/1`, `get_group/1`, `list_groups/0,1`) are pinned out by
+  `danger_static_test.exs`.
 - **Option names never collide with a keyword option of the function they are
   passed to.** The API-owned names are exactly `:actor_uuid`, `:scope`,
   `:activity_mode` and `:log_metadata`. The activity mode travels in
@@ -438,13 +445,20 @@ fail-closed: unprovable or raising means dangerous):
 | `restore_posts` | a trashed post to restore has an active version |
 | `upsert_categories`, `upsert_groups` | a row updates an existing record and effectively changes it (creating is never dangerous) |
 
-The text rule is `API.TextScan.dangerous?/1`: `<` followed by a letter, `/`, `!`
-or `?`; the token `[[post:`; `javascript:` / `vbscript:` / `data:` after removing
-whitespace; a markdown link or image destination outside http, https, mailto, tel
-and relative (`//host` is not relative). It scans the submitted string only (no rendering), applies to draft
+The text rule is `API.TextScan.dangerous?/1`, five rules: `<` followed by a
+letter, `/`, `!` or `?` (`html`); the token `[[post:` (`post_link`);
+`javascript:` / `vbscript:` / `data:` after removing whitespace (`scheme`); a
+markdown link or image destination outside http, https, mailto, tel and relative
+(`//host` is not relative) (`link_scheme`); and text the renderer autolinks to
+another scheme, read with printable-ASCII entities decoded: a bare `scheme://`
+other than http and https, `xmpp:`, and `mailto:` preceded by an email
+local-part character (`autolink_scheme`). It scans the submitted string only (no rendering), applies to draft
 writes too, and caps a body field at 262,144 bytes. Tools exist only when the
 loaded core can enforce the flow (`API.Gate`): otherwise every tool with a
-`danger` is withheld.
+`danger` is withheld, with one warning in the log. `Gate`'s `@markers` are two
+internal functions of core, `PhoenixKit.API.Keys.active?/1` and
+`PhoenixKit.API.Flow.gate/1`: a later 2.x core that renames or moves either one
+silently takes the dangerous tools away on every host until `@markers` follows.
 
 ### Landmines
 

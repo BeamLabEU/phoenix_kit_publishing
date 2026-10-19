@@ -153,7 +153,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       title: "Create a post",
       description:
         "Creates a post: a draft version 1 with the primary-language title and body. title is required; " <>
-          "content is Markdown. HTML, components, post links or non-http link destinations in content make " <>
+          "content is Markdown. HTML, components, post links, link destinations other than http, https, mailto " <>
+          "or tel, and bare URLs of another scheme (ftp://, xmpp: addresses) in content make " <>
           "the call a confirmed write: send it with dry_run first and confirm the preview. A slug is for " <>
           "slug-mode groups only; a timestamp-mode post has no slug and is addressed by id. The answer " <>
           "does not carry the slug: read it with get_post. Not idempotent: send an idempotency_key when " <>
@@ -183,8 +184,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "featured_image_id and og_image_id are ids of media library files (UUID) or null; an unknown file is " <>
           "refused with unknown_file. Tags come from " <>
           "#hashtags in the body and cannot be set. Edits to the live or an archived version, a slug change " <>
-          "on a live post, and body text with HTML, components, post links or link destinations other than " <>
-          "http, https, mailto or tel need a confirmation: send dry_run first and confirm the preview. " <>
+          "on a live post, and body text with HTML, components, post links, link destinations other than " <>
+          "http, https, mailto or tel, or bare URLs of another scheme (ftp://, xmpp: addresses) need a " <>
+          "confirmation: send dry_run first and confirm the preview. " <>
           "if_revision is the revision of get_post.",
       input_schema: Schemas.update_post(),
       output_schema: Schemas.update_post_output(),
@@ -227,8 +229,9 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
           "is created first; if the write then fails an empty row stays (the API deletes nothing) and the " <>
           "error says so. og_title, og_description and og_image_id (a media library file, else unknown_file) are " <>
           "optional; null clears. Writing to " <>
-          "the live version or an archived one, or body text with HTML, components, post links or link " <>
-          "destinations other than http, https, mailto or tel, needs a confirmation: send dry_run first and " <>
+          "the live version or an archived one, or body text with HTML, components, post links, link " <>
+          "destinations other than http, https, mailto or tel, or bare URLs of another scheme (ftp://, " <>
+          "xmpp: addresses), needs a confirmation: send dry_run first and " <>
           "confirm the preview. if_revision is the revision of get_post of the same language and version; for " <>
           "a language without text yet it is the revision get_post showed for the text it fell back to.",
       input_schema: Schemas.set_translation(),
