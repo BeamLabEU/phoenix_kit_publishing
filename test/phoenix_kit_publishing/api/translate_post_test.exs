@@ -4,7 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.API.TranslatePostTest do
 
   import PhoenixKitPublishing.ActivityLogAssertions
 
-  alias PhoenixKit.Modules.Publishing.{Groups, Posts, Versions}
+  alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts, Versions}
   alias PhoenixKit.Settings
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
@@ -242,6 +242,35 @@ defmodule PhoenixKit.Modules.Publishing.API.TranslatePostTest do
 
     assert row["overwrites"] == ["de-DE"] and row["endpoint_uuid"] == ctx.endpoint.uuid and
              row["prompt_uuid"] == ctx.prompt.uuid and row["estimated_jobs"] == 2
+  end
+
+  test "the preview says whether the version being translated is live", ctx do
+    assert {:preview, %{"rows" => [%{"live" => false, "public" => "none"}]}, _} =
+             translate(ctx, %{}, %{dry_run?: true})
+
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    assert {:preview, %{"rows" => [%{"live" => true, "public" => "active"}]}, _} =
+             translate(ctx, %{"version" => 1}, %{dry_run?: true})
+  end
+
+  test "the fingerprint pins the source text, the live state and the language paths", ctx do
+    preview = fn -> translate(ctx, %{"version" => 1}, %{dry_run?: true}) end
+
+    assert {:preview, _, base} = preview.()
+    assert {:preview, _, ^base} = preview.()
+
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "a different english body")
+    assert {:preview, _, edited} = preview.()
+    refute edited == base
+
+    {:ok, _} = DBStorage.update_content(Fx.content(ctx.post[:uuid]), %{url_slug: "moved"})
+    assert {:preview, _, moved} = preview.()
+    refute moved in [base, edited]
+
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+    assert {:preview, _, live} = preview.()
+    refute live in [base, edited, moved]
   end
 
   test "a trashed post and a trashed group are refused", ctx do

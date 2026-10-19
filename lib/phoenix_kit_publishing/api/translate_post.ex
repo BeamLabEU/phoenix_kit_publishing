@@ -2,7 +2,7 @@ defmodule PhoenixKit.Modules.Publishing.API.TranslatePost do
   @moduledoc false
   # Tool `publishing.translate_post`: queue AI translation jobs; they run and bill later.
 
-  alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
+  alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
 
   alias PhoenixKit.Modules.Publishing.{
     ActivityLog,
@@ -165,6 +165,8 @@ defmodule PhoenixKit.Modules.Publishing.API.TranslatePost do
     row = %{
       "action" => "queue",
       "version" => plan.version.version_number,
+      "live" => plan.hit.db_post.active_version_uuid == plan.version.uuid,
+      "public" => Presenter.public_state(plan.hit.db_post, plan.version),
       "source_language" => plan.source,
       "targets" => plan.targets,
       "skipped" => plan.skipped,
@@ -174,9 +176,12 @@ defmodule PhoenixKit.Modules.Publishing.API.TranslatePost do
       "estimated_jobs" => length(plan.targets)
     }
 
+    # The post state pins the source text, the live pointer and every language's path: the
+    # approver accepts the cost and the overwrite of exactly these texts.
     term =
-      {:translate_post, plan.hit.db_post.uuid, plan.version.version_number, plan.targets,
-       existing, plan.endpoint, plan.prompt}
+      {:translate_post,
+       Common.post_state(plan.hit.db_post, plan.hit.group, [plan.version], plan.contents),
+       plan.targets, existing, plan.endpoint, plan.prompt}
 
     Common.preview([row], %{"requires_confirmation" => true}, term)
   end
