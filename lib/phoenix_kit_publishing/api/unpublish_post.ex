@@ -10,7 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UnpublishPost do
   @spec call(map(), map()) ::
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
   def call(input, ctx) do
-    with {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(),
+    with {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(input["post"]),
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
          {:ok, live} <- live_version(hit.db_post) do
       if Map.get(ctx, :dry_run?, false), do: preview(hit, live), else: execute(hit, live, ctx)

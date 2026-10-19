@@ -12,7 +12,8 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
 
   @spec call(map(), map()) :: {:ok, map()} | {:error, atom(), String.t(), map()}
   def call(input, _ctx) do
-    with {:ok, group} <- input["group"] |> Refs.resolve_group() |> not_found(input["group"]),
+    with {:ok, group} <-
+           input["group"] |> Refs.resolve_group() |> Refs.group_missing(input["group"]),
          {:ok, limit, warnings} <- limit(input["limit"]),
          {:ok, allow} <- category_allow_list(group, input["category_id"]),
          status = input["status"] || "all",
@@ -33,13 +34,6 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
        )}
     end
   end
-
-  defp not_found({:ok, _} = ok, _ref), do: ok
-
-  defp not_found({:error, :not_found}, ref),
-    do: {:error, :not_found, "The group does not exist.", %{ref: clip(ref)}}
-
-  defp clip(ref), do: if(is_binary(ref), do: String.slice(ref, 0, 100), else: nil)
 
   defp limit(nil), do: {:ok, @default_limit, []}
 

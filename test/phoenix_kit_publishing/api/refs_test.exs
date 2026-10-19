@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.API.RefsTest do
     Versions
   }
 
+  alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
@@ -270,25 +271,73 @@ defmodule PhoenixKit.Modules.Publishing.API.RefsTest do
     end
   end
 
+  describe "not_found echoes the reference as given, clipped to 100 characters" do
+    test "echo_ref clips a string and every value of a post reference" do
+      long = String.duplicate("x", 150)
+      assert Refs.echo_ref(long) == String.duplicate("x", 100)
+
+      assert Refs.echo_ref(%{"group" => long, "slug" => "s"}) ==
+               %{"group" => String.duplicate("x", 100), "slug" => "s"}
+    end
+
+    test "every tool that resolves a post answers not_found with the post reference" do
+      ref = %{"group" => "no-such-group", "slug" => String.duplicate("s", 150)}
+      echoed = %{"group" => "no-such-group", "slug" => String.duplicate("s", 100)}
+
+      for {tool, extra} <- [
+            {"publishing.get_post", %{}},
+            {"publishing.update_post", %{"title" => "T"}},
+            {"publishing.publish_post", %{}},
+            {"publishing.unpublish_post", %{}},
+            {"publishing.create_version", %{}},
+            {"publishing.schedule_post", %{"publish_at" => "2030-01-01T00:00"}},
+            {"publishing.set_translation",
+             %{"language" => "de-DE", "title" => "T", "content" => "c"}},
+            {"publishing.translate_post", %{}}
+          ] do
+        assert {:error, :not_found, _, %{ref: ^echoed}} =
+                 ApiCase.call(tool, Map.put(extra, "post", ref)),
+               "#{tool} must echo the post reference"
+      end
+    end
+
+    test "every tool that resolves a group answers not_found with the slug" do
+      slug = String.duplicate("g", 150)
+      echoed = String.duplicate("g", 100)
+
+      for {tool, extra} <- [
+            {"publishing.list_posts", %{}},
+            {"publishing.list_categories", %{}},
+            {"publishing.create_post", %{"title" => "T"}},
+            {"publishing.upsert_categories", %{"categories" => [%{"name" => "C"}]}},
+            {"publishing.delete_categories", %{"refs" => [%{"slug" => "c"}]}}
+          ] do
+        assert {:error, :not_found, _, %{ref: ^echoed}} =
+                 ApiCase.call(tool, Map.put(extra, "group", slug)),
+               "#{tool} must echo the group slug"
+      end
+    end
+  end
+
   describe "error helpers" do
     test "post_error, group_error, group_missing and version_error map each failure and pass {:ok, x} through",
          %{g: g} do
-      assert {:ok, :x} = Refs.post_error({:ok, :x})
+      assert {:ok, :x} = Refs.post_error({:ok, :x}, %{})
 
       assert {:error, :validation_failed, _, %{errors: [%{reason: "invalid_ref"}]}} =
-               Refs.post_error({:error, :invalid_ref})
+               Refs.post_error({:error, :invalid_ref}, %{})
 
       assert {:error, :validation_failed, _, %{errors: [%{reason: "post_trashed"}]}} =
-               Refs.post_error({:error, {:post_trashed, %{}}})
+               Refs.post_error({:error, {:post_trashed, %{}}}, %{})
 
-      assert {:error, :not_found, _, _} = Refs.post_error({:error, :not_found})
+      assert {:error, :not_found, _, _} = Refs.post_error({:error, :not_found}, %{"id" => "x"})
       assert :ok = Refs.group_error(:ok)
 
       assert {:error, :validation_failed, _, %{errors: [%{reason: "group_trashed"}]}} =
                Refs.group_error({:error, :group_trashed})
 
-      assert {:error, :not_found, _, _} = Refs.group_missing({:error, :not_found})
-      assert {:ok, :g} = Refs.group_missing({:ok, :g})
+      assert {:error, :not_found, _, _} = Refs.group_missing({:error, :not_found}, "x")
+      assert {:ok, :g} = Refs.group_missing({:ok, :g}, "x")
       assert {:ok, :v} = Refs.version_error({:ok, :v})
 
       assert {:error, :validation_failed, _, %{errors: [%{reason: "version_not_found"}]}} =

@@ -44,7 +44,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
          :ok <- texts(input),
          :ok <- title_present(input),
          {:ok, input} <- images(input),
-         {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(),
+         {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(input["post"]),
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
          {:ok, version} <-
            Refs.resolve_version(hit.db_post, input["version"], :write) |> Refs.version_error(),

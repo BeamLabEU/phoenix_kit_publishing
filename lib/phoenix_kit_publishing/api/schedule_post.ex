@@ -12,7 +12,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
   def call(input, ctx) do
     with {:ok, {date, time}} <- parse(input["publish_at"]),
-         {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(),
+         {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(input["post"]),
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
          :ok <- timestamp_group(hit.group),
          {:ok, version} <-

@@ -9,7 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreateVersion do
 
   def call(input, ctx) do
     with :ok <- exclusive(input),
-         {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(),
+         {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(input["post"]),
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
          {:ok, source} <- source(hit.db_post, input) do
       if Map.get(ctx, :dry_run?, false), do: preview(hit, source), else: execute(hit, source, ctx)

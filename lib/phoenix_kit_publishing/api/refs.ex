@@ -257,16 +257,31 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
 
   # --- handler errors for failed resolutions (shared by every tool) ---------------------------
 
-  @doc "Handler error for a failed `resolve_post/2`: `{:ok, hit}` passes through."
-  def post_error({:ok, _} = ok), do: ok
+  @doc """
+  The reference as the caller gave it, clipped to 100 characters, for the `context` of a
+  `not_found` answer. A post reference keeps its keys; a group reference is the bare slug.
+  """
+  def echo_ref(ref) when is_binary(ref), do: String.slice(ref, 0, 100)
 
-  def post_error({:error, :invalid_ref}),
+  def echo_ref(%{} = ref),
+    do: Map.new(ref, fn {key, value} -> {key, echo_ref(value)} end)
+
+  def echo_ref(_other), do: nil
+
+  @doc """
+  Handler error for a failed `resolve_post/2`: `{:ok, hit}` passes through. `ref` is the post
+  reference as given; a `not_found` answer echoes it.
+  """
+  def post_error({:ok, _} = ok, _ref), do: ok
+
+  def post_error({:error, :invalid_ref}, _ref),
     do: Common.invalid("post", "give {id} or {group, slug}", "invalid_ref")
 
-  def post_error({:error, {:post_trashed, _}}),
+  def post_error({:error, {:post_trashed, _}}, _ref),
     do: Common.invalid("post", "the post is in the trash", "post_trashed")
 
-  def post_error({:error, :not_found}), do: {:error, :not_found, "The post does not exist.", %{}}
+  def post_error({:error, :not_found}, ref),
+    do: {:error, :not_found, "The post does not exist.", %{ref: echo_ref(ref)}}
 
   @doc "Handler error for `ensure_group_active/1`."
   def group_error(:ok), do: :ok
@@ -274,11 +289,11 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
   def group_error({:error, :group_trashed}),
     do: Common.invalid("group", "the group is in the trash; restore it first", "group_trashed")
 
-  @doc "Handler error for a failed `resolve_group/1`."
-  def group_missing({:ok, _} = ok), do: ok
+  @doc "Handler error for a failed `resolve_group/1`; a `not_found` answer echoes the slug as given."
+  def group_missing({:ok, _} = ok, _ref), do: ok
 
-  def group_missing({:error, :not_found}),
-    do: {:error, :not_found, "The group does not exist.", %{}}
+  def group_missing({:error, :not_found}, ref),
+    do: {:error, :not_found, "The group does not exist.", %{ref: echo_ref(ref)}}
 
   @doc "Handler error for a failed `resolve_version/3`."
   def version_error({:ok, _} = ok), do: ok

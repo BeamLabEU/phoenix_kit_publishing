@@ -235,7 +235,7 @@ Request-level errors are core's problem documents; this module uses these codes:
 
 | code | HTTP | when |
 |---|---|---|
-| `not_found` | 404 | the group, post, category or version of a ref does not exist (`context` echoes the ref, clipped to 100 characters) |
+| `not_found` | 404 | the group, post, category or version of a ref does not exist (`context.ref` echoes the post reference or group slug as given, clipped to 100 characters) |
 | `validation_failed` | 422 | bad input or a refused state; `context.errors` is a list of `{path, message, reason, allowed?}` |
 | `revision_mismatch` | 409 | `if_revision` no longer matches, or a version went live between the check and the write (`context.reason: "went_live"`: repeat the call to get a confirmation) |
 | `internal_error` | 500 | `db_update_failed` and every module error without a mapping; the reason is logged, never returned |

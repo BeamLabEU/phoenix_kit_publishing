@@ -7,9 +7,9 @@ defmodule PhoenixKit.Modules.Publishing.API.ListCategories do
 
   @spec call(map(), map()) :: {:ok, map()} | {:error, atom(), String.t(), map()}
   def call(input, _ctx) do
-    case Refs.resolve_group(input["group"]) do
-      {:error, :not_found} ->
-        {:error, :not_found, "The group does not exist.", %{}}
+    case input["group"] |> Refs.resolve_group() |> Refs.group_missing(input["group"]) do
+      {:error, _kind, _message, _context} = error ->
+        error
 
       {:ok, group} ->
         counts = Common.published_post_counts!(group.slug)

@@ -13,7 +13,8 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
   @spec call(map(), map()) ::
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
   def call(input, ctx) do
-    with {:ok, group} <- input["group"] |> Refs.resolve_group() |> Refs.group_missing(),
+    with {:ok, group} <-
+           input["group"] |> Refs.resolve_group() |> Refs.group_missing(input["group"]),
          :ok <- group |> Refs.ensure_group_active() |> Refs.group_error() do
       plan = plan(group.slug, input["categories"])
       if Map.get(ctx, :dry_run?, false), do: preview(group, plan), else: execute(group, plan, ctx)

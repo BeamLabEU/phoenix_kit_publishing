@@ -69,7 +69,7 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPost do
          %{trashed: true}}
 
       other ->
-        Refs.post_error(other)
+        Refs.post_error(other, ref)
     end
   end
 

@@ -20,7 +20,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreatePost do
   end
 
   defp group(slug) do
-    with {:ok, group} <- slug |> Refs.resolve_group() |> Refs.group_missing(),
+    with {:ok, group} <- slug |> Refs.resolve_group() |> Refs.group_missing(slug),
          :ok <- group |> Refs.ensure_group_active() |> Refs.group_error() do
       {:ok, group}
     end

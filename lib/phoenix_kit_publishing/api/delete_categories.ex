@@ -10,7 +10,8 @@ defmodule PhoenixKit.Modules.Publishing.API.DeleteCategories do
   @spec call(map(), map()) ::
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
   def call(input, ctx) do
-    with {:ok, group} <- input["group"] |> Refs.resolve_group() |> Refs.group_missing(),
+    with {:ok, group} <-
+           input["group"] |> Refs.resolve_group() |> Refs.group_missing(input["group"]),
          :ok <- group |> Refs.ensure_group_active() |> Refs.group_error() do
       categories = Common.categories!(group.slug)
       plan = plan(input["refs"], categories)
