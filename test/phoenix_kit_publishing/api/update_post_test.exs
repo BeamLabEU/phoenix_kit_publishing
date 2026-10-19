@@ -39,6 +39,31 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     assert body(ctx) == "new body"
   end
 
+  test "the context write is called with publish: false and never with a status param", ctx do
+    test_pid = self()
+
+    tracer =
+      spawn_link(fn ->
+        receive do
+          {:trace, _pid, :call, {Posts, :update_post, args}} -> send(test_pid, {:traced, args})
+        end
+      end)
+
+    :erlang.trace_pattern({Posts, :update_post, 4}, true, [:local])
+    :erlang.trace(:processes, true, [:call, {:tracer, tracer}])
+
+    on_exit(fn ->
+      :erlang.trace(:processes, false, [:call])
+      :erlang.trace_pattern({Posts, :update_post, 4}, false, [:local])
+    end)
+
+    assert {:ok, %{"action" => "updated"}} = edit(ctx, %{"title" => "Traced"})
+
+    assert_receive {:traced, [_group, _post, params, opts]}, 1000
+    assert Keyword.fetch!(opts, :publish) == false
+    refute Map.has_key?(params, "status")
+  end
+
   test "status, published_at, url_slug, tags and force are rejected by the schema", ctx do
     for key <- ~w(status published_at url_slug tags force) do
       assert {:error, :validation_failed, _, _} = edit(ctx, %{key => "x", "title" => "T"}), key
