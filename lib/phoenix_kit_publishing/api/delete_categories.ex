@@ -103,7 +103,7 @@ defmodule PhoenixKit.Modules.Publishing.API.DeleteCategories do
           Common.row_ok(ref, "removed", category.uuid, %{
             "irreversible" => true,
             "name" => category.name,
-            "children" => Enum.count(categories, &(&1.parent_uuid == category.uuid)),
+            "children" => category.uuid |> child_uuids(categories) |> length(),
             "published_posts" => Map.get(published, category.uuid, 0),
             "filed_versions" => Map.get(filed, category.uuid, 0),
             "post_categories" => Map.get(cascade, category.uuid, 0)
@@ -117,14 +117,19 @@ defmodule PhoenixKit.Modules.Publishing.API.DeleteCategories do
       {:delete_categories, group.status,
        Enum.map(plan, fn
          {:delete, _ref, c} ->
-           {:delete, c.uuid, c.slug, c.parent_uuid, Map.get(filed, c.uuid, 0),
-            Map.get(published, c.uuid, 0), Map.get(cascade, c.uuid, 0)}
+           {:delete, c.uuid, c.slug, c.parent_uuid, child_uuids(c.uuid, categories),
+            Map.get(filed, c.uuid, 0), Map.get(published, c.uuid, 0), Map.get(cascade, c.uuid, 0)}
 
          {:error, ref, row} ->
            {:error, Common.fingerprint(ref), row["error"]["code"]}
        end)}
 
     Common.preview(rows, %{"requires_confirmation" => true}, term)
+  end
+
+  # The categories that move to the top level when `uuid` is deleted.
+  defp child_uuids(uuid, categories) do
+    for(c <- categories, c.parent_uuid == uuid, do: c.uuid) |> Enum.sort()
   end
 
   # Rows of the join table that the delete cascades, per category.

@@ -97,6 +97,28 @@ defmodule PhoenixKit.Modules.Publishing.API.DeleteCategoriesTest do
     assert f1 != f2
   end
 
+  test "the fingerprint follows the children that would move to the top level", %{g: g, cat: cat} do
+    preview = fn ->
+      assert {:preview, %{"rows" => [row]}, fingerprint} =
+               delete(g, [%{"id" => cat.uuid}], %{dry_run?: true})
+
+      {row["children"], fingerprint}
+    end
+
+    {0, none} = preview.()
+    assert {0, ^none} = preview.()
+
+    kid = Fx.category!(g["slug"], "Kid", %{slug: "kid", parent_uuid: cat.uuid})
+    {1, one} = preview.()
+    refute one == none
+
+    # another child instead of the first: the count is the same, the tree is not
+    {:ok, _} = Categories.delete_category(kid.uuid)
+    Fx.category!(g["slug"], "Other kid", %{slug: "other-kid", parent_uuid: cat.uuid})
+    {1, swapped} = preview.()
+    refute swapped == one
+  end
+
   test "a second call is a not_found row; the same category twice and a malformed ref are row errors",
        %{g: g, cat: cat, other: other} do
     {:ok, _} = delete(g, [%{"id" => cat.uuid}])
