@@ -12,7 +12,11 @@ defmodule PhoenixKit.Modules.Publishing.API.DangerStaticTest do
     "Posts.read_post_by_uuid(",
     "SlugHelpers.slug_exists?(",
     "Groups.fetch_group(",
-    "Groups.get_group("
+    "Groups.get_group(",
+    "Groups.list_groups(",
+    "Posts.find_by_previous_url_slug(",
+    "Posts.resolve_link_targets(",
+    "Posts.read_back_post("
   ]
 
   test "guard/1 fails closed: a raise, a throw and an exit all answer true" do

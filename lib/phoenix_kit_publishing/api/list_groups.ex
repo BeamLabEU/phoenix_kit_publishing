@@ -2,11 +2,16 @@ defmodule PhoenixKit.Modules.Publishing.API.ListGroups do
   @moduledoc false
   # Tool `publishing.list_groups`.
 
-  alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, GroupSettings}
+  alias PhoenixKit.Modules.Publishing.API.Refs
+  alias PhoenixKit.Modules.Publishing.{DBStorage, GroupSettings}
 
   @spec call(map(), map()) :: {:ok, map()}
   def call(input, _ctx) do
-    groups = (input["status"] || "active") |> Groups.list_groups() |> Enum.map(&present/1)
+    groups =
+      (input["status"] || "active")
+      |> DBStorage.list_groups()
+      |> Enum.map(&(&1 |> Refs.group_map() |> present()))
+
     {:ok, %{"groups" => groups, "count" => length(groups)}}
   end
 

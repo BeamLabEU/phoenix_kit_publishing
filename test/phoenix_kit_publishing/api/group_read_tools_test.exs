@@ -1,6 +1,7 @@
 defmodule PhoenixKit.Modules.Publishing.API.GroupReadToolsTest do
   use PhoenixKit.DataCase, async: false
 
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.GroupSettings
   alias PhoenixKitPublishing.Test.ApiCase
@@ -28,6 +29,26 @@ defmodule PhoenixKit.Modules.Publishing.API.GroupReadToolsTest do
                ApiCase.call("publishing.list_groups", %{"status" => "trashed"})
 
       assert Enum.any?(trashed, &(&1["slug"] == other["slug"]))
+    end
+
+    test "reads a stale group as stored: the row is not repaired by the read" do
+      g = Fx.group!()
+
+      Ecto.Adapters.SQL.query!(
+        PhoenixKitPublishing.Test.Repo,
+        "UPDATE phoenix_kit_publishing_groups SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{type}', '\"bogus\"') WHERE slug = $1",
+        [g["slug"]]
+      )
+
+      before = DBStorage.get_group_by_slug(g["slug"])
+      assert before.data["type"] == "bogus"
+
+      assert {:ok, %{"groups" => groups}} = ApiCase.call("publishing.list_groups", %{})
+      assert Enum.find(groups, &(&1["slug"] == g["slug"]))["type"] == "bogus"
+
+      after_read = DBStorage.get_group_by_slug(g["slug"])
+      assert after_read.data == before.data
+      assert after_read.updated_at == before.updated_at
     end
 
     test "an unknown status is a validation error from the schema" do
