@@ -11,9 +11,10 @@ the `PhoenixKit.Module` behaviour, so a host app gets it by adding the dependenc
 — no config, no route wiring. Public pages are served by a plain Phoenix
 controller (dead views); the admin side is LiveView.
 
-- **Depends on:** `phoenix_kit` `>= 2.38.0 and < 3.0.0` (Hex — the release that carries 
-  `PhoenixKitWeb.Actor`, `Activity.log/3` and `Components.TreePicker`; the compound form 
-  keeps the ceiling open across later 2.x minors), `phoenix_kit_ai` `~> 0.18`
+- **Depends on:** `phoenix_kit` `>= 2.63.0 and < 3.0.0` (Hex — 2.63.0 is the first release
+  that carries the machine API, `PhoenixKit.API`, and with it `PhoenixKitWeb.Actor`,
+  `Activity.log/3` and `Components.TreePicker`; the compound form keeps the ceiling open
+  across later 2.x minors), `phoenix_kit_ai` `~> 0.18`
   (hard — it owns the `Translatable` adapter behaviour, the per-language Oban
   fan-out, the LLM call and `ai_multilang_tabs/1`; publishing contributes only
   the adapters and the editor wiring), `phoenix_kit_comments` `~> 0.3`
@@ -37,6 +38,7 @@ controller (dead views); the admin side is LiveView.
 - **Module key** `"publishing"`; settings prefix `publishing_`.
 
 The core pin is a hard floor, not a preference (reasons in `mix.exs`): the
+machine API is compiled against `PhoenixKit.API`, first released in core 2.63.0; the
 group media folders are built on core 2.38's `Storage.ResourceFolders` and the
 reorganizer's `ResourceSource`; `PublishingGroup.changeset/2` needs
 `PhoenixKit.Utils.Slug.put_slug/3`, and `Constants.to_site_wall/2` /
@@ -141,14 +143,13 @@ This repo's `precommit` alias also runs `deps.unlock --check-unused` and
 `precommit` that compiles and tests cleanly.
 
 The machine API (`lib/phoenix_kit_publishing/api/`) compiles only against a core
-that carries `PhoenixKit.API` (not yet in a Hex release), so the suite needs
-`PHOENIX_KIT_PATH` pointed at such a checkout, as above. Ordering constraint: this
-code must not be merged or released before core ships the machine API, and the
-`phoenix_kit` floor in `mix.exs` (and the line under "Depends on") must be raised
-to that release in the same change. The tests that run
-through core's executor are tagged `:core_api` and `test_helper.exs` excludes
-them when `PhoenixKit.API.Executor` is not loaded; read the `excluded` count in
-the `mix test` summary. The test database name is hard-coded in
+that carries `PhoenixKit.API`, which Hex has from 2.63.0 on (the floor in `mix.exs`),
+so a host on an older core cannot resolve the package. Raise the floor, and the line
+under "Depends on", in the same change that starts using a newer core API. To run the
+suite against an unreleased core, point `PHOENIX_KIT_PATH` at a checkout, as above.
+The tests that run through core's executor are tagged `:core_api` and `test_helper.exs`
+excludes them when `PhoenixKit.API.Executor` is not loaded; read the `excluded` count
+in the `mix test` summary. The test database name is hard-coded in
 `config/test.exs` as `phoenix_kit_publishing_test#{MIX_TEST_PARTITION}` (`PGDATABASE`
 is ignored), so a second suite or a parallel checkout sets `MIX_TEST_PARTITION`
 (for example `_api`), creates that database with `createdb`, and the pool size is
