@@ -1,5 +1,5 @@
 defmodule PhoenixKit.Modules.Publishing.API.GateTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias PhoenixKit.Modules.Publishing.API
   alias PhoenixKit.Modules.Publishing.API.{Gate, Tools}
@@ -18,15 +18,30 @@ defmodule PhoenixKit.Modules.Publishing.API.GateTest do
     assert API.tools(true) == Tools.all()
   end
 
-  test "the gate looks at the loaded core" do
-    assert Gate.available?() ==
-             Enum.all?(
-               [{PhoenixKit.API.Keys, :active?, 1}, {PhoenixKit.API.Flow, :gate, 1}],
-               &Gate.available?/1
-             )
+  test "the gate asks for exactly the two functions of the confirmation flow" do
+    assert Gate.markers() == [{PhoenixKit.API.Keys, :active?, 1}, {PhoenixKit.API.Flow, :gate, 1}]
+  end
 
+  test "the gate looks at the loaded core" do
+    assert Gate.available?()
     refute Gate.available?({Enum, :no_such_function, 7})
     refute Gate.available?({NoSuchModule, :x, 0})
+  end
+
+  describe "a core that lacks a marker" do
+    setup do
+      Application.put_env(:phoenix_kit_publishing, :gate_extra_markers, [{NoSuchModule, :x, 0}])
+      on_exit(fn -> Application.delete_env(:phoenix_kit_publishing, :gate_extra_markers) end)
+    end
+
+    test "closes the gate and tools/0 withholds every tool with a danger" do
+      refute Gate.available?()
+      assert Enum.sort(Enum.map(API.tools(), & &1.name)) == Enum.sort(@reads_and_safe)
+    end
+  end
+
+  test "with the gate open tools/0 exposes every declared tool" do
+    assert API.tools() == Tools.all()
   end
 
   test "the gated list is exactly the five reads and create_version" do

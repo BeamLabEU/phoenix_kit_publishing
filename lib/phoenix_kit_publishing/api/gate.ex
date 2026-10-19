@@ -7,9 +7,17 @@ defmodule PhoenixKit.Modules.Publishing.API.Gate do
 
   @markers [{PhoenixKit.API.Keys, :active?, 1}, {PhoenixKit.API.Flow, :gate, 1}]
 
+  @doc """
+  The functions the loaded core must export. `config :phoenix_kit_publishing, :gate_extra_markers`
+  can only ADD markers (a test seam that never loosens the gate).
+  """
+  @spec markers() :: [{module(), atom(), non_neg_integer()}]
+  def markers,
+    do: @markers ++ Application.get_env(:phoenix_kit_publishing, :gate_extra_markers, [])
+
   @doc "True when the marker functions of the confirmation flow are exported by the loaded core."
   @spec available?() :: boolean()
-  def available?, do: Enum.all?(@markers, &available?/1)
+  def available?, do: Enum.all?(markers(), &available?/1)
 
   @doc false
   @spec available?({module(), atom(), non_neg_integer()}) :: boolean()
