@@ -34,7 +34,9 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   # The link text and destination are bounded: an unbounded `[^\]\n]*` rescans
   # to the end of the line from every `[`, so a body of 260 KB of `[` cost
   # seconds on every save and render. Longer links than the bounds are not
-  # masked, which only matters for a link text of over 1000 characters.
+  # masked: a link text over 1000 characters, or a destination over 2000
+  # characters such as an inline `data:` image URI, whose alt text is then
+  # scanned for hashtags like plain text.
   @masked_regions ~r"```.*?```|~~~.*?~~~|```.*|~~~.*|``[^\n]+?``|`(?:[^`\n]|\n(?!\n))*`|!?\[[^\]\n]{0,1000}\]\([^)\n]{0,2000}\)|<(CTA|Headline|Subheadline|Video|Audio|EntityForm)\b[^>]*>.*?</\1>|<[A-Za-z][A-Za-z0-9-]*\b[^>]*>"s
 
   # Start-of-line / whitespace / "(" then #<letter><letter|digit|_|->*.

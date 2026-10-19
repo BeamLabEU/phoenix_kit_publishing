@@ -458,7 +458,7 @@ loaded core can enforce the flow (`API.Gate`): otherwise every tool with a
 `danger` is withheld, with one warning in the log. `Gate`'s `@markers` are two
 internal functions of core, `PhoenixKit.API.Keys.active?/1` and
 `PhoenixKit.API.Flow.gate/1`: a later 2.x core that renames or moves either one
-silently takes the dangerous tools away on every host until `@markers` follows.
+takes the dangerous tools away on every host (with that one warning) until `@markers` follows.
 
 ### Landmines
 
