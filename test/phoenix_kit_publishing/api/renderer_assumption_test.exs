@@ -104,7 +104,12 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
   defp failure(n, doc, html),
     do: "seed #{@seed} doc #{n}\nINPUT: #{inspect(doc)}\nOUTPUT: #{inspect(html)}"
 
-  defp render(doc), do: Renderer.render_markdown(doc, [])
+  # The options of the public render, so hashtags become links like they do on a live page.
+  defp render(doc), do: Renderer.render_markdown(doc, tag_links: {"blog", "en-US"})
+
+  test "the render options link hashtags, so the generated documents cover that path" do
+    assert render("a #hashtag here") =~ ~r/<a [^>]*href="[^"]*hashtag/
+  end
 
   @pieces [
     "# Heading",
