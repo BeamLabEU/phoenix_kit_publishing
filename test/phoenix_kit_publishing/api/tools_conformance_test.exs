@@ -11,22 +11,8 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.GroupSettings
 
-  # Tool names in the order of spec §6.2, by phase. @phase is the last COMPLETED phase; the
-  # task that closes a phase bumps it. Inside a phase the declared tools must be a prefix of
-  # the phase's list, so the test is green after every task.
-  @phases [
-    p0: [],
-    p1: ~w(list_groups get_group_settings_schema list_posts get_post list_categories),
-    p2: ~w(create_post update_post create_version set_translation),
-    p3: ~w(publish_post unpublish_post schedule_post trash_posts restore_posts),
-    p4: ~w(upsert_categories delete_categories),
-    p5: ~w(upsert_groups trash_groups restore_groups),
-    p6: ~w(translate_post)
-  ]
-  @phase :p6
-
-  # The declared order of the tool list: translate_post sits after set_translation although it is built last.
-  @spec_order ~w(list_groups get_group_settings_schema list_posts get_post list_categories
+  # The declared order of the tool list: translate_post sits after set_translation.
+  @tool_order ~w(list_groups get_group_settings_schema list_posts get_post list_categories
                  create_post update_post create_version set_translation translate_post
                  publish_post unpublish_post schedule_post trash_posts restore_posts
                  upsert_categories delete_categories upsert_groups trash_groups restore_groups)
@@ -55,40 +41,19 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     "restore_groups" => {"publishing.groups:delete", false, 20, :always}
   }
 
-  defp expected_names do
-    {done, rest} = Enum.split_while(@phases, fn {phase, _} -> phase != @phase end)
-    done = done ++ Enum.take(rest, 1)
-    next = Enum.at(rest, 1)
-    {Enum.flat_map(done, &elem(&1, 1)), if(next, do: elem(next, 1), else: [])}
-  end
-
-  test "the declared tools are the finished phases plus a prefix of the current one, in order" do
-    {finished, next} = expected_names()
+  test "the declared tools are the 20 tools, in the declared order" do
     names = Tools.all() |> Enum.map(&String.replace_prefix(&1.name, "publishing.", ""))
-
-    # Once every phase is done the order is the declaration order of the spec, not the build order.
-    if @phase == :p6 do
-      assert names == @spec_order
-    else
-      assert Enum.take(names, length(finished)) == finished
-    end
-
-    extra = Enum.drop(names, length(finished))
-    assert extra == Enum.take(next, length(extra))
+    assert names == @tool_order
+    assert length(names) == 20
   end
 
-  test "every declared tool is in the phase map and the table" do
-    all = @phases |> Keyword.values() |> List.flatten()
-
+  test "every declared tool is in the table" do
     for tool <- Tools.all() do
       short = String.replace_prefix(tool.name, "publishing.", "")
-      assert short in all, "#{short} is missing from the phase map"
-      assert Map.has_key?(@table, short)
+      assert Map.has_key?(@table, short), "#{short} is missing from the table"
     end
-  end
 
-  test "at the last phase all 20 tools are declared" do
-    if @phase == :p6, do: assert(length(Tools.all()) == 20)
+    assert Enum.sort(Map.keys(@table)) == Enum.sort(@tool_order)
   end
 
   test "every tool is a valid admin tool of the publishing permission" do
@@ -107,7 +72,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     end
   end
 
-  test "scope, read-only flag, max_items and danger kind follow the table of spec §6.2" do
+  test "scope, read-only flag, max_items and danger kind follow the declared table" do
     for tool <- Tools.all() do
       short = String.replace_prefix(tool.name, "publishing.", "")
       {scope, read_only?, max, danger} = Map.fetch!(@table, short)
@@ -223,7 +188,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     found
   end
 
-  test "every reason string in the handlers is in the contract of spec §6.6" do
+  test "every reason string in the handlers is in the error contract" do
     reasons =
       ~w(invalid_ref empty_update no_draft_version version_not_found language_not_enabled group_trashed post_trashed
       slug_not_allowed slug_taken invalid_slug reserved_language_code reserved_route_word invalid_name invalid_mode invalid_type

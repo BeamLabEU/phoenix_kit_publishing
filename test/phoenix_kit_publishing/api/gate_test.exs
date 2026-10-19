@@ -29,10 +29,7 @@ defmodule PhoenixKit.Modules.Publishing.API.GateTest do
     refute Gate.available?({NoSuchModule, :x, 0})
   end
 
-  @tag :final_phase
-  test "at P6 the gated list is exactly the five reads and create_version" do
-    if length(Tools.all()) == 20 do
-      assert Enum.sort(Enum.map(API.tools(false), & &1.name)) == Enum.sort(@reads_and_safe)
-    end
+  test "the gated list is exactly the five reads and create_version" do
+    assert Enum.sort(Enum.map(API.tools(false), & &1.name)) == Enum.sort(@reads_and_safe)
   end
 end
