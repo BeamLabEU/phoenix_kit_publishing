@@ -17,8 +17,9 @@ never crash the primary mutation.
 The wrapper exposes three call shapes:
 
 ```elixir
-# Standard "user-driven mutation" — used by every CRUD context fn.
-ActivityLog.log_manual(action, actor_uuid, resource_type, resource_uuid, metadata)
+# Standard "user-driven mutation" — used by every CRUD context fn. The sixth
+# argument, `opts`, is optional (see "Options of log_manual/6" below).
+ActivityLog.log_manual(action, actor_uuid, resource_type, resource_uuid, metadata, opts)
 
 # Extracts `:actor_uuid` from opts (keyword or map). Returns nil when the
 # key isn't present — context fns thread this through every mutation.
@@ -81,6 +82,53 @@ correctly.
 Module enable/disable runs without an actor (`actor_uuid: nil`) since it can be
 triggered from IEx as well as the UI; if you need attribution add it from the
 admin LV before calling `enable_system/0`.
+
+## Options of `log_manual/6` and `log_failed_mutation/6`
+
+Both take the call's `opts` (keyword list or map, the same value the context
+function received) as an optional sixth argument; the 4- and 5-argument forms
+keep working and `log/1` is untouched. Two keys are read:
+
+| key | meaning |
+|---|---|
+| `:activity_mode` | The entry's `mode`. A binary; default `"manual"`. A missing, blank or non-binary value falls back to `"manual"`. |
+| `:log_metadata` | A map merged UNDER the entry's own metadata: the entry's keys win on a clash. Only string keys are taken; atom keys and a non-map value are ignored. |
+
+A failed-mutation row keeps `db_pending: true` and takes the same mode and
+metadata. The key is `:activity_mode`, deliberately not `:mode`: the same `opts`
+reach `Groups.add_group/2`, where `:mode` is the group's URL mode, and an
+`"auto"` there would build the group in the default mode, which is locked at
+creation. Context functions pass their own `opts` through at every mutation site
+an API tool can reach (posts, versions, groups, categories, `add_language_to_post`),
+so a caller can attribute a whole call without the contexts knowing who it is.
+
+```elixir
+Posts.trash_post(group_slug, post_uuid,
+  actor_uuid: user_uuid,
+  activity_mode: "auto",
+  log_metadata: %{"via" => "api", "tool" => "publishing.trash_posts"}
+)
+```
+
+The machine API (`dev_docs/guides/machine-api.md`) builds these options once per
+request in `API.Common.write_opts/3`: `actor_uuid` is the key owner,
+`activity_mode` is `"auto"`, and `log_metadata` holds `via: "api"`, `key_prefix`,
+`request_id` and `tool` (plus `approved_by_uuid` for an approved operation, and
+`fields`, the NAMES of the changed fields, for `update_post` and
+`set_translation`). Never put values or free text in it.
+
+## Rows the API layer adds
+
+| action | when | resource_type |
+|--------|------|---------------|
+| `publishing.translation.requested` | `publishing.translate_post` queued its jobs. Mode `auto`, API metadata plus `group_slug`, `version`, `targets`, `enqueued` and `conflicts`. The per-language Oban jobs run in another process, so the writes they make appear as `publishing.post.updated` with the key owner as actor, mode `manual` and no API attribution. | `publishing_post` |
+
+Every other API write is logged by the ordinary context function, with the
+attribution above. A write that `update_post` or `set_translation` refuses under
+the post row lock (the post was trashed, or the version went live, between the
+check and the write) leaves one `publishing.post.updated` row with
+`db_pending: true`, like any failed mutation. Core adds its own `api.request`
+entry for every write call beside the module's rows.
 
 ## Auto-logged self-healing events
 
