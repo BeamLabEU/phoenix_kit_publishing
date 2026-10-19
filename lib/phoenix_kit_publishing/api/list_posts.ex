@@ -150,8 +150,10 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
   defp decode_cursor(nil), do: {:ok, nil}
 
   defp decode_cursor(cursor) do
-    case Base.url_decode64(cursor, padding: false) do
-      {:ok, uuid} -> {:ok, uuid}
+    with {:ok, decoded} <- Base.url_decode64(cursor, padding: false),
+         {:ok, uuid} <- Ecto.UUID.cast(decoded) do
+      {:ok, uuid}
+    else
       :error -> cursor_stale()
     end
   end

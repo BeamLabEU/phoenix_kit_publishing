@@ -166,6 +166,32 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
     _ = a
   end
 
+  for {label, raw} <- [
+        {"text", "not-a-uuid"},
+        {"36 characters that are not a uuid", String.duplicate("z", 36)},
+        {"one byte", "x"},
+        {"16 raw bytes", <<1::128>>}
+      ],
+      status <- [nil, "all", "draft", "trashed", "published", "scheduled"] do
+    test "a garbage cursor (#{label}) with status #{inspect(status)} is cursor_stale", %{g: g} do
+      Fx.post!(g["slug"], %{title: "A", slug: "a"})
+      cursor = Base.url_encode64(unquote(Macro.escape(raw)), padding: false)
+      extra = if unquote(status), do: %{"status" => unquote(status)}, else: %{}
+
+      assert {:error, :validation_failed, _, %{errors: [%{reason: "cursor_stale"}]}} =
+               list(g, Map.put(extra, "cursor", cursor))
+    end
+  end
+
+  test "a cursor that is not base64url is cursor_stale on every status", %{g: g} do
+    Fx.post!(g["slug"], %{title: "A", slug: "a"})
+
+    for status <- ["all", "draft", "trashed", "published"] do
+      assert {:error, :validation_failed, _, %{errors: [%{reason: "cursor_stale"}]}} =
+               list(g, %{"status" => status, "cursor" => "!!not base64!!"})
+    end
+  end
+
   test "an unknown group is not_found; a trashed group still lists" do
     assert {:error, :not_found, _, _} =
              ApiCase.call("publishing.list_posts", %{"group" => "nope"})
