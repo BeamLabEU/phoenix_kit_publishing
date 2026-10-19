@@ -5,7 +5,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
 
   import Ecto.Query, only: [from: 2]
 
-  alias PhoenixKit.Modules.Publishing.API.SetTranslation
+  alias PhoenixKit.Modules.Publishing.API.{Danger, SetTranslation}
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts, PublishingContent, Versions}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
@@ -526,6 +526,24 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
              SetTranslation.call(input, ApiCase.ctx())
 
     assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
+  test "the unchanged preview of the live version asks for a confirmation, like the gate", ctx do
+    assert {:ok, %{"action" => "created"}} = set(ctx)
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    input = %{
+      "post" => Fx.ref(ctx.post),
+      "language" => "de-DE",
+      "title" => "Hallo",
+      "version" => 1,
+      "content" => "Inhalt"
+    }
+
+    assert Danger.set_translation(input, %{})
+
+    assert {:preview, %{"requires_confirmation" => true, "rows" => [%{"action" => "unchanged"}]},
+            _} = set(ctx, %{"version" => 1}, %{dry_run?: true})
   end
 
   test "a draft that is not the live version is a plain write; the same text again is unchanged",

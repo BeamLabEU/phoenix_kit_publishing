@@ -4,6 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
   import Ecto.Query, only: [from: 2]
   import PhoenixKitPublishing.ActivityLogAssertions
 
+  alias PhoenixKit.Modules.Publishing.API.Danger
   alias PhoenixKit.Modules.Publishing.{Groups, Posts, PublishingContent, PublishingPost}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
@@ -70,6 +71,23 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     n = length(list_activities())
     assert {:ok, %{"action" => "unchanged"}} = edit(ctx, %{"title" => "Same"})
     assert length(list_activities()) == n
+  end
+
+  test "the unchanged preview asks for a confirmation exactly when the gate would", ctx do
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "plain <b>bold</b>")
+    input = %{"post" => Fx.ref(ctx.post), "content" => "plain <b>bold</b>"}
+
+    assert Danger.update_post(input, %{})
+
+    assert {:preview, %{"requires_confirmation" => true, "rows" => [%{"action" => "unchanged"}]},
+            _} = edit(ctx, %{"content" => "plain <b>bold</b>"}, %{dry_run?: true})
+
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "plain text")
+    refute Danger.update_post(%{input | "content" => "plain text"}, %{})
+
+    assert {:preview, %{"requires_confirmation" => false, "rows" => [%{"action" => "unchanged"}]},
+            _} =
+             edit(ctx, %{"content" => "plain text"}, %{dry_run?: true})
   end
 
   test "description is version-level: it applies to every language and is reported with scope version",

@@ -68,7 +68,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
       changes = changes(t, categories, slug)
 
       cond do
-        changes == %{} -> unchanged(t, dry?)
+        changes == %{} -> unchanged(t, dry?, ctx)
         dry? -> preview(t, changes, ctx)
         true -> execute(t, changes, params(t, categories, slug), slug, ctx)
       end
@@ -277,18 +277,18 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
 
   # --- answers ---------------------------------------------------------------------------------
 
-  defp unchanged(t, true) do
+  defp unchanged(t, true, ctx) do
     row = %{"action" => "unchanged", "version" => t.version.version_number}
 
     Common.preview(
       [row],
-      %{"requires_confirmation" => false},
+      %{"requires_confirmation" => Danger.update_post(t.input, ctx)},
       {:update_post, :unchanged, t.language,
        Common.post_state(t.hit.db_post, t.hit.group, [t.version], t.contents)}
     )
   end
 
-  defp unchanged(t, false), do: {:ok, answer("unchanged", t, %{})}
+  defp unchanged(t, false, _ctx), do: {:ok, answer("unchanged", t, %{})}
 
   defp preview(t, changes, ctx) do
     shown =

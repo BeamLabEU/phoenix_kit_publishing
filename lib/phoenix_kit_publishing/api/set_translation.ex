@@ -45,7 +45,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
       dry? = Map.get(ctx, :dry_run?, false)
 
       cond do
-        unchanged?(t) -> unchanged(t, dry?)
+        unchanged?(t) -> unchanged(t, dry?, ctx)
         dry? -> preview(t, ctx)
         true -> execute(t, ctx)
       end
@@ -143,7 +143,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
       og_changes(t) == %{}
   end
 
-  defp unchanged(t, true) do
+  defp unchanged(t, true, ctx) do
     row = %{
       "action" => "unchanged",
       "language" => t.language,
@@ -154,13 +154,13 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
 
     Common.preview(
       [row],
-      %{"requires_confirmation" => false},
+      %{"requires_confirmation" => Danger.set_translation(t.input, ctx)},
       {:set_translation, :unchanged,
        Common.post_state(t.hit.db_post, t.hit.group, [t.version], contents)}
     )
   end
 
-  defp unchanged(t, false), do: {:ok, answer(t.hit, t.version, t.language, "unchanged")}
+  defp unchanged(t, false, _ctx), do: {:ok, answer(t.hit, t.version, t.language, "unchanged")}
 
   # --- dry run -----------------------------------------------------------------------------
 
