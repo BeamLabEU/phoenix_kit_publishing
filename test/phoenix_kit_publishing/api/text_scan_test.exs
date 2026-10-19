@@ -86,7 +86,34 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     {"autolink_scheme", "javascript://x%0aalert(1)"},
     {"autolink_scheme", "xmpp:a@b.c"},
     {"autolink_scheme", "XMPP:a@b.c"},
-    {"autolink_scheme", "prose xmpp:a@b.c.d more"}
+    {"autolink_scheme", "prose xmpp:a@b.c.d more"},
+    # an entity that decodes to a character of the address completes the xmpp: link
+    {"autolink_scheme", "xmpp&colon;a@b.c"},
+    {"autolink_scheme", "xmpp&#58;a@b.c"},
+    {"autolink_scheme", "xmpp&#058;a@b.c"},
+    {"autolink_scheme", "xmpp&#0000058;a@b.c"},
+    {"autolink_scheme", "xmpp&#x3a;a@b.c"},
+    {"autolink_scheme", "xmpp&#x3A;a@b.c"},
+    {"autolink_scheme", "xmpp&#x03a;a@b.c"},
+    {"autolink_scheme", "&#120;mpp:a@b.c"},
+    {"autolink_scheme", "x&#109;pp&colon;a&#64;b.c"},
+    # the email autolinker keeps the local-part characters in front of mailto: / xmpp:
+    {"autolink_scheme", "x-mailto:a@b.c"},
+    {"autolink_scheme", "x.mailto:a@b.c"},
+    {"autolink_scheme", "x+mailto:a@b.c"},
+    {"autolink_scheme", "x_mailto:a@b.c"},
+    {"autolink_scheme", "1mailto:a@b.c"},
+    {"autolink_scheme", "X-MAILTO:a@b.c"},
+    {"autolink_scheme", "x&#45;mailto:a@b.c"},
+    {"autolink_scheme", "x&period;mailto:a@b.c"},
+    {"autolink_scheme", "x&plus;mailto:a@b.c"},
+    {"autolink_scheme", "x&lowbar;mailto:a@b.c"},
+    {"autolink_scheme", "x-mailto&colon;a@b.c"},
+    {"autolink_scheme", "&#120;-mailto:a@b.c"},
+    {"autolink_scheme", "see x-xmpp:a@b.c.d"},
+    # a bare scheme://, even with an entity for its colon, is not left to the renderer
+    {"autolink_scheme", "ftp&colon;//x.example"},
+    {"autolink_scheme", "ftp&#58;//x.example"}
   ]
 
   @clean [
@@ -105,6 +132,11 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     "see http://h/p and HTTPS://h/p and https://h/?next=https://other/x",
     "(https://h/paren) and +http://h/x",
     # not autolinked by the renderer (checked against it), so not flagged
+    "Mail us at mailto:a@b.c or (mailto:a@b.c) or <3 mailto:a@b.c",
+    "see: mailto:a@b.c, /mailto:a@b.c and =mailto:a@b.c",
+    "Tom &amp; Jerry, it&#39;s &copy; 2026&nbsp;&mdash; &#x27;ok&#x27;",
+    "x&hyphen;mailto:a@b.c and mailto&amp;colon;a@b.c",
+    "xmpp&amp;colon;a@b.c and &amp;#58; and &#58 and &colon",
     "Hours: 9-5. Note: sms:+123 skype:abc tel:+123 foo:bar ftp:/x ://h",
     "[x](https://h/p?a=1&b=2)",
     "[r]: https://h/p",
@@ -204,6 +236,32 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     end
   end
 
+  describe "entity-encoded findings" do
+    test "report the line and fragment of the source text, not of the decoded text" do
+      text = "first &#58;&#58; line\nsecond &#58; x&#45;mailto:a@b.c tail"
+
+      assert %{"findings" => [finding]} = TextScan.scan(text)
+
+      assert finding == %{
+               "kind" => "autolink_scheme",
+               "line" => 2,
+               "fragment" => "x&#45;mailto:a@b.c tail"
+             }
+    end
+
+    test "an entity-encoded xmpp: after many entities keeps its original offset" do
+      text = String.duplicate("&#58;", 50) <> " xmpp&colon;a@b.c"
+
+      assert %{"findings" => [%{"fragment" => "xmpp&colon;a@b.c"}]} = TextScan.scan(text)
+    end
+
+    test "an entity that decodes to a line break does not move the line number" do
+      text = "a&#10;b\nxmpp&colon;a@b.c"
+
+      assert %{"findings" => [%{"line" => 2}]} = TextScan.scan(text)
+    end
+  end
+
   describe "size and cost" do
     @size 262_144
     defp pad(unit),
@@ -231,7 +289,14 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
         "a:// repeated" => pad("a://"),
         "scheme chars then ://" => binary_part(pad("a1+.-"), 0, @size - 3) <> "://",
         "scheme chars only" => pad("a1+.-"),
-        "xmpp: repeated" => pad("xmpp:")
+        "xmpp: repeated" => pad("xmpp:"),
+        "decimal entities" => pad("&#58;"),
+        "padded entities" => "&#" <> String.duplicate("0", @size - 5) <> "58;",
+        "hex entities" => pad("&#x3a;"),
+        "named entities" => pad("&colon;"),
+        "entity and prefix" => pad("x&#45;mailto&colon;"),
+        "mailto: repeated" => pad("-mailto:"),
+        "ampersands" => pad("&")
       }
 
       for {name, text} <- inputs do

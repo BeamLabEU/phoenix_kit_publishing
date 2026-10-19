@@ -15,17 +15,6 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
   @fragment_chars 80
   @schemes ~w(http https mailto tel)
   @scheme_needles ["javascript:", "vbscript:", "data:"]
-  # "xmpp:" in every letter case (`:binary.matches/2` has no caseless mode).
-  @xmpp_needles for mask <- 0..15,
-                    do:
-                      "xmpp:"
-                      |> String.graphemes()
-                      |> Enum.with_index()
-                      |> Enum.map_join(fn {char, i} ->
-                        if Bitwise.band(mask, Bitwise.bsl(1, i)) != 0,
-                          do: String.upcase(char),
-                          else: char
-                      end)
 
   @doc "The cap on one body field the handlers enforce before the scan."
   def max_body_bytes, do: @max_body_bytes
@@ -221,20 +210,107 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
 
   # --- rule 5: autolink_scheme ------------------------------------------------------
 
-  # The GFM autolink extension links a bare `scheme://...` of ANY scheme (and `xmpp:` addresses),
-  # so a bare URL whose scheme is not http or https is flagged. The scheme is the run of
-  # `[a-z0-9+.-]` before each `://`, trimmed to start at a letter; the runs cannot overlap, so
-  # the scan is linear.
+  # The renderer decodes entities before it autolinks, and the GFM autolink extension links
+  # a bare `scheme://...` of ANY scheme and an email address with `mailto:` / `xmpp:` in front
+  # of it, keeping the local-part characters `[A-Za-z0-9.+_-]` that precede the word (so
+  # `x-mailto:a@b.c` becomes a link with the scheme `x-mailto`). The rule therefore reads the
+  # text with the entities that stand for printable ASCII decoded, and flags:
+  #
+  #   * a bare URL whose scheme is not http or https: the scheme is the run of `[a-z0-9+.-]`
+  #     before each `://`, trimmed to start at a letter; the runs cannot overlap, so the scan
+  #     is linear;
+  #   * `xmpp:` in any letter case;
+  #   * `mailto:` directly preceded by a local-part character.
+  #
+  # Offsets are mapped back to the submitted text, so a finding shows what the writer sent.
   defp autolink_scheme(text) do
+    {decoded, breaks} = decode_entities(text)
+
     bare =
-      for {pos, _len} <- :binary.matches(text, "://"),
-          {start, scheme} = scheme_before(text, pos),
+      for {pos, _len} <- :binary.matches(decoded, "://"),
+          {start, scheme} = scheme_before(decoded, pos),
           scheme != "" and String.downcase(scheme) not in ["http", "https"],
           do: start
 
-    xmpp = for {pos, _len} <- :binary.matches(text, @xmpp_needles), do: pos
-    Enum.sort(bare ++ xmpp)
+    Enum.sort(bare ++ email_schemes(decoded))
+    |> Enum.map(&original_offset(&1, breaks))
   end
+
+  defp email_schemes(decoded) do
+    case :re.run(decoded, "xmpp:|[A-Za-z0-9+._-]mailto:", [
+           :global,
+           :caseless,
+           {:capture, :first, :index}
+         ]) do
+      {:match, matches} -> for [{start, _len}] <- matches, do: local_part_start(decoded, start)
+      :nomatch -> []
+    end
+  end
+
+  # A finding starts at the first character of the address, not in the middle of it. The runs
+  # cannot overlap (each match ends in a colon, which is not a local-part character).
+  defp local_part_start(_decoded, 0), do: 0
+
+  defp local_part_start(decoded, pos) do
+    if local_part_byte?(:binary.at(decoded, pos - 1)),
+      do: local_part_start(decoded, pos - 1),
+      else: pos
+  end
+
+  defp local_part_byte?(b), do: letter?(b) or b in ?0..?9 or b in [?+, ?., ?_, ?-]
+
+  # An entity that stands for one printable ASCII character: a decimal reference of up to
+  # seven digits, a hexadecimal one of up to six (leading zeros included), or one of the
+  # named references of the characters an address can hold. Names are case-sensitive.
+  @entity "&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|colon|period|plus|lowbar|commat);"
+  @named_entities %{"colon" => ?:, "period" => ?., "plus" => ?+, "lowbar" => ?_, "commat" => ?@}
+
+  # The text with those entities replaced by their character, and the breakpoints that map a
+  # position in it back to the submitted text (same shape as `strip/1`). Entities that stand
+  # for a control character or a space stay as they are, so lines and word breaks do not move.
+  defp decode_entities(text) do
+    case :re.run(text, @entity, [:global, {:capture, :first, :index}]) do
+      :nomatch -> {text, {}}
+      {:match, matches} -> decode_entities(matches, text, 0, 0, 0, [], [])
+    end
+  end
+
+  defp decode_entities([], text, cursor, _kept, _removed, acc, breaks) do
+    tail = binary_part(text, cursor, byte_size(text) - cursor)
+    {IO.iodata_to_binary(Enum.reverse([tail | acc])), breaks |> Enum.reverse() |> List.to_tuple()}
+  end
+
+  defp decode_entities([[{start, len}] | rest], text, cursor, kept, removed, acc, breaks) do
+    case entity_char(binary_part(text, start, len)) do
+      nil ->
+        decode_entities(rest, text, cursor, kept, removed, acc, breaks)
+
+      char ->
+        before = binary_part(text, cursor, start - cursor)
+        kept = kept + byte_size(before) + 1
+        removed = removed + len - 1
+
+        decode_entities(rest, text, start + len, kept, removed, [<<char>>, before | acc], [
+          {kept, removed} | breaks
+        ])
+    end
+  end
+
+  defp entity_char("&#" <> reference), do: reference |> codepoint() |> printable()
+
+  defp entity_char("&" <> name), do: Map.get(@named_entities, String.trim_trailing(name, ";"))
+
+  defp codepoint(reference) do
+    digits = String.trim_trailing(reference, ";")
+
+    case digits do
+      <<x, hex::binary>> when x in [?x, ?X] -> String.to_integer(hex, 16)
+      decimal -> String.to_integer(decimal)
+    end
+  end
+
+  defp printable(cp) when cp in 0x21..0x7E, do: cp
+  defp printable(_cp), do: nil
 
   defp scheme_before(text, pos) do
     start = scheme_run_start(text, pos)

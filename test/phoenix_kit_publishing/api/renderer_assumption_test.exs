@@ -44,6 +44,15 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
     "javascript://x%0aalert(1)",
     "xmpp:a@b.c",
     "text\nxmpp:a@b.c.d",
+    "xmpp&colon;a@b.c",
+    "xmpp&#x3a;a@b.c",
+    "&#120;mpp&#58;a&#64;b.c",
+    "x-mailto:a@b.c",
+    "x.mailto:a@b.c",
+    "x+mailto:a@b.c",
+    "x_mailto:a@b.c",
+    "x&#45;mailto:a@b.c",
+    "ftp&colon;//x.example",
     "https://example.com/ok then ftp://x"
   ]
 
@@ -73,6 +82,64 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
     assert unsafe > 1_000, "the pieces no longer produce unsafe links (#{unsafe} of 2000)"
   end
 
+  # Addresses and entities in a wide alphabet: the email autolinker keeps characters in front of
+  # mailto: / xmpp:, and the renderer decodes entities before it autolinks. Every document that
+  # renders an unsafe link must be flagged, whatever the junk around the pieces.
+  @prefixes [
+    "",
+    "x",
+    "x-",
+    "x.",
+    "x+",
+    "x_",
+    "x&#45;",
+    "&#120;",
+    "a1",
+    "-",
+    " ",
+    "(",
+    "/",
+    "x&plus;",
+    "x&period;",
+    "x&lowbar;",
+    "x&hyphen;"
+  ]
+  @words ["mailto", "xmpp", "&#109;ailto", "x&#109;pp", "&#120;mpp", "ftp", "javascript", "data"]
+  @colons [":", ":", "&colon;", "&#58;", "&#x3a;", "&#058;", "&#x3A;", "&COLON;", "::", "://"]
+  @colons @colons ++ ["&colon;//", ":&#47;&#47;", ":/"]
+  @locals ["a", "a.b", "", "x-y", "&#97;"]
+  @ats ["@", "@", "&#64;", "&commat;", "@@"]
+  @domains ["b.c", "b.c.d", "example.org", "b", ""]
+
+  defp address do
+    Enum.random(@prefixes) <>
+      Enum.random(@words) <>
+      Enum.random(@colons) <>
+      Enum.random(@locals) <> Enum.random(@ats) <> Enum.random(@domains)
+  end
+
+  test "documents built from address and entity shapes never render an unflagged unsafe link" do
+    :rand.seed(:exsss, {@seed, @seed, @seed})
+
+    unsafe =
+      for n <- 1..6_000, reduce: 0 do
+        count ->
+          doc = junk() <> address() <> separator() <> address() <> separator() <> junk()
+          html = render(doc)
+
+          unsafe? =
+            Regex.scan(~r/(?:href|src)="([^"]*)"/i, html)
+            |> Enum.any?(fn [_, url] -> not safe_url?(url) end)
+
+          if unsafe? and not TextScan.dangerous?(doc),
+            do: flunk("unflagged unsafe link. " <> failure(n, doc, html))
+
+          if unsafe?, do: count + 1, else: count
+      end
+
+    assert unsafe > 1_000, "the shapes no longer produce unsafe links (#{unsafe} of 6000)"
+  end
+
   # The messages are built only when an assertion fails.
   defp check_html(n, doc, html) do
     if html =~ ~r/<script/i, do: flunk("<script in output. " <> failure(n, doc, html))
@@ -95,8 +162,9 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
       [_only] ->
         true
 
+      # An empty scheme (`://host`) is a relative reference, not a scheme.
       [scheme, _] ->
-        String.downcase(scheme) in ~w(http https mailto tel) or
+        scheme == "" or String.downcase(scheme) in ~w(http https mailto tel) or
           String.contains?(scheme, ["/", "?", "#"])
     end
   end
