@@ -82,6 +82,58 @@ defmodule PhoenixKit.Integration.Publishing.TranslationManagerTest do
     end
   end
 
+  describe "add_language_to_post/5 — :locked_check" do
+    test "runs with the locked post and the version; :ok creates the row", %{
+      group: group,
+      post: post
+    } do
+      me = self()
+
+      check = fn locked, version ->
+        send(me, {:checked, locked.uuid, version.version_number})
+        :ok
+      end
+
+      assert {:ok, _} =
+               TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de-DE", 1,
+                 locked_check: check
+               )
+
+      assert_received {:checked, uuid, 1}
+      assert uuid == post[:uuid]
+      [version] = DBStorage.list_versions(post[:uuid])
+      assert Enum.any?(DBStorage.list_contents(version.uuid), &(&1.language == "de-DE"))
+    end
+
+    test "an error is returned and no row is created", %{group: group, post: post} do
+      assert {:error, :went_live} =
+               TranslationManager.add_language_to_post(group["slug"], post[:uuid], "de-DE", nil,
+                 locked_check: fn _locked, _version -> {:error, :went_live} end
+               )
+
+      [version] = DBStorage.list_versions(post[:uuid])
+      refute Enum.any?(DBStorage.list_contents(version.uuid), &(&1.language == "de-DE"))
+    end
+
+    test "a missing post is :not_found and the hook does not run", %{group: group} do
+      me = self()
+
+      assert {:error, :not_found} =
+               TranslationManager.add_language_to_post(
+                 group["slug"],
+                 "019cce93-9999-7000-8000-000000000000",
+                 "de-DE",
+                 nil,
+                 locked_check: fn _locked, _version ->
+                   send(me, :ran)
+                   :ok
+                 end
+               )
+
+      refute_received :ran
+    end
+  end
+
   # ============================================================================
   # clear_translation/4
   # ============================================================================

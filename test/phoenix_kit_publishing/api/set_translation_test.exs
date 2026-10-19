@@ -263,6 +263,35 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
     assert row != nil and row.content in [nil, ""]
   end
 
+  test "a version that goes live right before the row is created is refused and leaves no row",
+       ctx do
+    # The publish lands right after the up-front recheck read the version, before the row is created.
+    flag = make_ref()
+    me = self()
+    handler = "set-translation-early-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      TestRepo.config()[:telemetry_prefix] ++ [:query],
+      fn _e, _m, meta, _c ->
+        if meta.source == "phoenix_kit_publishing_versions" and
+             meta.query =~ ~s|WHERE (p0."uuid" = $1)| and Process.get(flag) == nil do
+          Process.put(flag, true)
+          :ok = Versions.publish_version(ctx.g["slug"], ctx.post[:uuid], 1, [])
+          send(me, :interleaved)
+        end
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert {:error, :revision_mismatch, _, %{reason: "went_live"} = context} = set(ctx)
+    assert_received :interleaved
+    refute Map.has_key?(context, :left_behind)
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
   test "the text rule makes HTML a confirmed write even on a draft; a live target needs a confirmation",
        ctx do
     assert {:preview,

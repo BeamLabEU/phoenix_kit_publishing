@@ -95,6 +95,15 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
 
   Accepts an optional version parameter to specify which version to add
   the translation to. If not specified, defaults to the latest version.
+
+  Options:
+
+    * `:locked_check` - `fn locked_post, version -> :ok | {:error, term}`, the same hook
+      as `Posts.update_post/4`. It runs in the transaction that creates the row, after the post
+      row lock and the fresh version read; `{:error, reason}` creates nothing and is returned as
+      `{:error, reason}`. A missing post or version is `{:error, :not_found}` and the hook does
+      not run. It must not raise.
+    * `:scope`, `:actor_uuid` and the activity options of `ActivityLog` - who is doing it.
   """
   @spec add_language_to_post(
           String.t(),
@@ -104,7 +113,14 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
           keyword() | map()
         ) :: {:ok, map()} | {:error, any()}
   def add_language_to_post(group_slug, post_uuid, language_code, version \\ nil, opts \\ []) do
-    result = add_language_to_db(group_slug, post_uuid, language_code, version)
+    result =
+      add_language_checked(
+        group_slug,
+        post_uuid,
+        language_code,
+        version,
+        Shared.get_option(opts, :locked_check)
+      )
 
     with {:ok, new_post} <- result do
       ListingCache.regenerate(group_slug)
@@ -156,6 +172,33 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
     end
 
     result
+  end
+
+  defp add_language_checked(group_slug, post_uuid, language_code, version, nil),
+    do: add_language_to_db(group_slug, post_uuid, language_code, version)
+
+  defp add_language_checked(group_slug, post_uuid, language_code, version_number, locked_check)
+       when is_function(locked_check, 2) do
+    repo = PhoenixKit.RepoHelper.repo()
+
+    repo.transaction(fn ->
+      locked = DBStorage.lock_post_row!(repo, post_uuid)
+
+      version =
+        if version_number,
+          do: DBStorage.get_version(post_uuid, version_number),
+          else: DBStorage.get_latest_version(post_uuid)
+
+      with %{} <- locked,
+           %{} <- version,
+           :ok <- locked_check.(locked, version),
+           {:ok, post} <- add_language_to_db(group_slug, post_uuid, language_code, version_number) do
+        post
+      else
+        nil -> repo.rollback(:not_found)
+        {:error, reason} -> repo.rollback(reason)
+      end
+    end)
   end
 
   # Adds a language to a post.

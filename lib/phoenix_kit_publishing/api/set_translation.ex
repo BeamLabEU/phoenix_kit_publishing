@@ -203,7 +203,7 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
     base_opts = Common.write_opts(ctx, @tool)
 
     with :ok <- Danger.recheck(hit.db_post, version, nil, ctx),
-         {:ok, created?} <- ensure_row(t, base_opts) do
+         {:ok, created?} <- ensure_row(t, base_opts, ctx) do
       case reread(t) do
         {:ok, post} -> write(t, post, created?, base_opts, ctx)
         error -> left_behind(error, created?, language)
@@ -237,15 +237,19 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
 
   # An existing row skips the call: add_language_to_post logs translation.added unconditionally on
   # success, which for an update would be a misleading row. It also promotes a legacy base-code row.
-  defp ensure_row(%{row: %{}}, _opts), do: {:ok, false}
+  # A new row is created under the post row lock after the same live check the write makes, so a
+  # publish that lands after the recheck does not leave an empty row on a live version.
+  defp ensure_row(%{row: %{}}, _opts, _ctx), do: {:ok, false}
 
-  defp ensure_row(%{row: nil} = t, opts) do
+  defp ensure_row(%{row: nil} = t, opts, ctx) do
+    check = Common.locked_check(ctx, fn locked, v -> Danger.live_condition(locked, v, nil) end)
+
     case TranslationManager.add_language_to_post(
            t.hit.group.slug,
            t.hit.db_post.uuid,
            t.language,
            t.version.version_number,
-           opts
+           Keyword.put(opts, :locked_check, check)
          ) do
       {:ok, _} -> {:ok, true}
       {:error, reason} -> Common.error(reason)
