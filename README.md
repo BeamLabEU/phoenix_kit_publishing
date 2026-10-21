@@ -455,6 +455,80 @@ group is left unfiled rather than filed at the media root.
 > Rename or move these folders freely; trash them only together with their
 > group or post.
 
+## Machine API
+
+The module declares 20 admin tools for core's machine API (`/api/admin/v1` over
+REST, `/mcp/admin` over MCP): an AI agent, a script or an integration can read
+and edit groups, posts, versions, translations and categories the way an admin
+does in the editor. Core owns keys, scopes, rate limits, validation and the
+confirmation flow; this module declares the tools and the data rules. It needs
+`phoenix_kit` 2.63.0 or later, the first release that carries the machine API (the
+tools are compiled with the module, so an older core does not build it). The tools appear only while
+Publishing is enabled.
+
+**Enable it.** Switch on `api_admin_enabled` and create a key in
+`/admin/settings/api`. A key has scopes, and its owner must hold the role
+permission `publishing` (one permission for every tool, checked on every
+request). The scopes:
+
+| Scope | Tools |
+|---|---|
+| `publishing.posts:read` | `list_posts`, `get_post` |
+| `publishing.posts:write` | `create_post`, `update_post`, `create_version`, `set_translation` |
+| `publishing.posts:publish` | `publish_post`, `unpublish_post`, `schedule_post` |
+| `publishing.posts:delete` | `trash_posts`, `restore_posts` |
+| `publishing.categories:read` | `list_categories` |
+| `publishing.categories:write` | `upsert_categories` |
+| `publishing.categories:delete` | `delete_categories` |
+| `publishing.groups:read` | `list_groups`, `get_group_settings_schema` |
+| `publishing.groups:write` | `upsert_groups` |
+| `publishing.groups:delete` | `trash_groups`, `restore_groups` |
+| `publishing.translations:ai` | `translate_post` |
+
+**The confirmation rule.** Anything that changes what a visitor sees needs a
+confirmation: publishing, unpublishing, scheduling, trashing, restoring a post
+that has a live version, editing a live or archived version, a slug change on a
+live post, changing an existing category or group, a body that holds HTML or a
+component, text the renderer turns into a link of another scheme (`ftp://`, `xmpp:`), every AI translation (it costs money) and the permanent
+`delete_categories`. The call answers `confirmation_required` with a preview
+and a `confirm_token`; the agent repeats the same call with the token (and
+should ask its user first), or, when the key requires approval, a person
+approves it in `/admin/settings/api/approvals`. Everything else (reading,
+drafting, creating a version, editing a draft in plain Markdown, creating a
+category or a group) runs at once. `dry_run: true` shows the preview of any
+write without writing.
+
+**The tools.**
+`publishing.list_groups`, `publishing.get_group_settings_schema`,
+`publishing.list_posts`, `publishing.get_post`, `publishing.list_categories`,
+`publishing.create_post`, `publishing.update_post`, `publishing.create_version`,
+`publishing.set_translation`, `publishing.translate_post`,
+`publishing.publish_post`, `publishing.unpublish_post`,
+`publishing.schedule_post`, `publishing.trash_posts`,
+`publishing.restore_posts`, `publishing.upsert_categories`,
+`publishing.delete_categories`, `publishing.upsert_groups`,
+`publishing.trash_groups`, `publishing.restore_groups`.
+
+```bash
+curl -s -X POST https://example.com/api/admin/v1/publishing.list_groups \
+  -H "Authorization: Bearer pk_0123abcd_..." \
+  -H "Content-Type: application/json" -d '{}'
+```
+
+The API never hard-deletes a group, post, version or language; the one
+permanent delete is `delete_categories`. See
+[dev_docs/guides/machine-api.md](dev_docs/guides/machine-api.md) for references,
+output shapes, previews, the confirmation round trip, error codes and limits.
+
+**Public URLs.** A published post's `public_paths` hold one URL per language,
+absolute unless the site has no origin configured (then a language without a
+domain gets the bare root-relative path). On a multi-domain site (host app
+config `:canonical_host_resolver`) a language served from its own domain gets
+that domain and no base-language segment (`/de` goes); a sibling dialect keeps
+its own segment (`/en-gb`), so it is `https://<domain>/en-gb/...`. Any other
+language gets the site origin and the prefixed path, as does every language on
+a core without `PhoenixKit.Utils.Routes.canonical_absolute_or_nil/2`.
+
 ## Removing this module
 
 There is deliberately **no automated uninstall**.

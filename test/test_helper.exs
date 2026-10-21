@@ -152,7 +152,26 @@ if repo_available do
   {:ok, _} = PhoenixKitPublishing.Test.DispatchEndpoint.start_link()
 end
 
-# Exclude integration tests when DB is not available
-exclude = if repo_available, do: [], else: [:integration]
+# Core's API (keys, rate limits) and `Auth.register_user/2` count hits in the Hammer ETS table
+# this backend owns; without it the table is absent and the executor tests die at
+# `:ets.update_counter/4`.
+if Code.ensure_loaded?(PhoenixKit.Users.RateLimiter.Backend) do
+  case PhoenixKit.Users.RateLimiter.Backend.start_link([]) do
+    {:ok, _} -> :ok
+    {:error, {:already_started, _}} -> :ok
+  end
+end
+
+# Exclude integration tests when DB is not available. The `:core_api` tag marks only the tests
+# that run through core's executor; the library itself needs a core that has `PhoenixKit.API` to
+# compile, so the other API tests are not tagged. `:canonical_urls` marks the tests that need
+# core's `Routes.canonical_absolute_or_nil/2`, which the Hex 2.63.0 core lacks.
+exclude =
+  if(repo_available, do: [], else: [:integration]) ++
+    if(Code.ensure_loaded?(PhoenixKit.API.Executor), do: [], else: [:core_api]) ++
+    if Code.ensure_loaded?(PhoenixKit.Utils.Routes) and
+         function_exported?(PhoenixKit.Utils.Routes, :canonical_absolute_or_nil, 2),
+       do: [],
+       else: [:canonical_urls]
 
 ExUnit.start(exclude: exclude)

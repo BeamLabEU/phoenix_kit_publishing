@@ -6,6 +6,8 @@ defmodule PhoenixKit.Modules.Publishing.ActivityLog do
   # is logged there and returned — so audit failures never crash the
   # primary mutation.
 
+  alias PhoenixKit.Modules.Publishing.Shared
+
   @module_key "publishing"
 
   @spec log(map()) :: :ok
@@ -18,17 +20,21 @@ defmodule PhoenixKit.Modules.Publishing.ActivityLog do
   Convenience for the standard "user-driven mutation" shape — wraps `log/1`
   with `mode: "manual"` and the canonical key set so context functions only
   pass the bits that vary.
+
+  `opts` may carry `:activity_mode` (the entry's mode, default `"manual"`)
+  and `:log_metadata` (a map with string keys, merged under the entry's own
+  metadata).
   """
-  @spec log_manual(String.t(), String.t() | nil, String.t(), String.t() | nil, map()) :: :ok
-  def log_manual(action, actor_uuid, resource_type, resource_uuid, metadata \\ %{}) do
-    log(%{
-      action: action,
-      mode: "manual",
-      actor_uuid: actor_uuid,
-      resource_type: resource_type,
-      resource_uuid: resource_uuid,
-      metadata: metadata
-    })
+  @spec log_manual(
+          String.t(),
+          String.t() | nil,
+          String.t(),
+          String.t() | nil,
+          map(),
+          keyword() | map()
+        ) :: :ok
+  def log_manual(action, actor_uuid, resource_type, resource_uuid, metadata \\ %{}, opts \\ []) do
+    log(entry(action, actor_uuid, resource_type, resource_uuid, metadata, opts))
   end
 
   @doc """
@@ -50,24 +56,62 @@ defmodule PhoenixKit.Modules.Publishing.ActivityLog do
   assigned a UUID — that's expected for create paths. Metadata callers
   pass should still be PII-safe (slugs / names / status, never email or
   free-text body).
+
+  Takes the same `:activity_mode` and `:log_metadata` options as
+  `log_manual/6`.
   """
   @spec log_failed_mutation(
           String.t(),
           String.t() | nil,
           String.t(),
           String.t() | nil,
-          map()
+          map(),
+          keyword() | map()
         ) :: :ok
-  def log_failed_mutation(action, actor_uuid, resource_type, resource_uuid, metadata \\ %{}) do
-    log(%{
+  def log_failed_mutation(
+        action,
+        actor_uuid,
+        resource_type,
+        resource_uuid,
+        metadata \\ %{},
+        opts \\ []
+      ) do
+    log(
+      entry(
+        action,
+        actor_uuid,
+        resource_type,
+        resource_uuid,
+        Map.put(metadata, "db_pending", true),
+        opts
+      )
+    )
+  end
+
+  # `opts` may carry `:activity_mode` (the entry's mode, default "manual") and
+  # `:log_metadata` (merged UNDER the entry's own metadata). The key is NOT
+  # `:mode`: the same opts reach `Groups.add_group/2`, where `:mode` is the
+  # group's URL mode.
+  defp entry(action, actor_uuid, resource_type, resource_uuid, metadata, opts) do
+    %{
       action: action,
-      mode: "manual",
+      mode: activity_mode(opts),
       actor_uuid: actor_uuid,
       resource_type: resource_type,
       resource_uuid: resource_uuid,
-      metadata: Map.put(metadata, "db_pending", true)
-    })
+      metadata: Map.merge(string_keys(Shared.get_option(opts, :log_metadata)), metadata)
+    }
   end
+
+  defp activity_mode(opts) do
+    case Shared.get_option(opts, :activity_mode) do
+      mode when is_binary(mode) and mode != "" -> mode
+      _other -> "manual"
+    end
+  end
+
+  defp string_keys(%{} = map), do: Map.filter(map, fn {key, _value} -> is_binary(key) end)
+  defp string_keys(_other), do: %{}
 
   @doc """
   Compresses a mutation-failure reason into a PII-safe string for failure

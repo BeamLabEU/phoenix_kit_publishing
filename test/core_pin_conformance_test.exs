@@ -12,7 +12,7 @@ defmodule PhoenixKitPublishing.CorePinConformanceTest do
   outright, with no degraded mode. Nothing else in this repo's own test run
   would notice, which is why the check is a test rather than a convention.
 
-  What this does NOT forbid is raising the FLOOR. `>= 2.38.0 and < 3.0.0`
+  What this does NOT forbid is raising the FLOOR. `>= 2.63.0 and < 3.0.0`
   still admits every later 2.x, and the floor has to track the oldest core
   that has every function this module calls, BEHAVING as this module needs it
   to. The earlier floors' reasons, all subsumed now:
@@ -32,11 +32,13 @@ defmodule PhoenixKitPublishing.CorePinConformanceTest do
     * The group media folders (`MediaFolders`, `MediaAdoption`,
       `MediaReorganizer`) are built on `Storage.ResourceFolders` and the
       reorganizer's `ResourceSource`, both first shipped in core 2.38.0 — the
-      current floor.
+      floor before the machine API.
+    * 2.38.0 also brought the category parent pickers (core's `TreePicker`), the
+      actor and activity log (`PhoenixKitWeb.Actor`, `Activity.log/3`) and the
+      edit forms' `mount_multilang(open_on:)`.
 
-  The floor is 2.38.0 now: the category parent pickers are core's
-  `TreePicker`, the actor and activity log come from `PhoenixKitWeb.Actor` and
-  `Activity.log/3`, and the edit forms use `mount_multilang(open_on:)` — an
+  The floor is 2.63.0 now: it is the first Hex release with the machine API
+  (`PhoenixKit.API`), which the `publishing.*` tools are compiled against — an
   older core does not compile the package. Raise this alongside `mix.exs`
   whenever a newly-adopted core API — or a newly-relied-on core BEHAVIOUR —
   sets a higher one, keeping the compound form: patch-precise at the bottom,
@@ -46,15 +48,15 @@ defmodule PhoenixKitPublishing.CorePinConformanceTest do
   a V135 floor and this module is verified only against that baseline.
   """
 
-  # Floor: core 2.38.0 (`TreePicker`, `PhoenixKitWeb.Actor`, `Activity.log/3`,
-  # `mount_multilang(open_on:)`; the earlier 2.14 floor for the IANA-aware
-  # `Utils.Date` is subsumed). Everything above it, forever, must stay
-  # admitted — the open-ceiling invariant this test exists for; the compound
-  # form keeps the floor patch-precise. Move both lists together.
-  @must_admit ["2.38.0", "2.38.1", "2.39.0", "2.99.4"]
-  @must_reject ["1.7.236", "2.0.0", "2.13.9", "2.14.0", "2.37.5", "3.0.0"]
+  # Floor: core 2.63.0 (the machine API, `PhoenixKit.API`; the earlier 2.38 floor of
+  # `TreePicker`, `PhoenixKitWeb.Actor`, `Activity.log/3` and `mount_multilang(open_on:)`,
+  # and the 2.14 floor for the IANA-aware `Utils.Date`, are subsumed). Everything above
+  # it, forever, must stay admitted — the open-ceiling invariant this test exists for;
+  # the compound form keeps the floor patch-precise. Move both lists together.
+  @must_admit ["2.63.0", "2.63.1", "2.64.0", "2.99.4"]
+  @must_reject ["1.7.236", "2.0.0", "2.13.9", "2.14.0", "2.37.5", "2.38.0", "2.62.2", "3.0.0"]
 
-  test "the :phoenix_kit requirement admits every core >= 2.38.0 minor and nothing else" do
+  test "the :phoenix_kit requirement admits every core >= 2.63.0 minor and nothing else" do
     requirement = core_requirement()
 
     assert match?({:ok, _parsed}, Version.parse_requirement(requirement)),
@@ -65,7 +67,7 @@ defmodule PhoenixKitPublishing.CorePinConformanceTest do
              "`:phoenix_kit` requirement #{inspect(requirement)} rejects core #{version}. " <>
                "A pin that excludes a core minor at or above the floor breaks `mix deps.get` " <>
                "for every host running this module alongside that core. Keep the floor " <>
-               "patch-precise and the ceiling open (`>= 2.38.0 and < 3.0.0`)."
+               "patch-precise and the ceiling open (`>= 2.63.0 and < 3.0.0`)."
     end
 
     for version <- @must_reject do

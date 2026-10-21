@@ -177,7 +177,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
             "group_slug" => group_slug,
             "version_number" => version,
             "reason" => "not_found"
-          }
+          },
+          opts
         )
 
         {:error, :not_found}
@@ -193,7 +194,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
               "group_slug" => group_slug,
               "version_number" => version,
               "reason" => "post_trashed"
-            }
+            },
+            opts
           )
 
           {:error, :post_trashed}
@@ -240,7 +242,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           ActivityLog.actor_uuid(opts),
           "publishing_post",
           post_uuid,
-          %{"group_slug" => group_slug, "reason" => "not_found"}
+          %{"group_slug" => group_slug, "reason" => "not_found"},
+          opts
         )
 
         {:error, :not_found}
@@ -251,7 +254,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           ActivityLog.actor_uuid(opts),
           "publishing_post",
           db_post.uuid,
-          %{"group_slug" => group_slug, "reason" => "not_published"}
+          %{"group_slug" => group_slug, "reason" => "not_published"},
+          opts
         )
 
         {:error, :not_published}
@@ -293,7 +297,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
             "group_slug" => group_slug,
             "post_uuid" => db_post.uuid,
             "version_number" => version
-          }
+          },
+          opts
         )
 
         :ok
@@ -308,7 +313,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
             "group_slug" => group_slug,
             "post_uuid" => db_post.uuid,
             "version_number" => version
-          }
+          },
+          opts
         )
 
         {:error, reason}
@@ -449,7 +455,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           ActivityLog.actor_uuid(opts),
           "publishing_post",
           db_post.uuid,
-          %{"group_slug" => group_slug}
+          %{"group_slug" => group_slug},
+          opts
         )
 
         :ok
@@ -460,7 +467,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           ActivityLog.actor_uuid(opts),
           "publishing_post",
           db_post.uuid,
-          %{"group_slug" => group_slug}
+          %{"group_slug" => group_slug},
+          opts
         )
 
         {:error, reason}
@@ -684,7 +692,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
             "group_slug" => group_slug,
             "source_version" => source_version,
             "reason" => ActivityLog.reason_string(reason)
-          }
+          },
+          opts
         )
 
         err
@@ -738,7 +747,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
           "post_uuid" => db_post.uuid,
           "version_number" => db_version.version_number,
           "source_version" => source_version
-        }
+        },
+        opts
       )
 
       {:ok, post}

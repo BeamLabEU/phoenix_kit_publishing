@@ -185,7 +185,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
               ActivityLog.actor_uuid(opts),
               "publishing_category",
               category.uuid,
-              %{"group" => group_slug, "slug" => category.slug}
+              %{"group" => group_slug, "slug" => category.slug},
+              opts
             )
 
             {:ok, category}
@@ -242,7 +243,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
           ActivityLog.actor_uuid(opts),
           "publishing_category",
           updated.uuid,
-          %{"slug" => updated.slug}
+          %{"slug" => updated.slug},
+          opts
         )
 
         invalidate_group_cache(updated.group_uuid)
@@ -304,7 +306,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
               ActivityLog.actor_uuid(opts),
               "publishing_category",
               deleted.uuid,
-              %{"slug" => deleted.slug}
+              %{"slug" => deleted.slug},
+              opts
             )
 
             invalidate_group_cache(deleted.group_uuid)
@@ -997,7 +1000,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       ActivityLog.actor_uuid(opts),
       "publishing_category",
       resource_uuid,
-      Map.put(metadata, "reason", ActivityLog.reason_string(reason))
+      Map.put(metadata, "reason", ActivityLog.reason_string(reason)),
+      opts
     )
 
     err

@@ -286,9 +286,26 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     end
   end
 
+  # The first two keys of the listing order, shared with the keyset of `list_posts_page/3`.
+  defmacrop sort_date(p) do
+    quote do
+      coalesce(unquote(p).post_date, fragment("CAST(? AS DATE)", unquote(p).inserted_at))
+    end
+  end
+
+  defmacrop sort_time(p) do
+    quote do
+      coalesce(unquote(p).post_time, fragment("CAST(? AS TIME)", unquote(p).inserted_at))
+    end
+  end
+
   @doc "Lists posts in a group, optionally filtered by status. Excludes trashed by default."
   @spec list_posts(String.t(), String.t() | nil) :: [PublishingPost.t()]
   def list_posts(group_slug, status \\ nil) do
+    group_slug |> posts_query(status) |> repo().all()
+  end
+
+  defp posts_query(group_slug, status) do
     # Base query has no trashed_at filter — each status branch adds its own.
     # Composing additively means future base-query refinements (e.g. extra
     # joins / preloads) can't be silently dropped by a status branch that
@@ -303,7 +320,69 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     base
     |> filter_by_status(status)
     |> order_by_mode()
-    |> repo().all()
+  end
+
+  @doc """
+  One page of `list_posts/2`, cut in the query: `{:ok, %{rows, total, more?}}` with at most `limit`
+  rows after the post `:after` (a uuid; `:error` when it is not in the list), in
+  the order of `list_posts/2` with the uuid as the last tie-break. `:allow` limits the list to
+  those post uuids. `total` is the size of the whole filtered list.
+  """
+  @spec list_posts_page(String.t(), String.t() | nil, keyword()) ::
+          {:ok, %{rows: [PublishingPost.t()], total: non_neg_integer(), more?: boolean()}}
+          | :error
+  def list_posts_page(group_slug, status, opts) do
+    limit = Keyword.fetch!(opts, :limit)
+
+    query =
+      group_slug
+      |> posts_query(status)
+      |> allow_posts(Keyword.get(opts, :allow))
+
+    unordered = query |> exclude(:order_by) |> exclude(:preload)
+    total = unordered |> select([p], count(p.uuid)) |> repo().one()
+
+    with {:ok, page_query} <- after_post(query, unordered, Keyword.get(opts, :after)) do
+      rows = page_query |> order_by([p], desc: p.uuid) |> limit(^(limit + 1)) |> repo().all()
+      {page, rest} = Enum.split(rows, limit)
+      {:ok, %{rows: page, total: total, more?: rest != []}}
+    end
+  end
+
+  defp allow_posts(query, nil), do: query
+  defp allow_posts(query, uuids), do: where(query, [p], p.uuid in ^uuids)
+
+  defp after_post(query, _unordered, nil), do: {:ok, query}
+
+  defp after_post(query, unordered, uuid) do
+    key =
+      unordered
+      |> where([p], p.uuid == ^uuid)
+      |> select([p], {sort_date(p), sort_time(p), p.inserted_at})
+      |> repo().one()
+
+    case key do
+      nil ->
+        :error
+
+      {date, time, inserted_at} ->
+        {:ok,
+         where(
+           query,
+           [p],
+           fragment(
+             "(?, ?, ?, ?) < (?, ?, ?, ?)",
+             sort_date(p),
+             sort_time(p),
+             p.inserted_at,
+             p.uuid,
+             type(^date, :date),
+             type(^time, :time),
+             type(^inserted_at, :utc_datetime),
+             type(^uuid, Ecto.UUID)
+           )
+         )}
+    end
   end
 
   # A post is published when it points at a live version — the same sentence
@@ -1589,16 +1668,8 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     # cluster at the top of a mixed listing under PostgreSQL's default
     # NULLS FIRST DESC ordering.
     order_by(query, [p],
-      desc:
-        coalesce(
-          p.post_date,
-          fragment("CAST(? AS DATE)", p.inserted_at)
-        ),
-      desc:
-        coalesce(
-          p.post_time,
-          fragment("CAST(? AS TIME)", p.inserted_at)
-        ),
+      desc: sort_date(p),
+      desc: sort_time(p),
       desc: p.inserted_at
     )
   end

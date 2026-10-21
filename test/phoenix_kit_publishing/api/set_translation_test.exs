@@ -1,0 +1,564 @@
+defmodule PhoenixKit.Modules.Publishing.API.SetTranslationTest do
+  use PhoenixKit.DataCase, async: false
+
+  import PhoenixKitPublishing.ActivityLogAssertions
+
+  import Ecto.Query, only: [from: 2]
+
+  alias PhoenixKit.Modules.Publishing.API.{Danger, SetTranslation}
+  alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts, PublishingContent, Versions}
+  alias PhoenixKitPublishing.Test.ApiCase
+  alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
+  alias PhoenixKitPublishing.Test.MediaFixtures
+  alias PhoenixKitPublishing.Test.Repo, as: TestRepo
+
+  setup do
+    Fx.languages!(["en-US", "de-DE", "fr-FR"])
+    g = Fx.group!()
+    post = Fx.post!(g["slug"], %{title: "Hello", slug: "hello"})
+    Fx.body!(g["slug"], post[:uuid], "english body")
+    %{g: g, post: post}
+  end
+
+  defp set(ctx, extra \\ %{}, overrides \\ %{}) do
+    input = %{
+      "post" => Fx.ref(ctx.post),
+      "language" => "de-DE",
+      "title" => "Hallo",
+      "content" => "Inhalt"
+    }
+
+    ApiCase.call("publishing.set_translation", Map.merge(input, extra), overrides)
+  end
+
+  test "creates a language: the row, one translation.added and one post.updated, both attributed; English untouched",
+       ctx do
+    assert {:ok, %{"action" => "created", "language" => "de-DE"}} = set(ctx)
+    assert %{title: "Hallo", content: "Inhalt"} = Fx.content(ctx.post[:uuid], "de-DE")
+    assert Fx.content(ctx.post[:uuid], "en-US").content == "english body"
+
+    added =
+      assert_activity_logged("publishing.translation.added", resource_uuid: ctx.post[:uuid])
+
+    assert added.mode == "auto" and added.metadata["via"] == "api"
+
+    updated =
+      Enum.find(
+        list_activities(),
+        &(&1.action == "publishing.post.updated" and &1.mode == "auto")
+      )
+
+    assert updated.metadata["tool"] == "publishing.set_translation"
+
+    for action <- ["publishing.translation.added", "publishing.post.updated"] do
+      assert Enum.count(list_activities(), &(&1.action == action and &1.mode == "auto")) == 1
+    end
+  end
+
+  test "the context write is called with publish: false and none of the keys the tool never sends",
+       ctx do
+    ApiCase.trace_update_post!()
+
+    assert {:ok, %{"action" => "created"}} = set(ctx)
+
+    assert_receive {:traced, [_group, _post, params, opts]}, 1000
+    assert Keyword.fetch!(opts, :publish) == false
+
+    for key <- ~w(status published_at url_slug tags) do
+      refute Map.has_key?(params, key), key
+    end
+  end
+
+  test "updating an existing language writes no translation.added row", ctx do
+    {:ok, _} = set(ctx)
+    before = Enum.count(list_activities(), &(&1.action == "publishing.translation.added"))
+    assert {:ok, %{"action" => "updated"}} = set(ctx, %{"content" => "Neuer Inhalt"})
+
+    assert Enum.count(list_activities(), &(&1.action == "publishing.translation.added")) ==
+             before
+
+    assert Fx.content(ctx.post[:uuid], "de-DE").content == "Neuer Inhalt"
+  end
+
+  test "a handler called without schema validation answers empty_translation for a null text",
+       ctx do
+    input = %{
+      "post" => Fx.ref(ctx.post),
+      "language" => "de-DE",
+      "title" => nil,
+      "content" => "Inhalt"
+    }
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "empty_translation"}]}} =
+             SetTranslation.call(input, ApiCase.ctx())
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
+  test "the same call twice converges: the second answer is unchanged and writes nothing", ctx do
+    assert {:ok, %{"action" => "created"}} =
+             set(ctx, %{"og_title" => "OG", "og_description" => "", "og_image_id" => nil})
+
+    before = Fx.table_state()
+    logged = length(list_activities())
+
+    assert {:ok, %{"action" => "unchanged", "language" => "de-DE"}} =
+             set(ctx, %{"og_title" => "OG", "og_description" => "", "og_image_id" => nil})
+
+    assert {:preview, %{"requires_confirmation" => false, "rows" => [%{"action" => "unchanged"}]},
+            _} =
+             set(ctx, %{"og_title" => "OG"}, %{dry_run?: true})
+
+    assert Fx.table_state() == before
+    assert length(list_activities()) == logged
+
+    assert {:ok, %{"action" => "updated"}} = set(ctx, %{"og_title" => "OG other"})
+  end
+
+  test "the primary language is refused", ctx do
+    assert {:error, :validation_failed, message, _} = set(ctx, %{"language" => "en-US"})
+    assert message =~ "update_post"
+  end
+
+  test "an empty title or body is empty_translation and creates no row", ctx do
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "empty_translation"}]}} =
+             set(ctx, %{"content" => "  "})
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "empty_translation"}]}} =
+             set(ctx, %{"title" => "  "})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
+  test "a language that is not enabled is language_not_enabled with allowed", ctx do
+    assert {:error, :validation_failed, _,
+            %{errors: [%{reason: "language_not_enabled", allowed: allowed}]}} =
+             set(ctx, %{"language" => "xx"})
+
+    assert "de-DE" in allowed
+  end
+
+  test "a legacy base-code row is promoted, not duplicated", ctx do
+    # The legacy row is a content row for the base code "de" on version 1.
+    {:ok, _} =
+      DBStorage.create_content(%{
+        version_uuid: Fx.version(ctx.post[:uuid]).uuid,
+        language: "de",
+        title: "Alt",
+        content: "alt"
+      })
+
+    assert {:ok, _} = set(ctx)
+    languages = Fx.contents(ctx.post[:uuid]) |> Enum.map(& &1.language) |> Enum.sort()
+    assert languages == ["de-DE", "en-US"]
+  end
+
+  test "a language disabled after its row was written is language_not_enabled", ctx do
+    {:ok, _} = set(ctx)
+    Fx.languages!(["en-US", "fr-FR"])
+
+    assert {:error, :validation_failed, _,
+            %{errors: [%{reason: "language_not_enabled", allowed: allowed}]}} =
+             set(ctx, %{"content" => "neu"})
+
+    refute "de-DE" in allowed
+    assert Fx.content(ctx.post[:uuid], "de-DE").content == "Inhalt"
+  end
+
+  test "og fields are written to the language row; an invalid og_image_id is refused", ctx do
+    assert {:error, :validation_failed, _, %{errors: [%{path: "og_image_id"}]}} =
+             set(ctx, %{"og_image_id" => "not-a-uuid"})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+
+    assert {:ok, _} = set(ctx, %{"og_title" => "OG Titel", "og_description" => "OG Text"})
+
+    og =
+      PublishingContent.get_og(Fx.content(ctx.post[:uuid], "de-DE"))
+
+    assert og["title"] == "OG Titel" and og["description"] == "OG Text"
+  end
+
+  test "a valid og_image_id is stored on the language row", ctx do
+    image = MediaFixtures.file!().uuid
+    assert {:ok, %{"action" => "created"}} = set(ctx, %{"og_image_id" => image})
+
+    assert PublishingContent.get_og(Fx.content(ctx.post[:uuid], "de-DE"))["image_uuid"] == image
+  end
+
+  test "an og_image_id that is not a file of the media library is refused and writes no row",
+       ctx do
+    assert {:error, :validation_failed, _,
+            %{errors: [%{path: "og_image_id", reason: "unknown_file"}]}} =
+             set(ctx, %{"og_image_id" => Ecto.UUID.generate()})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
+  test "the dry run shows the og values the call would write", ctx do
+    image = MediaFixtures.file!().uuid
+
+    assert {:preview, %{"rows" => [%{"changes" => changes}]}, _} =
+             set(
+               ctx,
+               %{"og_title" => "OG Titel", "og_description" => "OG Text", "og_image_id" => image},
+               %{dry_run?: true}
+             )
+
+    assert %{"scope" => "language", "from" => "", "to" => "OG Titel"} = changes["og_title"]
+    assert %{"scope" => "language", "from" => "", "to" => "OG Text"} = changes["og_description"]
+    assert %{"scope" => "language", "from" => "", "to" => ^image} = changes["og_image_id"]
+
+    assert {:preview, %{"rows" => [%{"changes" => no_og}]}, _} = set(ctx, %{}, %{dry_run?: true})
+    refute Map.has_key?(no_og, "og_title")
+  end
+
+  test "a partial og input keeps the og fields of the legacy row it promotes", ctx do
+    {:ok, _} =
+      DBStorage.create_content(%{
+        version_uuid: Fx.version(ctx.post[:uuid]).uuid,
+        language: "de",
+        title: "Alt",
+        content: "alt",
+        data: %{"og" => %{"title" => "Alt OG", "description" => "Alte Beschreibung"}}
+      })
+
+    assert {:preview, %{"rows" => [%{"changes" => %{"og_title" => change}}]}, _} =
+             set(ctx, %{"og_title" => "Neu"}, %{dry_run?: true})
+
+    assert change["from"] == "Alt OG" and change["to"] == "Neu"
+
+    assert {:ok, _} = set(ctx, %{"og_title" => "Neu"})
+    og = PublishingContent.get_og(Fx.content(ctx.post[:uuid], "de-DE"))
+    assert og["title"] == "Neu" and og["description"] == "Alte Beschreibung"
+  end
+
+  test "NUL byte in title or content is a validation error", ctx do
+    assert {:error, :validation_failed, _, %{errors: [%{path: "title"}]}} =
+             set(ctx, %{"title" => "a\u0000"})
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "content"}]}} =
+             set(ctx, %{"content" => "a\u0000"})
+  end
+
+  test "a step-3 failure after the row was created reports the left-behind row and writes no body",
+       ctx do
+    # A publish landing right after step 1's INSERT makes the :locked_check of step 3 refuse the write.
+    flag = make_ref()
+    me = self()
+    handler = "set-translation-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      TestRepo.config()[:telemetry_prefix] ++ [:query],
+      fn _e, _m, meta, _c ->
+        if meta.source == "phoenix_kit_publishing_contents" and meta.query =~ ~r/^INSERT/ and
+             Process.get(flag) == nil do
+          Process.put(flag, true)
+          :ok = Versions.publish_version(ctx.g["slug"], ctx.post[:uuid], 1, [])
+          send(me, :interleaved)
+        end
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert {:error, :revision_mismatch, _,
+            %{reason: "went_live", left_behind: "empty row for de-DE"}} =
+             set(ctx)
+
+    assert_received :interleaved
+    row = Fx.content(ctx.post[:uuid], "de-DE")
+    assert row != nil and row.content in [nil, ""]
+  end
+
+  test "a version that goes live right before the row is created is refused and leaves no row",
+       ctx do
+    # The publish lands right after the up-front recheck read the version, before the row is created.
+    flag = make_ref()
+    me = self()
+    handler = "set-translation-early-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      TestRepo.config()[:telemetry_prefix] ++ [:query],
+      fn _e, _m, meta, _c ->
+        if meta.source == "phoenix_kit_publishing_versions" and
+             meta.query =~ ~s|WHERE (p0."uuid" = $1)| and Process.get(flag) == nil do
+          Process.put(flag, true)
+          :ok = Versions.publish_version(ctx.g["slug"], ctx.post[:uuid], 1, [])
+          send(me, :interleaved)
+        end
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert {:error, :revision_mismatch, _, %{reason: "went_live"} = context} = set(ctx)
+    assert_received :interleaved
+    refute Map.has_key?(context, :left_behind)
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
+  test "the text rule makes HTML a confirmed write even on a draft; a live target needs a confirmation",
+       ctx do
+    assert {:preview,
+            %{
+              "requires_confirmation" => true,
+              "rows" => [
+                %{"changes" => %{"content" => %{"raw_html" => %{"dangerous" => true}}}}
+              ]
+            }, _} = set(ctx, %{"content" => "<b>x</b>"}, %{dry_run?: true})
+
+    assert {:preview, %{"requires_confirmation" => false}, _} =
+             set(ctx, %{}, %{dry_run?: true})
+
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    assert {:preview, %{"requires_confirmation" => true}, _} =
+             set(ctx, %{"version" => 1}, %{dry_run?: true})
+  end
+
+  test "a dry run leaves ALL tables unchanged and previews add vs update per language", ctx do
+    before = Fx.table_state()
+
+    assert {:preview, %{"rows" => [%{"action" => "add", "language" => "de-DE"}]}, _} =
+             set(ctx, %{}, %{dry_run?: true})
+
+    assert Fx.table_state() == before
+    {:ok, _} = set(ctx)
+
+    assert {:preview, %{"rows" => [%{"action" => "update"}]}, _} =
+             set(ctx, %{"content" => "anders"}, %{dry_run?: true})
+  end
+
+  test "a matching if_revision lets the call through", ctx do
+    {:ok, _} = set(ctx)
+
+    {:ok, %{"revision" => rev}} =
+      ApiCase.call("publishing.get_post", %{"post" => Fx.ref(ctx.post), "language" => "de-DE"})
+
+    assert {:ok, %{"action" => "updated"}} =
+             set(ctx, %{"content" => "Neuer Inhalt", "if_revision" => rev})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE").content == "Neuer Inhalt"
+  end
+
+  test "if_revision of get_post lets a NEW language through, and refuses it once the text it showed changed",
+       ctx do
+    read = fn ->
+      {:ok, %{"revision" => rev, "language" => shown}} =
+        ApiCase.call("publishing.get_post", %{
+          "post" => Fx.ref(ctx.post),
+          "language" => "de-DE",
+          "version" => 1
+        })
+
+      assert shown == "en-US", "the fixture is not a missing row: this test would be vacuous"
+      rev
+    end
+
+    stale = read.()
+
+    {:ok, _} =
+      ApiCase.call("publishing.update_post", %{
+        "post" => Fx.ref(ctx.post),
+        "version" => 1,
+        "content" => "changed english body"
+      })
+
+    assert {:error, :revision_mismatch, _, %{current_revision: current}} =
+             set(ctx, %{"version" => 1, "if_revision" => stale})
+
+    assert current == read.()
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+
+    assert {:ok, %{"action" => "created"}} =
+             set(ctx, %{"version" => 1, "if_revision" => current})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE").content == "Inhalt"
+  end
+
+  test "if_revision mismatch, trashed post and trashed group", ctx do
+    assert {:error, :revision_mismatch, _, %{current_revision: _}} =
+             set(ctx, %{"if_revision" => String.duplicate("0", 64)})
+
+    {:ok, _} = Posts.trash_post(ctx.g["slug"], ctx.post[:uuid])
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "post_trashed"}]}} = set(ctx)
+    g2 = Fx.group!()
+    p2 = Fx.post!(g2["slug"], %{title: "T", slug: "t"})
+    {:ok, _} = Groups.trash_group(g2["slug"])
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "group_trashed"}]}} =
+             ApiCase.call("publishing.set_translation", %{
+               "post" => %{"id" => p2[:uuid]},
+               "language" => "de-DE",
+               "title" => "a",
+               "content" => "b"
+             })
+  end
+
+  test "the fingerprint follows title, body, language, og values and the post state", ctx do
+    fingerprint = fn extra ->
+      {:preview, _, f} = set(ctx, extra, %{dry_run?: true})
+      f
+    end
+
+    base = fingerprint.(%{})
+    assert base =~ ~r/\A[0-9a-f]{64}\z/
+    assert base == fingerprint.(%{})
+
+    refute base == fingerprint.(%{"title" => "Hallo anders"})
+    refute base == fingerprint.(%{"content" => "Inhalt anders"})
+    refute base == fingerprint.(%{"language" => "fr-FR"})
+
+    with_og = fingerprint.(%{"og_title" => "OG"})
+    refute base == with_og
+    refute with_og == fingerprint.(%{"og_title" => "OG other"})
+    refute with_og == fingerprint.(%{"og_title" => "OG", "og_description" => "text"})
+
+    refute with_og ==
+             fingerprint.(%{"og_title" => "OG", "og_image_id" => MediaFixtures.file!().uuid})
+
+    Fx.body!(ctx.g["slug"], ctx.post[:uuid], "someone else edited")
+    refute base == fingerprint.(%{})
+  end
+
+  test "an unconfirmed call on a version that is live is refused up front and writes no row",
+       ctx do
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    assert {:error, :revision_mismatch, _, %{reason: "went_live"}} =
+             set(ctx, %{"version" => 1})
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+
+    assert {:ok, %{"action" => "created"}} =
+             set(ctx, %{"version" => 1}, %{confirmation_uuid: "c"})
+
+    assert %{title: "Hallo"} = Fx.content(ctx.post[:uuid], "de-DE")
+  end
+
+  test "a failed read-back after the row was created reports the left-behind row", ctx do
+    handler = "set-translation-reread-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      TestRepo.config()[:telemetry_prefix] ++ [:query],
+      fn _e, _m, meta, _c ->
+        if meta.source == "phoenix_kit_publishing_contents" and meta.query =~ ~r/^INSERT/ do
+          TestRepo.delete_all(
+            from(c in PublishingContent, where: c.language == "de-DE"),
+            []
+          )
+        end
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert {:error, :validation_failed, _,
+            %{errors: [%{reason: "language_missing"}], left_behind: "empty row for de-DE"}} =
+             set(ctx)
+  end
+
+  test "content: 262,144 bytes is accepted, 262,145 is content_too_large", ctx do
+    ok = String.duplicate("a", 262_144)
+    assert {:ok, %{"action" => "created"}} = set(ctx, %{"content" => ok})
+
+    assert {:error, :validation_failed, _, %{errors: [%{reason: "content_too_large"}]}} =
+             set(ctx, %{"content" => ok <> "a"})
+  end
+
+  test "title: 500 characters (multibyte) are accepted, 501 are refused with no row", ctx do
+    assert {:ok, %{"action" => "created"}} =
+             set(ctx, %{"title" => String.duplicate("é", 500)})
+
+    assert String.length(Fx.content(ctx.post[:uuid], "de-DE").title) == 500
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "title"}]}} =
+             set(ctx, %{"title" => String.duplicate("é", 501), "language" => "fr-FR"})
+
+    assert Fx.content(ctx.post[:uuid], "fr-FR") == nil
+  end
+
+  test "a timestamp-mode post is addressed by id" do
+    Fx.languages!(["en-US", "de-DE"])
+    ts = Fx.group!(mode: "timestamp")
+    p = Fx.post!(ts["slug"], %{title: "Stamped"})
+    Fx.body!(ts["slug"], p[:uuid], "stamped body")
+
+    assert {:ok, %{"action" => "created", "language" => "de-DE"}} =
+             ApiCase.call("publishing.set_translation", %{
+               "post" => Fx.ref(p),
+               "language" => "de-DE",
+               "title" => "Gestempelt",
+               "content" => "Inhalt"
+             })
+
+    assert %{title: "Gestempelt"} = Fx.content(p[:uuid], "de-DE")
+  end
+
+  test "a NUL byte in any text field is a validation error with the path and writes no row",
+       ctx do
+    for field <- ~w(title content og_title og_description) do
+      assert {:error, :validation_failed, _, %{errors: [%{path: ^field}]}} =
+               set(ctx, %{field => "a\u0000b"}),
+             field
+
+      assert Fx.content(ctx.post[:uuid], "de-DE") == nil, field
+    end
+  end
+
+  test "the handler refuses a title over the character limit with no row", ctx do
+    input = %{
+      "post" => Fx.ref(ctx.post),
+      "language" => "de-DE",
+      "title" => String.duplicate("a", 501),
+      "content" => "Inhalt"
+    }
+
+    assert {:error, :validation_failed, _, %{errors: [%{path: "title"}]}} =
+             SetTranslation.call(input, ApiCase.ctx())
+
+    assert Fx.content(ctx.post[:uuid], "de-DE") == nil
+  end
+
+  test "the unchanged preview of the live version asks for a confirmation, like the gate", ctx do
+    assert {:ok, %{"action" => "created"}} = set(ctx)
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    input = %{
+      "post" => Fx.ref(ctx.post),
+      "language" => "de-DE",
+      "title" => "Hallo",
+      "version" => 1,
+      "content" => "Inhalt"
+    }
+
+    assert Danger.set_translation(input, %{})
+
+    assert {:preview, %{"requires_confirmation" => true, "rows" => [%{"action" => "unchanged"}]},
+            _} = set(ctx, %{"version" => 1}, %{dry_run?: true})
+  end
+
+  test "a draft that is not the live version is a plain write; the same text again is unchanged",
+       ctx do
+    Fx.publish!(ctx.g["slug"], ctx.post[:uuid])
+
+    {:ok, _} =
+      ApiCase.call("publishing.create_version", %{"post" => Fx.ref(ctx.post)})
+
+    assert {:ok, %{"action" => "created", "version" => 2}} = set(ctx, %{"version" => 2})
+    assert %{content: "Inhalt"} = Fx.content(ctx.post[:uuid], "de-DE", 2)
+    assert Fx.content(ctx.post[:uuid], "de-DE", 1) == nil
+
+    assert {:preview, %{"requires_confirmation" => false, "rows" => [%{"action" => "unchanged"}]},
+            _} =
+             set(ctx, %{"version" => 2}, %{dry_run?: true})
+  end
+end

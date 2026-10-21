@@ -1,0 +1,452 @@
+defmodule PhoenixKit.Modules.Publishing.API.Schemas do
+  @moduledoc false
+  # JSON Schemas (string keys) of the publishing tools. Only the keywords core's validator
+  # implements are used (type, enum, required, properties, additionalProperties, minimum,
+  # maximum, minLength, maxLength, pattern, minItems, maxItems, items). Every object closes
+  # itself: a field a tool does not declare (status, published_at, tags, url_slug, force) is a
+  # validation error at any depth.
+
+  alias PhoenixKit.Modules.Publishing.GroupSettings
+
+  @uuid %{"type" => "string", "minLength" => 36, "maxLength" => 36}
+  @revision_chars 200
+
+  def uuid, do: @uuid
+  def text(max), do: %{"type" => "string", "minLength" => 1, "maxLength" => max}
+  def nullable_text(max), do: %{"type" => ["string", "null"], "maxLength" => max}
+
+  # ROW-LEVEL and ref fields: the schema checks type and an upper bound only, so a malformed id
+  # or slug reaches the handler and answers `invalid_ref` / `not_found` for THAT row instead of
+  # one 422 for the whole request.
+  def row_id, do: %{"type" => "string", "maxLength" => 200}
+  def row_text(max), do: %{"type" => "string", "maxLength" => max}
+
+  @doc "A CLOSED object."
+  def object(properties, required \\ []) do
+    base = %{"type" => "object", "properties" => properties, "additionalProperties" => false}
+    if required == [], do: base, else: Map.put(base, "required", required)
+  end
+
+  @doc "A post reference: `{id}` or `{group, slug}`; the handler requires exactly one form."
+  def post_ref, do: object(%{"id" => row_id(), "group" => row_text(200), "slug" => row_text(200)})
+
+  @doc "A group reference: `{slug}`."
+  def group_ref, do: object(%{"slug" => row_text(200)})
+
+  @doc "A category reference: `{id}` or `{slug}`."
+  def category_ref, do: object(%{"id" => row_id(), "slug" => row_text(200)})
+
+  def warnings_output do
+    %{"type" => "array", "items" => %{"type" => "object"}}
+  end
+
+  # --- group reads ------------------------------------------------------------------------
+
+  def list_groups, do: object(%{"status" => %{"type" => "string", "enum" => ~w(active trashed)}})
+
+  def list_groups_output do
+    object_output(%{
+      "groups" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "count" => %{"type" => "integer"}
+    })
+  end
+
+  def get_group_settings_schema, do: object(%{})
+
+  def get_group_settings_schema_output do
+    object_output(%{
+      "settings" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "defaults" => %{"type" => "object"},
+      "group_fields" => %{"type" => "array", "items" => %{"type" => "string"}}
+    })
+  end
+
+  # --- category reads ---------------------------------------------------------------------
+
+  def list_categories, do: object(%{"group" => row_text(200)}, ["group"])
+
+  def list_categories_output do
+    object_output(%{
+      "categories" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "count" => %{"type" => "integer"}
+    })
+  end
+
+  # --- post reads -------------------------------------------------------------------------
+
+  def list_posts do
+    object(
+      %{
+        "group" => row_text(200),
+        "status" => %{"type" => "string", "enum" => ~w(all published scheduled draft trashed)},
+        "category_id" => %{"type" => "string", "maxLength" => 200},
+        "limit" => %{"type" => "integer", "minimum" => 1},
+        "cursor" => %{"type" => "string", "maxLength" => 300}
+      },
+      ["group"]
+    )
+  end
+
+  def list_posts_output do
+    object_output(%{
+      "posts" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "count" => %{"type" => "integer"},
+      "next_cursor" => %{"type" => ["string", "null"]},
+      "warnings" => warnings_output()
+    })
+  end
+
+  def get_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "language" => row_text(20),
+        "include_content" => %{"type" => "boolean"}
+      },
+      ["post"]
+    )
+  end
+
+  def get_post_output do
+    object_output(%{
+      "id" => %{"type" => "string"},
+      "group" => %{"type" => "string"},
+      "slug" => %{"type" => ["string", "null"]},
+      "mode" => %{"type" => "string"},
+      "title" => %{"type" => ["string", "null"]},
+      "status" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "language" => %{"type" => "string"},
+      "markdown" => %{"type" => "string"},
+      "fields" => %{"type" => "object"},
+      "versions" => %{"type" => "array"},
+      "public_paths" => %{"type" => "object"},
+      "content_updated_at" => %{"type" => ["string", "null"]},
+      "revision" => %{"type" => "string"},
+      "warnings" => warnings_output()
+    })
+  end
+
+  # --- post writes ------------------------------------------------------------------------
+
+  def create_post do
+    object(
+      %{
+        "group" => row_text(200),
+        "title" => %{"type" => "string", "minLength" => 1, "maxLength" => 500},
+        "content" => %{"type" => ["string", "null"], "maxLength" => 2_097_152},
+        "slug" => row_text(200)
+      },
+      ["group", "title"]
+    )
+  end
+
+  def create_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "post" => %{"type" => "object"},
+      "changed" => %{"type" => "array", "items" => %{"type" => "string"}}
+    })
+  end
+
+  def update_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "language" => row_text(20),
+        "if_revision" => row_text(@revision_chars),
+        "title" => nullable_text(500),
+        "content" => nullable_text(2_097_152),
+        "description" => nullable_text(5000),
+        "seo_title" => nullable_text(5000),
+        "excerpt" => nullable_text(5000),
+        "featured_image_id" => nullable_text(200),
+        "featured" => %{"type" => "boolean"},
+        "sitemap_exclude" => %{"type" => "boolean"},
+        "og_title" => nullable_text(5000),
+        "og_description" => nullable_text(5000),
+        "og_image_id" => nullable_text(200),
+        "category_ids" => %{
+          "type" => "array",
+          "maxItems" => 50,
+          "items" => %{"type" => "string", "maxLength" => 200}
+        },
+        "slug" => row_text(200)
+      },
+      ["post"]
+    )
+  end
+
+  def update_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "post" => %{"type" => "object"},
+      "changed" => %{"type" => "array", "items" => %{"type" => "object"}}
+    })
+  end
+
+  def create_version do
+    object(
+      %{
+        "post" => post_ref(),
+        "from_version" => %{"type" => "integer", "minimum" => 1},
+        "blank" => %{"type" => "boolean"}
+      },
+      ["post"]
+    )
+  end
+
+  def create_version_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
+  def set_translation do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "language" => row_text(20),
+        "title" => %{"type" => "string", "maxLength" => 500},
+        "content" => %{"type" => "string", "maxLength" => 2_097_152},
+        "og_title" => nullable_text(5000),
+        "og_description" => nullable_text(5000),
+        "og_image_id" => nullable_text(200),
+        "if_revision" => row_text(@revision_chars)
+      },
+      ["post", "language", "title", "content"]
+    )
+  end
+
+  def set_translation_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "language" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
+  def translate_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "languages" => %{"type" => "array", "maxItems" => 50, "items" => row_text(20)},
+        "overwrite_existing" => %{"type" => "boolean"}
+      },
+      ["post"]
+    )
+  end
+
+  def translate_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "source_language" => %{"type" => "string"},
+      "targets" => %{"type" => "array", "items" => %{"type" => "string"}},
+      "skipped" => %{"type" => "array", "items" => %{"type" => "string"}},
+      "enqueued" => %{"type" => "integer"},
+      "conflicts" => %{"type" => "integer"},
+      "errors" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "in_flight" => %{"type" => "array", "items" => %{"type" => "string"}}
+    })
+  end
+
+  def publish_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "if_revision" => row_text(@revision_chars)
+      },
+      ["post"]
+    )
+  end
+
+  def publish_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
+  def unpublish_post do
+    object(%{"post" => post_ref()}, ["post"])
+  end
+
+  def unpublish_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
+  def schedule_post do
+    object(
+      %{
+        "post" => post_ref(),
+        "version" => %{"type" => "integer", "minimum" => 1},
+        "publish_at" => %{"type" => "string", "minLength" => 16, "maxLength" => 16},
+        "if_revision" => row_text(@revision_chars)
+      },
+      ["post", "publish_at"]
+    )
+  end
+
+  def schedule_post_output do
+    object_output(%{
+      "action" => %{"type" => "string"},
+      "version" => %{"type" => "integer"},
+      "publish_at" => %{"type" => "string"},
+      "time_zone" => %{"type" => "string"},
+      "post" => %{"type" => "object"}
+    })
+  end
+
+  def trash_posts do
+    object(
+      %{
+        "posts" => %{
+          "type" => "array",
+          "minItems" => 1,
+          "maxItems" => 50,
+          "items" => post_ref()
+        }
+      },
+      ["posts"]
+    )
+  end
+
+  def trash_posts_output, do: batch_output()
+
+  def restore_posts do
+    object(
+      %{
+        "posts" => %{
+          "type" => "array",
+          "minItems" => 1,
+          "maxItems" => 50,
+          "items" => post_ref()
+        }
+      },
+      ["posts"]
+    )
+  end
+
+  def restore_posts_output, do: batch_output()
+
+  # --- category writes ------------------------------------------------------------------------
+
+  def upsert_categories do
+    row =
+      object(%{
+        "id" => row_id(),
+        "slug" => row_text(200),
+        "name" => row_text(200),
+        "description" => %{"type" => ["string", "null"], "maxLength" => 5000},
+        "name_i18n" => %{"type" => "object"},
+        "parent" => %{"type" => ["object", "null"]},
+        "position" => %{"type" => "integer"}
+      })
+
+    object(
+      %{
+        "group" => row_text(200),
+        "categories" => %{"type" => "array", "minItems" => 1, "maxItems" => 100, "items" => row}
+      },
+      ["group", "categories"]
+    )
+  end
+
+  def upsert_categories_output, do: batch_output()
+
+  def delete_categories do
+    object(
+      %{
+        "group" => row_text(200),
+        "refs" => %{
+          "type" => "array",
+          "minItems" => 1,
+          "maxItems" => 100,
+          "items" => category_ref()
+        }
+      },
+      ["group", "refs"]
+    )
+  end
+
+  def delete_categories_output, do: batch_output()
+
+  # --- group writes ---------------------------------------------------------------------------
+
+  # A CLOSED object with one property per GroupSettings key: the vocabulary of upsert_groups.settings.
+  def group_settings do
+    properties =
+      Map.new(GroupSettings.schema(), fn
+        %{key: key, type: :boolean} ->
+          {key, %{"type" => "boolean"}}
+
+        %{key: key, type: :enum, allowed: allowed} ->
+          {key, %{"type" => "string", "enum" => Enum.map(allowed, &to_string/1)}}
+      end)
+
+    object(properties)
+  end
+
+  def upsert_groups do
+    row =
+      object(%{
+        "slug" => row_text(200),
+        "name" => row_text(500),
+        "name_i18n" => %{"type" => "object"},
+        "mode" => row_text(20),
+        "type" => row_text(50),
+        "item_singular" => row_text(100),
+        "item_plural" => row_text(100),
+        "settings" => group_settings()
+      })
+
+    object(
+      %{"groups" => %{"type" => "array", "minItems" => 1, "maxItems" => 20, "items" => row}},
+      ["groups"]
+    )
+  end
+
+  def upsert_groups_output, do: batch_output()
+
+  def group_refs do
+    object(
+      %{
+        "groups" => %{
+          "type" => "array",
+          "minItems" => 1,
+          "maxItems" => 20,
+          "items" => group_ref()
+        }
+      },
+      ["groups"]
+    )
+  end
+
+  def trash_groups_output, do: batch_output()
+  def restore_groups_output, do: batch_output()
+
+  @doc "The answer of a batch tool: one row per input row and a count per action."
+  def batch_output do
+    object_output(%{
+      "results" => %{"type" => "array", "items" => %{"type" => "object"}},
+      "summary" => %{"type" => "object"}
+    })
+  end
+
+  @doc "An output schema (open: core does not validate answers strictly)."
+  def object_output(properties), do: %{"type" => "object", "properties" => properties}
+end

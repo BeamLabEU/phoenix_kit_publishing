@@ -30,7 +30,14 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   # - PHK components (`<Image alt="see #elixir" />`, `<Video>…</Video>`):
   #   attribute values must never be rewritten, and block bodies are
   #   emitted as raw HTML, where a Markdown link would show literally.
-  @masked_regions ~r{```.*?```|~~~.*?~~~|```.*|~~~.*|``[^\n]+?``|`(?:[^`\n]|\n(?!\n))*`|!?\[[^\]\n]*\]\([^)\n]*\)|<(CTA|Headline|Subheadline|Video|Audio|EntityForm)\b[^>]*>.*?</\1>|<[A-Za-z][A-Za-z0-9-]*\b[^>]*>}s
+  #
+  # The link text and destination are bounded: an unbounded `[^\]\n]*` rescans
+  # to the end of the line from every `[`, so a body of 260 KB of `[` cost
+  # seconds on every save and render. Longer links than the bounds are not
+  # masked: a link text over 1000 characters, or a destination over 2000
+  # characters such as an inline `data:` image URI, whose alt text is then
+  # scanned for hashtags like plain text.
+  @masked_regions ~r"```.*?```|~~~.*?~~~|```.*|~~~.*|``[^\n]+?``|`(?:[^`\n]|\n(?!\n))*`|!?\[[^\]\n]{0,1000}\]\([^)\n]{0,2000}\)|<(CTA|Headline|Subheadline|Video|Audio|EntityForm)\b[^>]*>.*?</\1>|<[A-Za-z][A-Za-z0-9-]*\b[^>]*>"s
 
   # Start-of-line / whitespace / "(" then #<letter><letter|digit|_|->*.
   # The lookahead makes overlong words fail entirely (plain text) rather
@@ -47,6 +54,10 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
   # the whitespace boundary the hashtag rule requires, so "`code`#tag" would
   # extract "tag".
   @mask_sentinel "\x00"
+
+  # Any `#tag`, wherever it sits: the spellings `linkify/2` may have to build
+  # a link for, collected once so each spelling's link is built once.
+  @any_hashtag ~r/#(\p{L}[\p{L}\p{N}_-]{0,29})(?![\p{L}\p{N}_-])/u
 
   @max_tags 20
 
@@ -78,26 +89,39 @@ defmodule PhoenixKit.Modules.Publishing.Hashtags do
     # a body (past the cap) renders as a link to an archive that can't find the
     # post — a dead link the author never sees in their tag list.
     allowed = content |> extract() |> MapSet.new(&String.downcase/1)
+    urls = link_urls(content, allowed, url_fun)
 
     @masked_regions
     |> Regex.split(content, include_captures: true)
     |> Enum.with_index()
-    |> Enum.map_join(fn {part, index} -> linkify_part(part, url_fun, allowed, index == 0) end)
+    |> Enum.map_join(fn {part, index} -> linkify_part(part, urls, allowed, index == 0) end)
   end
 
-  defp linkify_part(part, url_fun, allowed, first?) do
+  # The URL function runs once per spelling of a stored tag (at most 20 tags),
+  # not once per occurrence: a body that repeats a tag thousands of times would
+  # otherwise rebuild the same archive path thousands of times per render.
+  defp link_urls(content, allowed, url_fun) do
+    @any_hashtag
+    |> Regex.scan(content, capture: :all_but_first)
+    |> Enum.map(fn [tag] -> tag end)
+    |> Enum.filter(&MapSet.member?(allowed, String.downcase(&1)))
+    |> Enum.uniq()
+    |> Map.new(&{&1, url_fun.(&1)})
+  end
+
+  defp linkify_part(part, urls, allowed, first?) do
     if Regex.match?(@masked_regions, part) do
       part
     else
       regex = if first?, do: @hashtag, else: @hashtag_mid
 
-      Regex.replace(regex, part, &link_tag(&1, &2, &3, url_fun, allowed))
+      Regex.replace(regex, part, &link_tag(&1, &2, &3, urls, allowed))
     end
   end
 
-  defp link_tag(full, lead, tag, url_fun, allowed) do
+  defp link_tag(full, lead, tag, urls, allowed) do
     if MapSet.member?(allowed, String.downcase(tag)),
-      do: "#{lead}[##{tag}](#{url_fun.(tag)})",
+      do: "#{lead}[##{tag}](#{Map.fetch!(urls, tag)})",
       else: full
   end
 

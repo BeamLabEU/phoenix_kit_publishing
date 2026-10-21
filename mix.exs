@@ -85,13 +85,17 @@ defmodule PhoenixKitPublishing.MixProject do
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, and core infrastructure.
-      # 2.38 is a hard floor, not a preference. It is where the group media
-      # folders' toolkit shipped: `Storage.ResourceFolders` (MediaFolders,
-      # MediaAdoption) and the reorganizer's `ResourceSource`
-      # (MediaReorganizer). An older core has neither module, and every media
-      # pick in the editor asks `MediaFolders.enabled?/0`, which calls into
-      # `ResourceFolders` — so on any host, opted in or not, choosing a file
-      # would crash the editor. The other reasons for the floor, all still covered:
+      # 2.63 is a hard floor, not a preference: it is the first Hex release with the
+      # machine API (`PhoenixKit.API` with `Tool`, `Executor`, `Keys`, `Flow` and
+      # `ToolLint`), which the 20 `publishing.*` tools in `lib/phoenix_kit_publishing/api/`
+      # are compiled against; an older core does not build the package.
+      # The floor the media code needs, 2.38, is covered by it: that is where the
+      # group media folders' toolkit shipped, `Storage.ResourceFolders` (MediaFolders,
+      # MediaAdoption) and the reorganizer's `ResourceSource` (MediaReorganizer). An
+      # older core has neither module, and every media pick in the editor asks
+      # `MediaFolders.enabled?/0`, which calls into `ResourceFolders` — so on any
+      # host, opted in or not, choosing a file would crash the editor. The other
+      # reasons for a floor, all still covered:
       #
       #   * `PublishingGroup.changeset/2` calls `PhoenixKit.Utils.Slug.put_slug/3`,
       #     which core added in 2.4.0. Under the older `~> 2.0` a host resolving
@@ -104,14 +108,14 @@ defmodule PhoenixKitPublishing.MixProject do
       #     core every timestamp post is stamped, released and syndicated on UTC
       #     while the editor shows the site's clock, silently, which is the exact
       #     bug PR #45 fixed.
-      #   * 2.38.0 is the floor now: the category parent pickers are core's
-      #     `TreePicker` (`Utils.Tree`), the actor and activity log come from
+      #   * 2.38.0 was the floor before the machine API: the category parent
+      #     pickers are core's `TreePicker` (`Utils.Tree`), the actor and activity log come from
       #     `PhoenixKitWeb.Actor` and `Activity.log/3`, and the edit forms use
       #     `mount_multilang(open_on:)` — none feature-detected, so an older
       #     core fails to compile the package. Patch-precise floor in the
       #     compound form so the ceiling stays open through every later 2.x
       #     minor (see test/core_pin_conformance_test.exs).
-      pk_dep(:phoenix_kit, ">= 2.38.0 and < 3.0.0"),
+      pk_dep(:phoenix_kit, ">= 2.63.0 and < 3.0.0"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
       # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
       # which the group editor imports directly.

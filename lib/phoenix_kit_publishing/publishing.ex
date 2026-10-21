@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing do
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Publishing.ActivityLog
+  alias PhoenixKit.Modules.Publishing.API
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.SlugHelpers
@@ -709,6 +710,11 @@ defmodule PhoenixKit.Modules.Publishing do
   @impl PhoenixKit.Module
   @spec media_reorganizer() :: module()
   def media_reorganizer, do: PhoenixKit.Modules.Publishing.MediaReorganizer
+
+  # The machine API's admin tools (`PhoenixKit.Modules.Publishing.API`).
+  @impl PhoenixKit.Module
+  @spec api_tools() :: [PhoenixKit.API.Tool.t()]
+  def api_tools, do: API.tools()
 
   # ============================================================================
   # Shared Helpers (used across submodules)

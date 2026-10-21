@@ -247,7 +247,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           nil,
-          %{"slug" => slug, "reason" => "not_found"}
+          %{"slug" => slug, "reason" => "not_found"},
+          opts
         )
 
         {:error, :not_found}
@@ -268,7 +269,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
             ActivityLog.actor_uuid(opts),
             "publishing_group",
             updated.uuid,
-            %{"slug" => updated.slug, "previous_slug" => db_group.slug}
+            %{"slug" => updated.slug, "previous_slug" => db_group.slug},
+            opts
           )
 
           {:ok, group}
@@ -279,7 +281,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
               ActivityLog.actor_uuid(opts),
               "publishing_group",
               db_group.uuid,
-              %{"slug" => slug, "reason" => to_string_reason(reason)}
+              %{"slug" => slug, "reason" => to_string_reason(reason)},
+              opts
             )
 
             err
@@ -463,7 +466,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           nil,
-          %{"slug" => slug, "reason" => "not_found"}
+          %{"slug" => slug, "reason" => "not_found"},
+          opts
         )
 
         {:error, :not_found}
@@ -479,7 +483,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
               ActivityLog.actor_uuid(opts),
               "publishing_group",
               db_group.uuid,
-              %{"slug" => slug}
+              %{"slug" => slug},
+              opts
             )
 
             {:ok, slug}
@@ -490,7 +495,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
               ActivityLog.actor_uuid(opts),
               "publishing_group",
               db_group.uuid,
-              %{"slug" => slug}
+              %{"slug" => slug},
+              opts
             )
 
             {:error, reason}
@@ -510,7 +516,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           nil,
-          %{"slug" => slug, "reason" => "not_found"}
+          %{"slug" => slug, "reason" => "not_found"},
+          opts
         )
 
         {:error, :not_found}
@@ -527,7 +534,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
             ActivityLog.actor_uuid(opts),
             "publishing_group",
             db_group.uuid,
-            %{"slug" => slug, "reason" => "slug_taken"}
+            %{"slug" => slug, "reason" => "slug_taken"},
+            opts
           )
 
           {:error, :slug_taken}
@@ -601,7 +609,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           db_group.uuid,
-          %{"slug" => db_group.slug, "name" => db_group.name, "mode" => db_group.mode}
+          %{"slug" => db_group.slug, "name" => db_group.name, "mode" => db_group.mode},
+          opts
         )
 
         {:ok, group}
@@ -652,7 +661,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           db_group.uuid,
-          %{"slug" => slug}
+          %{"slug" => slug},
+          opts
         )
 
         {:ok, slug}
@@ -663,7 +673,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           db_group.uuid,
-          %{"slug" => slug}
+          %{"slug" => slug},
+          opts
         )
 
         {:error, reason}
@@ -680,7 +691,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       ActivityLog.actor_uuid(opts),
       "publishing_group",
       nil,
-      %{"name_attempted" => name_attempt, "reason" => reason}
+      %{"name_attempted" => name_attempt, "reason" => reason},
+      opts
     )
   end
 

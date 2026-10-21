@@ -11,8 +11,9 @@ the `PhoenixKit.Module` behaviour, so a host app gets it by adding the dependenc
 — no config, no route wiring. Public pages are served by a plain Phoenix
 controller (dead views); the admin side is LiveView.
 
-- **Depends on:** `phoenix_kit` `>= 2.38.0 and < 3.0.0` (Hex — the release that carries 
-  `PhoenixKitWeb.Actor`, `Activity.log/3` and `Components.TreePicker`; the compound form 
+- **Depends on:** `phoenix_kit` `>= 2.63.0 and < 3.0.0` (Hex — 2.63.0 is the first release
+  that carries the machine API, `PhoenixKit.API`; `PhoenixKitWeb.Actor`, `Activity.log/3`
+  and `Components.TreePicker` came with 2.38.0, the floor before it; the compound form
   keeps the ceiling open across later 2.x minors), `phoenix_kit_ai` `~> 0.18`
   (hard — it owns the `Translatable` adapter behaviour, the per-language Oban
   fan-out, the LLM call and `ai_multilang_tabs/1`; publishing contributes only
@@ -26,7 +27,10 @@ controller (dead views); the admin side is LiveView.
   `enabled?/0`, `list_groups/0` and `ListingCache.regenerate/1` (guarded and
   rescued on core's side) when a language is added or removed;
   `phoenix_kit_projects`, whose extension registry duck-types
-  `phoenix_kit_project_extensions/0` for its Docs project tab.
+  `phoenix_kit_project_extensions/0` for its Docs project tab; core's machine
+  API registry (`/api/admin/v1`, `/mcp/admin`), which collects the 20
+  `publishing.*` admin tools from `Publishing.api_tools/0` while the module is
+  enabled (see "Machine API" under Conventions).
 - **Admin surface:** one top-level tab `Publishing` at `/admin/publishing`
   (dynamic children, one per group, at `/admin/publishing/<slug>`), plus a
   settings subtab at `/admin/settings/publishing`. Public routes are served
@@ -34,6 +38,7 @@ controller (dead views); the admin side is LiveView.
 - **Module key** `"publishing"`; settings prefix `publishing_`.
 
 The core pin is a hard floor, not a preference (reasons in `mix.exs`): the
+machine API is compiled against `PhoenixKit.API`, first released in core 2.63.0; the
 group media folders are built on core 2.38's `Storage.ResourceFolders` and the
 reorganizer's `ResourceSource`; `PublishingGroup.changeset/2` needs
 `PhoenixKit.Utils.Slug.put_slug/3`, and `Constants.to_site_wall/2` /
@@ -59,7 +64,18 @@ Deliberate non-features, so nobody adds them assuming they were missed.
   trust boundary is "only admins author content"; if untrusted input ever reaches
   `render_markdown/1` (API import, AI prompt-injection on rotating roles), wire
   `html_sanitize_ex` in front of it. See `render_markdown_html/1` in
-  `renderer.ex`.
+  `renderer.ex`. The machine API does not sanitise either: a write whose body
+  text holds HTML, components, post links, link destinations outside http,
+  https, mailto, tel and relative (`//host` is not relative) or text the renderer
+  autolinks to another scheme is a confirmed write (`API.TextScan`); AI jobs and
+  the editor bypass that rule.
+- **No hard delete, stale fixer or media reorganizer in the machine API.** It
+  never deletes a group, post, version or language (trashing is the removal it
+  offers) and exposes neither `StaleFixer` nor `MediaReorganizer`. No read tool
+  runs the stale fixer; a write through a context function can self-heal as an
+  editor save does. The one
+  permanent delete is `delete_categories` (categories have no trash), which is
+  always confirmed and has its own scope.
 - **No outbound HTTP from this module.** AI translation dispatches via
   `phoenix_kit_ai`, which owns the `Req` boundary and its SSRF allowlist. A
   future feature that needs direct HTTP should retrofit the
@@ -128,6 +144,24 @@ is a plain `only: :test` tuple, so it always resolves from Hex.
 This repo's `precommit` alias also runs `deps.unlock --check-unused` and
 `mix hex.audit` (retired-dep scan) before `quality.ci`; both can fail a
 `precommit` that compiles and tests cleanly.
+
+The machine API (`lib/phoenix_kit_publishing/api/`) compiles only against a core
+that carries `PhoenixKit.API`, which Hex has from 2.63.0 on (the floor in `mix.exs`),
+so a host on an older core cannot resolve the package. Raise the floor, and the line
+under "Depends on", in the same change that starts using a newer core API. To run the
+suite against an unreleased core, point `PHOENIX_KIT_PATH` at a checkout, as above.
+The tests that run through core's executor are tagged `:core_api` and `test_helper.exs`
+excludes them when `PhoenixKit.API.Executor` is not loaded; read the `excluded` count
+in the `mix test` summary. The test database name is hard-coded in
+`config/test.exs` as `phoenix_kit_publishing_test#{MIX_TEST_PARTITION}` (`PGDATABASE`
+is ignored), so a second suite or a parallel checkout sets `MIX_TEST_PARTITION`
+(for example `_api`), creates that database with `createdb`, and the pool size is
+`System.schedulers_online() * 2`.
+
+```bash
+MIX_TEST_PARTITION=_api createdb phoenix_kit_publishing_test_api   # once
+MIX_TEST_PARTITION=_api PHOENIX_KIT_PATH=../phoenix_kit mix test test/phoenix_kit_publishing/api
+```
 
 ```bash
 mix test test/phoenix_kit_publishing/posts_test.exs      # one file
@@ -304,8 +338,9 @@ wrapper over core's `PhoenixKit.Activity.log/1` that injects
 the mutation it describes. Three call shapes:
 
 ```elixir
-# Standard user-driven mutation — every CRUD context fn.
-ActivityLog.log_manual(action, actor_uuid, resource_type, resource_uuid, metadata)
+# Standard user-driven mutation — every CRUD context fn. The optional sixth
+# argument is the call's opts (see below).
+ActivityLog.log_manual(action, actor_uuid, resource_type, resource_uuid, metadata, opts)
 
 # Pulls :actor_uuid out of opts (keyword or map); nil when absent.
 ActivityLog.actor_uuid(opts)
@@ -323,6 +358,15 @@ first, then the bare current user) rather than reading assigns inline. Failures 
 auditable. Patterns and the auto-event details are in
 [dev_docs/guides/activity-logging.md](dev_docs/guides/activity-logging.md).
 
+`log_manual/6` and `log_failed_mutation/6` take the call's `opts` (keyword or
+map) as a sixth argument; the 4- and 5-argument forms keep working. Two keys are
+read: `:activity_mode` (the entry's mode, default `"manual"`) and `:log_metadata`
+(a map with string keys, merged UNDER the entry's own metadata). Context
+functions pass their own `opts` so a caller such as the machine API can mark its
+rows `"auto"` with `via: "api"` metadata. The key is `:activity_mode`, never
+`:mode`: the same `opts` reach `Groups.add_group/2`, where `:mode` is the group's
+URL mode.
+
 User-driven actions (`mode: "manual"`):
 
 | action | resource_type |
@@ -335,11 +379,86 @@ User-driven actions (`mode: "manual"`):
 | `publishing.category.reordered` | `publishing_group` (failure rows say `publishing_category` — known drift) |
 | `publishing.comment.created` / `.replied` | `publishing_post` |
 | `publishing.module.enabled` / `.disabled` | `publishing_module` |
+| `publishing.translation.requested` | `publishing_post` — written only by the machine API's `translate_post` (mode `auto`, API metadata plus `group_slug`, `version`, `targets`, `enqueued`, `conflicts`), because the per-language Oban jobs log as the key owner without API attribution |
 
 Self-healing actions (`mode: "auto"`, no actor):
 `publishing.content.language_normalized`, `publishing.content.merged`,
 `publishing.content.promoted`, `publishing.content.metadata_promoted`,
 `publishing.post.auto_trashed`.
+
+### Machine API
+
+`lib/phoenix_kit_publishing/api/` declares 20 admin tools (`API.Tools`, handed to
+core by `Publishing.api_tools/0`, an optional `PhoenixKit.Module` callback that
+the 2.63.0 floor declares). Core owns keys, scopes, validation, rate limits
+and the confirmation flow; the module owns the tools and the data rules. Guide:
+[dev_docs/guides/machine-api.md](dev_docs/guides/machine-api.md).
+
+- **Never call a `DBStorage` write, an `Ecto.Repo` write, `ListingCache`,
+  `PubSub` or the render cache from `api/`.** (`list_posts` reads the per-day
+  counts through `Listing.group_date_counts/1`, which may fill the listing cache
+  on a miss.) Writes go through `Posts`,
+  `Versions`, `Groups`, `Categories` and `TranslationManager` with
+  `Common.write_opts/3`, so caches, broadcasts and activity entries behave as for
+  an admin click.
+- **`update_post` always passes `publish: false`** and never sends `status`,
+  `published_at`, `url_slug` or `tags`; `slug` only when the caller sent it. Tags
+  are derived from body hashtags, there is no `tags` input.
+- **A dry run writes nothing** (no context write, activity row, cache
+  regeneration or broadcast) and reads posts WITHOUT the self-heal
+  (`Refs.read_post_for_preview/3`). Danger functions, `Refs` and every preview path
+  read only through calls that raise (`Common.categories!/1`,
+  `published_post_counts!/1`, `DBStorage` reads); the banned reads that rescue to
+  an empty result (`Categories.published_post_counts/1`, `list_categories/1`,
+  `by_slug/2`, `categories_by_uuids/2`, `list_tree/1`, `Posts.read_post_by_uuid/3`,
+  `SlugHelpers.slug_exists?/2`) and the reads that run the stale fixer
+  (`Groups.fetch_group/1`, `get_group/1`, `list_groups/0,1`) are pinned out by
+  `danger_static_test.exs`.
+- **Option names never collide with a keyword option of the function they are
+  passed to.** The API-owned names are exactly `:actor_uuid`, `:scope`,
+  `:activity_mode` and `:log_metadata`. The activity mode travels in
+  `:activity_mode`, NEVER `:mode`: `Groups.add_group/2` reads the group's URL mode
+  from `:mode`, and a mode of `"auto"` there would silently build a timestamp
+  group that can never be changed. Extra options are only ones the target
+  documents (`publish:`, `locked_check:`, `target_status:`, the `add_group`
+  options).
+- **`Posts.update_post/4` takes `:locked_check`**, `fn locked_post, version ->
+  :ok | {:error, term}`, run under the post row lock with the freshly locked row
+  and the re-read version; absent means no-op. The API uses it to refuse a write
+  that became live-version-dangerous (`went_live`) or hit a trashed post between
+  the check and the write. The closure must not raise.
+- **Error codes** come from core's set (`not_found`, `validation_failed`,
+  `revision_mismatch`, `internal_error`, ...); a `validation_failed` carries
+  `context.errors[].reason`, a batch row error carries the reason as its `code`.
+  The full lists are in the guide and are pinned by `tools_conformance_test.exs`;
+  a new string reason must be added to both. Never log request-derived values.
+
+What needs a confirmation (`danger` of each tool, `API.Danger`; every function is
+fail-closed: unprovable or raising means dangerous):
+
+| Tool | Dangerous when |
+|---|---|
+| `publish_post`, `unpublish_post`, `schedule_post`, `trash_posts`, `translate_post`, `delete_categories`, `trash_groups`, `restore_groups` | always (`danger: :always`) |
+| `create_post` | `content` trips the text rule |
+| `update_post` | the text rule on `content`; or the post is not trashed, has an active version and the target version is the active one or is `published` / `archived`; or `slug` differs on a post with an active version |
+| `set_translation` | the text rule on `content`; or the live-version clause of `update_post` |
+| `restore_posts` | a trashed post to restore has an active version |
+| `upsert_categories`, `upsert_groups` | a row updates an existing record and effectively changes it (creating is never dangerous) |
+
+The text rule is `API.TextScan.dangerous?/1`, five rules: `<` followed by a
+letter, `/`, `!` or `?` (`html`); the token `[[post:` (`post_link`);
+`javascript:` / `vbscript:` / `data:` after removing whitespace (`scheme`); a
+markdown link or image destination outside http, https, mailto, tel and relative
+(`//host` is not relative) (`link_scheme`); and text the renderer autolinks to
+another scheme, read with printable-ASCII entities decoded: a bare `scheme://`
+other than http and https, `xmpp:`, and `mailto:` preceded by an email
+local-part character (`autolink_scheme`). It scans the submitted string only (no rendering), applies to draft
+writes too, and caps a body field at 262,144 bytes. Tools exist only when the
+loaded core can enforce the flow (`API.Gate`): otherwise every tool with a
+`danger` is withheld, with one warning in the log. `Gate`'s `@markers` are two
+internal functions of core, `PhoenixKit.API.Keys.active?/1` and
+`PhoenixKit.API.Flow.gate/1`: a later 2.x core that renames or moves either one
+takes the dangerous tools away on every host (with that one warning) until `@markers` follows.
 
 ### Landmines
 
