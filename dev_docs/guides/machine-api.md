@@ -190,7 +190,7 @@ Plain markdown runs at once. The scan reads the submitted string only; it render
 
 What the rule does NOT do:
 
-- **It does not sanitise.** The module still renders raw HTML unsanitised by design (admin trust). A CONFIRMED write can put any HTML into a page, scripts included; the API makes inserting HTML an explicit step, not a safe one. The long-term fix is output sanitisation in the renderer.
+- **It does not sanitise the write.** The text rule only decides what needs confirmation; the stored body is whatever was submitted. The renderer sanitises the output with an allow-list (`Renderer.Sanitizer`), so a confirmed write cannot put a script, an `on*` handler or a `javascript:` URL into a served page, but it can still add layout HTML, links and images the allow-list keeps. Inserting HTML stays an explicit step.
 - **`requires_approval` is the human gate.** The code round trip is performed by the agent; a person only decides on a key marked "Needs approval".
 - **It does not look at hosts.** `[text](https://evil.example)` and a tracking image run at once; `added_urls` in the preview is the aid for the approver.
 - **Editor and AI-job bodies bypass the rule.** Only the `contains_raw_html` report of the `publish_post` preview covers them.

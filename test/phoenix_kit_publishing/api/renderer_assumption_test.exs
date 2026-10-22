@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
   @documents 10_000
   @seed 20_261_018
 
+  @tag timeout: 180_000
   test "markdown without a '<' renders no script, no event attribute and no active URL" do
     :rand.seed(:exsss, {@seed, @seed, @seed})
 
@@ -56,6 +57,7 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
     "https://example.com/ok then ftp://x"
   ]
 
+  @tag timeout: 180_000
   test "a document the renderer turns into an unsafe link is flagged when it holds a bare URL" do
     :rand.seed(:exsss, {@seed, @seed, @seed})
 
@@ -67,14 +69,17 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
               separator() <> Enum.random(@autolink_pieces) <> separator() <> generate()
 
           refute String.contains?(doc, "<"), "generator bug (seed #{@seed}, doc #{n})"
-          html = render(doc)
+          html = raw_render(doc)
 
-          unsafe? =
-            Regex.scan(~r/(?:href|src)="([^"]*)"/i, html)
-            |> Enum.any?(fn [_, url] -> not safe_url?(url) end)
+          unsafe? = unsafe_link?(html)
 
           if unsafe? and not TextScan.dangerous?(doc),
             do: flunk("unflagged unsafe link. " <> failure(n, doc, html))
+
+          # The sanitiser is the second line: whatever comrak linked, the page
+          # that is served carries no such URL.
+          if active_unsafe_link?(render(doc)),
+            do: flunk("unsafe link survived the sanitiser. " <> failure(n, doc, html))
 
           if unsafe?, do: count + 1, else: count
       end
@@ -118,6 +123,7 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
       Enum.random(@locals) <> Enum.random(@ats) <> Enum.random(@domains)
   end
 
+  @tag timeout: 180_000
   test "documents built from address and entity shapes never render an unflagged unsafe link" do
     :rand.seed(:exsss, {@seed, @seed, @seed})
 
@@ -125,14 +131,17 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
       for n <- 1..6_000, reduce: 0 do
         count ->
           doc = junk() <> address() <> separator() <> address() <> separator() <> junk()
-          html = render(doc)
+          html = raw_render(doc)
 
-          unsafe? =
-            Regex.scan(~r/(?:href|src)="([^"]*)"/i, html)
-            |> Enum.any?(fn [_, url] -> not safe_url?(url) end)
+          unsafe? = unsafe_link?(html)
 
           if unsafe? and not TextScan.dangerous?(doc),
             do: flunk("unflagged unsafe link. " <> failure(n, doc, html))
+
+          # The sanitiser is the second line: whatever comrak linked, the page
+          # that is served carries no such URL.
+          if active_unsafe_link?(render(doc)),
+            do: flunk("unsafe link survived the sanitiser. " <> failure(n, doc, html))
 
           if unsafe?, do: count + 1, else: count
       end
@@ -171,6 +180,28 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
 
   defp failure(n, doc, html),
     do: "seed #{@seed} doc #{n}\nINPUT: #{inspect(doc)}\nOUTPUT: #{inspect(html)}"
+
+  # What comrak makes of the document, before the renderer's sanitiser. The rule's job is to
+  # flag exactly those documents, so the assumption is measured against this output.
+  defp raw_render(doc), do: MDEx.to_html!(doc, Renderer.mdex_options())
+
+  # A value only has a scheme when it starts with a valid scheme name followed by a colon
+  # (`9-x.xmpp:a@b` and `x_mailto:a@b` are relative references to a browser and to the
+  # sanitiser). After the sanitiser nothing but http, https, mailto and tel may be left.
+  defp active_unsafe_link?(html) do
+    Regex.scan(~r/(?:href|src)="([^"]*)"/i, html)
+    |> Enum.any?(fn [_, url] ->
+      case Regex.run(~r/^\s*([a-zA-Z][a-zA-Z0-9+.\-]*):/, url) do
+        [_, scheme] -> String.downcase(scheme) not in ~w(http https mailto tel)
+        nil -> false
+      end
+    end)
+  end
+
+  defp unsafe_link?(html) do
+    Regex.scan(~r/(?:href|src)="([^"]*)"/i, html)
+    |> Enum.any?(fn [_, url] -> not safe_url?(url) end)
+  end
 
   # The options of the public render, so hashtags become links like they do on a live page.
   defp render(doc), do: Renderer.render_markdown(doc, tag_links: {"blog", "en-US"})
