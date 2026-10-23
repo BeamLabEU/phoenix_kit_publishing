@@ -231,6 +231,30 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
       assert title(ctx) == "Hello"
     end
 
+    test "a language metadata change invalidates a confirmation for an OG overwrite", ctx do
+      input = Map.put(ctx.input, "og_title", "Replacement")
+
+      assert {200, %{"confirm_token" => code}, _} =
+               call_with(ctx.token, "publishing.update_post", input)
+
+      {:ok, post} = Publishing.read_post_by_uuid(ctx.post[:uuid], "en-US", 1)
+
+      assert {:ok, _} =
+               Publishing.update_post(ctx.g["slug"], post, %{"og_title" => "Edited elsewhere"},
+                 publish: false
+               )
+
+      assert {409, %{"context" => %{"reason" => "changed"}}, _} =
+               call_with(
+                 ctx.token,
+                 "publishing.update_post",
+                 Map.put(input, "confirm_token", code)
+               )
+
+      assert Fx.content(ctx.post[:uuid]).data["og"]["title"] == "Edited elsewhere"
+      assert title(ctx) == "Hello"
+    end
+
     test "a code cannot be redeemed for different text", ctx do
       input = Map.put(ctx.input, "content", "<b>previewed text</b>")
 

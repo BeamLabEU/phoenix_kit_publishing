@@ -128,6 +128,33 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
     assert og["title"] == "T2" and og["description"] == "Desc 1" and og["image_uuid"] == image
   end
 
+  test "a language metadata edit invalidates an earlier revision", ctx do
+    {:ok, %{"revision" => revision}} =
+      ApiCase.call("publishing.get_post", %{"post" => Fx.ref(ctx.post)})
+
+    assert {:ok, _} = edit(ctx, %{"og_title" => "Edited elsewhere"})
+
+    assert {:error, :revision_mismatch, _, %{current_revision: current}} =
+             edit(ctx, %{"og_title" => "Stale edit", "if_revision" => revision})
+
+    refute current == revision
+    assert Fx.content(ctx.post[:uuid]).data["og"]["title"] == "Edited elsewhere"
+  end
+
+  test "a confirmation fingerprint binds the stored language metadata", ctx do
+    assert {:ok, _} = edit(ctx, %{"og_title" => "Original"})
+
+    assert {:preview, _, before} =
+             edit(ctx, %{"og_title" => "Replacement"}, %{dry_run?: true})
+
+    assert {:ok, _} = edit(ctx, %{"og_title" => "Edited elsewhere"})
+
+    assert {:preview, _, after_edit} =
+             edit(ctx, %{"og_title" => "Replacement"}, %{dry_run?: true})
+
+    refute before == after_edit
+  end
+
   test "category_ids of the group are accepted, of another group refused", ctx do
     own = Fx.category!(ctx.g["slug"], "Own")
     foreign = Fx.category!(Fx.group!()["slug"], "Foreign")

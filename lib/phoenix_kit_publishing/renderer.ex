@@ -348,14 +348,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # Editor-inserted publication links: `[[post:UUID]]` / `[[post:UUID|Alias]]`.
   # The UUID is the stable identity — slugs and translations may change freely.
   @post_link_re ~r/\[\[post:([0-9a-fA-F-]{36})(?:\|([^\]]*))?\]\]/
-  # Regions where the token is literal text (or already inside a link) run from
-  # an opening `<pre|code|a …>` to the FIRST closing `</pre|code|a>` after it.
-  # Found by scanning for the two tag shapes and pairing them in one pass —
-  # a single `<open>.*?</close>` regex re-scans to the end of the document for
-  # every opener that never closes, which is quadratic on a long run of
-  # unclosed `<a`. `[^<>]*` keeps the opener itself from spanning tags.
-  @post_link_open_re ~r{<(?:pre|code|a)\b[^<>]*>}i
-  @post_link_close_re ~r{</(?:pre|code|a)>}i
+  # Scan skip tags once, then pair them with a stack. Nested <code> inside
+  # <pre> or <a> must not end the outer literal region when </code> closes.
+  # `[^<>]*` keeps malformed openers from re-scanning the rest of the page.
+  @post_link_region_re ~r{<(/?)(pre|code|a)\b[^<>]*>}i
 
   # Sentinel for a `<` that sits inside a code span/fence. The component scanner
   # is plain regex over the source, so without this it would extract a `<Image>`
@@ -484,43 +480,52 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   def resolve_post_links(html, _language), do: html
 
-  # Splits html into `{:skip, region}` (an opener through the first closer
-  # after it) and `{:text, prose}` chunks. A token in a skip region is literal
-  # text, mirroring Leaf's own decoration rules. Openers with no closer after
-  # them start no region.
+  # Only complete outer regions are skipped. An unclosed region stays text,
+  # and any replacement still goes through the final page sanitiser.
   defp split_post_link_regions(html) do
-    openers = Regex.scan(@post_link_open_re, html, return: :index)
-    closers = Regex.scan(@post_link_close_re, html, return: :index)
-    collect_post_link_regions(html, 0, Enum.map(openers, &hd/1), Enum.map(closers, &hd/1), [])
+    tags =
+      for [range, {_slash_pos, slash_len}, {name_pos, name_len}] <-
+            Regex.scan(@post_link_region_re, html, return: :index) do
+        {range, slash_len == 1, String.downcase(binary_part(html, name_pos, name_len))}
+      end
+
+    collect_post_link_regions(html, 0, tags, [], nil, [])
   end
 
-  defp collect_post_link_regions(html, pos, [], _closers, acc),
+  defp collect_post_link_regions(html, pos, [], _stack, _start, acc),
     do: finish_post_link_regions(html, pos, acc)
 
-  # An opener inside the previous region starts nothing of its own.
-  defp collect_post_link_regions(html, pos, [{o_start, _} | openers], closers, acc)
-       when o_start < pos,
-       do: collect_post_link_regions(html, pos, openers, closers, acc)
+  defp collect_post_link_regions(
+         html,
+         pos,
+         [{{at, _len}, false, name} | tags],
+         stack,
+         start,
+         acc
+       ),
+       do: collect_post_link_regions(html, pos, tags, [name | stack], start || at, acc)
 
-  defp collect_post_link_regions(html, pos, [{o_start, o_len} | openers], closers, acc) do
-    o_end = o_start + o_len
+  defp collect_post_link_regions(html, pos, [{{at, len}, true, name} | tags], [name], start, acc) do
+    stop = at + len
+    text = binary_part(html, pos, start - pos)
+    region = binary_part(html, start, stop - start)
 
-    case Enum.drop_while(closers, fn {c_start, _} -> c_start < o_end end) do
-      # No closer left for this or any later opener.
-      [] ->
-        finish_post_link_regions(html, pos, acc)
-
-      [{c_start, c_len} | _] = rest ->
-        r_end = c_start + c_len
-        text = binary_part(html, pos, o_start - pos)
-        region = binary_part(html, o_start, r_end - o_start)
-
-        collect_post_link_regions(html, r_end, openers, rest, [
-          {:skip, region},
-          {:text, text} | acc
-        ])
-    end
+    collect_post_link_regions(html, stop, tags, [], nil, [{:skip, region}, {:text, text} | acc])
   end
+
+  defp collect_post_link_regions(
+         html,
+         pos,
+         [{_range, true, name} | tags],
+         [name | stack],
+         start,
+         acc
+       ),
+       do: collect_post_link_regions(html, pos, tags, stack, start, acc)
+
+  # An unmatched closer cannot end a different element's literal region.
+  defp collect_post_link_regions(html, pos, [_tag | tags], stack, start, acc),
+    do: collect_post_link_regions(html, pos, tags, stack, start, acc)
 
   defp finish_post_link_regions(html, pos, acc) do
     tail = binary_part(html, pos, byte_size(html) - pos)

@@ -360,8 +360,15 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     {db_post.uuid, db_post.slug, db_post.trashed_at, db_post.active_version_uuid,
      db_post.post_date, db_post.post_time, group && group.status,
      Enum.map(versions, &{&1.version_number, &1.status, &1.published_at, fingerprint(&1.data)}),
-     Enum.map(contents, &{&1.language, &1.url_slug, digest(&1.title, &1.content)})}
+     Enum.map(contents, &content_state/1)}
   end
+
+  # Per-language metadata includes the OG values a partial update merges and can overwrite.
+  # Use the same value snapshot for confirmations and optimistic revisions; timestamps stay out.
+  defp content_state(content),
+    do:
+      {content.language, content.url_slug, digest(content.title, content.content),
+       fingerprint(content.data)}
 
   @doc "Adds the NAMES (never the values) of the changed fields to the API log metadata."
   @spec put_log_fields(keyword(), [String.t()]) :: keyword()
@@ -456,7 +463,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
       db_post.post_time,
       version &&
         {version.version_number, version.status, version.published_at, fingerprint(version.data)},
-      content && {content.language, digest(content.title, content.content)}
+      content && content_state(content)
     })
   end
 

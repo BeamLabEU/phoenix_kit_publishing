@@ -276,6 +276,9 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
         Common.post_state(db, group, [], [content]),
         Common.post_state(db, group, [version], [%{content | language: "de"}]),
         Common.post_state(db, group, [version], [%{content | url_slug: "another-path"}]),
+        Common.post_state(db, group, [version], [
+          %{content | data: %{"og" => %{"title" => "New metadata"}}}
+        ]),
         Common.post_state(db, group, [version], [])
       ]
 
@@ -580,6 +583,11 @@ defmodule PhoenixKit.Modules.Publishing.API.CommonTest do
         Common.post_revision(db, nil, content),
         Common.post_revision(db, version, %{content | language: "de"}),
         Common.post_revision(db, version, %{content | content: "other body"}),
+        Common.post_revision(db, version, %{content | url_slug: "another-path"}),
+        Common.post_revision(db, version, %{
+          content
+          | data: %{"og" => %{"title" => "New metadata"}}
+        }),
         Common.post_revision(db, version, nil)
       ]
 

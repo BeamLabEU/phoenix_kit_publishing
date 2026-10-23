@@ -262,6 +262,24 @@ defmodule PhoenixKit.Modules.Publishing.RendererSanitizeTest do
       html = "<p>x <a href=\"/x\">[[post:#{@uuid}|A]]</a> <code>[[post:#{@uuid}|B]]</code></p>"
       assert Renderer.resolve_post_links(html, "en") == html
     end
+
+    test "closing a nested code element does not end the surrounding literal region" do
+      for tag <- ["pre", "a"] do
+        html = "<#{tag}><code>sample</code>[[post:#{@uuid}|Literal]]</#{tag}>"
+        assert Renderer.resolve_post_links(html, "en") == html
+      end
+    end
+
+    test "only the token after a nested literal region is resolved" do
+      html =
+        "<pre><code>sample</code>[[post:#{@uuid}|Literal]]</pre>" <>
+          "<p>[[post:#{@uuid}|Resolved]]</p>"
+
+      resolved = Renderer.resolve_post_links(html, "en")
+      assert resolved =~ "[[post:#{@uuid}|Literal]]"
+      assert resolved =~ "<p>Resolved</p>"
+      refute resolved =~ "[[post:#{@uuid}|Resolved]]"
+    end
   end
 
   describe "style elements" do
