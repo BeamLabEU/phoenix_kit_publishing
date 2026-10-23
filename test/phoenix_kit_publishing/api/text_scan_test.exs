@@ -267,12 +267,17 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     defp pad(unit),
       do: unit |> String.duplicate(div(@size, byte_size(unit)) + 1) |> binary_part(0, @size)
 
+    # The best of three runs: a scheduler hiccup or a busy CI box shows up in one run, while a
+    # quadratic scan is slow in every one of them. The budget is a few times the measured cost
+    # (about 70 ms for the slowest input on an idle machine; async tests of other modules run
+    # beside this one), and a quadratic scan of 262,144 bytes takes seconds.
     defp timed(text) do
-      {us, _} = :timer.tc(fn -> TextScan.scan(text) end)
-      us
+      1..3
+      |> Enum.map(fn _ -> elem(:timer.tc(fn -> TextScan.scan(text) end), 0) end)
+      |> Enum.min()
     end
 
-    test "every worst-case 262,144-byte input scans in under 100 ms" do
+    test "every worst-case 262,144-byte input scans in linear time" do
       inputs = %{
         "all <" => pad("<"),
         "<a repeated" => pad("<a"),
@@ -301,7 +306,8 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
 
       for {name, text} <- inputs do
         assert byte_size(text) == @size, name
-        assert timed(text) < 100_000, "#{name} took #{timed(text)} us"
+        took = timed(text)
+        assert took < 500_000, "#{name} took #{took} us"
       end
     end
   end

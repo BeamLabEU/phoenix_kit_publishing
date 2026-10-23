@@ -68,37 +68,39 @@ defmodule PhoenixKit.Integration.Publishing.TranslationsTest do
     end
 
     test "promotes a legacy base-language row instead of creating a duplicate dialect row" do
-      {:ok, _} = Settings.update_setting("content_language", "en")
-
-      {:ok, _} =
-        Settings.update_json_setting("languages_config", %{
-          "languages" => [
-            %{
-              "code" => "en",
-              "name" => "English",
-              "is_default" => false,
-              "is_enabled" => true,
-              "position" => 0
-            },
-            %{
-              "code" => "en-US",
-              "name" => "English (United States)",
-              "is_default" => true,
-              "is_enabled" => true,
-              "position" => 1
-            }
-          ]
-        })
+      # The primary language is the default entry of `languages_config`. The post is created
+      # while the base code `en` is the default, so its row is stored under `en`.
+      put_languages(default: "en")
 
       {group, post} = create_group_and_post(title: "Legacy English")
       [version] = DBStorage.list_versions(post.uuid)
 
       assert Enum.map(DBStorage.list_contents(version.uuid), & &1.language) == ["en"]
 
+      put_languages(default: "en-US")
+
       assert {:ok, _} =
                TranslationManager.add_language_to_post(group["slug"], post[:uuid], "en-US", nil)
 
       assert Enum.map(DBStorage.list_contents(version.uuid), & &1.language) == ["en-US"]
+    end
+
+    defp put_languages(default: default) do
+      languages =
+        for {code, name, position} <- [
+              {"en", "English", 0},
+              {"en-US", "English (United States)", 1}
+            ] do
+          %{
+            "code" => code,
+            "name" => name,
+            "is_default" => code == default,
+            "is_enabled" => true,
+            "position" => position
+          }
+        end
+
+      {:ok, _} = Settings.update_json_setting("languages_config", %{"languages" => languages})
     end
   end
 

@@ -139,12 +139,21 @@ defmodule PhoenixKit.Modules.Publishing.Renderer.Sanitizer do
 
   defp clean(html, profile) do
     html
-    |> MDEx.safe_html(
+    |> safe_html(
       sanitize: sanitize_options(profile),
       escape: [content: false, curly_braces_in_code: false]
     )
     |> restore_nbsp()
     |> filter_tags()
+  end
+
+  # `MDEx.safe_html/2` types `:escape` as `[atom()]`, yet the option is a keyword list: its docs
+  # and its implementation read `escape: [content: false]`. Called directly, dialyzer takes the
+  # call for one that can never succeed and reports every caller up to the renderer as having no
+  # return. `apply/3` with a non-literal argument list keeps the spec out of the analysis.
+  defp safe_html(html, options) do
+    args = [html, options]
+    apply(MDEx, :safe_html, args)
   end
 
   defp sanitize_options(profile) do

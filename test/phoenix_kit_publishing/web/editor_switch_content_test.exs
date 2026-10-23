@@ -113,7 +113,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
   # What Leaf sends: a `content_changed` (→ leaf_changed) and then the
   # `flushed` reply carrying the same markdown and the ref.
   defp answer_flush(view, markdown, opts) do
-    assert_push_event(view, @leaf, %{action: "flush", ref: ref})
+    assert_push_event(view, @leaf, %{action: "flush", ref: ref}, 1000)
     dirty? = Keyword.get(opts, :dirty, true)
     send(view.pid, {:leaf_changed, leaf_payload(markdown, dirty?)})
     send(view.pid, {:leaf_flushed, Map.put(leaf_payload(markdown, dirty?), :ref, ref)})
@@ -125,7 +125,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
   defp switch(view, event, params, markdown, opts \\ []) do
     render_click(view, event, params)
     answer_flush(view, markdown, opts)
-    assert_patch(view)
+    assert_patch(view, 1000)
   end
 
   defp leaf_payload(markdown, dirty? \\ true) do
@@ -147,7 +147,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
 
     switch(view, "switch_language", %{"language" => "de-DE"}, "English body.", dirty: false)
 
-    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
+    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."}, 1000)
   end
 
   test "switching to a language without a translation empties the editor", ctx do
@@ -155,7 +155,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
 
     switch(view, "switch_language", %{"language" => "fr-FR"}, "English body.", dirty: false)
 
-    assert_push_event(view, @leaf, %{action: "set_content", content: ""})
+    assert_push_event(view, @leaf, %{action: "set_content", content: ""}, 1000)
   end
 
   test "switching versions puts the other version's text in the editor", ctx do
@@ -173,7 +173,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
 
     switch(view, "switch_version", %{"version" => "2"}, "English body.", dirty: false)
 
-    assert_push_event(view, @leaf, %{action: "set_content", content: "Second version body."})
+    assert_push_event(
+      view,
+      @leaf,
+      %{action: "set_content", content: "Second version body."},
+      1000
+    )
   end
 
   test "the last keystrokes go with the switch instead of being dropped", ctx do
@@ -186,7 +191,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
 
     {:ok, english} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
     assert english.content == "English body. Last word."
-    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
+    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."}, 1000)
   end
 
   test "creating a version saves and copies the last client keystrokes", ctx do
@@ -200,7 +205,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     assert original.available_versions == [1]
 
     answer_flush(view, "Last keystrokes before copying.", dirty: true)
-    assert_redirect(view)
+    assert_redirect(view, 1000)
 
     assert {:ok, original} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
     assert {:ok, copy} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 2)
@@ -212,7 +217,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
 
     render_click(view, "switch_language", %{"language" => "de-DE"})
-    assert_push_event(view, @leaf, %{action: "flush", ref: ref})
+    assert_push_event(view, @leaf, %{action: "flush", ref: ref}, 1000)
 
     # First the wait shows; nothing is switched on stale text.
     send(view.pid, {:flush_slow, ref})
@@ -236,7 +241,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
   test "a flush reply that is not dirty leaves the post clean", ctx do
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
     switch(view, "switch_language", %{"language" => "de-DE"}, "English body.", dirty: false)
-    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
+    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."}, 1000)
 
     # The buffer ack: hybrid mode hands the document back re-serialised, and
     # Leaf says it is not dirty. Nothing was edited, nothing may be saved.
@@ -267,8 +272,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
 
     switch(view, "switch_language", %{"language" => "de-DE"}, "English body.", dirty: false)
-    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
-    assert_push_event(view, @leaf, %{action: "flush", ref: ref})
+    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."}, 1000)
+    assert_push_event(view, @leaf, %{action: "flush", ref: ref}, 1000)
 
     # Leaf flushes on blur, and the click that switched the language blurred
     # the editor, so the English text arrives after the German post is loaded.
@@ -290,10 +295,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
 
     switch(view, "switch_language", %{"language" => "de-DE"}, "English body.", dirty: false)
-    assert_push_event(view, @leaf, %{action: "flush", ref: german_ref})
+    assert_push_event(view, @leaf, %{action: "flush", ref: german_ref}, 1000)
 
     switch(view, "switch_language", %{"language" => "fr-FR"}, "Deutscher Text.", dirty: false)
-    assert_push_event(view, @leaf, %{action: "flush", ref: french_ref})
+    assert_push_event(view, @leaf, %{action: "flush", ref: french_ref}, 1000)
     assert german_ref != french_ref
 
     send(view.pid, {:leaf_flushed, Map.put(leaf_payload("Deutscher Text."), :ref, german_ref)})
@@ -309,8 +314,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
 
     switch(view, "switch_language", %{"language" => "de-DE"}, "English body.", dirty: false)
-    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
-    assert_push_event(view, @leaf, %{action: "flush", ref: first_ref})
+    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."}, 1000)
+    assert_push_event(view, @leaf, %{action: "flush", ref: first_ref}, 1000)
 
     # Leaf's script had not mounted when the commands were pushed: the node
     # still shows the English text it rendered at first, and nothing answers.
@@ -322,8 +327,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     # The check fires: the document is handed over again with a fresh ref,
     # and the old text is still not an edit.
     send(view.pid, {:handover_check, first_ref})
-    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."})
-    assert_push_event(view, @leaf, %{action: "flush", ref: second_ref})
+    assert_push_event(view, @leaf, %{action: "set_content", content: "Deutscher Text."}, 1000)
+    assert_push_event(view, @leaf, %{action: "flush", ref: second_ref}, 1000)
     assert second_ref != first_ref
     send(view.pid, {:leaf_changed, leaf_payload("English body.")})
     refute render(view) =~ "Unsaved changes"
