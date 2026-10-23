@@ -58,17 +58,31 @@ with the dependency too.
 
 Deliberate non-features, so nobody adds them assuming they were missed.
 
-- **No HTML sanitiser on Markdown output.** `Renderer` calls MDEx with
-  `render: [unsafe: true]` so admin-authored `<div class="grid">` / inline HTML /
-  `<script>` tags pass through (GFM `tagfilter` is deliberately left off). The
-  trust boundary is "only admins author content"; if untrusted input ever reaches
-  `render_markdown/1` (API import, AI prompt-injection on rotating roles), wire
-  `html_sanitize_ex` in front of it. See `render_markdown_html/1` in
-  `renderer.ex`. The machine API does not sanitise either: a write whose body
-  text holds HTML, components, post links, link destinations outside http,
-  https, mailto, tel and relative (`//host` is not relative) or text the renderer
-  autolinks to another scheme is a confirmed write (`API.TextScan`); AI jobs and
-  the editor bypass that rule.
+- **No unfiltered raw HTML in Markdown output.** `Renderer` still calls MDEx with
+  `render: [unsafe: true]` so author HTML (`<div class="grid">`, `<details>`) reaches
+  the cleaner, but every Markdown segment, and then the assembled page, goes through
+  `Renderer.Sanitizer` (`MDEx.safe_html/2`, an allow-list on ammonia). Scripts, `on*`
+  and `phx-*` attributes, `javascript:` / `data:` URLs and unsafe `style` values are
+  removed, and so is everything outside the allow-list: `<style>`, `<iframe>`,
+  `<form>` and its controls, `<object>`, `<embed>`, `<audio>`, `<video>`, `<source>`,
+  `<picture>`, `<svg>`, `<math>`, `<canvas>`, `<button>`, `<section>`, `<dialog>`,
+  `<template>`, `<meta>`, `<link>`, `<base>` and the like, plus attributes such as
+  `name`, `value`, `tabindex`, `contenteditable`, `hidden` and the legacy table and
+  `align` presentation attributes. Component output (`<Embed>`, `<Audio>`, `<Video>`,
+  `<EntityForm>`, notes) is kept by the page profile.
+  `<style>` never passes the cleaner in either profile: the renderer's own
+  stylesheets are static text appended after it. The cleaner runs before the render
+  cache fills and again after `resolve_post_links/2` when it rewrote something; that
+  pass sets the appended stylesheet tail aside and puts it back, recognising only the
+  sheets listed in `@constant_style_blocks` and keyframes-only sheets of the generated
+  shape, so a NEW generated stylesheet must be added to `@constant_style_blocks`
+  (or fit the keyframes shape), or it silently disappears on pages with post links.
+  A new tag or attribute a component emits must be added to the allow-list in
+  `renderer/sanitizer.ex`. The machine API's text rule is the
+  confirmation gate on top: a write whose body text holds HTML, components, post
+  links, link destinations outside http, https, mailto, tel and relative (`//host`
+  is not relative) or text the renderer autolinks to another scheme is a confirmed
+  write (`API.TextScan`); AI jobs and the editor bypass that rule.
 - **No hard delete, stale fixer or media reorganizer in the machine API.** It
   never deletes a group, post, version or language (trashing is the removal it
   offers) and exposes neither `StaleFixer` nor `MediaReorganizer`. No read tool

@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio, as: AudioComponent
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Embed, as: EmbedComponent
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.Renderer.Sanitizer
   alias PhoenixKit.Modules.Publishing.RenderSignal
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
@@ -44,7 +45,13 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   #     component fallback, and its stylesheet is appended per document.
   # v8: <Gallery> renders as a helix instead of falling through to the unknown-
   #     component fallback, and its stylesheet is appended per document.
-  @cache_version "v8"
+  # v9: the rendered HTML goes through an allow-list sanitiser, so output for an
+  #     unchanged source differs (stripped script/handlers/unsafe URLs, entity
+  #     and attribute re-serialisation), and the component stylesheets are
+  #     appended after the sanitised document.
+  @cache_version "v9"
+
+  @generated_styles_key :pk_publishing_generated_styles
 
   # Matches the internal signed-file route — `<prefix>/file/<uuid>/<variant>/<token>`
   # — embedded as an `<img src>`. The prefix is bounded to plain path segments
@@ -322,27 +329,33 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # MDEx (comrak) options chosen to reproduce the prior Earmark behavior:
   #   * parse smart punctuation — curly quotes, en/em dashes, ellipses
   #   * GFM extensions — tables, strikethrough, autolinks, task lists
-  #   * render unsafe — pass raw inline/block HTML straight through, the
-  #     documented admin trust boundary (see render_markdown_html/1)
-  # The GFM `tagfilter` extension is deliberately omitted so a pasted `<script>`
-  # still renders live — neutering it would break that trust boundary. comrak
-  # emits fenced code as `<pre><code class="language-x">`, matching the
-  # `language-` prefix the post-processing in style_code_blocks/1 expects.
+  #   * render unsafe — pass raw inline/block HTML through comrak, which the
+  #     allow-list sanitiser then cleans (see render_markdown_html/1)
+  # The GFM `tagfilter` extension is deliberately omitted: the sanitiser, not
+  # comrak, decides which raw tags survive. comrak emits fenced code as
+  # `<pre><code class="language-x">`, matching the `language-` prefix the
+  # post-processing in style_code_blocks/1 expects.
   @mdex_options [
     extension: [strikethrough: true, table: true, autolink: true, tasklist: true],
     parse: [smart: true],
     render: [unsafe: true]
   ]
 
+  @doc false
+  # The comrak options of the render, for tests that look at its raw output.
+  def mdex_options, do: @mdex_options
+
   # Editor-inserted publication links: `[[post:UUID]]` / `[[post:UUID|Alias]]`.
   # The UUID is the stable identity — slugs and translations may change freely.
   @post_link_re ~r/\[\[post:([0-9a-fA-F-]{36})(?:\|([^\]]*))?\]\]/
-  # Regions where the token is literal text (or already inside a link).
-  @post_link_skip_re ~r{(<(?:pre|code|a)\b[^>]*>.*?</(?:pre|code|a)>)}is
-
-  # Identifies a chunk that IS one of the captured skip regions above, so the
-  # split's captures can be told apart from the prose between them.
-  @post_link_skip_head_re ~r/^<(?:pre|code|a)\b/i
+  # Regions where the token is literal text (or already inside a link) run from
+  # an opening `<pre|code|a …>` to the FIRST closing `</pre|code|a>` after it.
+  # Found by scanning for the two tag shapes and pairing them in one pass —
+  # a single `<open>.*?</close>` regex re-scans to the end of the document for
+  # every opener that never closes, which is quadratic on a long run of
+  # unclosed `<a`. `[^<>]*` keeps the opener itself from spanning tags.
+  @post_link_open_re ~r{<(?:pre|code|a)\b[^<>]*>}i
+  @post_link_close_re ~r{</(?:pre|code|a)>}i
 
   # Sentinel for a `<` that sits inside a code span/fence. The component scanner
   # is plain regex over the source, so without this it would extract a `<Image>`
@@ -444,11 +457,26 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   @spec resolve_post_links(String.t(), String.t() | nil) :: String.t()
   def resolve_post_links(html, language) when is_binary(html) do
     if String.contains?(html, "[[post:") do
-      targets = build_post_link_targets(html, language)
+      # The stylesheets the renderer appended after the sanitiser are set aside
+      # first: the cleaner removes every `<style>`, and only blocks that are
+      # byte-identical to a generated one (or a keyframes-only sheet of the
+      # exact generated shape) are recognised, so a `<style>` anywhere else in
+      # the input is still cleaned away with the rest.
+      {body, styles} = split_generated_style_tail(html)
+      targets = build_post_link_targets(body, language)
 
-      html
-      |> String.split(@post_link_skip_re, include_captures: true)
-      |> Enum.map_join("", &resolve_post_links_in_chunk(&1, targets))
+      resolved =
+        body
+        |> split_post_link_regions()
+        |> Enum.map_join("", fn
+          {:skip, chunk} -> chunk
+          {:text, chunk} -> resolve_post_links_in_chunk(chunk, targets)
+        end)
+
+      # The links are added to HTML that was already cleaned, so the cleaner
+      # runs again over the result: whatever the inserted text completes (or
+      # whatever the caller passed in) is checked as one document.
+      if resolved == body, do: html, else: Sanitizer.page(resolved) <> styles
     else
       html
     end
@@ -456,16 +484,53 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   def resolve_post_links(html, _language), do: html
 
-  # A chunk that is itself a <pre>/<code>/<a> region passes through untouched:
-  # a token in there is literal text, mirroring Leaf's own decoration rules.
-  defp resolve_post_links_in_chunk(chunk, targets) do
-    if Regex.match?(@post_link_skip_head_re, chunk) do
-      chunk
-    else
-      Regex.replace(@post_link_re, chunk, fn _full, uuid, alias_text ->
-        render_post_link(Map.get(targets, String.downcase(uuid)), alias_text)
-      end)
+  # Splits html into `{:skip, region}` (an opener through the first closer
+  # after it) and `{:text, prose}` chunks. A token in a skip region is literal
+  # text, mirroring Leaf's own decoration rules. Openers with no closer after
+  # them start no region.
+  defp split_post_link_regions(html) do
+    openers = Regex.scan(@post_link_open_re, html, return: :index)
+    closers = Regex.scan(@post_link_close_re, html, return: :index)
+    collect_post_link_regions(html, 0, Enum.map(openers, &hd/1), Enum.map(closers, &hd/1), [])
+  end
+
+  defp collect_post_link_regions(html, pos, [], _closers, acc),
+    do: finish_post_link_regions(html, pos, acc)
+
+  # An opener inside the previous region starts nothing of its own.
+  defp collect_post_link_regions(html, pos, [{o_start, _} | openers], closers, acc)
+       when o_start < pos,
+       do: collect_post_link_regions(html, pos, openers, closers, acc)
+
+  defp collect_post_link_regions(html, pos, [{o_start, o_len} | openers], closers, acc) do
+    o_end = o_start + o_len
+
+    case Enum.drop_while(closers, fn {c_start, _} -> c_start < o_end end) do
+      # No closer left for this or any later opener.
+      [] ->
+        finish_post_link_regions(html, pos, acc)
+
+      [{c_start, c_len} | _] = rest ->
+        r_end = c_start + c_len
+        text = binary_part(html, pos, o_start - pos)
+        region = binary_part(html, o_start, r_end - o_start)
+
+        collect_post_link_regions(html, r_end, openers, rest, [
+          {:skip, region},
+          {:text, text} | acc
+        ])
     end
+  end
+
+  defp finish_post_link_regions(html, pos, acc) do
+    tail = binary_part(html, pos, byte_size(html) - pos)
+    Enum.reverse([{:text, tail} | acc])
+  end
+
+  defp resolve_post_links_in_chunk(chunk, targets) do
+    Regex.replace(@post_link_re, chunk, fn _full, uuid, alias_text ->
+      render_post_link(Map.get(targets, String.downcase(uuid)), alias_text)
+    end)
   end
 
   @doc """
@@ -608,6 +673,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   def render_markdown(content, opts \\ [])
 
   def render_markdown(content, opts) when is_binary(content) do
+    with_generated_styles(fn -> do_render_markdown(content, opts) end)
+  end
+
+  def render_markdown(_, _opts), do: ""
+
+  defp do_render_markdown(content, opts) do
     # Author notes are a document-level feature (sequential numbering + a
     # collected section), so they're extracted before the per-segment
     # component pipeline runs. Two display styles (group setting):
@@ -641,9 +712,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         else
           # No code-region pre-escaping needed: comrak always HTML-escapes
           # fenced and inline code content, so a raw <script> inside a
-          # ```fence``` renders as literal text. Raw HTML *outside* code still
-          # passes through live (render: [unsafe: true]) — the admin trust
-          # boundary documented in render_markdown_html/1.
+          # ```fence``` renders as literal text. Raw HTML *outside* code comes
+          # out of comrak (render: [unsafe: true]) and is then cleaned by the
+          # allow-list sanitiser, see render_markdown_html/1.
           render_markdown_html(content)
         end
       end)
@@ -651,17 +722,59 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     # credo:disable-for-lines:2 Credo.Check.Warning.MissingMetadataKeyInLoggerConfig
     Logger.debug("Content render time: #{time}μs", content_size: byte_size(content))
 
-    notes_html =
+    {notes_html, notes_css} =
       case notes_style do
-        "panel" -> notes_ref_styles(notes)
-        _ -> notes_section(notes)
+        "panel" -> {"", notes_ref_styles(notes)}
+        _ -> {notes_section(notes), notes_css(notes)}
       end
 
     healed = heal_signed_file_urls(result)
-    healed <> notes_html <> showcase_styles(healed) <> helix_styles(healed)
+
+    # Last step over the assembled document (body + notes section), so what one
+    # part leaves open cannot be completed by the next. Each Markdown segment
+    # was already cleaned on its own in render_markdown_html/1.
+    #
+    # The stylesheets are NOT part of what is cleaned: the sanitiser removes
+    # every `<style>`, so the generated ones are appended here, AFTER it, as
+    # static text (the component stylesheets, the notes CSS, and the numeric
+    # keyframes a scrolling gallery collected while rendering). Nothing
+    # author-supplied reaches them, and nothing is lifted out of the document
+    # and put back.
+    cleaned = Sanitizer.page(healed <> notes_html)
+
+    cleaned <>
+      notes_css <>
+      take_generated_styles() <> showcase_styles(cleaned) <> helix_styles(cleaned)
   end
 
-  def render_markdown(_, _opts), do: ""
+  # Stylesheets generated while rendering (a scrolling gallery's keyframes),
+  # collected per render in the process dictionary and appended by
+  # render_markdown/2 after the sanitiser. Cleared at the start of each render.
+  # Runs one render with its own, empty collection and puts the caller's back
+  # afterwards (also when the render raises), so a render started from inside
+  # another one can neither read nor lose the outer one's stylesheets.
+  defp with_generated_styles(fun) do
+    previous = Process.delete(@generated_styles_key)
+
+    try do
+      fun.()
+    after
+      Process.delete(@generated_styles_key)
+      if previous, do: Process.put(@generated_styles_key, previous)
+    end
+  end
+
+  defp push_generated_style(css) do
+    Process.put(@generated_styles_key, [css | Process.get(@generated_styles_key, [])])
+    :ok
+  end
+
+  defp take_generated_styles do
+    case Process.delete(@generated_styles_key) do
+      nil -> ""
+      styles -> styles |> Enum.reverse() |> Enum.map_join("", &("<style>" <> &1 <> "</style>"))
+    end
+  end
 
   # One stylesheet per document, appended only when a band actually RENDERED.
   # Keyed off the output rather than the source: a <Showcase> shown inside a
@@ -793,28 +906,77 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       # Escaped, not just #-encoded. The '#' still has to go (the ref is
       # already an <a> and the later hashtag pass must not nest a second
       # anchor inside it), and escape_html does that along with the rest.
-      # Admin markdown renders with `unsafe: true`, so leaving the phrase raw
-      # was not a way in that the body didn't already offer — but it sits
-      # inside an <a> this function is building, one line below the body's own
-      # escape, and the AI-translation and import paths write bodies no admin
-      # typed.
+      # The phrase sits inside an <a> this function is building, one line
+      # below the body's own escape, and the AI-translation and import paths
+      # write bodies no admin typed. The sanitiser runs over this markup
+      # afterwards and re-serialises quotes, so this is the first line of
+      # defence rather than the only one.
       escape_html(phrase),
       ~s(<sup>#{number}</sup></a>)
     ]
   end
 
+  # Stylesheets of the note refs and the collected section. Emitted by
+  # render_markdown/2 after the sanitiser, never as part of the cleaned HTML.
+  @note_ref_css """
+  <style>
+  .pk-note-ref{text-decoration:underline dotted;text-underline-offset:3px;position:relative;color:inherit}
+  .pk-note-ref sup{color:var(--color-primary,currentColor);font-weight:600;margin-left:1px}
+  .pk-note-ref:hover::after,.pk-note-ref:focus-visible::after{content:attr(data-note);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(20rem,80vw);white-space:normal;background:var(--color-base-200,#eee);color:var(--color-base-content,#111);border:1px solid var(--color-base-300,#ddd);border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;line-height:1.35;z-index:20;box-shadow:0 4px 12px rgb(0 0 0/.08)}
+  </style>
+  """
+
+  @notes_section_css """
+  <style>
+  .pk-note-ref{text-decoration:underline dotted;text-underline-offset:3px;position:relative;color:inherit}
+  .pk-note-ref sup{color:var(--color-primary,currentColor);font-weight:600;margin-left:1px}
+  .pk-note-ref:hover::after,.pk-note-ref:focus-visible::after{content:attr(data-note);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(20rem,80vw);white-space:normal;background:var(--color-base-200,#eee);color:var(--color-base-content,#111);border:1px solid var(--color-base-300,#ddd);border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;line-height:1.35;z-index:20;box-shadow:0 4px 12px rgb(0 0 0/.08)}
+  .pk-notes li:target{background:var(--color-base-200,#eee);border-radius:.25rem}
+  </style>
+  """
+
   # Panel style: no bottom section — the template renders the panels. The
   # refs keep the hover/focus popover, so emit just that style block.
   defp notes_ref_styles([]), do: ""
+  defp notes_ref_styles(_notes), do: @note_ref_css
 
-  defp notes_ref_styles(_notes) do
-    """
-    <style>
-    .pk-note-ref{text-decoration:underline dotted;text-underline-offset:3px;position:relative;color:inherit}
-    .pk-note-ref sup{color:var(--color-primary,currentColor);font-weight:600;margin-left:1px}
-    .pk-note-ref:hover::after,.pk-note-ref:focus-visible::after{content:attr(data-note);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(20rem,80vw);white-space:normal;background:var(--color-base-200,#eee);color:var(--color-base-content,#111);border:1px solid var(--color-base-300,#ddd);border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;line-height:1.35;z-index:20;box-shadow:0 4px 12px rgb(0 0 0/.08)}
-    </style>
-    """
+  defp notes_css([]), do: ""
+  defp notes_css(_notes), do: @notes_section_css
+
+  # The stylesheets render_markdown/2 appends after the sanitiser, as they are
+  # emitted: the four constant sheets, and one keyframes-only sheet per
+  # scrolling gallery (numbers and names the renderer generates).
+  @constant_style_blocks [@note_ref_css, @notes_section_css, @showcase_css, @helix_css]
+
+  # Splits `html` into `{body, styles}`, where `styles` is the longest tail made
+  # only of generated stylesheet blocks (each runs from its `<style>` to the
+  # next block, or to the end of the document).
+  defp split_generated_style_tail(html) do
+    openers = :binary.matches(html, "<style>")
+    split_style_tail(Enum.reverse(openers), html, byte_size(html))
+  end
+
+  defp split_style_tail([{pos, _} | rest], html, stop) do
+    if generated_style_block?(binary_part(html, pos, stop - pos)),
+      do: split_style_tail(rest, html, pos),
+      else: split_style_tail([], html, stop)
+  end
+
+  defp split_style_tail([], html, stop),
+    do: {binary_part(html, 0, stop), binary_part(html, stop, byte_size(html) - stop)}
+
+  defp generated_style_block?(block) do
+    block in @constant_style_blocks or generated_keyframes_block?(block)
+  end
+
+  defp generated_keyframes_block?(block) do
+    case Regex.run(
+           ~r/\A<style>((?:@keyframes [A-Za-z0-9_-]+\{(?:[^<>{}\\"'\/]*\{[^<>{}\\"'\/]*\})*\})+)<\/style>\z/,
+           block
+         ) do
+      [_, css] -> Sanitizer.style_value_safe?(css)
+      nil -> false
+    end
   end
 
   defp notes_section([]), do: ""
@@ -839,16 +1001,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     <h2 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">#{escape_html(gettext("Notes"))}</h2>
     <ol class="list-decimal space-y-1 pl-5">#{items}</ol>
     </section>
-    <style>
-    .pk-note-ref{text-decoration:underline dotted;text-underline-offset:3px;position:relative;color:inherit}
-    .pk-note-ref sup{color:var(--color-primary,currentColor);font-weight:600;margin-left:1px}
-    .pk-note-ref:hover::after,.pk-note-ref:focus-visible::after{content:attr(data-note);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(20rem,80vw);white-space:normal;background:var(--color-base-200,#eee);color:var(--color-base-content,#111);border:1px solid var(--color-base-300,#ddd);border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;line-height:1.35;z-index:20;box-shadow:0 4px 12px rgb(0 0 0/.08)}
-    .pk-notes li:target{background:var(--color-base-200,#eee);border-radius:.25rem}
-    </style>
     """
   end
 
-  defp escape_html(text) do
+  @doc false
+  def escape_html(text) do
     text
     |> String.replace("&", "&amp;")
     |> String.replace("<", "&lt;")
@@ -856,8 +1013,14 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     |> String.replace("\"", "&quot;")
     # '#' too: the hashtag-link pass runs after the notes pass, and an
     # entity-encoded hash renders identically while never matching the
-    # hashtag regex — a tag mentioned in a note stays plain text.
+    # hashtag regex — a tag mentioned in a note stays plain text. This one
+    # goes BEFORE the quote entities below, which contain a '#' themselves.
     |> String.replace("#", "&#35;")
+    # A note body lands inside a double-quoted attribute and inside text; the
+    # single quote and backtick are escaped too, so no quoting style (or a
+    # legacy parser's backtick delimiter) can end the value early.
+    |> String.replace("'", "&#39;")
+    |> String.replace("`", "&#96;")
   end
 
   # Re-resolves embedded signed-file URLs against the CURRENT url_prefix and
@@ -903,18 +1066,20 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
       # (mixed path only); comrak then HTML-escapes it inside the code block.
       |> unmask_scanned_code()
 
-    # Trust model: admin-authored Markdown can include inline HTML
-    # (`<div class="grid">…</div>` is a common authoring affordance), so we
-    # render with `unsafe: true` — an admin who pastes a `<script>` tag sees it
-    # render as live HTML. This is the documented trust boundary; true XSS
-    # protection would require a sanitiser like html_sanitize_ex on the output.
+    # Author Markdown can include inline HTML (`<div class="grid">…</div>` is a
+    # common authoring affordance), so comrak renders with `unsafe: true` and
+    # the result goes through `Sanitizer.author/1` (an allow-list: no
+    # `<script>`, `on*` handlers, `javascript:` URLs, or unsafe `style`) before
+    # the classes are injected. Content reaches this path from the machine API
+    # and AI translation as well as the editor. The cleaner also closes
+    # anything the body left open, which keeps the regex passes below linear.
     # comrak always escapes code spans/blocks, so fenced examples render as
-    # literal text regardless. Re-evaluate if any non-admin-authored input
-    # reaches this path (API import, AI-translation prompt-injection on
-    # rotating roles).
+    # literal text regardless.
     case MDEx.to_html(content, @mdex_options) do
       {:ok, html} ->
-        add_tailwind_classes(html)
+        html
+        |> Sanitizer.author()
+        |> add_tailwind_classes()
 
       {:error, _reason} ->
         escaped =
@@ -1340,14 +1505,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
         # Scroll mode can't express per-card phase through delays or ranges,
         # so each card gets keyframes carrying its own starting angle.
-        keyframes =
-          if motion == "scroll" do
-            "<style>" <>
-              Enum.map_join(0..(length(images) - 1), "", &gallery_scroll_keyframes(&1, geometry)) <>
-              "</style>"
-          else
-            ""
-          end
+        if motion == "scroll" do
+          push_generated_style(
+            Enum.map_join(0..(length(images) - 1), "", &gallery_scroll_keyframes(&1, geometry))
+          )
+        end
 
         """
         <figure class="pk-helix#{if motion == "scroll", do: " pk-helix--scroll", else: ""}">
@@ -1358,7 +1520,6 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         <div class="pk-helix__vignette"></div>
         </div>
         </figure>
-        #{keyframes}
         """
         |> Phoenix.HTML.raw()
         |> PageBuilder.Renderer.wrap_stretch(showcase_lane(attrs))

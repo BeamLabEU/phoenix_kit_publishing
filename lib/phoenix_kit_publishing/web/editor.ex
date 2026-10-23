@@ -548,8 +548,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   @doc false
   # Honoring the site-wide Content Editor mode must not destroy content the
-  # trust model deliberately allows: admin-authored raw HTML
-  # (`<div class="grid">…</div>`) renders fine, but Leaf's hybrid/visual/html
+  # renderer deliberately allows: raw HTML that survives its allow-list
+  # sanitiser (`<div class="grid">…</div>`) renders fine, but Leaf's hybrid/visual/html
   # surfaces round-trip the body through a serializer that keeps only the
   # INNER TEXT of tags it doesn't own — the wrapper and its attributes are
   # gone on the next autosave, silently. `preserve_tags` shields PHK
