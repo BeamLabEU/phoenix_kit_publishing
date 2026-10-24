@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.14.0 - 2026-10-24
+
+### Changed
+
+- **Core requirement is now `>= 2.63.0 and < 3.0.0`** (was `>= 2.38.0`). 2.63.0 is
+  the first core release with the machine API (`PhoenixKit.API` and its `Tool`,
+  `Executor`, `Keys`, `Flow` and `ToolLint`), which the new `publishing.*` tools are
+  compiled against; an older core does not build the package. No migrations.
+- **Rendered post HTML is sanitised with an allow-list.** Markdown still renders
+  with inline HTML allowed, but the output now goes through `Renderer.Sanitizer`
+  (`MDEx.safe_html/2`, ammonia) per Markdown segment and again over the assembled
+  page, before it is cached or served. Scripts, `on*` / `phx-*` attributes,
+  `javascript:` / `data:` URLs, `srcdoc`, forms, iframes and hostile `style`
+  values are removed, including inside component bodies. The render cache moves
+  to `v9`, so nothing rendered before the sanitiser is served. Hosts that relied
+  on raw `<iframe>`, `<form>` or `<script>` in post bodies lose them. Thanks to
+  Tymofii Shapovalov (#61, closes #60).
+- The Gettext backend is split by locale and domain, so its catalogues compile in
+  parallel instead of in one long serial compile (#58). Lookups are unchanged.
+- `ActivityLog.log_manual/6` and `log_failed_mutation/6` take `:activity_mode` and
+  `:log_metadata` options; the context functions pass them through, so API writes
+  are logged with mode `"auto"` and their key and request metadata.
+- Hashtag linking is linear on large bodies: link texts and destinations are
+  masked up to 1,000 / 2,000 characters, and each tag's archive URL is built once
+  per render instead of once per occurrence.
+- Dependencies refreshed to PhoenixKit 2.64.1 and phoenix_kit_ai 0.26.1.
+
+### Added
+
+- Machine API: 20 `publishing.*` admin tools served by core's API layer
+  (REST at `/api/admin/v1/<tool>`, MCP at `/mcp/admin`) behind its keys, scopes
+  and rate limits, available while Publishing is enabled and the key's owner has
+  the `publishing` permission. Reads of groups, group settings schema, posts and
+  categories; post create / update / version / translation edits; AI
+  `translate_post`; publish, unpublish and schedule; trash and restore of posts
+  and groups; batch upserts of categories and groups and category deletes.
+  Anything that changes what a visitor sees needs core's confirmation round trip,
+  and a confirmed write is rechecked against the fresh rows under the post lock;
+  on a core that cannot enforce confirmations only the reads and
+  `create_version` are offered. Guide: `dev_docs/guides/machine-api.md`. Thanks
+  to Tymofii Shapovalov (#59).
+- `Posts.update_post/4` and the translation add path take a `:locked_check`
+  hook that runs inside the transaction after the post row lock;
+  `DBStorage.list_posts_page/3` pages posts by keyset.
+
+### Fixed
+
+- API revisions and confirmation fingerprints include language metadata and URL
+  slugs, so a concurrent change to them is caught before a confirmed write
+  applies.
+- Literal post-link tokens inside nested `pre` / `code` / link regions are kept
+  through the outer region's closing tag instead of being resolved.
+- A sibling dialect's group-name override no longer answers for another dialect.
+- The Edit Group form keeps dependent display settings when their toggle is
+  unticked and ticked again, and refreshes the breadcrumb after a rename.
+- Blank AI translations of a group name are trimmed in the form binding.
+- Listing sorts break ties on uuid, and a `cache_changed` broadcast erases only
+  the local listing cache instead of regenerating and broadcasting again.
+
 ## 0.13.2 - 2026-10-05
 
 ### Changed
