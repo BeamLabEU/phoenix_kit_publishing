@@ -4,6 +4,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   """
   use PhoenixKitWeb, :live_view
   use Gettext, backend: PhoenixKitPublishing.Gettext
+  # The Embed's hooks enqueue translations without a permission check, so
+  # this gate attaches first (hooks run in attach order) and refuses the
+  # modal's events once `publishing.manage` is gone from the live scope.
+  on_mount({__MODULE__, :gate_ai_translate})
   # Injects the six ai_* handle_event delegates + the {:ai_translation, …}
   # handle_info as composing lifecycle hooks (see the Embed moduledoc).
   use PhoenixKitAI.Components.AITranslate.Embed
@@ -31,6 +35,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
   alias PhoenixKitAI.Components.AITranslate.FormGlue
+
+  @ai_translate_events ~w(ai_translate_lang ai_toggle_modal ai_select_endpoint
+                          ai_select_prompt ai_select_scope ai_generate_prompt)
+
+  @doc false
+  def on_mount(:gate_ai_translate, _params, _session, socket) do
+    {:cont, attach_hook(socket, :publishing_ai_translate_gate, :handle_event, &gate_ai_event/3)}
+  end
+
+  # The same right the save checks, asked of the scope the socket holds now.
+  defp gate_ai_event(event, _params, socket) when event in @ai_translate_events do
+    if Access.can_manage_groups?(Access.scope(socket)) do
+      {:cont, socket}
+    else
+      {:halt,
+       put_flash(socket, :error, gettext("You don't have permission to manage publishing groups"))}
+    end
+  end
+
+  defp gate_ai_event(_event, _params, socket), do: {:cont, socket}
 
   # Editing a group (name, slug, display settings) needs `publishing.manage`,
   # at mount and again on save.

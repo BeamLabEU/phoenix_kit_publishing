@@ -18,6 +18,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PermissionsLiveTest do
   alias PhoenixKit.Modules.Publishing.Web
   alias PhoenixKit.Settings
   alias PhoenixKit.Users.{Permissions, Roles}
+  alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   @base_only ["publishing"]
 
@@ -235,6 +236,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.PermissionsLiveTest do
                )
 
       assert "publishing.manage" in keys(holder)
+    end
+  end
+
+  describe "Edit: the AI-translate modal" do
+    # `AITranslate.Embed` handles these events in a lifecycle hook that checks
+    # no permission; the page's gate runs first and asks the live scope.
+    test "a crafted ai_translate_lang after publishing.manage is revoked is refused",
+         %{conn: conn} do
+      group = group!()
+      jobs = fn -> TestRepo.aggregate(Oban.Job, :count) end
+
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope())
+        |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+      before = jobs.()
+
+      :sys.replace_state(view.pid, fn %{socket: socket} = state ->
+        narrowed = fake_scope(permissions: @base_only)
+        %{state | socket: Phoenix.Component.assign(socket, :phoenix_kit_current_scope, narrowed)}
+      end)
+
+      assert render_click(view, "ai_translate_lang", %{"lang" => "*"}) =~
+               "permission to manage publishing groups"
+
+      assert jobs.() == before
     end
   end
 end

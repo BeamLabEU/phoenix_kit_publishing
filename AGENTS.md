@@ -697,6 +697,13 @@ after every grant succeeded so a failed pass retries next boot). A role given
 module to be enabled, so with Publishing off nobody but the module toggle on
 core's Modules page reaches these rights.
 
+`Web.Edit`'s AI-translate modal events (`ai_translate_lang` enqueues jobs) are
+handled by `phoenix_kit_ai`'s `AITranslate.Embed` hook, which checks no
+permission; the page's own `on_mount({__MODULE__, :gate_ai_translate})`,
+declared BEFORE `use ...AITranslate.Embed` (hooks run in attach order),
+refuses them when the live scope lacks `publishing.manage`. Another page that
+uses the Embed needs the same gate.
+
 ### Host-consumable conn assigns
 
 Both are set on `conn.assigns` by `Web.Controller` and forwarded through
