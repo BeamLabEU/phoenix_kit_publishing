@@ -182,4 +182,13 @@ chain_check_exclude =
     do: [],
     else: [:requires_module_chain_check]
 
-ExUnit.start(exclude: chain_check_exclude ++ exclude)
+# The file-references test compares against core's own list, which the first
+# core release after 2.64.1 exposes as `Storage.builtin_file_references/0`;
+# against an older core it is excluded.
+file_refs_exclude =
+  if Code.ensure_loaded?(PhoenixKit.Modules.Storage) and
+       function_exported?(PhoenixKit.Modules.Storage, :builtin_file_references, 0),
+     do: [],
+     else: [:requires_core_file_references]
+
+ExUnit.start(exclude: chain_check_exclude ++ file_refs_exclude ++ exclude)
