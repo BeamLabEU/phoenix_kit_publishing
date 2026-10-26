@@ -102,6 +102,13 @@ Application.put_env(:phoenix_kit_publishing, :test_repo_available, repo_availabl
 {:ok, _pid} = PhoenixKit.PubSub.Manager.start_link([])
 {:ok, _pid} = PhoenixKit.ModuleRegistry.start_link([])
 
+# Registered so `Scope.can?/2` resolves `publishing.*` sub-keys (it asks the
+# registry whether the module behind a key is on) and `grant_permission/3`
+# accepts them.
+unless PhoenixKit.Modules.Publishing in PhoenixKit.ModuleRegistry.all_modules() do
+  :ok = PhoenixKit.ModuleRegistry.register(PhoenixKit.Modules.Publishing)
+end
+
 # PhoenixKit.Cache.Registry — Renderer.render_post calls PhoenixKit.Cache.get
 # which needs the registry. Without this the cache hit/miss paths bail out
 # via rescue clauses without exercising the actual cache logic.

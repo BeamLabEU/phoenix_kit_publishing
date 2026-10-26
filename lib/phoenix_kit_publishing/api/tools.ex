@@ -3,7 +3,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
   # The 20 tool declarations of the Publishing API. `Publishing.api_tools/0`
   # returns them through `API.tools/1`; core's registry validates each struct.
   #
-  # Scope -> role permission, all permission "publishing":
+  # Scope -> role permission: "publishing", except the group tools, which need
+  # "publishing.manage" (the same right the admin pages ask for):
   #   publishing.posts:read          list_posts, get_post
   #   publishing.posts:write         create_post, update_post, create_version, set_translation
   #   publishing.posts:publish       publish_post, unpublish_post, schedule_post
@@ -20,6 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
   alias PhoenixKit.Modules.Publishing.API.Schemas
 
   @permission "publishing"
+  @manage_permission "publishing.manage"
 
   @spec all() :: [PhoenixKit.API.Tool.t()]
   def all do
@@ -433,7 +435,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       name: "publishing.upsert_groups",
       audience: :admin,
       scope: "publishing.groups:write",
-      permission: @permission,
+      permission: @manage_permission,
       title: "Create or update groups",
       description:
         "Creates or updates up to 20 publishing groups, each named by slug. A slug that does not exist is " <>
@@ -461,7 +463,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       name: "publishing.trash_groups",
       audience: :admin,
       scope: "publishing.groups:delete",
-      permission: @permission,
+      permission: @manage_permission,
       title: "Trash groups",
       description:
         "Moves up to 20 publishing groups, each named by slug, to the trash. The whole group and every " <>
@@ -483,7 +485,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Tools do
       name: "publishing.restore_groups",
       audience: :admin,
       scope: "publishing.groups:delete",
-      permission: @permission,
+      permission: @manage_permission,
       title: "Restore groups",
       description:
         "Brings up to 20 publishing groups, each named by slug, back from the trash; the group and its " <>

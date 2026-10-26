@@ -52,6 +52,13 @@ defmodule PhoenixKitPublishing.LiveCase do
       Sandbox.stop_owner(pid)
     end)
 
+    # The admin pages check `publishing.manage` / `publishing.settings`
+    # through `Scope.can?/2`, which also asks whether the module is on. Tag a
+    # test `publishing_enabled: false` to see the pages with it off.
+    unless tags[:publishing_enabled] == false do
+      {:ok, _} = PhoenixKit.Settings.update_boolean_setting("publishing_enabled", true)
+    end
+
     conn =
       Phoenix.ConnTest.build_conn()
       |> Plug.Test.init_test_session(%{})
@@ -79,7 +86,10 @@ defmodule PhoenixKitPublishing.LiveCase do
   @doc """
   Builds a minimal admin scope for tests. Pass `roles:` to override
   the default `["Owner", "Admin"]` (the roles `Scope.admin?/1`
-  pattern-matches against).
+  pattern-matches against), and `permissions:` to override the default
+  `["publishing", "publishing.manage", "publishing.settings"]` — every key
+  the admin pages check, so a test that is not about permissions sees
+  every page.
 
   Returns a real `%PhoenixKit.Users.Auth.Scope{}` with a `%User{}` so
   callers using `Scope.user_uuid/1` (which pattern-matches the struct
@@ -91,6 +101,13 @@ defmodule PhoenixKitPublishing.LiveCase do
     email = Keyword.get(opts, :email, "test@example.com")
     roles = Keyword.get(opts, :roles, ["Owner", "Admin"])
 
+    permissions =
+      Keyword.get(opts, :permissions, [
+        "publishing",
+        "publishing.manage",
+        "publishing.settings"
+      ])
+
     user = %PhoenixKit.Users.Auth.User{
       uuid: user_uuid,
       email: email,
@@ -101,6 +118,7 @@ defmodule PhoenixKitPublishing.LiveCase do
     %PhoenixKit.Users.Auth.Scope{
       user: user,
       cached_roles: roles,
+      cached_permissions: MapSet.new(permissions),
       authenticated?: true
     }
   end

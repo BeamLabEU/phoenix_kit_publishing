@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing do
   alias PhoenixKit.Modules.Publishing.API
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.PermissionBackfill
   alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   # ============================================================================
@@ -564,8 +565,52 @@ defmodule PhoenixKit.Modules.Publishing do
       key: "publishing",
       label: "Publishing",
       icon: "hero-document-duplicate",
-      description: "Database-backed CMS pages and multi-language content"
+      description: "Database-backed CMS pages and multi-language content",
+      # The base key used to let its holder force-delete a whole group with
+      # every post in it, and change the module's settings. Those rights are
+      # split out here; Admin gets them from core's boot-time auto-grant,
+      # Owner through "*", and `migrate_legacy/0` carries every other role
+      # that already held `publishing`, so nobody loses access.
+      sub_permissions: [
+        %{
+          key: "manage",
+          label: "Manage groups",
+          description:
+            "Create, edit, trash, restore and permanently delete publishing groups with all their posts"
+        },
+        %{
+          key: "settings",
+          label: "Change the module's settings",
+          description: "Open the Publishing settings page and change settings and caches there"
+        }
+      ]
     }
+  end
+
+  # One flag per sub-key, so a later split gets its own pass.
+  @sub_key_backfills [
+    {"publishing.manage", "publishing_manage_backfilled"},
+    {"publishing.settings", "publishing_settings_backfilled"}
+  ]
+
+  @doc """
+  One-time data repairs, run by core at every boot.
+
+  Grants each sub-permission split out of the base `publishing` key
+  (`publishing.manage`, `publishing.settings`) once to every role that
+  already holds `publishing`, so the split takes nothing away. Each pass has
+  its own flag and is retried on the next boot when it did not finish; see
+  `PhoenixKit.Modules.Publishing.PermissionBackfill`.
+  """
+  @impl PhoenixKit.Module
+  @spec migrate_legacy() :: :ok | {:error, term()}
+  def migrate_legacy do
+    results =
+      Enum.map(@sub_key_backfills, fn {key, flag} ->
+        PermissionBackfill.run(module_key(), key, flag)
+      end)
+
+    Enum.find(results, :ok, &(&1 != :ok))
   end
 
   @impl PhoenixKit.Module
@@ -657,7 +702,7 @@ defmodule PhoenixKit.Modules.Publishing do
         priority: 921,
         level: :admin,
         parent: :admin_settings,
-        permission: "publishing",
+        permission: "publishing.settings",
         gettext_backend: PhoenixKitPublishing.Gettext
       )
     ]

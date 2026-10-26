@@ -25,15 +25,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
 
   alias Phoenix.Component
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Access
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
   alias PhoenixKitAI.Components.AITranslate.FormGlue
 
+  # Editing a group (name, slug, display settings) needs `publishing.manage`,
+  # at mount and again on save.
   @impl true
   def mount(%{"group" => group_slug} = _params, _session, socket) do
-    case find_group(group_slug) do
+    case Access.can_manage_groups?(Access.scope(socket)) && find_group(group_slug) do
+      false ->
+        {:ok,
+         socket
+         |> put_flash(:error, gettext("You don't have permission to manage publishing groups"))
+         |> push_navigate(to: Routes.path("/admin/publishing"))}
+
       nil ->
         {:ok,
          socket
@@ -98,99 +107,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
   end
 
   def handle_event("save", %{"group" => params} = all_params, socket) do
-    # The "Save and exit" submit button rides `name="exit" value="true"` into
-    # the params (entities-form pattern); the plain Save button omits it.
-    exit? = all_params["exit"] == "true"
-    previous_slug = socket.assigns.group["slug"]
-
-    case Publishing.update_group(previous_slug, params,
-           actor_uuid: Shared.actor_uuid_from_socket(socket)
-         ) do
-      {:ok, updated_group} ->
-        # No broadcast here — Groups.update_group/3 already broadcasts
-        # {:group_updated, group} after the DB write; a second one from the LV
-        # made every subscriber refresh twice per save.
-        updated_form = Component.to_form(group_form_params(updated_group), as: :group)
-
-        socket =
-          socket
-          |> assign(:group, updated_group)
-          |> assign(:form, updated_form)
-          |> assign(:page_crumbs, group_crumbs(updated_group, updated_group["slug"]))
-          |> put_flash(:info, gettext("Group updated"))
-
-        cond do
-          exit? ->
-            {:noreply,
-             push_navigate(socket, to: Routes.path("/admin/publishing/#{updated_group["slug"]}"))}
-
-          updated_group["slug"] != previous_slug ->
-            # Staying, but this page's URL embeds the (now old) slug — remount
-            # the editor at its new address so a reload doesn't 404.
-            {:noreply,
-             push_navigate(socket,
-               to: Routes.path("/admin/publishing/edit-group/#{updated_group["slug"]}")
-             )}
-
-          true ->
-            {:noreply, socket}
-        end
-
-      {:error, :invalid_name} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("Please provide a valid group name."))
-         |> assign(:form, Component.to_form(params, as: :group))}
-
-      {:error, :invalid_slug} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           gettext(
-             "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
-           )
-         )
-         |> assign(:form, Component.to_form(params, as: :group))}
-
-      {:error, :not_found} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("Group not found"))
-         |> push_navigate(to: Routes.path("/admin/publishing"))}
-
-      # DBStorage changeset errors pass through Groups.update_group — the
-      # reachable ones are the slug unique-constraint (renaming onto another
-      # group's slug) and the 255-char name length. Without this clause the
-      # save crashed with CaseClauseError and the whole form was lost.
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, group_changeset_message(changeset))
-         |> assign(:form, Component.to_form(params, as: :group))}
-    end
-  rescue
-    # Narrow to the realistic failure classes (DB errors, optimistic-lock
-    # races, query construction). Leaves system errors / programmer mistakes
-    # / ArithmeticError etc. to crash the LV with a useful stacktrace.
-    e in [
-      Ecto.QueryError,
-      Ecto.ConstraintError,
-      Ecto.StaleEntryError,
-      DBConnection.ConnectionError
-    ] ->
-      Logger.error(
-        "[Publishing.Edit] Group save failed: " <>
-          Exception.format(:error, e, __STACKTRACE__)
-      )
-
+    if Access.can_manage_groups?(Access.scope(socket)) do
+      save_group(params, all_params, socket)
+    else
       {:noreply,
-       put_flash(
-         socket,
-         :error,
-         gettext("Something went wrong while saving this group.") <>
-           " " <> Errors.truncate_for_log(Exception.message(e), 200)
-       )}
+       put_flash(socket, :error, gettext("You don't have permission to manage publishing groups"))}
+    end
   end
 
   def handle_event("cancel", _params, socket) do
@@ -805,5 +727,101 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       </div>
     </div>
     """
+  end
+
+  defp save_group(params, all_params, socket) do
+    # The "Save and exit" submit button rides `name="exit" value="true"` into
+    # the params (entities-form pattern); the plain Save button omits it.
+    exit? = all_params["exit"] == "true"
+    previous_slug = socket.assigns.group["slug"]
+
+    case Publishing.update_group(previous_slug, params,
+           actor_uuid: Shared.actor_uuid_from_socket(socket)
+         ) do
+      {:ok, updated_group} ->
+        # No broadcast here — Groups.update_group/3 already broadcasts
+        # {:group_updated, group} after the DB write; a second one from the LV
+        # made every subscriber refresh twice per save.
+        updated_form = Component.to_form(group_form_params(updated_group), as: :group)
+
+        socket =
+          socket
+          |> assign(:group, updated_group)
+          |> assign(:form, updated_form)
+          |> assign(:page_crumbs, group_crumbs(updated_group, updated_group["slug"]))
+          |> put_flash(:info, gettext("Group updated"))
+
+        cond do
+          exit? ->
+            {:noreply,
+             push_navigate(socket, to: Routes.path("/admin/publishing/#{updated_group["slug"]}"))}
+
+          updated_group["slug"] != previous_slug ->
+            # Staying, but this page's URL embeds the (now old) slug — remount
+            # the editor at its new address so a reload doesn't 404.
+            {:noreply,
+             push_navigate(socket,
+               to: Routes.path("/admin/publishing/edit-group/#{updated_group["slug"]}")
+             )}
+
+          true ->
+            {:noreply, socket}
+        end
+
+      {:error, :invalid_name} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Please provide a valid group name."))
+         |> assign(:form, Component.to_form(params, as: :group))}
+
+      {:error, :invalid_slug} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext(
+             "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
+           )
+         )
+         |> assign(:form, Component.to_form(params, as: :group))}
+
+      {:error, :not_found} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, gettext("Group not found"))
+         |> push_navigate(to: Routes.path("/admin/publishing"))}
+
+      # DBStorage changeset errors pass through Groups.update_group — the
+      # reachable ones are the slug unique-constraint (renaming onto another
+      # group's slug) and the 255-char name length. Without this clause the
+      # save crashed with CaseClauseError and the whole form was lost.
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, group_changeset_message(changeset))
+         |> assign(:form, Component.to_form(params, as: :group))}
+    end
+  rescue
+    # Narrow to the realistic failure classes (DB errors, optimistic-lock
+    # races, query construction). Leaves system errors / programmer mistakes
+    # / ArithmeticError etc. to crash the LV with a useful stacktrace.
+    e in [
+      Ecto.QueryError,
+      Ecto.ConstraintError,
+      Ecto.StaleEntryError,
+      DBConnection.ConnectionError
+    ] ->
+      Logger.error(
+        "[Publishing.Edit] Group save failed: " <>
+          Exception.format(:error, e, __STACKTRACE__)
+      )
+
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         gettext("Something went wrong while saving this group.") <>
+           " " <> Errors.truncate_for_log(Exception.message(e), 200)
+       )}
   end
 end

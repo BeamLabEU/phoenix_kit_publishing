@@ -88,11 +88,20 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     assert Enum.sort(Map.keys(@table)) == Enum.sort(@tool_order)
   end
 
+  # The group tools create, trash and restore whole groups, so they need the
+  # same `publishing.manage` the admin pages ask for; every other tool is the
+  # base key.
+  @manage_tools ~w(publishing.upsert_groups publishing.trash_groups publishing.restore_groups)
+
   test "every tool is a valid admin tool of the publishing permission" do
     for tool <- Tools.all() do
       assert {:ok, _} = Tool.validate(tool), "#{tool.name} is not valid"
       assert tool.audience == :admin
-      assert tool.permission == "publishing"
+
+      expected =
+        if tool.name in @manage_tools, do: "publishing.manage", else: "publishing"
+
+      assert tool.permission == expected, "#{tool.name} needs #{expected}"
       assert is_binary(tool.title) and tool.title != ""
       assert String.length(tool.description) > 80
       assert is_map(tool.output_schema)
