@@ -115,7 +115,9 @@ defmodule PhoenixKitPublishing.MixProject do
       #     core fails to compile the package. Patch-precise floor in the
       #     compound form so the ceiling stays open through every later 2.x
       #     minor (see test/core_pin_conformance_test.exs).
-      pk_dep(:phoenix_kit, ">= 2.63.0 and < 3.0.0"),
+      # Floor 2.65.0: the first core with the `file_references/0` and `expected_schema/0`
+      # callbacks this module implements (`@impl`). The ceiling is open through core 3.x.
+      pk_dep(:phoenix_kit, ">= 2.65.0 and < 4.0.0"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
       # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
       # which the group editor imports directly.

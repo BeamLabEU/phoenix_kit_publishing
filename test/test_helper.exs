@@ -68,6 +68,13 @@ repo_available =
       # `dev_docs/migration_cleanup.md` for the staleness story.
       PhoenixKit.Migration.ensure_current(TestRepo, log: false)
 
+      # The tables other modules own (core 3.0 no longer creates them): their real
+      # chains, in dependency order.
+      for chain <- [PhoenixKitAI.Migrations, PhoenixKitComments.Migrations],
+          stmt <- chain.up_statements("public") do
+        TestRepo.query!(stmt)
+      end
+
       # This module's own chain (PhoenixKitPublishing.Migrations) stamps
       # phoenix_kit_publishing_groups with pkpub_schema:1 on top of what
       # core's chain above already created — every test run starts from a
