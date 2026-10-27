@@ -30,7 +30,8 @@ controller (dead views); the admin side is LiveView.
   `phoenix_kit_project_extensions/0` for its Docs project tab; core's machine
   API registry (`/api/admin/v1`, `/mcp/admin`), which collects the 20
   `publishing.*` admin tools from `Publishing.api_tools/0` while the module is
-  enabled (see "Machine API" under Conventions).
+  enabled (see "Machine API" under Conventions); the three group tools need
+  `publishing.manage`, the rest the base key.
 - **Admin surface:** one top-level tab `Publishing` at `/admin/publishing`
   (dynamic children, one per group, at `/admin/publishing/<slug>`), plus a
   settings subtab at `/admin/settings/publishing`. Public routes are served
@@ -672,9 +673,36 @@ keys — see
 
 ### Permissions
 
-One permission, `"publishing"` (`permission_metadata/0`: label "Publishing", icon
-`hero-document-duplicate`). No sub-permissions. Every admin tab and settings tab
-carries `permission: "publishing"`.
+Base key `"publishing"` (`permission_metadata/0`: label "Publishing", icon
+`hero-document-duplicate`) reaches the module and covers writing and managing
+posts. Two sub-permissions, checked by the module itself through
+`Publishing.Access` (`Scope.can?/2`, never raw key membership):
+
+| Key | Allows | Checked in |
+|-----|--------|------------|
+| `publishing.manage` | Create, edit, trash, restore and permanently delete groups | `Web.New` and `Web.Edit` at mount and on submit; `Web.Index` on `trash_group` / `restore_group` / `delete_group`; the `upsert_groups`, `trash_groups` and `restore_groups` API tools (`permission:`) |
+| `publishing.settings` | The settings page and every event on it | `Web.Settings` at mount and in its single `handle_event/3` |
+
+Buttons for a right the viewer lacks are hidden (`@can_manage_groups`), but
+the server-side check is the guard. The admin tab carries `"publishing"`; the
+settings tab carries `"publishing.settings"` so the sidebar hides it, but it
+has no `live_view:` (the routes come from `route_module/0`), so core's admin
+`on_mount` still gates that page on the base key — the LiveView's own check is
+what refuses it. Admin gets the sub-keys from core's boot auto-grant, Owner
+through `"*"`; `migrate_legacy/0` grants each once to every role that already
+held `"publishing"` (`Publishing.PermissionBackfill`, flags
+`publishing_manage_backfilled` / `publishing_settings_backfilled`, set only
+after every grant succeeded so a failed pass retries next boot). A role given
+`"publishing"` later gets the narrow meaning. `Scope.can?/2` also requires the
+module to be enabled, so with Publishing off nobody but the module toggle on
+core's Modules page reaches these rights.
+
+`Web.Edit`'s AI-translate modal events (`ai_translate_lang` enqueues jobs) are
+handled by `phoenix_kit_ai`'s `AITranslate.Embed` hook, which checks no
+permission; the page's own `on_mount({__MODULE__, :gate_ai_translate})`,
+declared BEFORE `use ...AITranslate.Embed` (hooks run in attach order),
+refuses them when the live scope lacks `publishing.manage`. Another page that
+uses the Embed needs the same gate.
 
 ### Host-consumable conn assigns
 
@@ -798,7 +826,12 @@ Support modules under `test/support/` (compiled via `elixirc_paths(:test)`):
 - `PhoenixKitPublishing.{ConnCase, LiveCase, DataCase}` plus `PhoenixKit.DataCase`
   (in `phoenix_kit_data_case.ex`) — case templates. ConnCase does sandbox checkout
   plus `with_scope/1`; LiveCase runs the sandbox in shared mode and adds
-  `put_test_scope/2` and `fake_scope/1`.
+  `put_test_scope/2` and `fake_scope/1`. `fake_scope/1` holds `publishing`,
+  `publishing.manage` and `publishing.settings` unless `permissions:` says
+  otherwise, and LiveCase turns `publishing_enabled` on for every test (tag
+  `publishing_enabled: false` to opt out) because `Scope.can?/2` refuses a
+  disabled module's keys; `test_helper.exs` registers the module with
+  `ModuleRegistry` for the same reason.
 - `PhoenixKitPublishing.ActivityLogAssertions` — `assert_activity_logged/2`,
   `refute_activity_logged/2`, `list_activities/0`, imported into DataCase and
   LiveCase. Queries `phoenix_kit_activities` with raw SQL and normalises

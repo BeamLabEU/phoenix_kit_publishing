@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Access
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.Web.Editor.Helpers
@@ -91,6 +92,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
       |> assign(:view_mode, "active")
       |> assign(:loading, false)
       |> assign(:trashed_count, trashed_count)
+      |> assign(:can_manage_groups, Access.can_manage_groups?(Access.scope(socket)))
 
     {:ok, socket}
   end
@@ -182,7 +184,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
      |> assign(:loading, true)}
   end
 
-  def handle_event("trash_group", %{"slug" => slug}, socket) do
+  # Trashing, restoring and deleting a group need `publishing.manage`; the
+  # buttons are hidden without it, and a crafted event is refused here.
+  def handle_event(event, params, socket)
+      when event in ["trash_group", "restore_group", "delete_group"] do
+    if Access.can_manage_groups?(Access.scope(socket)) do
+      group_event(event, params, socket)
+    else
+      {:noreply,
+       put_flash(socket, :error, gettext("You don't have permission to manage publishing groups"))}
+    end
+  end
+
+  defp group_event("trash_group", %{"slug" => slug}, socket) do
     case Publishing.trash_group(slug, actor_uuid: Shared.actor_uuid_from_socket(socket)) do
       {:ok, _} ->
         {:noreply,
@@ -202,7 +216,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     end
   end
 
-  def handle_event("restore_group", %{"slug" => slug}, socket) do
+  defp group_event("restore_group", %{"slug" => slug}, socket) do
     case Publishing.restore_group(slug, actor_uuid: Shared.actor_uuid_from_socket(socket)) do
       {:ok, _} ->
         {:noreply,
@@ -222,7 +236,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     end
   end
 
-  def handle_event("delete_group", %{"slug" => slug}, socket) do
+  defp group_event("delete_group", %{"slug" => slug}, socket) do
     case Publishing.remove_group(slug,
            force: true,
            actor_uuid: Shared.actor_uuid_from_socket(socket)
@@ -433,7 +447,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
           title={gettext("No publishing groups yet")}
           description={gettext("Create your first publishing group to start drafting posts.")}
         >
-          <.button navigate={Routes.path("/admin/publishing/new-group")} size="sm">
+          <.button
+            :if={@can_manage_groups}
+            navigate={Routes.path("/admin/publishing/new-group")}
+            size="sm"
+          >
             <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext("Create Publishing Group")}
           </.button>
         </.empty_state>
@@ -570,6 +588,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                         <span class="hidden sm:inline">{gettext("Open")}</span>
                       </.button>
                       <.button
+                        :if={@can_manage_groups}
                         navigate={Routes.path("/admin/publishing/edit-group/#{insight.slug}")}
                         variant="outline"
                         size="sm"
@@ -596,6 +615,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                         </.button>
                       <% end %>
                       <.button
+                        :if={@can_manage_groups}
                         type="button"
                         phx-click="trash_group"
                         phx-value-slug={insight.slug}
@@ -609,6 +629,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                       </.button>
                     <% else %>
                       <.button
+                        :if={@can_manage_groups}
                         type="button"
                         phx-click="restore_group"
                         phx-value-slug={insight.slug}
@@ -621,6 +642,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                         <span class="hidden sm:inline">{gettext("Restore")}</span>
                       </.button>
                       <.button
+                        :if={@can_manage_groups}
                         type="button"
                         phx-click="delete_group"
                         phx-value-slug={insight.slug}
@@ -646,7 +668,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                   the row of groups — where the eye already is — instead of
                   a small navbar button beside the page title that nobody
                   found. Active view only: nothing gets created in Trash. --%>
-            <%= if @view_mode == "active" do %>
+            <%= if @view_mode == "active" and @can_manage_groups do %>
               <.link
                 navigate={Routes.path("/admin/publishing/new-group")}
                 aria-label={gettext("Create Publishing Group")}

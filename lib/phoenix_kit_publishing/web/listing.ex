@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Access
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
@@ -65,6 +66,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       |> assign(:post_view_mode, default_mode)
       |> assign(:post_status_counts, status_counts)
       |> assign(:mount_group_slug, group_slug)
+      |> assign(:can_manage_groups, Access.can_manage_groups?(Access.scope(socket)))
       |> assign_view_totals()
 
     {:ok, socket}
@@ -1032,6 +1034,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
           <.icon name="hero-tag" class="w-4 h-4 mr-1" /> {gettext("Categories")}
         </.button>
         <.button
+          :if={@can_manage_groups}
           navigate={Routes.path("/admin/publishing/edit-group/#{group_slug}")}
           variant="outline"
           size="sm"

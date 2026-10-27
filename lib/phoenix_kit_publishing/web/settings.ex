@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   require Logger
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Access
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
@@ -37,6 +38,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
 
   @impl true
   def mount(_params, _session, socket) do
+    if Access.can_change_settings?(Access.scope(socket)) do
+      {:ok, mount_page(socket)}
+    else
+      {:ok,
+       socket
+       |> put_flash(
+         :error,
+         gettext("You don't have permission to change the Publishing settings")
+       )
+       |> push_navigate(to: Routes.path("/admin"))}
+    end
+  end
+
+  defp mount_page(socket) do
     # Subscribe to group changes for live updates. All DB-backed reads
     # live in `handle_params/3` (PR #9 follow-up — Phoenix iron law:
     # mount runs twice per page load, handle_params once).
@@ -56,7 +71,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       |> assign(:active_tab, @default_settings_tab)
       |> assign(:current_path, Routes.path("/admin/settings/publishing"))
 
-    {:ok, socket}
+    socket
   end
 
   @impl true
@@ -106,8 +121,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     :ok
   end
 
+  # Every event on this page writes a setting or touches a cache, so one
+  # check covers them all: `publishing.settings`, re-asked on each event
+  # rather than trusted from mount.
   @impl true
-  def handle_event("regenerate_cache", %{"slug" => slug}, socket) do
+  def handle_event(event, params, socket) do
+    if Access.can_change_settings?(Access.scope(socket)) do
+      settings_event(event, params, socket)
+    else
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         gettext("You don't have permission to change the Publishing settings")
+       )}
+    end
+  end
+
+  defp settings_event("regenerate_cache", %{"slug" => slug}, socket) do
     case ListingCache.regenerate(slug) do
       :ok ->
         {:noreply,
@@ -126,7 +157,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     end
   end
 
-  def handle_event("invalidate_cache", %{"slug" => slug}, socket) do
+  defp settings_event("invalidate_cache", %{"slug" => slug}, socket) do
     ListingCache.invalidate(slug)
 
     {:noreply,
@@ -135,7 +166,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      |> put_flash(:info, gettext("Cache cleared for %{group}", group: slug))}
   end
 
-  def handle_event("regenerate_all_caches", _params, socket) do
+  defp settings_event("regenerate_all_caches", _params, socket) do
     results =
       Enum.map(socket.assigns.cache_groups, fn group ->
         {group["slug"], ListingCache.regenerate(group["slug"])}
@@ -149,7 +180,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      |> put_flash(:info, gettext("Regenerated %{count} caches", count: success_count))}
   end
 
-  def handle_event("toggle_memory_cache", _params, socket) do
+  defp settings_event("toggle_memory_cache", _params, socket) do
     new_value = !socket.assigns.memory_cache_enabled
     Settings.update_setting(@memory_cache_key, to_string(new_value))
 
@@ -166,7 +197,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      |> put_flash(:info, memory_cache_toggle_message(new_value))}
   end
 
-  def handle_event("toggle_show_language_switcher", _params, socket) do
+  defp settings_event("toggle_show_language_switcher", _params, socket) do
     new_value = !socket.assigns.show_language_switcher
     Settings.update_boolean_setting(@show_language_switcher_key, new_value)
 
@@ -188,7 +219,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      )}
   end
 
-  def handle_event("toggle_render_og_tags", _params, socket) do
+  defp settings_event("toggle_render_og_tags", _params, socket) do
     new_value = !socket.assigns.render_og_tags
     Settings.update_boolean_setting(@render_og_tags_key, new_value)
 
@@ -210,7 +241,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      )}
   end
 
-  def handle_event("toggle_feeds_enabled", _params, socket) do
+  defp settings_event("toggle_feeds_enabled", _params, socket) do
     new_value = !socket.assigns.feeds_enabled
     Settings.update_boolean_setting(@feeds_enabled_key, new_value)
 
@@ -226,7 +257,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      )}
   end
 
-  def handle_event("toggle_render_jsonld", _params, socket) do
+  defp settings_event("toggle_render_jsonld", _params, socket) do
     new_value = !socket.assigns.render_jsonld
     Settings.update_boolean_setting(@render_jsonld_key, new_value)
 
@@ -242,7 +273,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      )}
   end
 
-  def handle_event("toggle_unique_views", _params, socket) do
+  defp settings_event("toggle_unique_views", _params, socket) do
     new_value = !socket.assigns.unique_views
     Settings.update_boolean_setting(@unique_views_key, new_value)
 
@@ -258,8 +289,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      )}
   end
 
-  def handle_event("change_slug_style", %{"slug_style" => style}, socket)
-      when style in @valid_slug_styles do
+  defp settings_event("change_slug_style", %{"slug_style" => style}, socket)
+       when style in @valid_slug_styles do
     Settings.update_setting(@slug_style_key, style)
 
     {:noreply,
@@ -271,7 +302,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      )}
   end
 
-  def handle_event("change_slug_style", _params, socket), do: {:noreply, socket}
+  defp settings_event("change_slug_style", _params, socket), do: {:noreply, socket}
 
   # Three numbers that were previously not settable at all. `posts_per_page`
   # is the sharpest case: the reader was already there in the code, so the
@@ -287,8 +318,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     "publishing_editor_lock_minutes" => {1, 480, 30}
   }
 
-  def handle_event("change_number_setting", %{"field" => field, "value" => value}, socket)
-      when is_map_key(@number_settings, field) do
+  defp settings_event("change_number_setting", %{"field" => field, "value" => value}, socket)
+       when is_map_key(@number_settings, field) do
     {min, max, default} = Map.fetch!(@number_settings, field)
 
     number =
@@ -305,9 +336,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      |> put_flash(:info, gettext("Setting updated"))}
   end
 
-  def handle_event("change_number_setting", _params, socket), do: {:noreply, socket}
+  defp settings_event("change_number_setting", _params, socket), do: {:noreply, socket}
 
-  def handle_event("clear_render_cache", _params, socket) do
+  defp settings_event("clear_render_cache", _params, socket) do
     Renderer.clear_all_cache()
 
     {:noreply,
@@ -316,7 +347,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      |> put_flash(:info, gettext("Render cache cleared"))}
   end
 
-  def handle_event("clear_group_render_cache", %{"slug" => slug}, socket) do
+  defp settings_event("clear_group_render_cache", %{"slug" => slug}, socket) do
     case Renderer.clear_group_cache(slug) do
       {:ok, count} ->
         {:noreply,
@@ -337,7 +368,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     end
   end
 
-  def handle_event("toggle_render_cache", _params, socket) do
+  defp settings_event("toggle_render_cache", _params, socket) do
     new_value = !socket.assigns.render_cache_enabled
     Settings.update_setting(@render_cache_key, to_string(new_value))
 
@@ -347,7 +378,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
      |> put_flash(:info, render_cache_toggle_message(new_value))}
   end
 
-  def handle_event("toggle_group_render_cache", %{"slug" => slug}, socket) do
+  defp settings_event("toggle_group_render_cache", %{"slug" => slug}, socket) do
     # Use Renderer helper to get the new key for writes
     per_group_key = Renderer.per_group_cache_key(slug)
     current_value = Renderer.group_render_cache_enabled?(slug)
