@@ -134,7 +134,9 @@ defmodule PhoenixKit.Modules.Publishing.Integration.ExpectedSchemaTest do
     Repo.query!(~s(ALTER TABLE "#{schema}"."#{table}" DROP COLUMN "#{column}"))
 
     id = "column:#{table}.#{column}"
-    assert [%{kind: :missing, module: @app, object_id: ^id}] = schema |> verify() |> module_findings()
+
+    assert [%{kind: :missing, module: @app, object_id: ^id}] =
+             schema |> verify() |> module_findings()
 
     {:ok, _report} = Repair.repair(prefix: schema, repo: Repo, module_manifests: @modules)
 
