@@ -3011,6 +3011,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   defp component_media_url(_tag, _attrs), do: nil
 
+  # How each PHK component is drawn in the editor (Leaf's `tag_previews`
+  # kinds): the ones whose look is part of what they mean. The rest keep
+  # Leaf's generic block.
+  defp component_tag_previews do
+    %{
+      "Headline" => :headline,
+      "Showcase" => :split,
+      "CTA" => :button,
+      "Embed" => :frame,
+      "Audio" => :audio
+    }
+  end
+
   defp toolbar_glyph(char) do
     ~s(<span class="text-xs font-semibold leading-none">#{char}</span>)
   end
@@ -3941,6 +3954,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   protect_navigation={true}
                   toolbar_extra={component_toolbar_buttons()}
                   media_url={&component_media_url/2}
+                  tag_previews={component_tag_previews()}
                   wiki_links={%{follow: :click}}
                   suggestions={[
                     %{
