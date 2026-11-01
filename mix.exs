@@ -134,7 +134,7 @@ defmodule PhoenixKitPublishing.MixProject do
       # switches; 0.4.1 supports bare flushes but never answers their refs.
       # Keep the ceiling open across later 0.x minors: a three-segment `~>`
       # would strand hosts resolving a newer Leaf alongside core.
-      {:leaf, ">= 0.5.1 and < 1.0.0"},
+      {:leaf, ">= 0.9.0 and < 1.0.0"},
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},
