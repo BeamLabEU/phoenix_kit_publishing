@@ -133,8 +133,11 @@ defmodule PhoenixKitPublishing.MixProject do
       # baseline on `:set_content`. The editor requires both for safe document
       # switches; 0.4.1 supports bare flushes but never answers their refs.
       # Keep the ceiling open across later 0.x minors: a three-segment `~>`
-      # would strand hosts resolving a newer Leaf alongside core.
-      {:leaf, ">= 0.9.0 and < 1.0.0"},
+      # would strand hosts resolving a newer Leaf alongside core. 0.10.0 is
+      # the floor: rendered HTML passes an allow-list, typed text is written
+      # back as text rather than markdown syntax, and a `collapse: false`
+      # toolbar button stays on the mobile toolbar.
+      {:leaf, ">= 0.10.0 and < 1.0.0"},
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},
