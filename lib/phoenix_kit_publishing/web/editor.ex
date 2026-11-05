@@ -2995,6 +2995,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     ]
   end
 
+  # Which picture a component stands for in the editor. Leaf draws a block for
+  # every PHK tag but cannot tell that `file_uuid` is an image, nor sign a URL
+  # for it; this answers for the tags whose file is a picture. Audio is a file
+  # too, but drawing it as an image would be a broken icon.
+  @picture_components ~w(Image Showcase)
+
+  defp component_media_url(tag, %{"file_uuid" => file_uuid})
+       when tag in @picture_components and is_binary(file_uuid) do
+    case Ecto.UUID.cast(String.trim(file_uuid)) do
+      {:ok, uuid} -> Storage.URLSigner.signed_url(uuid, "medium")
+      :error -> nil
+    end
+  end
+
+  defp component_media_url(_tag, _attrs), do: nil
+
+  # How each PHK component is drawn in the editor (Leaf's `tag_previews`
+  # kinds): the ones whose look is part of what they mean. The rest keep
+  # Leaf's generic block.
+  defp component_tag_previews do
+    %{
+      "Headline" => :headline,
+      "Showcase" => :split,
+      "CTA" => :button,
+      "Embed" => :frame,
+      "Audio" => :audio
+    }
+  end
+
   defp toolbar_glyph(char) do
     ~s(<span class="text-xs font-semibold leading-none">#{char}</span>)
   end
@@ -3924,6 +3953,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   gettext_backend={PhoenixKitPublishing.Gettext}
                   protect_navigation={true}
                   toolbar_extra={component_toolbar_buttons()}
+                  media_url={&component_media_url/2}
+                  tag_previews={component_tag_previews()}
                   wiki_links={%{follow: :click}}
                   suggestions={[
                     %{
