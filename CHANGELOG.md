@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.16.0 - 2026-11-06
+
+### Changed
+
+- **Leaf requirement is now `>= 0.10.1 and < 1.0.0`** (was `>= 0.5.1`). The editor passes Leaf `tag_previews` and `media_url`, added in 0.9.0, and 0.10.1 fixes two 0.10.0 bugs this editor hits: text inserted by the component toolbar could arrive backslash-escaped, and text typed after a `[[…]]` link was lost on save. Hosts must update their Leaf JS bundle along with the dependency. No migration.
+- The render cache moves to `v10`, so every post re-renders once after deploy.
+- Dependencies refreshed to PhoenixKit 3.4.0 and phoenix_kit_ai 0.28.0.
+
+### Added
+
+- **Components are drawn as previews in the editor** (#63). `<Image>` and `<Showcase>` show their picture, also inside a `<Gallery>`, and `<Headline>`, `<CTA>`, `<Embed>` and `<Audio>` read as what they are instead of a box of attributes. The signed picture URL stays out of the saved body. A `<CTA>` preview does not show its destination yet, because Leaf's button preview does not read `action`; it stays in the block's hover title.
+
+### Fixed
+
+- **Text written as a literal `<Tag` no longer renders as a live component.** Leaf 0.10 stores a typed `<` as `\<`, and the renderer's component and note scanners ignored the backslash, so `\<CTA action="/x">` became a real button with a stray backslash on the page. They now treat it as text, and so do excerpts.
+- **RSS descriptions are plain text.** They carried the body's Markdown as written, including `**bold**` and Leaf's backslash escapes.
+- The editor no longer opens a post in markdown mode because its text holds an escaped `\<b`.
+
 ## 0.15.0 - 2026-10-27
 
 ### Changed
