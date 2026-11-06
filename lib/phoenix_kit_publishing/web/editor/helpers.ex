@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.Editor.Translation
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Modules.Storage
@@ -309,6 +310,44 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
   def audio_component_markup(file_uuid) when is_binary(file_uuid) do
     safe = String.replace(file_uuid, ~r/[^0-9a-fA-F-]/, "")
     ~s(\n<Audio file_uuid="#{safe}" title="#{alt_from_file(file_uuid)}"/>\n)
+  end
+
+  # The tags whose `file_uuid` is a picture. Audio carries a file too, but drawn
+  # as an image it would be a broken icon.
+  @picture_components ~w(Image Showcase)
+
+  @doc """
+  Which picture a PHK component stands for: Leaf's `media_url`.
+
+  Leaf draws a block for every component but cannot tell that a `file_uuid` is
+  an image, nor sign a URL for it. The gate is the public renderer's
+  (`Shared.uuid_format?/1`), so the editor never shows a picture the published
+  page would not. The uuid is lowercased because the file route checks the
+  token against the stored one.
+  """
+  @spec component_media_url(String.t(), map()) :: String.t() | nil
+  def component_media_url(tag, %{"file_uuid" => file_uuid}) when tag in @picture_components do
+    if Shared.uuid_format?(file_uuid) do
+      Storage.URLSigner.signed_url(String.downcase(file_uuid), "medium")
+    end
+  end
+
+  def component_media_url(_tag, _attrs), do: nil
+
+  @doc """
+  How each PHK component is drawn in the editor (Leaf's `tag_previews` kinds):
+  the ones whose look is part of what they mean. The rest keep Leaf's generic
+  block.
+  """
+  @spec component_tag_previews() :: %{String.t() => atom()}
+  def component_tag_previews do
+    %{
+      "Headline" => :headline,
+      "Showcase" => :split,
+      "CTA" => :button,
+      "Embed" => :frame,
+      "Audio" => :audio
+    }
   end
 
   defp alt_from_file(file_uuid) do

@@ -128,16 +128,16 @@ defmodule PhoenixKitPublishing.MixProject do
       {:phoenix_kit_comments, "~> 0.5", only: :test},
 
       # The post editor. Leaf is a standalone package (phoenix_kit depends on it
-      # too, for the comment composer). 0.5.1 is the first published version
-      # with correlated `:flush` replies (`{:leaf_flushed, …}`) and the dirty
-      # baseline on `:set_content`. The editor requires both for safe document
-      # switches; 0.4.1 supports bare flushes but never answers their refs.
+      # too, for the comment composer). The editor needs correlated `:flush`
+      # replies (`{:leaf_flushed, …}`) and the dirty baseline on `:set_content`
+      # (0.5.1) and passes `tag_previews` and `media_url` (0.9.0). 0.10.0 sanitizes
+      # what it renders and writes typed text back as text, and 0.10.1 is the
+      # floor because of what that first cut got wrong here: `insert_markdown`,
+      # which the component toolbar uses, could arrive backslash-escaped, and
+      # text typed after a `[[…]]` link was dropped on save.
       # Keep the ceiling open across later 0.x minors: a three-segment `~>`
-      # would strand hosts resolving a newer Leaf alongside core. 0.10.0 is
-      # the floor: rendered HTML passes an allow-list, typed text is written
-      # back as text rather than markdown syntax, and a `collapse: false`
-      # toolbar button stays on the mobile toolbar.
-      {:leaf, ">= 0.10.0 and < 1.0.0"},
+      # would strand hosts resolving a newer Leaf alongside core.
+      {:leaf, ">= 0.10.1 and < 1.0.0"},
 
       # LiveView for admin pages
       {:phoenix_live_view, "~> 1.0"},

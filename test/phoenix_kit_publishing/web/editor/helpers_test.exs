@@ -201,4 +201,41 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.HelpersTest do
       assert markup =~ "<Image "
     end
   end
+
+  describe "component_media_url/2" do
+    @file_uuid "019a6f96-e895-74e2-a745-1b596ee235af"
+
+    test "signs a medium URL for the tags whose file is a picture" do
+      for tag <- ~w(Image Showcase) do
+        assert Helpers.component_media_url(tag, %{"file_uuid" => @file_uuid}) =~
+                 "/file/#{@file_uuid}/medium/"
+      end
+    end
+
+    test "answers nothing for a file that is not a picture" do
+      assert Helpers.component_media_url("Audio", %{"file_uuid" => @file_uuid}) == nil
+    end
+
+    test "answers nothing for a tag with no file" do
+      assert Helpers.component_media_url("Image", %{"src" => "/a.png"}) == nil
+    end
+
+    # The preview must not promise a picture the published page will not show:
+    # the renderer's gate is `Shared.uuid_format?/1`, with no trimming. A 16-byte
+    # string is the trap in `Ecto.UUID.cast/1`, which reads it as a raw UUID.
+    test "refuses what the public renderer refuses" do
+      for bad <- [" #{@file_uuid} ", "aaaaaaaaaaaaaaaa", "not-a-uuid", "", nil, 42] do
+        assert Helpers.component_media_url("Image", %{"file_uuid" => bad}) == nil,
+               "#{inspect(bad)} must not be drawn"
+      end
+    end
+
+    # The file route checks the token against the stored, lowercase uuid.
+    test "signs the canonical uuid whatever case the tag spelled it in" do
+      upper = String.upcase(@file_uuid)
+
+      assert Helpers.component_media_url("Image", %{"file_uuid" => upper}) ==
+               Helpers.component_media_url("Image", %{"file_uuid" => @file_uuid})
+    end
+  end
 end

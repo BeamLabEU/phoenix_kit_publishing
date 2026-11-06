@@ -128,9 +128,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
     end
   end
 
+  # The excerpt is Markdown (the body's first paragraph unless an author wrote
+  # one), so it is reduced to text like the cards' is: a feed reader would show
+  # `**bold**` as asterisks, and the backslashes Leaf puts before a typed `*`.
   defp excerpt_fallback(post) do
     case post[:content] do
-      t when is_binary(t) -> t
+      t when is_binary(t) -> PublishingHTML.extract_excerpt(t)
       _ -> nil
     end
   end

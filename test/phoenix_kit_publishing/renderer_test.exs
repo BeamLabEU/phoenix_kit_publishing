@@ -767,4 +767,77 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
       assert excerpt =~ "Alias"
     end
   end
+
+  # Leaf writes a `<` typed as text into a rendered block as `\\<` (0.10.0 on).
+  # Markdown reads that as a literal `<`, and the editor shows it as one, so the
+  # component scanners have to agree or the writer's text goes live on the page.
+  describe "a backslash-escaped component is text" do
+    test "a self-closing tag stays literal, with no backslash left over" do
+      html = Renderer.render_markdown(~S(see \<Image src="/a.png" alt="x"/> here))
+
+      refute html =~ "<img"
+      refute html =~ "\\"
+      assert html =~ "&lt;Image"
+      assert html =~ "here"
+    end
+
+    test "a block tag stays literal" do
+      html = Renderer.render_markdown(~S(\<CTA action="/x">Go\</CTA>))
+
+      refute html =~ ~s(href="/x")
+      refute html =~ "\\"
+      assert html =~ "&lt;CTA"
+    end
+
+    test "an escaped note is not collected as a note" do
+      source = ~S(a \<Note note="n">phrase\</Note> b)
+
+      assert Renderer.list_notes(source) == []
+      assert Renderer.render_markdown(source) =~ "&lt;Note"
+    end
+
+    test "a real component beside an escaped one still renders" do
+      html = Renderer.render_markdown(~s(\\<Image src="/a.png"/>\n\n<Image src="/b.png"/>))
+
+      assert html =~ ~s(src="/b.png")
+      refute html =~ ~s(src="/a.png")
+    end
+
+    # In `\\<` the backslash is what is escaped, so the tag after it is real.
+    # A CTA, not an Image: raw `<image>` reaching the cleaner comes back as `<img>`
+    # (HTML5 aliases it), so an Image passes this even when it was wrongly masked.
+    test "only an odd run of backslashes escapes" do
+      assert Renderer.render_markdown(~S(\\<CTA action="/x">Go</CTA>)) =~ ~s(href="/x")
+      refute Renderer.render_markdown(~S(\\\<CTA action="/x">Go</CTA>)) =~ ~s(href="/x")
+    end
+
+    test "an escaped `<` inside a real component's attribute reaches it unmasked" do
+      html = Renderer.render_markdown(~S(<Image src="/a.png" alt="a \<b"/>))
+
+      assert html =~ ~s(src="/a.png")
+      refute html =~ "pk-code-lt"
+      refute html =~ <<0>>
+    end
+
+    test "a code sample keeps its backslash" do
+      assert Renderer.render_markdown(~S(`\<Image src="/a.png"/>`)) =~ "\\&lt;Image"
+    end
+  end
+
+  describe "the excerpt of a body with an escaped component" do
+    alias PhoenixKit.Modules.Publishing.Shared
+    alias PhoenixKit.Modules.Publishing.Web.HTML
+
+    test "strip_components leaves escaped tags and still removes real ones" do
+      assert Shared.strip_components(~S(a \<Image src="/a.png"/> b)) ==
+               ~S(a \<Image src="/a.png"/> b)
+
+      assert Shared.strip_components(~S(a \<CTA>Go\</CTA> b)) == ~S(a \<CTA>Go\</CTA> b)
+      assert Shared.strip_components(~s(a <Image src="/a.png"/> b)) == "a   b"
+    end
+
+    test "it reads as the text the writer typed" do
+      assert HTML.extract_excerpt(~S(see \<Image/> here)) == "see <Image/> here"
+    end
+  end
 end

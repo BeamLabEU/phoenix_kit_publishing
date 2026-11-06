@@ -11,13 +11,14 @@ the `PhoenixKit.Module` behaviour, so a host app gets it by adding the dependenc
 — no config, no route wiring. Public pages are served by a plain Phoenix
 controller (dead views); the admin side is LiveView.
 
-- **Depends on:** `phoenix_kit` `>= 2.63.0 and < 3.0.0` (Hex — 2.63.0 is the first release
-  that carries the machine API, `PhoenixKit.API`; `PhoenixKitWeb.Actor`, `Activity.log/3`
-  and `Components.TreePicker` came with 2.38.0, the floor before it; the compound form
-  keeps the ceiling open across later 2.x minors), `phoenix_kit_ai` `~> 0.18`
+- **Depends on:** `phoenix_kit` `>= 2.65.0 and < 4.0.0` (Hex — 2.65.0 is the first release
+  with the `file_references/0` and `expected_schema/0` callbacks; the machine API,
+  `PhoenixKit.API`, came with 2.63.0, and `PhoenixKitWeb.Actor`, `Activity.log/3` and
+  `Components.TreePicker` with 2.38.0; the compound form keeps the ceiling open through
+  core 3.x), `phoenix_kit_ai` `~> 0.27`
   (hard — it owns the `Translatable` adapter behaviour, the per-language Oban
   fan-out, the LLM call and `ai_multilang_tabs/1`; publishing contributes only
-  the adapters and the editor wiring), `phoenix_kit_comments` `~> 0.3`
+  the adapters and the editor wiring), `phoenix_kit_comments` `~> 0.5`
   (`only: :test`; the production seam is optional and guarded with
   `Code.ensure_loaded?/1`), `phoenix_kit_og` (optional, no dep at all — guarded
   seam), plus `leaf`, `phoenix_live_view`, `mdex`, `saxy`, `oban`, `gettext`.
@@ -47,13 +48,16 @@ reorganizer's `ResourceSource`; `PublishingGroup.changeset/2` needs
 reading it as offset 0 — under an older core every timestamp post is stamped
 and syndicated on UTC while the editor shows the site clock. Don't lower it.
 
-The `leaf` requirement is `>= 0.5.1 and < 1.0.0`. The floor is load-bearing:
-0.4.1 has bare `:flush`, but the editor now waits for correlated
-`{:leaf_flushed, …}` replies and needs `:set_content` to baseline dirty state,
-both first published in 0.5.1. Keep the ceiling open through later 0.x minors;
-a three-segment `~>` previously held publishing a release behind in hosts
-resolving a newer Leaf alongside core. Hosts must update their Leaf JS bundle
-with the dependency too.
+The `leaf` requirement is `>= 0.10.1 and < 1.0.0`. The floor is load-bearing:
+the editor waits for correlated `{:leaf_flushed, …}` replies and needs
+`:set_content` to baseline dirty state (both 0.5.1), and passes `tag_previews`
+and `media_url` (0.9.0). 0.10.0 began escaping typed text and got it wrong in
+ways this editor hits: text from `insert_markdown`, which the component toolbar
+uses, could arrive backslash-escaped, and text typed after a `[[…]]` link was
+dropped on save. Both are fixed in 0.10.1. Keep the ceiling open through later
+0.x minors; a three-segment `~>` previously held publishing a release behind in
+hosts resolving a newer Leaf alongside core. Hosts must update their Leaf JS
+bundle with the dependency too.
 
 ## What this module does NOT do
 
@@ -476,6 +480,15 @@ internal functions of core, `PhoenixKit.API.Keys.active?/1` and
 takes the dangerous tools away on every host (with that one warning) until `@markers` follows.
 
 ### Landmines
+
+- **A stored body can hold Markdown backslash escapes.** From Leaf 0.10.0 the
+  visual and hybrid surfaces write a typed `*`, `[`, `_`, `` ` `` or `<` as `\*`,
+  `\[`, `\_`, `` \` `` and `\<`, and a line-start `# ` as `\# `. So body text
+  never goes to a reader raw: run it through `Renderer.render_markdown/1`
+  (`Web.HTML.extract_excerpt/1` for plain text). A new regex over the body must
+  treat `\<Tag` as text: `mask_scanned_code/1` does it for the renderer's
+  scanners, `Shared.strip_components/1` and the editor's raw-HTML guard use a
+  lookbehind. `#tag` is safe, the escaper leaves `#` alone unless a space follows.
 
 - **A publishing setting that stopped being a publishing setting.**
   `publishing_default_language_no_prefix` is legacy — core's Languages module

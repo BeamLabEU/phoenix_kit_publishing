@@ -96,6 +96,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorPreserveTagsTest do
                :hybrid
     end
 
+    # Leaf writes a literal `<` as `\\<`. That is text, which the surfaces
+    # round-trip, so it must not pin the post to markdown mode.
+    test "a backslash-escaped `<` is text, not raw HTML" do
+      assert Editor.__effective_editor_mode__(:hybrid, "a \\<b c") == :hybrid
+      assert Editor.__effective_editor_mode__(:visual, ~S(\\<div class="x">)) == :visual
+    end
+
     test "markdown mode is never overridden" do
       assert Editor.__effective_editor_mode__(:markdown, "<div >x") == :markdown
     end

@@ -49,7 +49,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   #     unchanged source differs (stripped script/handlers/unsafe URLs, entity
   #     and attribute re-serialisation), and the component stylesheets are
   #     appended after the sanitised document.
-  @cache_version "v9"
+  # v10: a backslash-escaped `\\<Tag` is text, so a body holding one renders it
+  #      literally instead of as a live component with a stray backslash.
+  @cache_version "v10"
 
   @generated_styles_key :pk_publishing_generated_styles
 
@@ -360,6 +362,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # — comrak then HTML-escapes it inside the code, so it shows as literal text. A
   # NUL-delimited token can't collide with real post content.
   @code_lt_sentinel "\x00pk-code-lt\x00"
+
+  # A `<` behind an ODD run of backslashes: in `\\\\<` the backslash is what is
+  # escaped, and the `<` is real.
+  @escaped_lt_regex ~r/(?<!\\)(?:\\\\)*\\</
 
   # Tailwind/daisyUI classes for post-processing the rendered markdown HTML.
   # Code blocks (pre, code) are handled separately in style_code_blocks/1.
@@ -1224,10 +1230,17 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # the component scanner can't match a component shown literally inside code.
   # Backtick/fence delimiters are left intact so the markdown still parses as
   # code. Restored by unmask_scanned_code/1 before MDEx renders.
+  #
+  # A backslash-escaped `<` is masked too: Leaf writes a `<` typed as text as
+  # `\\<`, and the scanners are plain regexes that would otherwise take the tag
+  # after it for a live component, leaving the backslash on the page. Code goes
+  # first, so a `\\<` shown inside code is already out of reach here.
   defp mask_scanned_code(content) do
-    Regex.replace(@code_region_regex, content, fn match ->
-      String.replace(match, "<", @code_lt_sentinel)
-    end)
+    mask = fn match -> String.replace(match, "<", @code_lt_sentinel) end
+
+    @code_region_regex
+    |> Regex.replace(content, mask)
+    |> then(&Regex.replace(@escaped_lt_regex, &1, mask))
   end
 
   # Restore sentinels back to raw `<`. A no-op on the plain path (which never
@@ -1307,7 +1320,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   end
 
   defp add_component(acc, tag, attrs) do
-    [render_inline_component(tag, attrs) | acc]
+    # An attribute can hold a masked `<` too (`alt="a \\<b"`).
+    [render_inline_component(tag, unmask_scanned_code(attrs)) | acc]
   end
 
   defp add_block_component(acc, fragment) do

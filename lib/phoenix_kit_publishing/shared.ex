@@ -27,11 +27,12 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   """
   @spec strip_components(String.t() | term()) :: String.t() | term()
   def strip_components(markdown) when is_binary(markdown) do
+    # `\<Tag` is text, not a component: it is how Leaf writes a typed `<`.
     markdown
-    |> String.replace(~r/<Note\b[^>]*>(.*?)<\/Note>/s, "\\1")
-    |> String.replace(~r/<([A-Z][A-Za-z]*)\b[^>]*>.*?<\/\1>/s, " ")
-    |> String.replace(~r/<[A-Z][A-Za-z]*\b[^>]*\/?>/, " ")
-    |> String.replace(~r/<[A-Z][A-Za-z]*\b[^>]*\z/s, " ")
+    |> String.replace(~r/(?<!\\)<Note\b[^>]*>(.*?)<\/Note>/s, "\\1")
+    |> String.replace(~r/(?<!\\)<([A-Z][A-Za-z]*)\b[^>]*>.*?<\/\1>/s, " ")
+    |> String.replace(~r/(?<!\\)<[A-Z][A-Za-z]*\b[^>]*\/?>/, " ")
+    |> String.replace(~r/(?<!\\)<[A-Z][A-Za-z]*\b[^>]*\z/s, " ")
   end
 
   def strip_components(other), do: other
