@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.17.0 - 2026-11-08
+
+A full audit of the module; the report is `dev_docs/2026-11-08-full-module-audit.md`.
+
+### Changed
+
+- **`add_group/2` refuses an unknown mode** with `{:error, :invalid_mode}`. It used to create a timestamp group, and the mode can never change.
+- **Group slugs `new-group`, `edit-group` and `categories` are refused** for new and renamed groups (a name that slugifies to one gets a suffix): they are the literal admin segments beside `/admin/publishing/:group`, so such a group could never be opened. An existing group keeps its slug.
+- **Author `data-*` attributes are dropped by the sanitiser**; only the notes' `data-note` on links is kept. The render cache moves to `v11`, so every post re-renders once after deploy.
+- Permission and notification labels are translated through this module's catalogue (`gettext_backend`), and comment notifications are written in the recipient's language.
+- `mix test.reset` rebuilds the test database, and the test suite fails when the database answers but its schema can't be built (it excluded the integration tier and passed).
+
+### Fixed
+
+- **Stored XSS through `data-*` attributes:** a host's phoenix_html.js turned `data-method` + `data-to="javascript:…"` in a post body into a script-running submit on a reader's click.
+- **Pages with an `<EntityForm>` were cached with the first visitor's CSRF token,** so every other visitor's submit was refused.
+- **Non-ASCII URLs (hashtag archives, unicode slugs) redirected to themselves forever.**
+- **The machine API's post-link confirmation was bypassed** by `\[\[post:` and `&#91;&#91;post:` spellings, which render as a live link.
+- **Peer nodes kept serving a stale listing after a post, version or translation change.**
+- **Core's orphan-file check missed body `<Image>` references, audio and OG images,** so "Delete all orphaned" could remove a picture from a live post.
+- A concurrent language repair could delete the row it meant to keep.
+- The editor created one orphan draft per autosave for a new post whose typed slug was taken; after a version switch an AI translation's progress counted double; a background save could swap a listing card for the live version's, whose language pills then put a draft-only language live.
+- Embargoed posts were readable through `/v/N`; `?page[]=1` and non-UTF-8 path segments gave a 500; query params could override the route's language, group and path; `/date/time/v/N` version URLs never routed; RSS descriptions could carry markup; component attributes were cut at an apostrophe.
+- Trashed posts' slugs were handed out again and refused by the unique index; a publish could leave the pointer on an archived version; `fix_all_stale_values/0` always raised.
+- A crafted event could permanently delete an active group; Draft ↔ Archived always failed in the listing; "restored as draft" was untrue for a post with a live version; Settings reported success for failed writes; flush saves ignored the translation lock; a sibling language's save replaced the editor's text; the listing's stale-fixer sweep never ran.
+- Nine error atoms rendered as "Unexpected error"; changeset messages are translated.
+- Translations: literal backslashes in et/it/ru, Russian and Italian month names, plurals hard-coding "1", hard-coded English labels, the render-cache TTL (24 hours, not 6).
+- UI: full-size save spinners, an unreadable notice in dark themes, raw ISO dates on the post page, unnamed icon buttons, keyboard-invisible image controls, a full page reload on listing titles, a hand-built URL preview.
+
 ## 0.16.0 - 2026-11-06
 
 ### Changed
