@@ -66,8 +66,10 @@ Deliberate non-features, so nobody adds them assuming they were missed.
 - **No unfiltered raw HTML in Markdown output.** `Renderer` still calls MDEx with
   `render: [unsafe: true]` so author HTML (`<div class="grid">`, `<details>`) reaches
   the cleaner, but every Markdown segment, and then the assembled page, goes through
-  `Renderer.Sanitizer` (`MDEx.safe_html/2`, an allow-list on ammonia). Scripts, `on*`
-  and `phx-*` attributes, `javascript:` / `data:` URLs and unsafe `style` values are
+  `Renderer.Sanitizer` (`MDEx.safe_html/2`, an allow-list on ammonia). Scripts, `on*`,
+  `phx-*` and `data-*` attributes (only the notes' `data-note` on `a` is kept: a host's
+  phoenix_html.js submits a form to any `data-to`, a `javascript:` one included, and
+  htmx runs `data-hx-*`), `javascript:` / `data:` URLs and unsafe `style` values are
   removed, and so is everything outside the allow-list: `<style>`, `<iframe>`,
   `<form>` and its controls, `<object>`, `<embed>`, `<audio>`, `<video>`, `<source>`,
   `<picture>`, `<svg>`, `<math>`, `<canvas>`, `<button>`, `<section>`, `<dialog>`,
@@ -169,9 +171,9 @@ that carries `PhoenixKit.API`, which Hex has from 2.63.0 on (the floor in `mix.e
 so a host on an older core cannot resolve the package. Raise the floor, and the line
 under "Depends on", in the same change that starts using a newer core API. To run the
 suite against an unreleased core, point `PHOENIX_KIT_PATH` at a checkout, as above.
-The tests that run through core's executor are tagged `:core_api` and `test_helper.exs`
-excludes them when `PhoenixKit.API.Executor` is not loaded; read the `excluded` count
-in the `mix test` summary. The test database name is hard-coded in
+Every core API the suite once probed for ships in 2.65.0, the floor, so `test_helper.exs`
+excludes nothing but `:integration`, and that only when the database cannot be reached.
+The test database name is hard-coded in
 `config/test.exs` as `phoenix_kit_publishing_test#{MIX_TEST_PARTITION}` (`PGDATABASE`
 is ignored), so a second suite or a parallel checkout sets `MIX_TEST_PARTITION`
 (for example `_api`), creates that database with `createdb`, and the pool size is
@@ -183,6 +185,7 @@ MIX_TEST_PARTITION=_api PHOENIX_KIT_PATH=../phoenix_kit mix test test/phoenix_ki
 ```
 
 ```bash
+mix test.reset                                           # drop + recreate the test database (stale schema)
 mix test test/phoenix_kit_publishing/posts_test.exs      # one file
 mix test test/phoenix_kit_publishing/posts_test.exs:42   # one line
 mix test --only integration                              # DB-backed tests only
@@ -500,7 +503,11 @@ takes the dangerous tools away on every host (with that one warning) until `@mar
   `erase_local/1`, which is what `ListingCache.CacheSync` must call on receipt.
 - **A peer node's `:persistent_term` listing cache never misses on its own.**
   It is process-less, so without `CacheSync` a peer kept serving pre-mutation
-  listings until an unrelated LOCAL mutation. Delivery is at-most-once PubSub:
+  listings until an unrelated LOCAL mutation. A mutation's `regenerate/2`
+  announces `{:cache_regenerated, slug, node()}` on the node-level topic, and
+  every OTHER node's `CacheSync` erases its copy (the per-group `:cache_changed`
+  reaches only open admin Listings); a rebuild a mutation asked for that fails
+  erases the old listing everywhere. Delivery is at-most-once PubSub:
   a partitioned node stays stale until its next local mutation or restart. The
   listing cache is eventually consistent, by design; erase-only, so an
   invalidation can never trigger a cluster-wide regeneration storm.
@@ -556,8 +563,8 @@ lib/phoenix_kit_publishing/
   ordered by `next_sequence/0` (strictly increasing, never a tie), so a
   regeneration that started before an invalidation can neither reinstall the
   old listing nor overwrite the tombstone. Reads stay lock-free
-  `:persistent_term` lookups. `ListingCache.CacheSync` erases on peer
-  invalidation.
+  `:persistent_term` lookups. `ListingCache.CacheSync` erases on a peer's
+  invalidation or regeneration.
 - `Publishing.Renderer` — Markdown → HTML via MDEx/comrak, cached in
   `PhoenixKit.Cache` under `:publishing_posts` (24h TTL, max 2000, FIFO). The key
   folds a content hash and a `@cache_version` token, so an edit or a renderer
@@ -576,10 +583,10 @@ lib/phoenix_kit_publishing/
   `ResourceSource`) moves the folders when the host's hooks change. Design:
   `dev_docs/2026-09-25-publishing-media-reorganizer.md`.
 - `Publishing.Errors` — every public-API error tuple returns either an atom
-  listed in `@type error_atom` or one of five tagged tuples
+  listed in `@type error_atom` or one of six tagged tuples
   (`{:ai_translation_failed, _}`, `{:ai_extract_failed, _}`,
   `{:ai_request_failed, _}`, `{:source_post_read_failed, _}`,
-  `{:publish_failed, _}`). `message/1`
+  `{:publish_failed, _}`, `{:has_posts, count}`). `message/1`
   translates through this module's gettext backend, keeping the API layer
   locale-agnostic; `truncate_for_log/2` is the canonical way to put an opaque
   reason in a `Logger` call (500-char budget, appends `(truncated, N bytes)`). A
@@ -650,7 +657,8 @@ raw `Phoenix.PubSub` call.
 | `publishing:<group>:post:<slug>:versions` | `post_versions_topic/2` | version lifecycle for one post |
 | `publishing:<group>:post:<slug>:translations` | `post_translations_topic/2` | `:translation_created` / `:translation_deleted`, version scope as a STRING |
 | `publishing:editor_forms` + per-key topics | `editor_form_topic/1` | collaborative form sync |
-| per-group cache topics | `cache_topic/1`, `cache_invalidation_topic/0` | `{:cache_invalidated, slug}` |
+| `publishing:<group>:cache` | `cache_topic/1` | `{:cache_changed, slug}` after a mutation's regeneration; the admin Listing erases its node's copy |
+| `publishing:cache_invalidations` | `cache_invalidation_topic/0` | `{:cache_invalidated, slug}` (erase everywhere) and `{:cache_regenerated, slug, origin_node}` (erase everywhere but the origin); `CacheSync` subscribes |
 | `publishing:<group>:editors` | `group_editors_topic/1` | `{:editor_joined, uuid, user_info}` / `{:editor_left, uuid, user_info}` from the editor; nothing in this module subscribes |
 
 ### Settings keys
@@ -801,8 +809,10 @@ All tables use UUIDv7 primary keys, and every table-backed schema declares
 
 Test database `phoenix_kit_publishing_test`. Unit tests (schemas, changesets,
 pure functions) always run; DB-backed tests are tagged `:integration` and
-`test_helper.exs` excludes them when `psql -lqt` cannot find the database or the
-connection fails. Integration tests live in
+`test_helper.exs` excludes them when core's `PostgresPreflight` cannot reach the
+database. A database that answers but cannot be brought to the current schema
+(one below core's migration floor, or a SQL error in this module's chain) fails
+the run instead of excluding most of the suite; `mix test.reset` rebuilds it. Integration tests live in
 `test/phoenix_kit_publishing/integration/`, controller tests in
 `test/phoenix_kit_publishing/web/controller/`.
 

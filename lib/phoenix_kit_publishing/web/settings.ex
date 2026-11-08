@@ -173,133 +173,184 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       end)
 
     success_count = Enum.count(results, fn {_, result} -> result == :ok end)
+    failed_count = length(results) - success_count
+
+    flash =
+      if failed_count == 0,
+        do:
+          {:info,
+           ngettext("Regenerated %{count} cache", "Regenerated %{count} caches", success_count)},
+        else:
+          {:error,
+           ngettext(
+             "Regenerated %{count} of %{total} caches; the others failed",
+             "Regenerated %{count} of %{total} caches; the others failed",
+             success_count,
+             total: length(results)
+           )}
+
+    {kind, message} = flash
 
     {:noreply,
      socket
      |> assign(:cache_status, build_cache_status(socket.assigns.cache_groups))
-     |> put_flash(:info, gettext("Regenerated %{count} caches", count: success_count))}
+     |> put_flash(kind, message)}
   end
 
   defp settings_event("toggle_memory_cache", _params, socket) do
     new_value = !socket.assigns.memory_cache_enabled
-    Settings.update_setting(@memory_cache_key, to_string(new_value))
 
-    # If disabling memory cache, erase ALL listing-cache entries (every group +
-    # both persistent_term prefixes) so a later re-enable can't serve stale
-    # pre-disable data. The old loop only cleared the posts key for the groups it
-    # happened to have loaded (L7).
-    if !new_value, do: ListingCache.erase_all()
+    case Settings.update_setting(@memory_cache_key, to_string(new_value)) do
+      {:ok, _} ->
+        # If disabling memory cache, erase ALL listing-cache entries (every group +
+        # both persistent_term prefixes) so a later re-enable can't serve stale
+        # pre-disable data. The old loop only cleared the posts key for the groups it
+        # happened to have loaded (L7).
+        if !new_value, do: ListingCache.erase_all()
 
-    {:noreply,
-     socket
-     |> assign(:memory_cache_enabled, new_value)
-     |> assign(:cache_status, build_cache_status(socket.assigns.cache_groups))
-     |> put_flash(:info, memory_cache_toggle_message(new_value))}
+        {:noreply,
+         socket
+         |> assign(:memory_cache_enabled, new_value)
+         |> assign(:cache_status, build_cache_status(socket.assigns.cache_groups))
+         |> put_flash(:info, memory_cache_toggle_message(new_value))}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("toggle_show_language_switcher", _params, socket) do
     new_value = !socket.assigns.show_language_switcher
-    Settings.update_boolean_setting(@show_language_switcher_key, new_value)
 
-    {:noreply,
-     socket
-     |> assign(:show_language_switcher, new_value)
-     |> put_flash(
-       :info,
-       if(new_value,
-         do:
-           gettext(
-             "In-page language switcher enabled — publishing pages will render their own switcher"
-           ),
-         else:
-           gettext(
-             "In-page language switcher disabled — host layout / custom switcher should render translations"
+    case Settings.update_boolean_setting(@show_language_switcher_key, new_value) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:show_language_switcher, new_value)
+         |> put_flash(
+           :info,
+           if(new_value,
+             do:
+               gettext(
+                 "In-page language switcher enabled — publishing pages will render their own switcher"
+               ),
+             else:
+               gettext(
+                 "In-page language switcher disabled — host layout / custom switcher should render translations"
+               )
            )
-       )
-     )}
+         )}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("toggle_render_og_tags", _params, socket) do
     new_value = !socket.assigns.render_og_tags
-    Settings.update_boolean_setting(@render_og_tags_key, new_value)
 
-    {:noreply,
-     socket
-     |> assign(:render_og_tags, new_value)
-     |> put_flash(
-       :info,
-       if(new_value,
-         do:
-           gettext(
-             "In-page OpenGraph tags enabled — publishing pages will render their own social meta tags"
-           ),
-         else:
-           gettext(
-             "In-page OpenGraph tags disabled — your host layout should render the forwarded :og assign in <head>"
+    case Settings.update_boolean_setting(@render_og_tags_key, new_value) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:render_og_tags, new_value)
+         |> put_flash(
+           :info,
+           if(new_value,
+             do:
+               gettext(
+                 "In-page OpenGraph tags enabled — publishing pages will render their own social meta tags"
+               ),
+             else:
+               gettext(
+                 "In-page OpenGraph tags disabled — your host layout should render the forwarded :og assign in <head>"
+               )
            )
-       )
-     )}
+         )}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("toggle_feeds_enabled", _params, socket) do
     new_value = !socket.assigns.feeds_enabled
-    Settings.update_boolean_setting(@feeds_enabled_key, new_value)
 
-    {:noreply,
-     socket
-     |> assign(:feeds_enabled, new_value)
-     |> put_flash(
-       :info,
-       if(new_value,
-         do: gettext("RSS feeds enabled — every group serves /<group>/feed.xml"),
-         else: gettext("RSS feeds disabled — feed URLs return 404")
-       )
-     )}
+    case Settings.update_boolean_setting(@feeds_enabled_key, new_value) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:feeds_enabled, new_value)
+         |> put_flash(
+           :info,
+           if(new_value,
+             do: gettext("RSS feeds enabled — every group serves /<group>/feed.xml"),
+             else: gettext("RSS feeds disabled — feed URLs return 404")
+           )
+         )}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("toggle_render_jsonld", _params, socket) do
     new_value = !socket.assigns.render_jsonld
-    Settings.update_boolean_setting(@render_jsonld_key, new_value)
 
-    {:noreply,
-     socket
-     |> assign(:render_jsonld, new_value)
-     |> put_flash(
-       :info,
-       if(new_value,
-         do: gettext("JSON-LD structured data enabled on post pages"),
-         else: gettext("JSON-LD structured data disabled")
-       )
-     )}
+    case Settings.update_boolean_setting(@render_jsonld_key, new_value) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:render_jsonld, new_value)
+         |> put_flash(
+           :info,
+           if(new_value,
+             do: gettext("JSON-LD structured data enabled on post pages"),
+             else: gettext("JSON-LD structured data disabled")
+           )
+         )}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("toggle_unique_views", _params, socket) do
     new_value = !socket.assigns.unique_views
-    Settings.update_boolean_setting(@unique_views_key, new_value)
 
-    {:noreply,
-     socket
-     |> assign(:unique_views, new_value)
-     |> put_flash(
-       :info,
-       if(new_value,
-         do: gettext("Unique views enabled — one view per visitor per post per day"),
-         else: gettext("Unique views disabled — every page open counts")
-       )
-     )}
+    case Settings.update_boolean_setting(@unique_views_key, new_value) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:unique_views, new_value)
+         |> put_flash(
+           :info,
+           if(new_value,
+             do: gettext("Unique views enabled — one view per visitor per post per day"),
+             else: gettext("Unique views disabled — every page open counts")
+           )
+         )}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("change_slug_style", %{"slug_style" => style}, socket)
        when style in @valid_slug_styles do
-    Settings.update_setting(@slug_style_key, style)
+    case Settings.update_setting(@slug_style_key, style) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:slug_style, style)
+         |> put_flash(
+           :info,
+           gettext("Slug style updated to %{style}", style: slug_style_label(style))
+         )}
 
-    {:noreply,
-     socket
-     |> assign(:slug_style, style)
-     |> put_flash(
-       :info,
-       gettext("Slug style updated to %{style}", style: slug_style_label(style))
-     )}
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("change_slug_style", _params, socket), do: {:noreply, socket}
@@ -328,12 +379,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
         :error -> default
       end
 
-    Settings.update_setting(field, to_string(number))
+    case Settings.update_setting(field, to_string(number)) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign_numbers()
+         |> put_flash(:info, gettext("Setting updated"))}
 
-    {:noreply,
-     socket
-     |> assign_numbers()
-     |> put_flash(:info, gettext("Setting updated"))}
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("change_number_setting", _params, socket), do: {:noreply, socket}
@@ -355,7 +410,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
          |> assign(:render_cache_stats, get_render_cache_stats())
          |> put_flash(
            :info,
-           gettext("Cleared %{count} cached posts for %{group}", count: count, group: slug)
+           ngettext(
+             "Cleared %{count} cached post for %{group}",
+             "Cleared %{count} cached posts for %{group}",
+             count,
+             group: slug
+           )
          )}
 
       {:error, reason} ->
@@ -370,12 +430,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
 
   defp settings_event("toggle_render_cache", _params, socket) do
     new_value = !socket.assigns.render_cache_enabled
-    Settings.update_setting(@render_cache_key, to_string(new_value))
 
-    {:noreply,
-     socket
-     |> assign(:render_cache_enabled, new_value)
-     |> put_flash(:info, render_cache_toggle_message(new_value))}
+    case Settings.update_setting(@render_cache_key, to_string(new_value)) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:render_cache_enabled, new_value)
+         |> put_flash(:info, render_cache_toggle_message(new_value))}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
   end
 
   defp settings_event("toggle_group_render_cache", %{"slug" => slug}, socket) do
@@ -383,12 +448,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
     per_group_key = Renderer.per_group_cache_key(slug)
     current_value = Renderer.group_render_cache_enabled?(slug)
     new_value = !current_value
-    Settings.update_setting(per_group_key, to_string(new_value))
 
+    case Settings.update_setting(per_group_key, to_string(new_value)) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(
+           :render_cache_per_group,
+           build_render_cache_per_group(socket.assigns.cache_groups)
+         )
+         |> put_flash(:info, render_cache_group_toggle_message(slug, new_value))}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
+  end
+
+  # A write the settings table refused: the page keeps showing the stored value.
+  defp write_failed(socket) do
     {:noreply,
-     socket
-     |> assign(:render_cache_per_group, build_render_cache_per_group(socket.assigns.cache_groups))
-     |> put_flash(:info, render_cache_group_toggle_message(slug, new_value))}
+     put_flash(socket, :error, gettext("Couldn't save this setting. Please try again."))}
   end
 
   # ============================================================================
@@ -996,7 +1075,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               <div>
                 <p class="font-medium">{gettext("Render Cache")}</p>
                 <p class="text-xs text-base-content/60">
-                  {gettext("Cache rendered HTML for published posts (6-hour TTL)")}
+                  {gettext("Cache rendered HTML for published posts (24-hour TTL)")}
                 </p>
               </div>
             </div>
@@ -1103,7 +1182,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             <p>
               <.icon name="hero-information-circle" class="w-3 h-3 inline" />
               {gettext(
-                "Render cache stores pre-rendered HTML for published posts. Cache keys include content hashes, so edits automatically use fresh renders. TTL: 6 hours."
+                "Render cache stores pre-rendered HTML for published posts. Cache keys include content hashes, so edits automatically use fresh renders. TTL: 24 hours."
               )}
             </p>
           </div>

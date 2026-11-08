@@ -778,14 +778,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 :if={assigns[:group] && @group["show_post_count"]}
                 class="text-base sm:text-lg text-base-content/70"
               >
-                {ngettext("1 post", "%{count} posts", @total_count)}
+                {ngettext("%{count} post", "%{count} posts", @total_count)}
               </p>
             </div>
             <%!-- Admin Edit Button --%>
             <%= if assigns[:admin_edit_url] do %>
               <a href={@admin_edit_url} class="btn btn-sm btn-outline gap-2">
                 <.icon name="hero-pencil-square" class="w-4 h-4" />
-                {@admin_edit_label || "Edit"}
+                {@admin_edit_label || gettext("Edit")}
               </a>
             <% end %>
           </div>
@@ -2113,7 +2113,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <%= if assigns[:admin_edit_url] do %>
               <a href={@admin_edit_url} class="btn btn-sm btn-outline gap-2">
                 <.icon name="hero-pencil-square" class="w-4 h-4" />
-                {@admin_edit_label || "Edit"}
+                {@admin_edit_label || gettext("Edit")}
               </a>
             <% end %>
             <%!-- Version History Dropdown --%>
@@ -2594,7 +2594,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   def format_date(datetime) when is_struct(datetime, DateTime) do
     datetime
     |> DateTime.to_date()
-    |> locale_strftime(gettext("%B %d, %Y"))
+    |> locale_strftime(gettext("%B %-d, %Y"))
   end
 
   def format_date(datetime_string) when is_binary(datetime_string) do
@@ -2602,7 +2602,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       {:ok, datetime, _} ->
         datetime
         |> DateTime.to_date()
-        |> locale_strftime(gettext("%B %d, %Y"))
+        |> locale_strftime(gettext("%B %-d, %Y"))
 
       _ ->
         datetime_string
@@ -2617,7 +2617,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   """
   @spec format_date_with_time(term()) :: String.t()
   def format_date_with_time(datetime) when is_struct(datetime, DateTime) do
-    date_str = locale_strftime(datetime, gettext("%B %d, %Y"))
+    date_str = locale_strftime(datetime, gettext("%B %-d, %Y"))
     time_str = Calendar.strftime(datetime, "%H:%M")
     gettext("%{date} at %{time}", date: date_str, time: time_str)
   end
@@ -2625,7 +2625,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   def format_date_with_time(datetime_string) when is_binary(datetime_string) do
     case DateTime.from_iso8601(datetime_string) do
       {:ok, datetime, _} ->
-        date_str = locale_strftime(datetime, gettext("%B %d, %Y"))
+        date_str = locale_strftime(datetime, gettext("%B %-d, %Y"))
         time_str = Calendar.strftime(datetime, "%H:%M")
         gettext("%{date} at %{time}", date: date_str, time: time_str)
 
@@ -2854,11 +2854,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   defp format_timestamp_date(post) do
     cond do
       is_struct(post[:date], Date) ->
-        locale_strftime(post.date, gettext("%B %d, %Y"))
+        locale_strftime(post.date, gettext("%B %-d, %Y"))
 
       is_binary(post[:date]) ->
         case Date.from_iso8601(post.date) do
-          {:ok, date} -> locale_strftime(date, gettext("%B %d, %Y"))
+          {:ok, date} -> locale_strftime(date, gettext("%B %-d, %Y"))
           _ -> post.date
         end
 
@@ -3015,7 +3015,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   # Locale-aware Calendar.strftime that translates month names via gettext.
-  # The format string itself can also be translated (e.g., "%d %B %Y" for day-first locales).
+  # The format string itself can also be translated (e.g., "%-d %B %Y" for day-first locales).
+  # The full names appear only inside a day-month-year date, so a language that
+  # inflects the month there (Russian "5 января") translates them in that form;
+  # the abbreviations are also the timeline rail's standalone labels.
   defp locale_strftime(date_or_datetime, format) do
     Calendar.strftime(date_or_datetime, format,
       month_names: fn month ->
@@ -3050,7 +3053,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       gettext("Feb"),
       gettext("Mar"),
       gettext("Apr"),
-      gettext("May"),
+      # Its own context: English writes the full name and the abbreviation the
+      # same, and one shared msgid gave Italian full dates the abbreviation
+      # ("05 Mag 2026").
+      pgettext("month abbreviation", "May"),
       gettext("Jun"),
       gettext("Jul"),
       gettext("Aug"),

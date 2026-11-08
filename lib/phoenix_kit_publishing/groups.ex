@@ -721,17 +721,31 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       desired_slug == "" ->
         auto_slug = Publishing.slugify(name)
 
-        if Publishing.valid_slug?(auto_slug),
+        if valid_group_slug?(auto_slug),
           do: {:ok, auto_slug},
           else: {:error, :invalid_slug}
 
-      Publishing.valid_slug?(desired_slug) ->
+      # A group keeps the slug it has, even one created before the admin route
+      # segments were refused.
+      desired_slug == db_group.slug ->
+        {:ok, desired_slug}
+
+      valid_group_slug?(desired_slug) ->
         {:ok, desired_slug}
 
       true ->
         {:error, :invalid_slug}
     end
   end
+
+  # The literal segments of the admin routes next to `/admin/publishing/:group`
+  # (`Routes`): a group with one of these slugs is shadowed by that page, so
+  # "New Group" opened the create form instead of its listing, and a group named
+  # `categories` routed every post page to the category manager.
+  @admin_route_segments ~w(new-group edit-group categories)
+
+  defp valid_group_slug?(slug),
+    do: Publishing.valid_slug?(slug) and slug not in @admin_route_segments
 
   defp db_group_to_map(%{
          uuid: uuid,
@@ -821,7 +835,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
         slugified = Publishing.slugify(fallback_name)
         if slugified == "", do: {:error, :invalid_slug}, else: {:ok, slugified}
 
-      Publishing.valid_slug?(trimmed) ->
+      valid_group_slug?(trimmed) ->
         {:ok, trimmed}
 
       true ->
@@ -855,7 +869,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # `same-name-3`. It also respects the length ceiling, trimming the base to make
   # room for the suffix instead of overflowing `validate_length(:slug, ...)`.
   defp ensure_unique_slug(slug, taken) do
-    Slug.ensure_unique(slug, &(&1 in taken or not Publishing.valid_slug?(&1)),
+    Slug.ensure_unique(slug, &(&1 in taken or not valid_group_slug?(&1)),
       max_length: Constants.max_group_slug_length()
     )
   end
@@ -873,9 +887,10 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   defp normalize_mode(mode) when is_atom(mode), do: normalize_mode(Atom.to_string(mode))
   defp normalize_mode(_), do: nil
 
-  # Normalize mode with default fallback
-  defp normalize_mode_with_default(nil), do: @default_group_mode
-  defp normalize_mode_with_default(mode), do: normalize_mode(mode) || @default_group_mode
+  # The default only when no mode was given: an unknown one (`"slugs"`) is
+  # `:invalid_mode`, not a timestamp group, because the mode can never change.
+  defp normalize_mode_with_default(mode) when mode in [nil, ""], do: @default_group_mode
+  defp normalize_mode_with_default(mode), do: normalize_mode(mode)
 
   # Normalize and validate type
   # Preset types are passed through, custom types are validated and normalized

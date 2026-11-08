@@ -22,6 +22,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
 
   use PhoenixKitPublishing.LiveCase
 
+  import Ecto.Query, only: [from: 2]
+
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
@@ -528,6 +530,56 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert {:ok, saved} = Posts.read_post(group["slug"], post[:uuid])
       assert saved[:metadata][:title] == "Saved Title"
       assert saved[:content] =~ "## Body content"
+    end
+
+    # create_post uniquifies a taken slug ("hello" -> "hello-1") and the save of the
+    # fields then refuses the typed "hello"; the editor stayed on a new post, so
+    # every later save created one more draft.
+    test "a new post whose typed slug is taken is created once, not once per save",
+         %{conn: conn, group: group} do
+      {:ok, _} = Posts.create_post(group["slug"], %{title: "Hello", slug: "hello"})
+      saver_uuid = "019cce93-0000-7000-8000-00000000ee02"
+
+      TestRepo.query!(
+        """
+        INSERT INTO phoenix_kit_users (uuid, email, hashed_password, inserted_at, updated_at)
+        VALUES ($1::uuid, 'editor-new-slug@example.com', 'x', now(), now())
+        ON CONFLICT (email) DO NOTHING
+        """,
+        [Ecto.UUID.dump!(saver_uuid)]
+      )
+
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope(user_uuid: saver_uuid))
+        |> live("/admin/publishing/#{group["slug"]}/new")
+
+      _ = render_change(view, "update_meta", %{"title" => "Hello again", "_target" => ["title"]})
+      _ = render_change(view, "update_meta", %{"slug" => "hello", "_target" => ["slug"]})
+
+      send(
+        view.pid,
+        {:leaf_changed, %{editor_id: "content-editor", markdown: "Body", html: ""}}
+      )
+
+      _ = render(view)
+      before = post_count(group)
+
+      html = render_click(view, "save", %{})
+      assert html =~ "is already used by another post"
+      _ = render_click(view, "save", %{})
+      _ = render_click(view, "save", %{})
+
+      assert post_count(group) == before + 1
+    end
+
+    defp post_count(group) do
+      TestRepo.one(
+        from(p in PhoenixKit.Modules.Publishing.PublishingPost,
+          where: p.group_uuid == ^group["uuid"],
+          select: count(p.uuid)
+        )
+      )
     end
 
     test "saving a url_slug owned by another post shows the conflict modal (M13)",

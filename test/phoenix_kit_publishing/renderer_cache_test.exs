@@ -67,6 +67,14 @@ defmodule PhoenixKit.Modules.Publishing.RendererCacheTest do
     end
   end
 
+  test "a page with a form carrying the visitor's CSRF token is not stored" do
+    post = post(~s(Intro\n\n<EntityForm entity="contact" />))
+
+    assert {:ok, html} = Renderer.render_post(post)
+    assert html =~ ~s(name="_csrf_token")
+    assert {:ok, 0} = Cache.clear_by_prefix(:publishing_posts, prefix(post))
+  end
+
   defp post(content) do
     n = System.unique_integer([:positive])
 

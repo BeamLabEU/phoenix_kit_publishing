@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.ActivityLog
+  alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Constants
 
   @status_published Constants.status_published()
@@ -1203,7 +1204,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       {:error, %Ecto.Changeset{} = changeset} ->
         Logger.warning("[Publishing] slug update changeset error: #{inspect(changeset.errors)}")
 
-        if Keyword.has_key?(changeset.errors, :slug),
+        if slug_unique_violation?(changeset),
           do: {:error, :slug_already_exists},
           else: {:error, :db_update_failed}
 
@@ -1211,6 +1212,16 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         Logger.warning("[Publishing] slug update failed: #{inspect(reason)}")
         {:error, reason}
     end
+  end
+
+  # `unique_constraint([:group_uuid, :slug])` files its error under the FIRST
+  # field, `:group_uuid`, so a check for a `:slug` key never saw a lost race:
+  # the save answered `:db_update_failed` and rolled the content back with it.
+  defp slug_unique_violation?(%Ecto.Changeset{errors: errors}) do
+    Enum.any?(errors, fn {_field, {_message, meta}} ->
+      meta[:constraint] == :unique and
+        to_string(meta[:constraint_name]) == "idx_publishing_posts_group_slug"
+    end)
   end
 
   defp do_update_post_in_db(
@@ -1561,7 +1572,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       )
       |> maybe_put_version_field("seo_title", Map.get(params, "seo_title"))
       |> maybe_put_version_field("tags", resolve_tags(version, params))
-      |> maybe_put_version_field("category_uuids", resolve_category_uuids(params))
+      |> maybe_put_version_field("category_uuids", resolve_category_uuids(params, post[:group]))
       |> maybe_put_version_field("excerpt", Map.get(params, "excerpt"))
       |> maybe_put_version_field("featured", normalize_featured(Map.get(params, "featured")))
       # Public `?v=N` browsing is gated on this and the mapper reads it, but no
@@ -1635,12 +1646,28 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # autosave from a context that never loaded the picker, a translation
   # write — can't quietly unfile a post. An empty list is a real answer:
   # somebody removed the last chip, and that has to stick.
-  defp resolve_category_uuids(params) do
+  #
+  # Only categories of the post's own group are filed: the picker's event
+  # carries client-sent uuids, and anything else was stored as it came.
+  defp resolve_category_uuids(params, group_slug) do
     case Map.get(params, "category_uuids") do
-      list when is_list(list) -> list |> Enum.filter(&is_binary/1) |> Enum.uniq()
-      _ -> nil
+      list when is_list(list) ->
+        list |> Enum.filter(&is_binary/1) |> Enum.uniq() |> only_group_categories(group_slug)
+
+      _ ->
+        nil
     end
   end
+
+  defp only_group_categories([], _group_slug), do: []
+
+  defp only_group_categories(uuids, group_slug) when is_binary(group_slug) do
+    known = group_slug |> Categories.categories_by_uuids(uuids) |> MapSet.new(& &1.uuid)
+    Enum.filter(uuids, &MapSet.member?(known, &1))
+  end
+
+  defp only_group_categories(uuids, _group_slug),
+    do: Enum.filter(uuids, &match?({:ok, _}, Ecto.UUID.cast(&1)))
 
   # Normalizes the editor's "featured" checkbox into a boolean for version.data.
   # `nil` (key absent) is preserved so a save that doesn't carry the field leaves

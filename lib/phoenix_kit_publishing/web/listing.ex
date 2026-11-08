@@ -84,21 +84,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     # `handle_params` fires for pagination clicks, query-param tweaks,
     # filter changes, etc.; running the fixer over every active +
     # trashed post on each one creates needless DB load and background
-    # process churn on large groups.
-    if connected?(socket) and not is_nil(new_group_slug) and old_group_slug != new_group_slug do
-      Task.Supervisor.start_child(PhoenixKit.TaskSupervisor, fn ->
-        try do
-          active = Publishing.list_raw_posts(new_group_slug)
-          trashed = Publishing.list_raw_posts(new_group_slug, "trashed")
-          Enum.each(active ++ trashed, &StaleFixer.fix_stale_post/1)
-        rescue
-          e ->
-            Logger.error(
-              "[Publishing] Stale fixer task crashed for #{new_group_slug}: #{Exception.message(e)}"
-            )
-        end
-      end)
-    end
+    # process churn on large groups. Gated on its own marker: `mount`
+    # already assigns `:group_slug`, so comparing it with the new slug
+    # never let the first connected load through, and the sweep (which
+    # also auto-trashes abandoned empty posts) never ran.
+    socket = maybe_sweep_stale_posts(socket, new_group_slug)
 
     # Skip full reload if mount already loaded data for this group.
     # This prevents the visual flash on hard refresh (dead render → connected render).
@@ -186,15 +176,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
 
   def handle_event("restore_post", %{"uuid" => post_uuid}, socket) do
     group_slug = socket.assigns.group_slug
+    # Trashing keeps the live version: a restored post that had one is public
+    # again at once, so "as draft" was untrue for it.
+    live? = live_version_for(socket, post_uuid) != nil
 
     case Publishing.restore_post(group_slug, post_uuid,
            actor_uuid: Shared.actor_uuid_from_socket(socket)
          ) do
       {:ok, _} ->
+        message =
+          if live?,
+            do: gettext("Post restored and live again"),
+            else: gettext("Post restored as draft")
+
         {:noreply,
          socket
          |> reload_current_view()
-         |> put_flash(:info, gettext("Post restored as draft"))}
+         |> put_flash(:info, message)}
 
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, gettext("Post not found"))}
@@ -494,85 +492,48 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     :ok
   end
 
-  # Execute debounced update when timer fires
+  # Execute debounced update when timer fires. A burst of saves across several
+  # posts ends in ONE reload: the last timer to fire does it.
   defp do_debounced_update(socket, post_slug) do
-    # Clear the timer from pending
     pending = socket.assigns[:pending_post_updates] || %{}
-    socket = assign(socket, :pending_post_updates, Map.delete(pending, post_slug))
+    pending = Map.delete(pending, post_slug)
+    socket = assign(socket, :pending_post_updates, pending)
 
-    # Do the actual update
-    refresh_post_by_slug(socket, post_slug)
+    if map_size(pending) == 0, do: refresh_posts(socket), else: socket
   end
 
-  # Incrementally update a single post in the list by slug
-  # We refresh the full post from the database to ensure all fields are current
-  # (available_versions, language_slugs, version_statuses, etc.)
-  defp update_post_in_list(socket, updated_post) do
-    post_slug =
-      updated_post[:slug] || updated_post["slug"] ||
-        updated_post[:uuid] || updated_post["uuid"]
+  # A changed post is reloaded the way the list was loaded (`Publishing.list_posts/1`,
+  # the live-effective listing map), never through `read_post/4`: that answers with
+  # the LIVE version's map — its languages, its number as `:version`, no
+  # `:live_version`, the title in the admin's UI language. A card swapped for it
+  # sent a draft-only language's pill to the published version, whose first save
+  # put that language live; and the status counts and the tab filter went stale.
+  defp update_post_in_list(socket, _updated_post), do: refresh_posts(socket)
 
-    can_update? = post_slug && socket.assigns[:posts] && socket.assigns[:group_slug]
+  defp refresh_post_by_slug(socket, _post_slug), do: refresh_posts(socket)
 
-    if can_update? do
-      reload_post(socket, post_slug)
-    else
-      refresh_posts(socket)
-    end
-  end
-
-  defp reload_post(socket, post_slug) do
-    case Publishing.read_post(
-           socket.assigns.group_slug,
-           post_slug,
-           socket.assigns.current_locale_base,
-           nil
-         ) do
-      {:ok, fresh_post} ->
-        replace_post_in_list(socket, post_slug, fresh_post)
-
-      {:error, reason} ->
-        Logger.warning(
-          "[Publishing.Listing] reload_post failed for #{post_slug}: #{inspect(reason)}, doing full refresh"
-        )
-
-        refresh_posts(socket)
-    end
-  end
-
-  defp replace_post_in_list(socket, post_identifier, fresh_post) do
-    updated_posts =
-      Enum.map(socket.assigns.posts, fn post ->
-        if post[:slug] == post_identifier or post[:uuid] == post_identifier do
-          fresh_post
-        else
-          post
-        end
+  defp maybe_sweep_stale_posts(socket, group_slug) do
+    if connected?(socket) and not is_nil(group_slug) and
+         socket.assigns[:stale_fixed_group] != group_slug do
+      Task.Supervisor.start_child(PhoenixKit.TaskSupervisor, fn ->
+        sweep_stale_posts(group_slug)
       end)
 
-    assign(socket, :posts, updated_posts)
+      assign(socket, :stale_fixed_group, group_slug)
+    else
+      socket
+    end
   end
 
-  # Refresh a single post by slug (used when we need fresh data from the database)
-  defp refresh_post_by_slug(socket, post_slug) do
-    case socket.assigns.group_slug do
-      nil ->
-        socket
-
-      group_slug ->
-        case Publishing.read_post(group_slug, post_slug, socket.assigns.current_locale_base, nil) do
-          {:ok, fresh_post} ->
-            # Replace directly — data is already fresh from DB, no need to re-read
-            replace_post_in_list(socket, post_slug, fresh_post)
-
-          {:error, reason} ->
-            Logger.warning(
-              "[Publishing.Listing] Post #{post_slug} not found during refresh: #{inspect(reason)}, doing full refresh"
-            )
-
-            refresh_posts(socket)
-        end
-    end
+  defp sweep_stale_posts(group_slug) do
+    active = Publishing.list_raw_posts(group_slug)
+    trashed = Publishing.list_raw_posts(group_slug, "trashed")
+    Enum.each(active ++ trashed, &StaleFixer.fix_stale_post/1)
+  rescue
+    e ->
+      Logger.error(
+        "[Publishing] Stale fixer task crashed for #{group_slug}: #{Exception.message(e)}"
+      )
   end
 
   # ============================================================================
@@ -790,7 +751,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     # Just format them with user preferences
     date_str = UtilsDate.format_date_with_user_timezone_cached(date, user, date_time_settings)
     time_str = UtilsDate.format_time_with_user_timezone_cached(time, user, date_time_settings)
-    "#{date_str} #{gettext("at")} #{time_str}"
+    gettext("%{date} at %{time}", date: date_str, time: time_str)
   end
 
   def format_datetime(
@@ -815,7 +776,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
         time_str =
           UtilsDate.format_time_with_user_timezone_cached(naive_dt, user, date_time_settings)
 
-        "#{date_str} #{gettext("at")} #{time_str}"
+        gettext("%{date} at %{time}", date: date_str, time: time_str)
 
       _ ->
         gettext("Unsaved draft")
@@ -949,13 +910,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     # results in the version row carrying status "archived" — without
     # it the version reverts to "draft" and the listing's status badge
     # silently misrepresents DB state.
-    Publishing.unpublish_post(group_slug, post_uuid,
-      actor_uuid: actor_uuid,
-      target_status: status
-    )
+    case Publishing.unpublish_post(group_slug, post_uuid,
+           actor_uuid: actor_uuid,
+           target_status: status
+         ) do
+      {:error, :not_published} -> set_version_status(group_slug, post_uuid, status, actor_uuid)
+      result -> result
+    end
   end
 
   defp apply_status_change(_, _, _, _), do: {:error, :invalid_status}
+
+  # A post with no live version has nothing to unpublish (Draft <-> Archived
+  # always answered "Not published"): its newest version changes status, as the
+  # editor's status field does it.
+  defp set_version_status(group_slug, post_uuid, status, actor_uuid) do
+    with {:ok, post} <- Publishing.read_post_by_uuid(post_uuid),
+         true <- post[:group] == group_slug || {:error, :not_found},
+         {:ok, _} <-
+           Publishing.update_post(group_slug, post, %{"status" => status}, %{
+             actor_uuid: actor_uuid,
+             publish: false
+           }) do
+      :ok
+    end
+  end
 
   # Translates the four valid post statuses for user-facing display.
   # The raw keys (`"draft"`/`"published"`/`"archived"`/`"trashed"`) flow
@@ -1199,7 +1178,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                             (what readers see); drafts open the newest revision.
                             All versions stay editable (variant versioning). --%>
                           <.link
-                            href={
+                            navigate={
                               Helpers.build_edit_url(group_slug, post,
                                 lang: post_primary_lang,
                                 version: post[:live_version]
@@ -1293,6 +1272,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                             phx-click="restore_post"
                             phx-value-uuid={post[:uuid]}
                             phx-disable-with={gettext("Restoring…")}
+                            data-confirm={
+                              post[:live_version] &&
+                                gettext(
+                                  "This post has a live version: restoring it puts it back on the public site. Restore?"
+                                )
+                            }
                             class="inline-flex items-center gap-1.5 px-2.5 h-[2.5em] rounded-lg border border-success/30 bg-success/10 hover:bg-success/20 text-success font-medium transition-colors cursor-pointer"
                             title={gettext("Restore")}
                           >

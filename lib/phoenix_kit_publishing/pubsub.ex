@@ -534,6 +534,18 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
     Manager.broadcast(cache_invalidation_topic(), {:cache_invalidated, group_slug})
   end
 
+  @doc """
+  Broadcasts, on the same node-level topic, that `origin` rebuilt a group's
+  listing after a mutation (`{:cache_regenerated, group_slug, origin}`). Every
+  OTHER node's `CacheSync` erases its copy; the origin keeps the one it just
+  installed. Without it a post, version or translation change reached only the
+  nodes that had an admin Listing open (the only `:cache_changed` receiver).
+  """
+  @spec broadcast_cache_regenerated(String.t(), node()) :: broadcast_result
+  def broadcast_cache_regenerated(group_slug, origin \\ node()) do
+    Manager.broadcast(cache_invalidation_topic(), {:cache_regenerated, group_slug, origin})
+  end
+
   # ============================================================================
   # AI Translation Progress
   # ============================================================================

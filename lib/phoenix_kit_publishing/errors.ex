@@ -15,7 +15,8 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
       `:invalid_mode`, `:no_published_version`, etc.
     * tagged tuples — `{:ai_translation_failed, reason}`,
       `{:ai_extract_failed, reason}`, `{:ai_request_failed, reason}`,
-      `{:source_post_read_failed, reason}`, `{:publish_failed, reason}`
+      `{:source_post_read_failed, reason}`, `{:publish_failed, reason}`,
+      `{:has_posts, count}`
     * strings — passed through unchanged (legacy / interpolated messages)
     * `%Ecto.Changeset{}` — a humanized, two-error-capped summary of its
       field errors (defensive: changesets are normally normalized to atoms
@@ -42,6 +43,8 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
 
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  alias PhoenixKitWeb.Components.Core.Input
+
   @max_log_bytes 500
 
   @typedoc "Atoms returned by Publishing's public API on error."
@@ -50,9 +53,13 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | :cache_miss
           | :cannot_delete_live
           | :category_cycle
+          | :comments_unavailable
           | :conflicts_with_post_slug
+          | :conflicts_with_previous_slug
+          | :content_copy_failed
           | :db_update_failed
           | :destination_exists
+          | :group_not_active
           | :group_not_found
           | :invalid_content
           | :invalid_format
@@ -67,9 +74,11 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | :cannot_delete_primary_language
           | :last_language
           | :last_version
+          | :no_active_version
           | :no_post
           | :no_published_version
           | :no_uuid
+          | :no_version
           | :not_found
           | :not_published
           | :params_not_applied
@@ -82,10 +91,12 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | :reserved_route_word
           | :slug_already_exists
           | :slug_taken
+          | :source_not_found
           | :timestamp_collision_unresolvable
           | :title_required
           | :unpublished
           | :version_access_disabled
+          | :version_not_found
           | :ai_disabled
           | :ai_no_prompt
           | :ai_endpoint_not_found
@@ -98,6 +109,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | {:ai_request_failed, term()}
           | {:source_post_read_failed, term()}
           | {:publish_failed, term()}
+          | {:has_posts, non_neg_integer()}
 
   @doc """
   Translates an error reason (atom, tagged tuple, or string) into a
@@ -111,9 +123,16 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:category_cycle),
     do: gettext("A category can't be moved inside itself or one of its own children")
 
+  def message(:comments_unavailable), do: gettext("Comments are not available")
   def message(:conflicts_with_post_slug), do: gettext("URL slug conflicts with another post")
+
+  def message(:conflicts_with_previous_slug),
+    do: gettext("URL slug is a previous address of another post")
+
+  def message(:content_copy_failed), do: gettext("Could not copy the content to the new version")
   def message(:db_update_failed), do: gettext("Database update failed")
   def message(:destination_exists), do: gettext("Destination already exists")
+  def message(:group_not_active), do: gettext("Group is in the trash")
   def message(:group_not_found), do: gettext("Group not found")
   def message(:invalid_content), do: gettext("Invalid content")
   def message(:invalid_format), do: gettext("Invalid format")
@@ -134,9 +153,11 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
 
   def message(:last_language), do: gettext("Cannot delete the last language")
   def message(:last_version), do: gettext("Cannot delete the last version")
+  def message(:no_active_version), do: gettext("The post has no live version")
   def message(:no_post), do: gettext("No post")
   def message(:no_published_version), do: gettext("No published version")
   def message(:no_uuid), do: gettext("No UUID")
+  def message(:no_version), do: gettext("The post has no version")
   def message(:not_found), do: gettext("Not found")
   def message(:not_published), do: gettext("Not published")
 
@@ -155,6 +176,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:reserved_route_word), do: gettext("Slug conflicts with a reserved route word")
   def message(:slug_already_exists), do: gettext("Slug already exists")
   def message(:slug_taken), do: gettext("Slug taken")
+  def message(:source_not_found), do: gettext("Source version not found")
 
   def message(:timestamp_collision_unresolvable),
     do:
@@ -165,6 +187,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:title_required), do: gettext("Title is required to publish")
   def message(:unpublished), do: gettext("Unpublished")
   def message(:version_access_disabled), do: gettext("Version access is disabled")
+  def message(:version_not_found), do: gettext("Version not found")
 
   def message(:ai_disabled), do: gettext("AI module is not enabled")
   def message(:ai_no_prompt), do: gettext("No AI prompt selected")
@@ -190,6 +213,14 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   # `update_post/4` saved the content and was then refused the publish it was
   # asked for. The inner reason is one of this module's own, so it is
   # translated rather than inspected.
+  def message({:has_posts, count}) when is_integer(count) do
+    ngettext(
+      "The group still holds %{count} post",
+      "The group still holds %{count} posts",
+      count
+    )
+  end
+
   def message({:publish_failed, reason}) do
     gettext("Saved as a draft, but it could not be published: %{reason}",
       reason: message(reason)
@@ -218,15 +249,41 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
 
   defp humanize_changeset_errors(changeset) do
     changeset
-    |> Ecto.Changeset.traverse_errors(fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", safe_to_string(value))
+    |> Ecto.Changeset.traverse_errors(&translate_changeset_error/1)
+    |> Enum.flat_map(fn {field, msgs} ->
+      Enum.map(msgs, fn msg ->
+        gettext("%{field} %{message}", field: humanize_field(field), message: msg)
       end)
     end)
-    |> Enum.flat_map(fn {field, msgs} ->
-      Enum.map(msgs, fn msg -> "#{humanize_field(field)} #{msg}" end)
-    end)
     |> Enum.take(2)
+  end
+
+  # Ecto's own messages ("can't be blank", "should be at most %{count}
+  # character(s)") through core's `errors` catalogue, which every core locale
+  # ships; a message core does not know comes back as it is. Whatever gettext
+  # leaves (or a lookup that raised) is interpolated here, so a value that is
+  # not a string (a type tuple, an enum list) cannot crash the flash.
+  defp translate_changeset_error({msg, opts}) do
+    translated =
+      try do
+        Input.translate_error({msg, bindings(opts)})
+      rescue
+        _ -> msg
+      end
+
+    Enum.reduce(opts, translated, fn {key, value}, acc ->
+      String.replace(acc, "%{#{key}}", safe_to_string(value))
+    end)
+  end
+
+  # `count` stays a number (it picks the plural form); every other value is made
+  # a string first, since gettext interpolates with `to_string/1`.
+  defp bindings(opts) do
+    for {key, value} <- opts, is_atom(key) do
+      if key == :count and is_integer(value),
+        do: {key, value},
+        else: {key, safe_to_string(value)}
+    end
   end
 
   # Ecto error opts can carry values that don't convert to a string: tuples

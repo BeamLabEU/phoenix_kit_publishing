@@ -3,8 +3,10 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
   # The text danger rule of the Publishing API: a fail-closed
   # scan of a SUBMITTED string. It renders nothing and parses no markdown. A write of body
   # text is dangerous when the text holds raw HTML or a component (`<` + letter, `/`, `!`,
-  # `?`), the `[[post:` token, `javascript:` / `vbscript:` / `data:` (whitespace removed, any
-  # case), a markdown link / image destination outside http, https, mailto, tel and
+  # `?`), the `[[post:` token (read with backslashes dropped and the entities for printable
+  # ASCII, `[` and `:` decoded, as the renderer reads it), `javascript:` / `vbscript:` /
+  # `data:` (whitespace removed, any case), a markdown link / image destination outside http,
+  # https, mailto, tel and
   # relative (`//host` is another site, not relative), or text the renderer autolinks to
   # another scheme: a bare `scheme://`, `xmpp:`, or `mailto:` behind an email local-part
   # character, read with entities for printable ASCII decoded (the renderer enables the GFM
@@ -88,7 +90,34 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
 
   # --- rule 2: post_link -----------------------------------------------------------
 
-  defp post_link(text), do: offsets(text, ~S"\[\[post:", [:caseless])
+  # The renderer resolves the token in its HTML, after the markdown has decoded backslash
+  # escapes and entities, so `\[\[post:` and `&#91;&#91;post:` / `&lbrack;&lbrack;post:` become
+  # a live link just as the literal token does. The rule reads the text with every backslash
+  # dropped and the entities of printable ASCII (plus the named ones for `[` and `:`) decoded.
+  # Dropping every backslash also drops an escaped one (`\\`), which can only add findings.
+  @post_link_normalise "\\\\|&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|lbrack|lsqb|colon);"
+  @post_link_named %{"lbrack" => "[", "lsqb" => "[", "colon" => ":"}
+
+  defp post_link(text) do
+    {normalised, breaks} = normalise(text, @post_link_normalise, &post_link_char/1)
+
+    normalised
+    |> offsets(~S"\[\[post:", [:caseless])
+    |> Enum.map(&original_offset(&1, breaks))
+  end
+
+  defp post_link_char("\\"), do: ""
+  defp post_link_char("&#" <> _ = entity), do: entity_binary(entity)
+
+  defp post_link_char("&" <> name),
+    do: Map.get(@post_link_named, String.trim_trailing(name, ";"))
+
+  defp entity_binary(entity) do
+    case entity_char(entity) do
+      nil -> nil
+      char -> <<char>>
+    end
+  end
 
   defp offsets(text, pattern, opts) do
     case :re.run(text, pattern, [:global, {:capture, :first, :index}] ++ opts) do
@@ -263,35 +292,48 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScan do
   # An entity that stands for one printable ASCII character: a decimal reference of up to
   # seven digits, a hexadecimal one of up to six (leading zeros included), or one of the
   # named references of the characters an address can hold. Names are case-sensitive.
-  @entity "&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|colon|period|plus|lowbar|commat);"
-  @named_entities %{"colon" => ?:, "period" => ?., "plus" => ?+, "lowbar" => ?_, "commat" => ?@}
+  # `sol` and `UnderBar` too: `ftp&colon;&sol;&sol;x` renders as an autolinked `ftp://x`.
+  @entity "&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|colon|period|plus|lowbar|UnderBar|commat|sol);"
+  @named_entities %{
+    "colon" => ?:,
+    "period" => ?.,
+    "plus" => ?+,
+    "lowbar" => ?_,
+    "UnderBar" => ?_,
+    "commat" => ?@,
+    "sol" => ?/
+  }
 
   # The text with those entities replaced by their character, and the breakpoints that map a
   # position in it back to the submitted text (same shape as `strip/1`). Entities that stand
   # for a control character or a space stay as they are, so lines and word breaks do not move.
-  defp decode_entities(text) do
-    case :re.run(text, @entity, [:global, {:capture, :first, :index}]) do
+  defp decode_entities(text), do: normalise(text, @entity, &entity_binary/1)
+
+  # `text` with each match of `pattern` replaced by what `replace` answers for it (a binary,
+  # possibly empty; `nil` keeps the match as it is), and the breakpoints back to `text`.
+  defp normalise(text, pattern, replace) do
+    case :re.run(text, pattern, [:global, {:capture, :first, :index}]) do
       :nomatch -> {text, {}}
-      {:match, matches} -> decode_entities(matches, text, 0, 0, 0, [], [])
+      {:match, matches} -> normalise(matches, text, replace, 0, 0, 0, [], [])
     end
   end
 
-  defp decode_entities([], text, cursor, _kept, _removed, acc, breaks) do
+  defp normalise([], text, _replace, cursor, _kept, _removed, acc, breaks) do
     tail = binary_part(text, cursor, byte_size(text) - cursor)
     {IO.iodata_to_binary(Enum.reverse([tail | acc])), breaks |> Enum.reverse() |> List.to_tuple()}
   end
 
-  defp decode_entities([[{start, len}] | rest], text, cursor, kept, removed, acc, breaks) do
-    case entity_char(binary_part(text, start, len)) do
+  defp normalise([[{start, len}] | rest], text, replace, cursor, kept, removed, acc, breaks) do
+    case replace.(binary_part(text, start, len)) do
       nil ->
-        decode_entities(rest, text, cursor, kept, removed, acc, breaks)
+        normalise(rest, text, replace, cursor, kept, removed, acc, breaks)
 
-      char ->
+      replacement ->
         before = binary_part(text, cursor, start - cursor)
-        kept = kept + byte_size(before) + 1
-        removed = removed + len - 1
+        kept = kept + byte_size(before) + byte_size(replacement)
+        removed = removed + len - byte_size(replacement)
 
-        decode_entities(rest, text, start + len, kept, removed, [<<char>>, before | acc], [
+        normalise(rest, text, replace, start + len, kept, removed, [replacement, before | acc], [
           {kept, removed} | breaks
         ])
     end

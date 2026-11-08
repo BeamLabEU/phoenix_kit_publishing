@@ -48,4 +48,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.FeedDescriptionTest do
   test "markdown does not reach the reader", %{conn: conn, slug: slug} do
     assert description(conn, slug, "some **bold** words") == "some bold words"
   end
+
+  # A reader reads the description as HTML, so text that names a tag stays text.
+  test "a tag written as text is not markup to the reader", %{conn: conn, slug: slug} do
+    assert description(conn, slug, "Use the `<b>` tag & more") ==
+             "Use the &lt;b&gt; tag &amp; more"
+  end
+
+  test "a control character does not break the feed", %{conn: conn, slug: slug} do
+    assert description(conn, slug, "bell\u0007 here") == "bell here"
+  end
 end

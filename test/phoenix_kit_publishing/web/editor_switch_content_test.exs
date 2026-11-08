@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
@@ -179,6 +180,75 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
       %{action: "set_content", content: "Second version body."},
       1000
     )
+  end
+
+  # The switch subscribes under the new form key, then patches; handle_params
+  # comes back with that same key as the "old" one. A second subscribe there
+  # delivered every message twice: an AI translation's completions counted
+  # double and the lock lifted at half the jobs.
+  test "a version switch leaves one subscription per topic, not two", ctx do
+    {:ok, _} = Versions.create_version_from(ctx.slug, ctx.uuid, 1)
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
+
+    switch(view, "switch_version", %{"version" => "2"}, "English body.", dirty: false)
+    _ = render(view)
+
+    assigns = :sys.get_state(view.pid).socket.assigns
+    post_id = PublishingPubSub.broadcast_id(assigns.post)
+
+    for topic <- [
+          PublishingPubSub.editor_form_topic(assigns.form_key),
+          PublishingPubSub.post_translations_topic(ctx.slug, post_id),
+          PublishingPubSub.post_versions_topic(ctx.slug, post_id)
+        ] do
+      subscriptions =
+        :phoenix_kit_internal_pubsub
+        |> Registry.lookup(topic)
+        |> Enum.count(fn {pid, _} -> pid == view.pid end)
+
+      assert subscriptions == 1, "#{subscriptions} subscriptions to #{topic}"
+    end
+  end
+
+  # Edits made before another session's AI translation locked the post are
+  # still pending; the Save button refuses them, and so must the save a
+  # switch makes on its way out.
+  test "a switch under the translation lock does not save pending edits", ctx do
+    user = with_real_user()
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid, user_uuid: user)
+
+    # Typed before the lock: the edit is pending when the lock arrives.
+    send(view.pid, {:leaf_changed, leaf_payload("English body. Typed before the lock.")})
+    _ = render(view)
+    assert :sys.get_state(view.pid).socket.assigns.has_pending_changes
+
+    :sys.replace_state(view.pid, fn state ->
+      socket = state.socket
+      assigns = Map.put(socket.assigns, :translation_locked?, true)
+      %{state | socket: %{socket | assigns: assigns}}
+    end)
+
+    render_click(view, "switch_language", %{"language" => "de-DE"})
+    answer_flush(view, "English body. Typed before the lock.", [])
+
+    assert render(view) =~ "Cannot save while translation is in progress"
+    {:ok, english} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
+    assert english.content == "English body."
+  end
+
+  # A save in another language of the same version cannot change this
+  # language's body; handing Leaf the stored body replaced its document and
+  # dropped what was typed inside its debounce.
+  test "a sibling language's save does not replace this editor's text", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
+    form_key = :sys.get_state(view.pid).socket.assigns.form_key
+    sibling_key = String.replace_suffix(form_key, ":en-US", ":de-DE")
+    refute sibling_key == form_key
+
+    send(view.pid, {:sibling_editor_saved, sibling_key, "another-socket"})
+    _ = render(view)
+
+    refute_push_event(view, @leaf, %{action: "set_content"})
   end
 
   test "the last keystrokes go with the switch instead of being dropped", ctx do

@@ -51,7 +51,10 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   #     appended after the sanitised document.
   # v10: a backslash-escaped `\\<Tag` is text, so a body holding one renders it
   #      literally instead of as a live component with a stray backslash.
-  @cache_version "v10"
+  # v11: author `data-*` attributes are dropped (only the notes' `data-note` stays),
+  #      and a component attribute value keeps an apostrophe or a quote of the other
+  #      kind instead of ending at it.
+  @cache_version "v11"
 
   @generated_styles_key :pk_publishing_generated_styles
 
@@ -1350,7 +1353,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   rescue
     error ->
       Logger.warning("Error rendering Image component: #{inspect(error)}")
-      "<div class='error'>Error rendering image</div>"
+      component_error(gettext("Error rendering image"))
   end
 
   defp render_inline_component("Video", attrs) do
@@ -1371,7 +1374,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   rescue
     error ->
       Logger.warning("Error rendering Video component: #{inspect(error)}")
-      "<div class='error'>Error rendering video</div>"
+      component_error(gettext("Error rendering video"))
   end
 
   defp render_inline_component("Audio", attrs) do
@@ -1392,7 +1395,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   rescue
     error ->
       Logger.warning("Error rendering Audio component: #{inspect(error)}")
-      "<div class='error'>Error rendering audio</div>"
+      component_error(gettext("Error rendering audio"))
   end
 
   defp render_inline_component("Embed", attrs) do
@@ -1413,7 +1416,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   rescue
     error ->
       Logger.warning("Error rendering Embed component: #{inspect(error)}")
-      "<div class='error'>Error rendering embed</div>"
+      component_error(gettext("Error rendering embed"))
   end
 
   defp render_inline_component("EntityForm", attrs) do
@@ -1436,7 +1439,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   rescue
     error ->
       Logger.warning("Error rendering EntityForm component: #{inspect(error)}")
-      "<div class='error'>Error rendering entity form</div>"
+      component_error(gettext("Error rendering entity form"))
   end
 
   defp render_inline_component(tag, _attrs) do
@@ -1751,7 +1754,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
       {:error, reason} ->
         Logger.warning("Error rendering block component: #{inspect(reason)}")
-        "<div class='error'>Error rendering component</div>"
+        component_error(gettext("Error rendering component"))
     end
   end
 
@@ -1818,7 +1821,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   rescue
     error ->
       Logger.warning("Error rendering Showcase component: #{inspect(error)}")
-      "<div class='error'>Error rendering showcase</div>"
+      component_error(gettext("Error rendering showcase"))
   end
 
   # Full-bleed by default — the look is the image running off the page edge —
@@ -1902,12 +1905,23 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   defp showcase_height(_), do: nil
 
   # Parse XML attribute string into a map
+  # The page's stand-in for a component that failed to render, in the page's
+  # language, as "Error rendering markdown" already was.
+  defp component_error(message) do
+    escaped = message |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
+    "<div class='error'>" <> escaped <> "</div>"
+  end
+
   defp parse_xml_attributes(attrs_string) do
-    # Match key="value" or key='value' patterns
-    attr_regex = ~r/(\w+)=["']([^"']+)["']/
+    # key="value" or key='value': a value ends at its own quote, so the other quote is text
+    # (`alt="Tallinn's old town"`, `caption='Say "hi"'`). An empty value is left out.
+    attr_regex = ~r/(\w+)=(?:"([^"]+)"|'([^']+)')/
 
     Regex.scan(attr_regex, attrs_string)
-    |> Enum.map(fn [_, key, value] -> {key, value} end)
+    |> Enum.map(fn
+      [_, key, "", single] -> {key, single}
+      [_, key, double | _] -> {key, double}
+    end)
     |> Enum.into(%{})
   end
 
@@ -2022,7 +2036,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
            )
          end) do
       {:ok, html} ->
-        put_cached(cache_key, html)
+        if per_request_html?(html), do: :ok, else: put_cached(cache_key, html)
         {:ok, html}
 
       # An image lookup raised (schema not migrated yet, database down).
@@ -2038,6 +2052,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         {:ok, html}
     end
   end
+
+  # A form that carries the visitor's CSRF token (`<EntityForm>`, and its time trap's load
+  # timestamp) is rendered for one request: cached, every other visitor would post the first
+  # visitor's token and get a 403, and that token would be shown to everyone.
+  defp per_request_html?(html), do: String.contains?(html, ~s(name="_csrf_token"))
 
   # `{:retry, html}` when an image lookup raised (core 2.41.1 and later).
   # Older cores report `{:ok, html}` and the render is stored.

@@ -54,6 +54,7 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
     "x_mailto:a@b.c",
     "x&#45;mailto:a@b.c",
     "ftp&colon;//x.example",
+    "ftp&colon;&sol;&sol;x.example",
     "https://example.com/ok then ftp://x"
   ]
 
@@ -111,7 +112,7 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
   ]
   @words ["mailto", "xmpp", "&#109;ailto", "x&#109;pp", "&#120;mpp", "ftp", "javascript", "data"]
   @colons [":", ":", "&colon;", "&#58;", "&#x3a;", "&#058;", "&#x3A;", "&COLON;", "::", "://"]
-  @colons @colons ++ ["&colon;//", ":&#47;&#47;", ":/"]
+  @colons @colons ++ ["&colon;//", ":&#47;&#47;", ":/", "&colon;&sol;&sol;", ":&sol;/"]
   @locals ["a", "a.b", "", "x-y", "&#97;"]
   @ats ["@", "@", "&#64;", "&commat;", "@@"]
   @domains ["b.c", "b.c.d", "example.org", "b", ""]
@@ -176,6 +177,38 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
         scheme == "" or String.downcase(scheme) in ~w(http https mailto tel) or
           String.contains?(scheme, ["/", "?", "#"])
     end
+  end
+
+  # The renderer resolves `[[post:` in its HTML, after the markdown has decoded backslash
+  # escapes and entities, so every spelling that renders as the token must be flagged.
+  @brackets ["[", "\\[", "&#91;", "&#091;", "&#x5b;", "&#X5B;", "&lbrack;", "&lsqb;", "&#92;["]
+  @post_words ["post", "POST", "&#112;ost", "p&#x6f;st", "\\post", "pos&#116;"]
+  @post_colons [":", "\\:", "&colon;", "&#58;", "&#x3A;"]
+
+  test "every spelling the renderer turns into a post link is flagged" do
+    uuid = "00000000-0000-0000-0000-000000000000"
+
+    rendered =
+      for b1 <- @brackets,
+          b2 <- @brackets,
+          word <- @post_words,
+          colon <- @post_colons,
+          reduce: 0 do
+        count ->
+          doc = "text " <> b1 <> b2 <> word <> colon <> uuid <> "|alias]] more"
+          html = Renderer.render_markdown(doc)
+
+          if String.contains?(html, "[[post:") do
+            unless TextScan.dangerous?(doc),
+              do: flunk("unflagged post link. " <> failure(count, doc, html))
+
+            count + 1
+          else
+            count
+          end
+      end
+
+    assert rendered > 1_000, "the spellings no longer render the token (#{rendered})"
   end
 
   defp failure(n, doc, html),

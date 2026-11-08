@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing do
   """
 
   use PhoenixKit.Module
+  use Gettext, backend: PhoenixKitPublishing.Gettext
 
   # Single-sourced from mix.exs so a release bump cannot leave version/0 behind.
   @version Mix.Project.config()[:version]
@@ -534,22 +535,25 @@ defmodule PhoenixKit.Modules.Publishing do
     [
       %{
         key: "publishing",
-        label: "Publishing",
-        description: "Activity on posts you wrote",
+        label: gettext_noop("Publishing"),
+        description: gettext_noop("Activity on posts you wrote"),
+        # The settings pages translate these through the named backend, in the
+        # reader's locale (`PhoenixKit.Notifications.Types.translate/2`).
+        gettext_backend: PhoenixKitPublishing.Gettext,
         actions: [],
         default: true,
         sub_types: [
           %{
             key: "comments",
-            label: "Comments on your posts",
-            description: "Someone commented on a post you wrote",
+            label: gettext_noop("Comments on your posts"),
+            description: gettext_noop("Someone commented on a post you wrote"),
             actions: ["publishing.comment.created"],
             default: true
           },
           %{
             key: "replies",
-            label: "Replies to your comments",
-            description: "Someone replied to a comment you left",
+            label: gettext_noop("Replies to your comments"),
+            description: gettext_noop("Someone replied to a comment you left"),
             actions: ["publishing.comment.replied"],
             default: true
           }
@@ -563,9 +567,13 @@ defmodule PhoenixKit.Modules.Publishing do
   def permission_metadata do
     %{
       key: "publishing",
-      label: "Publishing",
+      label: gettext_noop("Publishing"),
       icon: "hero-document-duplicate",
-      description: "Database-backed CMS pages and multi-language content",
+      description: gettext_noop("Database-backed CMS pages and multi-language content"),
+      # The permissions matrix translates the labels (sub-permissions inherit
+      # it) through this backend; without it they went through core's catalog,
+      # which has neither sub-permission label.
+      gettext_backend: PhoenixKitPublishing.Gettext,
       # The base key used to let its holder force-delete a whole group with
       # every post in it, and change the module's settings. Those rights are
       # split out here; Admin gets them from core's boot-time auto-grant,
@@ -574,14 +582,17 @@ defmodule PhoenixKit.Modules.Publishing do
       sub_permissions: [
         %{
           key: "manage",
-          label: "Manage groups",
+          label: gettext_noop("Manage groups"),
           description:
-            "Create, edit, trash, restore and permanently delete publishing groups with all their posts"
+            gettext_noop(
+              "Create, edit, trash, restore and permanently delete publishing groups with all their posts"
+            )
         },
         %{
           key: "settings",
-          label: "Change the module's settings",
-          description: "Open the Publishing settings page and change settings and caches there"
+          label: gettext_noop("Change the module's settings"),
+          description:
+            gettext_noop("Open the Publishing settings page and change settings and caches there")
         }
       ]
     }

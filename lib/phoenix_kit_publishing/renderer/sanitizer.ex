@@ -14,7 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer.Sanitizer do
 
     * `author/1` — HTML that came out of an author's Markdown. Layout, text,
       tables, `details`, images, links, task-list checkboxes, classes, ids,
-      `data-*` / `aria-*`. No `iframe`/`form`/`object`/`embed`/media elements.
+      `aria-*`. No `iframe`/`form`/`object`/`embed`/media elements.
     * `page/1` — the assembled page: `author/1` plus what the renderer's own
       components emit (`section` for notes, `iframe` for `<Embed>`,
       `audio`/`video`/`source`, the `<EntityForm>` form controls).
@@ -40,10 +40,14 @@ defmodule PhoenixKit.Modules.Publishing.Renderer.Sanitizer do
                 textarea button fieldset legend picture)
 
   @generic_attributes ~w(class id lang title dir role style)
-  @generic_prefixes ["data-", "aria-"]
+  # No `data-` prefix: the cleaner never reads a `data-*` value as a URL, and the scripts a
+  # host page loads act on them — phoenix_html.js submits a form to any `data-to` (a
+  # `javascript:` one included) on a click inside an element with `data-method`, htmx runs
+  # `data-hx-*`. The one data attribute the renderer emits, `data-note`, is listed on `a`.
+  @generic_prefixes ["aria-"]
 
   @tag_attributes %{
-    "a" => ~w(href hreflang rel target download),
+    "a" => ~w(href hreflang rel target download data-note),
     "img" => ~w(align alt height src srcset sizes width loading decoding),
     "input" => ~w(type checked disabled),
     "ol" => ~w(start type reversed),

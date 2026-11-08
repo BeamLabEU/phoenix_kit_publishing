@@ -231,4 +231,19 @@ defmodule PhoenixKit.Modules.Publishing.VersionCategoriesTest do
     assert Map.get(counts, ctx.news.uuid) == 1
     assert Map.get(counts, ctx.guides.uuid) == nil
   end
+
+  # The editor's picker sends client uuids; only real categories of the post's
+  # own group are filed.
+  test "a save files only the group's own categories", ctx do
+    {:ok, other_group} = Groups.add_group("vercat-other-#{System.unique_integer([:positive])}")
+    {:ok, foreign} = Categories.create_category(other_group["slug"], %{"name" => "Elsewhere"})
+    {:ok, read} = Posts.read_post(ctx.slug, ctx.post.uuid)
+
+    {:ok, _} =
+      Posts.update_post(ctx.slug, read, %{
+        "category_uuids" => [ctx.news.uuid, foreign.uuid, "not-a-uuid", Ecto.UUID.generate()]
+      })
+
+    assert version_categories(ctx.post.uuid, 1) == [ctx.news.uuid]
+  end
 end

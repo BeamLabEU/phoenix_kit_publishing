@@ -1505,12 +1505,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   def handle_info({:deferred_language_switch, group_slug, target_language}, socket) do
     old_form_key = socket.assigns[:form_key]
 
-    if old_form_key && connected?(socket) do
-      alias PhoenixKit.Modules.Publishing.PresenceHelpers
-      PresenceHelpers.untrack_editing_session(old_form_key, socket)
-      PresenceHelpers.unsubscribe_from_editing(old_form_key)
-      PublishingPubSub.unsubscribe_from_editor_form(old_form_key)
-    end
+    socket =
+      if old_form_key && connected?(socket) do
+        alias PhoenixKit.Modules.Publishing.PresenceHelpers
+        PresenceHelpers.untrack_editing_session(old_form_key, socket)
+        PresenceHelpers.unsubscribe_from_editing(old_form_key)
+        PublishingPubSub.unsubscribe_from_editor_form(old_form_key)
+        Collaborative.unsubscribe_from_old_post_topics(socket)
+        # Everything `Collaborative` subscribed for this key is gone now.
+        assign(socket, :collab_subscribed_key, nil)
+      else
+        socket
+      end
 
     post = socket.assigns.post
 
@@ -1966,7 +1972,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     if socket.assigns[:form_key] != nil and source != socket.id and
          form_key != socket.assigns.form_key and
          same_post_and_version?(form_key, socket.assigns.form_key) do
-      {:noreply, Persistence.reload_post(socket)}
+      {:noreply, Persistence.reload_post(socket, keep_buffer: true)}
     else
       {:noreply, socket}
     end
@@ -2427,7 +2433,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   defp translation_summary(success, 0) do
-    {:info, gettext("Translation completed successfully for %{count} languages", count: success)}
+    {:info,
+     ngettext(
+       "Translation completed successfully for %{count} language",
+       "Translation completed successfully for %{count} languages",
+       success
+     )}
   end
 
   defp translation_summary(success, failures) do
@@ -2727,6 +2738,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   defp preview_after_flush(socket) do
+    if locked_with_pending_changes?(socket) do
+      {:noreply, refuse_locked_save(socket)}
+    else
+      do_preview_after_flush(socket)
+    end
+  end
+
+  defp do_preview_after_flush(socket) do
     if socket.assigns.has_pending_changes and not socket.assigns[:readonly?] do
       {:noreply, saved} = Persistence.perform_save(socket)
 
@@ -2747,17 +2766,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # A read-only spectator never saves — they read has_pending_changes: true
   # after a remote sync, so saving would clobber the owner.
   defp flush_before_switch(socket) do
-    if socket.assigns.has_pending_changes and not socket.assigns[:readonly?] do
-      {:noreply, saved} = Persistence.perform_save(socket)
+    cond do
+      locked_with_pending_changes?(socket) ->
+        {:blocked, refuse_locked_save(socket)}
 
-      if saved.assigns.has_pending_changes do
-        {:blocked, saved}
-      else
-        {:ok, saved}
-      end
-    else
-      {:ok, socket}
+      socket.assigns.has_pending_changes and not socket.assigns[:readonly?] ->
+        {:noreply, saved} = Persistence.perform_save(socket)
+
+        if saved.assigns.has_pending_changes do
+          {:blocked, saved}
+        else
+          {:ok, saved}
+        end
+
+      true ->
+        {:ok, socket}
     end
+  end
+
+  # Edits made before another session started an AI translation are still
+  # pending when the lock arrives. The Save button refuses them while the lock
+  # holds; a save on the way to a switch, a preview or an enqueue wrote them
+  # over the rows the translation was writing.
+  @doc false
+  def locked_with_pending_changes?(socket) do
+    socket.assigns[:translation_locked?] == true and
+      socket.assigns[:has_pending_changes] == true and
+      not socket.assigns[:readonly?]
+  end
+
+  @doc false
+  def refuse_locked_save(socket) do
+    put_flash(socket, :error, gettext("Cannot save while translation is in progress"))
   end
 
   defp cancel_autosave_timer(socket) do
@@ -3306,8 +3346,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
             tabindex={if @has_pending_changes, do: "-1", else: "0"}
             title={
               if(@has_pending_changes,
-                do: "Save the post before viewing the public page",
-                else: "View this post on the public site"
+                do: gettext("Save the post before viewing the public page"),
+                else: gettext("View this post on the public site")
               )
             }
           >
@@ -3797,7 +3837,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       <span class="badge badge-info badge-sm gap-1">
                         <.icon name="hero-eye" class="w-3 h-3" />
                         {ngettext(
-                          "1 other viewing",
+                          "%{count} other viewing",
                           "%{count} others viewing",
                           length(@other_viewers),
                           count: length(@other_viewers)
@@ -3813,12 +3853,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <%= cond do %>
                     <% @flush_slow? -> %>
                       <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
-                        <span class="loading loading-spinner loading-2xs"></span>
+                        <span class="loading loading-spinner loading-xs"></span>
                         {gettext("Collecting your edits…")}
                       </span>
                     <% @is_autosaving -> %>
                       <span class="inline-flex items-center gap-1.5 text-xs text-base-content/50">
-                        <span class="loading loading-spinner loading-2xs"></span>
+                        <span class="loading loading-spinner loading-xs"></span>
                         {gettext("Saving...")}
                       </span>
                     <% @autosave_blocked -> %>
@@ -3855,7 +3895,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     disabled={save_disabled}
                   >
                     <span class="hidden phx-click-loading:inline-flex items-center gap-1">
-                      <span class="loading loading-spinner loading-2xs"></span>
+                      <span class="loading loading-spinner loading-xs"></span>
                       {gettext("Saving...")}
                     </span>
                     <span class="inline-flex items-center gap-1 phx-click-loading:hidden">
@@ -4056,14 +4096,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         )}
                       </p>
                       <p class="text-xs text-base-content/50 mt-0.5">
-                        {gettext("Preview: /%{language}/%{group}/%{slug}",
-                          language: @current_language,
-                          group: @group_slug,
-                          slug:
-                            if(@form["url_slug"] != "",
-                              do: @form["url_slug"],
-                              else: @form["slug"]
-                            )
+                        <%!-- Through the public builder: a sibling dialect lives
+                              at /en-gb/…, a base owner at /en/…, a prefixless
+                              primary has no segment, and url_prefix applies. --%>
+                        {gettext("Preview: %{path}",
+                          path:
+                            PublishingHTML.group_listing_path(@current_language, @group_slug) <>
+                              "/" <>
+                              if(@form["url_slug"] != "",
+                                do: @form["url_slug"],
+                                else: @form["slug"]
+                              )
                         )}
                       </p>
                     </div>
@@ -4093,7 +4136,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         />
                         <%!-- Desktop: Hover overlay (hidden when readonly or viewing older version) --%>
                         <%= if not (edit_disabled? or @viewing_older_version) do %>
-                          <div class="hidden md:flex absolute inset-0 bg-base-content/0 group-hover:bg-base-content/60 transition-all rounded-lg items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
+                          <div class="hidden md:flex absolute inset-0 bg-base-content/0 group-hover:bg-base-content/60 group-focus-within:bg-base-content/60 transition-all rounded-lg items-center justify-center gap-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
                             <.button
                               type="button"
                               phx-click="open_media_selector"
@@ -4388,7 +4431,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     </p>
                     <div
                       :if={@og_module_active?}
-                      class="rounded-md border border-info/30 bg-info/5 px-2.5 py-2 text-xs text-info-content flex items-start gap-2"
+                      class="rounded-md border border-info/30 bg-info/5 px-2.5 py-2 text-xs text-base-content/80 flex items-start gap-2"
                     >
                       <.icon name="hero-share" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-info" />
                       <span>

@@ -99,7 +99,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   - [group_slug, date] -> Date-only timestamp (resolves to single post or first post)
   - [group_slug, date, time] -> Timestamp mode post
   """
-  def show(conn, %{"language" => language_param} = params) do
+  def show(conn, _params) do
+    conn = route_params_only(conn)
+
+    # `/blog/%FF` decodes to a byte Postgres refuses in a text comparison: a 500
+    # from the first lookup, the fallback's included. No slug, language or date
+    # holds one, so the answer is a plain 404.
+    if valid_path_params?(conn.path_params),
+      do: do_show(conn, conn.params),
+      else: render_404(conn)
+  end
+
+  defp valid_path_params?(path_params) do
+    Enum.all?(path_params, fn
+      {_key, value} when is_binary(value) -> String.valid?(value)
+      {_key, values} when is_list(values) -> Enum.all?(values, &String.valid?/1)
+      _ -> true
+    end)
+  end
+
+  # Query and body params share `conn.params` with the route's bindings, and a
+  # route without a `:language` (or `:path`) segment leaves that key to the
+  # query: `/blog/post?language=x` took the localized branch and shifted "x"
+  # into the group position, `?language=fr` served French at the prefixless
+  # URL, and `/blog?path[]=slug` acted like `/blog/slug`. Only the route
+  # decides these three.
+  @route_keys ~w(language group path)
+
+  defp route_params_only(conn) do
+    stray = Enum.reject(@route_keys, &Map.has_key?(conn.path_params, &1))
+    %{conn | params: Map.drop(conn.params, stray)}
+  end
+
+  defp do_show(conn, %{"language" => language_param} = params) do
     # Detect if 'language' param is actually a language code or a group slug.
     # This allows the same route to work for both single and multi-language setups.
     {language, adjusted_params} = Language.detect_language_or_group(language_param, params)
@@ -126,7 +158,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
   # Fallback for routes without language parameter
   # This handles the non-localized route where :group might actually be a language code
-  def show(conn, params) do
+  defp do_show(conn, params) do
     if Publishing.enabled?() and public_enabled?() do
       # Check if the first segment (group) is actually a language with content
       case Language.detect_language_in_group_param(params) do
@@ -168,6 +200,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     group_slug = params["group"]
 
     with true <- Publishing.enabled?() and public_enabled?(),
+         true <- is_binary(group_slug) and String.valid?(group_slug),
          {:ok, group} <- Publishing.fetch_group(group_slug),
          # Same status the GET path's group_trashed?/1 reads — get_group
          # returns trashed groups too, so a trashed group kept taking comments.
@@ -180,9 +213,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     end
   end
 
+  # The form's hidden language field, from the request body: anything but a
+  # language-code-shaped string (a map, `//host`) took the POST to a 500 in the
+  # path builders or Phoenix's redirect guard.
+  defp comment_language(language) when is_binary(language) do
+    if Regex.match?(~r/\A[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*\z/, language),
+      do: language,
+      else: Language.get_default_language()
+  end
+
+  defp comment_language(_language), do: Language.get_default_language()
+
   defp handle_comment_submission(conn, group, params) do
     group_slug = group["slug"]
-    language = params["language"] || Language.get_default_language()
+    language = comment_language(params["language"])
     # The flash strings below are gettext'd; without this the POST renders
     # them in the default (or a recycled worker's residual) locale while
     # redirecting back to the reader's localized page.
@@ -474,7 +518,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         })
         |> maybe_assign_admin_edit(
           Routes.path("/admin/publishing/#{group_slug}"),
-          "Edit Blog"
+          gettext("Edit group")
         )
         |> render(:index)
 
@@ -623,15 +667,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     # fetch_query_params (idempotent) rather than conn.params — ?q= is a
     # query param by definition, and a minimal host/test endpoint without
     # Plug.Parsers never merges the query string into conn.params.
-    case Plug.Conn.fetch_query_params(conn).query_params["q"] do
-      q when is_binary(q) ->
-        case String.trim(q) do
-          "" -> nil
-          trimmed -> String.slice(trimmed, 0, 100)
-        end
-
-      _ ->
-        nil
+    # Bytes that are not UTF-8 would reach Postgres in the ILIKE and raise.
+    with q when is_binary(q) <- Plug.Conn.fetch_query_params(conn).query_params["q"],
+         true <- String.valid?(q),
+         trimmed when trimmed != "" <- String.trim(q) do
+      String.slice(trimmed, 0, 100)
+    else
+      _ -> nil
     end
   end
 
@@ -663,7 +705,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:og, build_og_data(conn, assigns.post, canonical_url, assigns.current_language))
         |> maybe_assign_admin_edit(
           edit_post_admin_url(group_slug, assigns.post.uuid, assigns.current_language),
-          "Edit Post"
+          gettext("Edit post")
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> assign_post_neighbors(
@@ -709,7 +751,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         )
         |> maybe_assign_admin_edit(
           edit_post_admin_url(group_slug, assigns.post.uuid, assigns.current_language),
-          "Edit Post"
+          gettext("Edit post")
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> render(:show)
@@ -744,7 +786,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:og, build_og_data(conn, assigns.post, canonical_url, assigns.current_language))
         |> maybe_assign_admin_edit(
           edit_post_admin_url(group_slug, assigns.post.uuid, assigns.current_language),
-          "Edit Post"
+          gettext("Edit post")
         )
         |> assign_group_display_config(Map.get(assigns, :group, %{}))
         |> assign_post_neighbors(
@@ -782,11 +824,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> redirect(to: path)
 
       {:render_404} ->
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: PhoenixKitWeb.ErrorHTML)
-        |> render(:"404")
+        render_404(conn)
     end
+  end
+
+  defp render_404(conn) do
+    conn
+    |> put_status(:not_found)
+    |> put_view(html: PhoenixKitWeb.ErrorHTML)
+    |> render(:"404")
   end
 
   # ============================================================================
@@ -1197,7 +1243,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     maybe_assign_admin_edit(
       conn,
       Routes.path("/admin/publishing/categories/#{group_slug}"),
-      "Edit Categories"
+      gettext("Edit categories")
     )
   end
 

@@ -120,10 +120,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
       {:error, {:already_tracked, _pid, _topic, _key}} -> :ok
     end
 
-    PresenceHelpers.subscribe_to_editing(form_key)
-    PublishingPubSub.subscribe_to_editor_form(form_key)
-    subscribe_to_post_translations(socket)
-    subscribe_to_post_versions(socket)
+    socket = subscribe_once(socket, form_key)
 
     # Cleared up front: switching language or version rebuilds this socket
     # around a different row, so a synced-from-owner marker left over from the
@@ -135,6 +132,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Collaborative do
     |> maybe_broadcast_editor_joined()
     |> maybe_load_spectator_state(form_key)
     |> maybe_start_lock_expiration_timer()
+  end
+
+  # A version switch, a switch to a new translation and the first save of one
+  # assign the new form key and subscribe, then patch; `handle_params` comes back
+  # with that same key as the old one, so the cleanup is skipped and a second
+  # subscribe would deliver every message on these topics twice (an AI
+  # translation's completions counted double, the lock lifting at half the jobs).
+  # `Phoenix.PubSub.subscribe/2` is not idempotent, so the key already
+  # subscribed is remembered.
+  defp subscribe_once(socket, form_key) do
+    if socket.assigns[:collab_subscribed_key] == form_key do
+      socket
+    else
+      PresenceHelpers.subscribe_to_editing(form_key)
+      PublishingPubSub.subscribe_to_editor_form(form_key)
+      subscribe_to_post_translations(socket)
+      subscribe_to_post_versions(socket)
+      Phoenix.Component.assign(socket, :collab_subscribed_key, form_key)
+    end
   end
 
   @doc """

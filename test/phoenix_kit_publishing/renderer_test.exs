@@ -326,39 +326,10 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
       assert {:ok, html_2} = Renderer.render_post(post)
       assert html_1 == html_2
     end
-
-    test "render_post returns cached html on hit" do
-      post = %{
-        content: "Cache me",
-        metadata: %{title: "z", status: "published"},
-        group: "blog-hit-#{System.unique_integer([:positive])}",
-        slug: "z",
-        uuid: "uuid-hit-#{System.unique_integer([:positive])}",
-        language: "en"
-      }
-
-      {:ok, _} = Renderer.render_post(post)
-      assert {:ok, _} = Renderer.render_post(post)
-    end
   end
 
-  describe "invalidate_cache/3 actually clears the cache" do
-    test "after invalidate, the next render is a miss" do
-      post = %{
-        content: "First content",
-        metadata: %{title: "z", status: "published"},
-        group: "blog-inv-#{System.unique_integer([:positive])}",
-        slug: "z",
-        uuid: "uuid-inv-#{System.unique_integer([:positive])}",
-        language: "en"
-      }
-
-      {:ok, _} = Renderer.render_post(post)
-      Renderer.invalidate_cache(post.group, post.slug, post.language)
-      # Should not raise; second render rebuilds from content
-      assert {:ok, _} = Renderer.render_post(post)
-    end
-  end
+  # The cache hit and invalidation paths are covered against a started cache in
+  # renderer_cache_test.exs; this module runs without one.
 
   # ============================================================================
   # Edge cases — blank-line preservation and class merge details
@@ -771,6 +742,18 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
   # Leaf writes a `<` typed as text into a rendered block as `\\<` (0.10.0 on).
   # Markdown reads that as a literal `<`, and the editor shows it as one, so the
   # component scanners have to agree or the writer's text goes live on the page.
+  describe "component attribute values" do
+    test "an apostrophe in a double-quoted value is kept" do
+      html = Renderer.render_markdown(~s(<Image src="/a.png" alt="Tallinn's old town"/>))
+      assert html =~ ~s(alt="Tallinn's old town")
+    end
+
+    test "a double quote in a single-quoted value is kept" do
+      html = Renderer.render_markdown(~s(<Image src='/a.png' alt='Say "hi"'/>))
+      assert html =~ ~s(alt="Say &quot;hi&quot;")
+    end
+  end
+
   describe "a backslash-escaped component is text" do
     test "a self-closing tag stays literal, with no backslash left over" do
       html = Renderer.render_markdown(~S(see \<Image src="/a.png" alt="x"/> here))

@@ -93,6 +93,33 @@ defmodule PhoenixKit.Modules.Publishing.CommentsActivityTest do
     end
   end
 
+  # Core shows the stored text as it is, so it must be in the author's language,
+  # not the language of the page the reader commented on.
+  test "the notification text is in the recipient's language", ctx do
+    assert Comments.available?()
+
+    Repo.query!(
+      "UPDATE phoenix_kit_users SET custom_fields = $1 WHERE uuid = $2::uuid",
+      [%{"preferred_locale" => "de-DE"}, Ecto.UUID.dump!(@author)]
+    )
+
+    Gettext.put_locale(PhoenixKitPublishing.Gettext, "ru")
+
+    try do
+      {:ok, _} = Comments.create(ctx.post[:uuid], @reader, "Привет.")
+      entry = last_activity("publishing.comment.created")
+
+      assert entry.metadata["notification_text"] ==
+               Gettext.with_locale(PhoenixKitPublishing.Gettext, "de", fn ->
+                 Gettext.gettext(PhoenixKitPublishing.Gettext, "New comment on your post")
+               end)
+
+      refute entry.metadata["notification_text"] == "New comment on your post"
+    after
+      Gettext.put_locale(PhoenixKitPublishing.Gettext, "en")
+    end
+  end
+
   test "a comment on your own post notifies nobody", ctx do
     assert Comments.available?()
 

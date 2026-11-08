@@ -39,10 +39,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ViewsTest do
     conn |> put_req_header("user-agent", @browser_ua) |> get(path)
   end
 
+  # record_async fires through the task supervisor: wait until no recording task
+  # is left, instead of a fixed sleep that a loaded suite outran (a late
+  # increment then also slipped past the `== 0` / `== 1` assertions).
   defp drain(post_uuid) do
-    # record_async fires through the task supervisor — give it a beat.
-    Process.sleep(50)
+    wait_for_tasks(200)
     Views.total(post_uuid)
+  end
+
+  defp wait_for_tasks(0), do: flunk("view-recording tasks still running after 2 s")
+
+  defp wait_for_tasks(attempts) do
+    if Task.Supervisor.children(PhoenixKit.TaskSupervisor) == [] do
+      :ok
+    else
+      Process.sleep(10)
+      wait_for_tasks(attempts - 1)
+    end
   end
 
   test "no counting while views_enabled is off", %{conn: conn, slug: slug, post: post} do

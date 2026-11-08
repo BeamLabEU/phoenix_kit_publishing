@@ -19,6 +19,48 @@ defmodule PhoenixKit.Modules.Publishing.GroupSlugTest do
     PublishingGroup.changeset(group, attrs)
   end
 
+  # The mode is locked at creation, so an unknown one must be refused rather
+  # than turned into the default for good.
+  describe "add_group/2 mode" do
+    test "an unknown mode is :invalid_mode, not a timestamp group" do
+      assert {:error, :invalid_mode} =
+               Groups.add_group("Mode #{System.unique_integer([:positive])}", mode: "slugs")
+    end
+
+    test "no mode (or a blank one) is the default" do
+      assert {:ok, %{"mode" => "timestamp"}} =
+               Groups.add_group("Mode #{System.unique_integer([:positive])}")
+
+      assert {:ok, %{"mode" => "timestamp"}} =
+               Groups.add_group("Mode #{System.unique_integer([:positive])}", mode: "")
+
+      assert {:ok, %{"mode" => "slug"}} =
+               Groups.add_group("Mode #{System.unique_integer([:positive])}", mode: :slug)
+    end
+  end
+
+  # `/admin/publishing/new-group`, `/edit-group/:g` and `/categories/:g` are
+  # literal routes beside `/admin/publishing/:group`: a group under one of
+  # these slugs could never be opened.
+  describe "admin route segments" do
+    test "a name that slugifies to one gets a suffix" do
+      assert {:ok, %{"slug" => slug}} = Groups.add_group("New Group")
+      refute slug == "new-group"
+
+      assert {:ok, %{"slug" => slug}} = Groups.add_group("Categories")
+      refute slug == "categories"
+    end
+
+    test "an explicit one is refused, at create and at rename" do
+      assert {:error, :invalid_slug} = Groups.add_group("X", slug: "edit-group")
+
+      {:ok, group} = Groups.add_group("Rename #{System.unique_integer([:positive])}")
+
+      assert {:error, :invalid_slug} =
+               Groups.update_group(group["slug"], %{"slug" => "categories"})
+    end
+  end
+
   describe "creation without an explicit slug" do
     test "is now valid — the dead-code path this fixes" do
       cs = changeset(%{name: "My Publication", mode: "timestamp"})

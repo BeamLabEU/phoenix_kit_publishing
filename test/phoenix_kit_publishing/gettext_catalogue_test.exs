@@ -88,4 +88,59 @@ defmodule PhoenixKitPublishing.GettextCatalogueTest do
   end
 
   defp unescape(id), do: id |> String.replace("\\\"", "\"") |> String.replace("\\n", "\n")
+
+  # Lint of the shipped translations themselves. Each of these reached users:
+  # `\\"` in et/it/ru showed a backslash before every quote, and gettext
+  # serves `fuzzy` entries (a merge's guess) as if they were reviewed.
+  describe "shipped catalogues" do
+    for locale <- ~w(de et fr it ru) do
+      @locale locale
+
+      test "#{locale}: no fuzzy entry, no empty msgstr, no stray backslash" do
+        {:ok, po} = Expo.PO.parse_file("priv/gettext/#{@locale}/LC_MESSAGES/default.po")
+
+        for message <- po.messages do
+          id = Expo.Message.key(message) |> inspect()
+          refute "fuzzy" in List.flatten(message.flags), "#{@locale}: fuzzy entry #{id}"
+
+          for string <- msgstrs(message) do
+            assert string != "", "#{@locale}: untranslated #{id}"
+            refute string =~ "\\", "#{@locale}: backslash in #{id}: #{inspect(string)}"
+          end
+        end
+      end
+
+      test "#{locale}: every placeholder in a msgstr exists in its msgid" do
+        {:ok, po} = Expo.PO.parse_file("priv/gettext/#{@locale}/LC_MESSAGES/default.po")
+
+        for message <- po.messages do
+          allowed = placeholders(msgids(message))
+
+          for string <- msgstrs(message) do
+            extra = MapSet.difference(placeholders([string]), allowed)
+
+            assert MapSet.size(extra) == 0,
+                   "#{@locale}: #{inspect(MapSet.to_list(extra))} in #{inspect(string)}"
+          end
+        end
+      end
+    end
+  end
+
+  defp msgstrs(%Expo.Message.Singular{msgstr: msgstr}), do: [IO.iodata_to_binary(msgstr)]
+
+  defp msgstrs(%Expo.Message.Plural{msgstr: msgstr}),
+    do: msgstr |> Map.values() |> Enum.map(&IO.iodata_to_binary/1)
+
+  defp msgids(%Expo.Message.Singular{msgid: id}), do: [IO.iodata_to_binary(id)]
+
+  defp msgids(%Expo.Message.Plural{msgid: id, msgid_plural: plural}),
+    do: [IO.iodata_to_binary(id), IO.iodata_to_binary(plural)]
+
+  defp placeholders(strings) do
+    strings
+    |> Enum.flat_map(&Regex.scan(~r/%\{\w+\}/, &1))
+    |> List.flatten()
+    |> MapSet.new()
+  end
 end

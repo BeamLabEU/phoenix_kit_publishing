@@ -56,6 +56,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.LanguageTest do
       conn = Plug.Test.conn(:get, "/blog?utm_source=x")
       refute Language.request_matches_canonical_url?(conn, "/blog?page=2")
     end
+
+    # A browser percent-encodes a non-ASCII segment; the builders produce it decoded.
+    # A raw comparison sent `/blog/tag/%C3%A4ri` to `/blog/tag/äri`, which the browser
+    # re-encoded, forever.
+    test "a percent-encoded request matches its decoded canonical" do
+      conn = Plug.Test.conn(:get, "/blog/tag/%C3%A4ri")
+      assert Language.request_matches_canonical_url?(conn, "/blog/tag/äri")
+      refute Language.request_matches_canonical_url?(conn, "/blog/tag/ari")
+    end
+
+    test "a malformed escape is compared as it is" do
+      conn = Plug.Test.conn(:get, "/blog/%zz")
+      refute Language.request_matches_canonical_url?(conn, "/blog/x")
+    end
   end
 
   describe "prefixed_default_language_request?/2" do

@@ -215,7 +215,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RichFixturesTest do
       {:ok, group} = Groups.add_group(group_slug, mode: "slug")
 
       {:ok, post} =
-        Posts.create_post(group["slug"], %{title: "Trashable", slug: "trashable"})
+        Posts.create_post(group["slug"], %{
+          title: "Trashable",
+          slug: "trashable",
+          content: "TRASHED-BODY-SECRET"
+        })
 
       :ok = Versions.publish_version(group["slug"], post.uuid, 1)
       {:ok, _} = Posts.trash_post(group["slug"], post.uuid)
@@ -223,10 +227,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RichFixturesTest do
       %{group_slug: group["slug"], post: post}
     end
 
-    test "trashed post URL exercises fallback chain",
+    # A trashed post's live version survives the trash, so only the read path
+    # keeps its body off the page: the URL must send the reader to the group
+    # listing, never render the post.
+    test "a trashed post's URL withholds its body",
          %{conn: conn, group_slug: group_slug, post: post} do
       conn = get(conn, "/en/#{group_slug}/#{post.slug}")
-      assert conn.status in [200, 301, 302, 404]
+
+      assert conn.status == 302
+      refute String.ends_with?(redirected_to(conn), "/" <> post.slug)
+      refute conn.resp_body =~ "TRASHED-BODY-SECRET"
     end
   end
 
@@ -238,16 +248,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RichFixturesTest do
       {:ok, group} = Groups.add_group(group_slug, mode: "slug")
 
       {:ok, post} =
-        Posts.create_post(group["slug"], %{title: "Draft", slug: "draft"})
+        Posts.create_post(group["slug"], %{
+          title: "Draft",
+          slug: "draft",
+          content: "DRAFT-BODY-SECRET"
+        })
 
       # Don't publish — leave as draft
       %{group_slug: group["slug"], post: post}
     end
 
-    test "draft post URL falls back via :unpublished reason",
+    test "a draft's URL withholds its body",
          %{conn: conn, group_slug: group_slug, post: post} do
       conn = get(conn, "/en/#{group_slug}/#{post.slug}")
-      assert conn.status in [200, 301, 302, 404]
+
+      assert conn.status == 302
+      refute String.ends_with?(redirected_to(conn), "/" <> post.slug)
+      refute conn.resp_body =~ "DRAFT-BODY-SECRET"
     end
   end
 end

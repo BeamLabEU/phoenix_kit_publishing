@@ -43,6 +43,10 @@ defmodule PhoenixKitPublishing.MixProject do
     ]
   end
 
+  def cli do
+    [preferred_envs: ["test.reset": :test]]
+  end
+
   def application do
     [
       extra_applications: [:logger, :gettext]
@@ -56,6 +60,12 @@ defmodule PhoenixKitPublishing.MixProject do
     [
       quality: ["format", "credo --strict", "dialyzer"],
       "quality.ci": ["format --check-formatted", "credo --strict", "dialyzer"],
+      # Rebuilds the test database from nothing; the next `mix test` builds the
+      # schema (test_helper.exs). Core's below-floor error names this alias.
+      "test.reset": [
+        "ecto.drop --quiet -r PhoenixKitPublishing.Test.Repo",
+        "ecto.create --quiet -r PhoenixKitPublishing.Test.Repo"
+      ],
       precommit: [
         "compile --force --warnings-as-errors",
         "deps.unlock --check-unused",

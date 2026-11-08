@@ -262,8 +262,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def publicly_browsable_version?(group_slug, post, version) do
     {allow_access, live_version} = get_cached_version_info(group_slug, post)
 
+    # An embargoed (scheduled-ahead) post is not live yet, so it has no public
+    # history either: `/v/N` must not show today what the post URL withholds.
     allow_access == true and is_integer(live_version) and is_integer(version) and
-      version <= live_version and historically_published?(post)
+      version <= live_version and historically_published?(post) and
+      not Constants.scheduled_ahead?(post)
   end
 
   # Published now, or archived after having been published at some point.

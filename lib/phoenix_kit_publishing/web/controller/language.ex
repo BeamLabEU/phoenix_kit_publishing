@@ -265,11 +265,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
     %URI{path: canonical_path, query: canonical_query} = URI.parse(canonical_url)
     request_query = decode_query(conn.query_string)
 
-    conn.request_path == canonical_path and
+    # Compared decoded: the browser sends `/blog/tag/%C3%A4ri` for the canonical
+    # `/blog/tag/äri` the builders produce, and a raw comparison 301'd it onto
+    # itself forever.
+    decode_path(conn.request_path) == decode_path(canonical_path) and
       Enum.all?(decode_query(canonical_query), fn {key, value} ->
         Map.get(request_query, key) == value
       end)
   end
+
+  defp decode_path(path) when is_binary(path) do
+    URI.decode(path)
+  rescue
+    ArgumentError -> path
+  end
+
+  defp decode_path(_), do: nil
 
   defp decode_query(query) when is_binary(query) and query != "", do: URI.decode_query(query)
   defp decode_query(_), do: %{}

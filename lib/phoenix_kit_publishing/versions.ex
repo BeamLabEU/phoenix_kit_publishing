@@ -270,7 +270,11 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
 
     tx_result =
       repo.transaction(fn ->
-        lock_post!(repo, db_post.uuid)
+        # The pointer is written through the LOCKED row: `db_post` was read before
+        # the lock, and an update diffed against it is a no-op when it already
+        # names the target, which a publish that committed in between makes stale
+        # (v2 archived below, the pointer left on it, v2 still served).
+        locked_post = lock_post!(repo, db_post.uuid) || repo.rollback(:not_found)
 
         versions = DBStorage.list_versions(db_post.uuid)
         target_version = Enum.find(versions, &(&1.version_number == version))
@@ -281,7 +285,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
 
         validate_primary_title!(repo, target_version)
         archive_other_published_versions!(repo, versions, version)
-        publish_and_activate!(repo, db_post, target_version)
+        publish_and_activate!(repo, locked_post, target_version)
       end)
 
     case tx_result do

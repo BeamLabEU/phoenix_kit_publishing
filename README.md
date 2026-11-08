@@ -7,7 +7,7 @@ A standalone PhoenixKit plugin module that provides a database-backed content ma
 Add to your parent app's `mix.exs`:
 
 ```elixir
-{:phoenix_kit_publishing, "~> 0.5"}
+{:phoenix_kit_publishing, "~> 0.16"}
 ```
 
 Or for local development:
@@ -18,10 +18,11 @@ Or for local development:
 
 Then run `mix deps.get` and `mix phoenix_kit.install`. The module is auto-discovered by PhoenixKit at startup — no additional config needed. The installer also adds the necessary Tailwind CSS `@source` directive so all styles render correctly.
 
-The editor requires Leaf 0.5.1 or later. When upgrading, update any vendored
-`leaf.js` bundle or CDN version alongside the dependency: language/version
-switches, Preview, version creation, and translation wait for Leaf's correlated
-flush replies, which older bundles do not send.
+The editor requires Leaf 0.10.1 or later (`>= 0.10.1 and < 1.0.0`). When
+upgrading, update any vendored `leaf.js` bundle or CDN version alongside the
+dependency: language/version switches, Preview, version creation, and
+translation wait for Leaf's correlated flush replies, and the component
+previews need the 0.9 `tag_previews`, which older bundles do not have.
 
 ### Database Setup
 
@@ -53,12 +54,12 @@ PhoenixKit.Modules.Publishing.enable_system()
 - **Multi-Language Support** — Separate content per language with language switcher and smart fallbacks
 - **Versioning** — Independent version history per post with publish/archive controls
 - **Collaborative Editing** — Real-time presence tracking with owner/spectator locking
-- **AI Translation** — Background translation via OpenRouter integration (Oban workers)
-- **Two-Layer Caching** — Listing cache (`:persistent_term`, ~0.1us reads) + render cache (ETS, 6hr TTL)
-- **Rich Content** — Markdown + inline PHK components (Image, Hero, CTA, Video, Headline, EntityForm)
+- **AI Translation** — Background translation through `phoenix_kit_ai` (one Oban job per target language)
+- **Two-Layer Caching** — Listing cache (`:persistent_term`, ~0.1us reads) + render cache (ETS, 24h TTL)
+- **Rich Content** — Markdown + inline PHK components (Image, Hero, CTA, Video, Audio, Embed, Headline, Subheadline, EntityForm, Showcase, Gallery, Note)
 - **Admin Interface** — Full CRUD with inline status controls, skeleton loading, trash management
 - **Public Routes** — SEO-friendly URLs with smart language/date fallbacks, pagination, breadcrumbs
-- **Featured Images** — Media library integration via PhoenixKit's MediaSelectorModal
+- **Featured Images** — Media library integration through core's media picker
 
 ## URL Modes
 
@@ -201,9 +202,9 @@ lib/phoenix_kit_publishing/
   presence.ex                # Collaborative editing presence
   pubsub.ex                  # Real-time broadcasting
   routes.ex                  # Admin route definitions
-  schemas/                   # Ecto schemas (4 files)
+  schemas/                   # Ecto schemas (6 files)
+  api/                       # Machine API tools (20)
   web/                       # LiveViews, controller, templates
-  workers/                   # Oban background jobs
 ```
 
 ### Core Modules
@@ -256,11 +257,16 @@ Publishing.invalidate_cache("docs")
 | `/admin/publishing` | Index | Groups overview |
 | `/admin/publishing/new-group` | New | Create group |
 | `/admin/publishing/edit-group/:group` | Edit | Group settings |
+| `/admin/publishing/categories/:group` | CategoriesLive | Category tree |
 | `/admin/publishing/:group` | Listing | Posts list with status tabs |
 | `/admin/publishing/:group/new` | Editor | Create post |
-| `/admin/publishing/:group/:uuid/edit` | Editor | Edit post |
-| `/admin/publishing/:group/preview` | Preview | Live preview |
-| `/admin/settings/publishing` | Settings | Cache config |
+| `/admin/publishing/:group/:post_uuid` | PostShow | Post overview |
+| `/admin/publishing/:group/:post_uuid/edit` | Editor | Edit post |
+| `/admin/publishing/:group/:post_uuid/preview` | Preview | Preview |
+| `/admin/settings/publishing` | Settings | Module settings and caches |
+
+A group can't be named `new-group`, `edit-group` or `categories`: those are
+the literal admin segments beside `/admin/publishing/:group`.
 
 ## Public Routes
 
@@ -274,14 +280,15 @@ Multi-language mode:
 
 Single-language mode omits the `/{language}` segment.
 
-When `publishing_default_language_no_prefix` is enabled, the default-language URL also drops its prefix (e.g. `/blog` instead of `/en/blog`), and requests to the prefixed form 301-redirect to the canonical prefixless URL.
+When core's `default_language_no_prefix` setting is enabled (Languages module; it replaced the legacy `publishing_default_language_no_prefix`), the primary language's URL also drops its prefix (e.g. `/blog` instead of `/en/blog`), and requests to the prefixed form 301-redirect to the canonical prefixless URL.
 
 ### Fallback Behavior
 
 - Missing language → tries default language, then other available languages
 - Missing timestamp post → tries other times on same date, then group listing
 - All fallbacks include a flash message explaining the redirect
-- Invalid group slugs fall back to 404 only after exhausting all alternatives
+- A group that does not exist is a 404, never a redirect: under `url_prefix: "/"`
+  a fallback would claim every unclaimed path of the host
 
 ### How Dispatch Works (and how it interacts with host routes)
 
@@ -304,7 +311,7 @@ Two consequences worth knowing:
 ### Reserved Route Prefixes
 
 Another PhoenixKit module can claim a top-level segment by implementing
-`PhoenixKit.Module.reserved_route_prefixes/0` (added in `phoenix_kit` 1.7.170):
+`PhoenixKit.Module.reserved_route_prefixes/0`:
 
 ```elixir
 @impl PhoenixKit.Module
@@ -314,8 +321,7 @@ def reserved_route_prefixes, do: ["shop"]
 `RouterDispatch.known_group?/1` consults
 `PhoenixKit.ModuleRegistry.all_reserved_route_prefixes/0` and refuses to claim a
 reserved segment **even when a group with that exact slug exists in publishing's
-own data**. On `phoenix_kit` older than 1.7.170 the callback is absent and nothing
-is reserved.
+own data**.
 
 Reserve a prefix only if your module actually renders that route — a reservation
 removes the path from publishing's dispatch, and if nothing takes over, the result
@@ -339,7 +345,9 @@ Publishing.find_cached_post("my-blog", "post-slug")
 
 ### Render Cache
 
-ETS-based with 6-hour TTL and content-hash keys. Toggled globally or per-group:
+ETS-based with a 24-hour TTL and content-hash keys. A page holding a form that
+carries the visitor's CSRF token (`<EntityForm>`) is never cached. Toggled
+globally or per-group:
 
 ```elixir
 # Global toggle
@@ -372,7 +380,7 @@ Regular **Markdown** content with all GitHub-flavored features.
 <EntityForm entity="contact" />
 ```
 
-Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`, `EntityForm`.
+Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`, `Audio`, `Embed`, `EntityForm`, `Showcase`, `Gallery`, `Note`. The full format is in `phk-publishing-format.md`.
 
 ## Settings
 
@@ -380,8 +388,15 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 |-----|---------|-------------|
 | `publishing_enabled` | `false` | Enable/disable module |
 | `publishing_public_enabled` | `true` | Show public routes |
-| `publishing_default_language_no_prefix` | `false` | Omit the locale prefix from default-language public URLs; prefixed requests 301-redirect |
-| `publishing_posts_per_page` | `20` | Listing pagination |
+| `publishing_posts_per_page` | `20` | Listing pagination (1–200) |
+| `publishing_reading_wpm` | `200` | Words per minute for the reading time (50–1000) |
+| `publishing_editor_lock_minutes` | `30` | Editor owner-lock timeout (1–480) |
+| `publishing_slug_style` | `transliterate` | `transliterate`, `unicode` or `ascii` |
+| `publishing_show_language_switcher` | `true` | In-page language switcher on public pages |
+| `publishing_render_og_tags` | `true` | In-page OpenGraph/Twitter meta tags |
+| `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD on post pages |
+| `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` |
+| `publishing_unique_views` | `true` | One view per visitor per post per day |
 | `publishing_memory_cache_enabled` | `true` | Listing cache toggle |
 | `publishing_render_cache_enabled` | `true` | Render cache global toggle |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group render cache |
@@ -462,14 +477,14 @@ REST, `/mcp/admin` over MCP): an AI agent, a script or an integration can read
 and edit groups, posts, versions, translations and categories the way an admin
 does in the editor. Core owns keys, scopes, rate limits, validation and the
 confirmation flow; this module declares the tools and the data rules. It needs
-`phoenix_kit` 2.63.0 or later, the first release that carries the machine API (the
-tools are compiled with the module, so an older core does not build it). The tools appear only while
+`phoenix_kit` 2.63.0 or later, the first release that carries the machine API; the
+module as a whole requires 2.65.0. The tools appear only while
 Publishing is enabled.
 
 **Enable it.** Switch on `api_admin_enabled` and create a key in
 `/admin/settings/api`. A key has scopes, and its owner must hold the role
-permission `publishing` (one permission for every tool, checked on every
-request). The scopes:
+permission `publishing`, checked on every request; `upsert_groups`,
+`trash_groups` and `restore_groups` also need `publishing.manage`. The scopes:
 
 | Scope | Tools |
 |---|---|
@@ -526,8 +541,7 @@ domain gets the bare root-relative path). On a multi-domain site (host app
 config `:canonical_host_resolver`) a language served from its own domain gets
 that domain and no base-language segment (`/de` goes); a sibling dialect keeps
 its own segment (`/en-gb`), so it is `https://<domain>/en-gb/...`. Any other
-language gets the site origin and the prefixed path, as does every language on
-a core without `PhoenixKit.Utils.Routes.canonical_absolute_or_nil/2`.
+language gets the site origin and the prefixed path.
 
 ## Removing this module
 
@@ -582,17 +596,23 @@ createdb phoenix_kit_publishing_test
 mix test
 ```
 
-Integration tests are automatically excluded when the database is unavailable. Controller tests run through a minimal `Phoenix.Endpoint` + `Router` + `Layouts` shipped under `test/support/` — see `AGENTS.md` for details.
+Integration tests are automatically excluded when the database cannot be reached. A
+database that is reachable but cannot be brought to the current schema (one left
+behind by an older core, say) fails the run instead; rebuild it with `mix test.reset`.
+Controller tests run through a minimal `Phoenix.Endpoint` + `Router` + `Layouts` shipped under `test/support/` — see `AGENTS.md` for details.
 
 ## Dependencies
 
 | Package | Purpose |
 |---------|---------|
-| `phoenix_kit` | Module behaviour, Settings, Auth, Cache, shared components |
+| `phoenix_kit` | Module behaviour, Settings, Auth, Cache, shared components, machine API |
+| `phoenix_kit_ai` | AI translation pipeline (adapters live here, the jobs and LLM call there) |
+| `leaf` | The post editor |
 | `phoenix_live_view` | Admin LiveView pages |
-| `mdex` | Markdown rendering (comrak) |
+| `mdex` | Markdown rendering (comrak) and the HTML sanitiser (ammonia) |
 | `saxy` | XML parsing for PHK components |
-| `oban` | Background translation and migration workers |
+| `oban` | Background jobs (AI translation) |
+| `gettext` | This module's own translations (de, en, et, fr, it, ru) |
 
 ## License
 

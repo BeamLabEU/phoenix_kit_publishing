@@ -1,7 +1,8 @@
 defmodule PhoenixKit.Modules.Publishing.ListingCache.CacheSync do
   @moduledoc """
   Node-local subscriber that erases this node's cached listing terms when
-  another node invalidates a group (rename/trash/delete, category changes).
+  another node invalidates a group (rename/trash/delete, category changes)
+  or rebuilds it after a post, version or translation change.
 
   `:persistent_term` is process-less: a peer node's warm cache never misses
   on its own, so before this subscriber existed it kept serving pre-mutation
@@ -43,6 +44,13 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.CacheSync do
   def handle_info({:cache_invalidated, group_slug}, state) do
     # erase_local, never invalidate/1 — that would re-broadcast in a loop.
     ListingCache.erase_local(group_slug)
+    {:noreply, state}
+  end
+
+  # A peer rebuilt the listing after a mutation; this node's copy predates it.
+  # The origin node keeps the listing it just installed.
+  def handle_info({:cache_regenerated, group_slug, origin}, state) do
+    if origin != node(), do: ListingCache.erase_local(group_slug)
     {:noreply, state}
   end
 

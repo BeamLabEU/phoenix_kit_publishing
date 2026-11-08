@@ -35,6 +35,14 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     {"post_link", "[[POST:00000000-0000-0000-0000-000000000000|alias]]"},
     {"post_link", "prose [[post:x]] more"},
     {"post_link", "```\n[[post:x]]\n```"},
+    # the renderer reads these as the token: backslash escapes and entities are decoded
+    # before `resolve_post_links/2` sees the HTML
+    {"post_link", "\\[\\[post:00000000-0000-0000-0000-000000000000|x\\]\\]"},
+    {"post_link", "&#91;&#91;post:00000000-0000-0000-0000-000000000000|x]]"},
+    {"post_link", "&#x5B;&#X5b;post:00000000-0000-0000-0000-000000000000]]"},
+    {"post_link", "&lbrack;&lsqb;post:00000000-0000-0000-0000-000000000000]]"},
+    {"post_link", "[[&#112;ost&colon;00000000-0000-0000-0000-000000000000]]"},
+    {"post_link", "[\\[post\\:00000000-0000-0000-0000-000000000000]]"},
     # scheme
     {"scheme", "javascript:alert(1)"},
     {"scheme", "JavaScript:alert(1)"},
@@ -113,7 +121,10 @@ defmodule PhoenixKit.Modules.Publishing.API.TextScanTest do
     {"autolink_scheme", "see x-xmpp:a@b.c.d"},
     # a bare scheme://, even with an entity for its colon, is not left to the renderer
     {"autolink_scheme", "ftp&colon;//x.example"},
-    {"autolink_scheme", "ftp&#58;//x.example"}
+    {"autolink_scheme", "ftp&#58;//x.example"},
+    {"autolink_scheme", "ftp&colon;&sol;&sol;evil.example"},
+    {"autolink_scheme", "javascript&colon;&sol;&sol;%0aalert(1)"},
+    {"autolink_scheme", "x&UnderBar;mailto:a@b.c"}
   ]
 
   @clean [

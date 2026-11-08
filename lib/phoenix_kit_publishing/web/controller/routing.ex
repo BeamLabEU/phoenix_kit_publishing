@@ -106,6 +106,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Routing do
     end
   end
 
+  # A timestamp post that shares its date carries its time too, so its version
+  # URL is /group/2026-05-01/14:30/v/2 (`build_version_url/4` appends `/v/N` to
+  # the post URL). `read_post/4` takes the identifier as "date/time".
+  def parse_path([group_slug, date, time, "v", version_str]) do
+    with true <- date?(date) and time?(time),
+         {:versioned_post, ^group_slug, _, version} <-
+           parse_path([group_slug, date, "v", version_str]) do
+      {:versioned_post, group_slug, date <> "/" <> time, version}
+    else
+      false -> {:error, :invalid_path}
+      error -> error
+    end
+  end
+
   def parse_path([group_slug, segment]) do
     # Check if segment is a date (for date-only timestamp URLs)
     # If it's a date, treat as date-only timestamp post

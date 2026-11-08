@@ -169,6 +169,18 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpersDBTest do
       {:ok, post} = Posts.create_post(group_slug, %{title: "Slug Exists", slug: "exists-now"})
       assert SlugHelpers.slug_exists?(group_slug, post.slug)
     end
+
+    # The unique index covers trashed posts (they can be restored under their
+    # slug): a probe that skipped them handed out a slug the insert refused.
+    test "a trashed post's slug is still taken", %{group_slug: group_slug} do
+      {:ok, post} = Posts.create_post(group_slug, %{title: "About", slug: "about"})
+      {:ok, _} = Posts.trash_post(group_slug, post.uuid)
+
+      assert SlugHelpers.slug_exists?(group_slug, "about")
+
+      assert {:ok, again} = Posts.create_post(group_slug, %{title: "About"})
+      assert again.slug != "about"
+    end
   end
 
   describe "validate_url_slug/4" do

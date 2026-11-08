@@ -345,6 +345,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     assert is_binary(render(view))
   end
 
+  # The refreshed card must be the listing's own map: `read_post/4` answers with
+  # the LIVE version's (no :live_version, the live number as :version), and a
+  # draft-only language's pill then opened the published version.
+  test "a card refreshed after a save keeps its live and newest version",
+       %{conn: conn, group: group, post: post} do
+    :ok = Versions.publish_version(group["slug"], post.uuid, 1)
+    {:ok, _} = Versions.create_version_from(group["slug"], post.uuid, 1, %{})
+
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    send(view.pid, {:debounced_post_update, post[:slug]})
+    _ = render(view)
+
+    card =
+      :sys.get_state(view.pid).socket.assigns.posts
+      |> Enum.find(&(&1[:uuid] == post.uuid))
+
+    assert card[:live_version] == 1
+    assert card[:version] == 2
+  end
+
   test "add_language event navigates to the edit URL with lang param",
        %{conn: conn, group: group, post: post} do
     {:ok, view, _html} =
@@ -400,6 +424,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
       })
 
     assert is_binary(html)
+  end
+
+  # A draft has nothing to unpublish: archiving it used to answer "Not published".
+  test "a draft that never went live can be archived and drafted again",
+       %{conn: conn, group: group, post: post} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    html = render_click(view, "change_status", %{"uuid" => post[:uuid], "status" => "archived"})
+    refute html =~ "Couldn"
+    assert {:ok, archived} = Posts.read_post(group["slug"], post[:uuid])
+    assert archived.metadata.status == "archived"
+
+    _ = render_click(view, "change_status", %{"uuid" => post[:uuid], "status" => "draft"})
+    assert {:ok, drafted} = Posts.read_post(group["slug"], post[:uuid])
+    assert drafted.metadata.status == "draft"
   end
 
   test "toggle_status event cycles draft → published → archived → draft",

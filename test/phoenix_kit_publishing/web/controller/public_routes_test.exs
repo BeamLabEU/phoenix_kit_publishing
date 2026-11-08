@@ -40,6 +40,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PublicRoutesTest do
     %{group_slug: group["slug"], post: post}
   end
 
+  describe "only the route decides language, group and path" do
+    # Query params share conn.params with the route's bindings on a host that
+    # parses them: `?language=x` took the localized branch and shifted "x" into
+    # the group position.
+    test "a ?language= query param does not move the group", %{
+      conn: conn,
+      group_slug: group_slug,
+      post: post
+    } do
+      response =
+        get(conn, "/" <> group_slug <> "/" <> post.slug, %{"language" => "x"})
+        |> html_response(200)
+
+      assert response =~ "First Post"
+    end
+
+    test "a ?path[]= query param does not add a segment", %{conn: conn, group_slug: group_slug} do
+      conn = get(conn, "/" <> group_slug, %{"path" => ["no-such-post"]})
+      assert html_response(conn, 200)
+    end
+
+    test "a ?page[]= param is ignored, not a 500", %{conn: conn, group_slug: group_slug} do
+      assert html_response(get(conn, "/" <> group_slug, %{"page" => ["1"]}), 200)
+      assert html_response(get(conn, "/" <> group_slug, %{"page" => %{"x" => "1"}}), 200)
+    end
+
+    test "a path segment that is not UTF-8 is a 404, not a 500", %{
+      conn: conn,
+      group_slug: group_slug
+    } do
+      assert get(conn, "/" <> group_slug <> "/%FF").status == 404
+    end
+  end
+
   describe "/:group — group listing" do
     test "renders 200 for an existing group", %{conn: conn, group_slug: group_slug} do
       assert html_response(get(conn, "/" <> group_slug), 200)

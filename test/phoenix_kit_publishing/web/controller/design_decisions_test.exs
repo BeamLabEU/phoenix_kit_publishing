@@ -21,6 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DesignDecisionsTest do
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.ListingCache.CacheSync
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
 
@@ -208,6 +209,42 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DesignDecisionsTest do
       :sys.get_state(pid)
 
       assert ListingCache.cache_generated_at(slug) == nil
+    end
+
+    # A post, version or translation change regenerates on the node that made it
+    # and announces `{:cache_regenerated, slug, origin}`: a peer erases its copy,
+    # the origin keeps the one it just installed.
+    test "erases on a peer's regeneration and keeps its own" do
+      base_settings()
+      {:ok, group} = Groups.add_group(unique_name("sync"), mode: "slug")
+      slug = group["slug"]
+      published_post(slug, %{title: "Cached", slug: "cached", content: "Body."})
+
+      :ok = ListingCache.regenerate(slug, broadcast: false)
+      pid = start_supervised!(CacheSync)
+
+      send(pid, {:cache_regenerated, slug, node()})
+      :sys.get_state(pid)
+      assert ListingCache.cache_generated_at(slug) != nil
+
+      send(pid, {:cache_regenerated, slug, :"peer@other-host"})
+      :sys.get_state(pid)
+      assert ListingCache.cache_generated_at(slug) == nil
+    end
+
+    test "a mutation's regeneration announces itself on the node-level topic" do
+      base_settings()
+      {:ok, group} = Groups.add_group(unique_name("sync"), mode: "slug")
+      slug = group["slug"]
+
+      PublishingPubSub.subscribe_to_cache_invalidations()
+      :ok = ListingCache.regenerate(slug)
+
+      assert_receive {:cache_regenerated, ^slug, origin}
+      assert origin == node()
+
+      :ok = ListingCache.regenerate(slug, broadcast: false)
+      refute_receive {:cache_regenerated, ^slug, _}
     end
   end
 end

@@ -130,7 +130,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
              }
     end
 
-    @tag :canonical_urls
     test "a language with a domain gets it, without its base language segment",
          %{db: db, contents: contents} do
       resolver!()
@@ -141,7 +140,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
       assert paths["en-US"] == "https://en.example.test/#{slug}/hello"
     end
 
-    @tag :canonical_urls
     test "a sibling dialect on the base domain keeps its own segment",
          %{db: db, contents: contents} do
       resolver!()
@@ -150,7 +148,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
                "https://en.example.test/en-gb/#{db.group.slug}/hello"
     end
 
-    @tag :canonical_urls
     test "a sibling dialect with a domain of its own gets that domain and keeps its segment",
          %{db: db, contents: contents} do
       resolver!(:host_for_dialect)
@@ -161,7 +158,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
       assert paths["en-US"] == "https://en.example.test/#{slug}/hello"
     end
 
-    @tag :canonical_urls
     test "a language without a domain falls back to the site origin and the prefix",
          %{db: db, contents: contents} do
       resolver!()
@@ -170,7 +166,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
                "https://example.test/fr/#{db.group.slug}/hello"
     end
 
-    @tag :canonical_urls
     test "with no site origin configured a language without a domain stays root-relative",
          %{db: db, contents: contents} do
       resolver!()
@@ -182,7 +177,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
       assert paths["de-DE"] == "https://de.example.test/#{slug}/hello"
     end
 
-    @tag :canonical_urls
     test "the resolver is asked once per language", %{db: db, contents: contents} do
       resolver!(:host_for_counted)
       Process.put(:resolver_calls, 0)
@@ -194,7 +188,6 @@ defmodule PhoenixKit.Modules.Publishing.API.PresenterTest do
 
     # Pins today's behaviour, not a goal: core cannot tell that the module emitted no language
     # prefix, so a group slug equal to the prefixless primary language's code loses its segment.
-    @tag :canonical_urls
     test "a prefixless primary language and a group slugged like its code lose the group segment" do
       resolver!()
       {:ok, _} = PhoenixKit.Settings.update_boolean_setting("default_language_no_prefix", true)

@@ -551,9 +551,8 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   Also reconciles active_version_uuid consistency and ensures single published version.
   Callable via internal API or IEx.
 
-  Streams the per-group post listing inside a `Repo.checkout/1` so the BEAM
-  doesn't have to hold every post in memory at once for large catalogues
-  (PR #9 follow-up — Pincer review). Group fix-up still loads the group
+  Reads each group's posts in keyset pages of 200 so the BEAM doesn't have
+  to hold every post in memory at once for large catalogues. Group fix-up still loads the group
   list eagerly because the count is bounded by the number of CMS sections
   (typically <100), and `fix_stale_group/1` mutates rows that the post
   pass also reads.
@@ -564,15 +563,28 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     groups = DBStorage.list_groups(nil)
     Enum.each(groups, &fix_stale_group/1)
 
-    PhoenixKit.RepoHelper.repo().checkout(fn ->
-      for group <- groups do
-        DBStorage.stream_posts(group.slug)
-        |> Stream.each(&fix_stale_post/1)
-        |> Stream.run()
-      end
-    end)
+    Enum.each(groups, &fix_group_posts(&1.slug, nil))
 
     :ok
+  end
+
+  @fix_batch_size 200
+
+  # Keyset pages of the group's posts, each post fixed on its own. A `Repo.stream/2` would
+  # need a transaction around the whole pass (Ecto refuses to reduce one outside), which
+  # would hold every fixed row's lock until the last post of the last group.
+  defp fix_group_posts(group_slug, after_uuid) do
+    case DBStorage.list_posts_batch(group_slug, after_uuid, @fix_batch_size) do
+      [] ->
+        :ok
+
+      posts ->
+        Enum.each(posts, &fix_stale_post/1)
+
+        if length(posts) == @fix_batch_size,
+          do: fix_group_posts(group_slug, List.last(posts).uuid),
+          else: :ok
+    end
   end
 
   @spec fix_stale_version(PhoenixKit.Modules.Publishing.PublishingVersion.t()) ::
@@ -650,47 +662,60 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   defp normalize_content_language(%PublishingContent{} = content) do
     target_language = normalized_content_language(content.language)
 
-    cond do
-      target_language in [nil, "", content.language] ->
-        :unchanged
+    if target_language in [nil, "", content.language] do
+      :unchanged
+    else
+      content.version_uuid
+      |> DBStorage.get_content(target_language)
+      |> heal_content_language(content, target_language)
+    end
+  end
 
-      target = DBStorage.get_content(content.version_uuid, target_language) ->
-        case merge_duplicate_language_content(target, content) do
-          {:ok, _} -> {:deleted, target_language}
-          {:error, _reason} -> :unchanged
-        end
+  defp heal_content_language(nil, content, target_language),
+    do: rename_content_language(content, target_language)
 
-      true ->
-        Logger.info(
-          "[Publishing] Normalizing legacy content language #{content.uuid}: " <>
-            "#{inspect(content.language)} → #{inspect(target_language)}"
+  # A concurrent heal already renamed THIS row: the lookup finds the row itself,
+  # and merging it into itself would delete it.
+  defp heal_content_language(%PublishingContent{uuid: uuid}, %{uuid: uuid}, _target_language),
+    do: :unchanged
+
+  defp heal_content_language(target, content, target_language) do
+    case merge_duplicate_language_content(target, content) do
+      {:ok, _} -> {:deleted, target_language}
+      {:error, _reason} -> :unchanged
+    end
+  end
+
+  defp rename_content_language(content, target_language) do
+    Logger.info(
+      "[Publishing] Normalizing legacy content language #{content.uuid}: " <>
+        "#{inspect(content.language)} → #{inspect(target_language)}"
+    )
+
+    case DBStorage.update_content(content, %{language: target_language}) do
+      {:ok, updated} ->
+        mark_listing_dirty()
+
+        ActivityLog.log(%{
+          action: "publishing.content.language_normalized",
+          mode: "auto",
+          resource_type: "publishing_content",
+          resource_uuid: updated.uuid,
+          metadata: %{
+            "from_language" => content.language,
+            "to_language" => target_language,
+            "version_uuid" => content.version_uuid
+          }
+        })
+
+        {:ok, updated}
+
+      {:error, reason} ->
+        Logger.warning(
+          "[Publishing] Failed to normalize content language for #{content.uuid}: #{inspect(reason)}"
         )
 
-        case DBStorage.update_content(content, %{language: target_language}) do
-          {:ok, updated} ->
-            mark_listing_dirty()
-
-            ActivityLog.log(%{
-              action: "publishing.content.language_normalized",
-              mode: "auto",
-              resource_type: "publishing_content",
-              resource_uuid: updated.uuid,
-              metadata: %{
-                "from_language" => content.language,
-                "to_language" => target_language,
-                "version_uuid" => content.version_uuid
-              }
-            })
-
-            {:ok, updated}
-
-          {:error, reason} ->
-            Logger.warning(
-              "[Publishing] Failed to normalize content language for #{content.uuid}: #{inspect(reason)}"
-            )
-
-            :unchanged
-        end
+        :unchanged
     end
   end
 
@@ -727,7 +752,7 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     result =
       repo.transaction(fn ->
         with :ok <- apply_merge_attrs(target, attrs),
-             {:ok, _} <- DBStorage.delete_content(legacy) do
+             :ok <- delete_legacy_content(repo, legacy) do
           :ok
         else
           {:error, reason} -> repo.rollback(reason)
@@ -780,15 +805,31 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
+  # Deletes the legacy row only while it still holds the legacy language: a parallel heal
+  # that already renamed, merged or deleted it leaves nothing to delete, and the merge rolls
+  # back instead of removing a row it no longer describes (or raising on a vanished one).
+  defp delete_legacy_content(repo, legacy) do
+    query =
+      from(c in PublishingContent,
+        where: c.uuid == ^legacy.uuid and c.language == ^legacy.language
+      )
+
+    case repo.delete_all(query) do
+      {1, _} -> :ok
+      {_count, _} -> {:error, :not_found}
+    end
+  end
+
   # A discarded body is capped so a huge markdown blob doesn't bloat every
   # merged row's JSONB — the stash is recovery insurance, not a mirror.
   @discarded_body_cap 100_000
 
   defp build_duplicate_content_merge_attrs(target, legacy) do
+    target_data = row_data(target)
+
     merged_data =
-      target.data
-      |> Kernel.||(%{})
-      |> merge_content_data(legacy.data || %{}, target.url_slug, legacy.url_slug)
+      target_data
+      |> merge_content_data(row_data(legacy), target.url_slug, legacy.url_slug)
       |> maybe_stash_discarded_body(target, legacy)
 
     %{}
@@ -796,8 +837,11 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     |> maybe_take_legacy_body(target, legacy)
     |> maybe_take_legacy_url_slug(target, legacy)
     |> maybe_take_legacy_status(target, legacy)
-    |> maybe_put_merged_data(target.data || %{}, merged_data)
+    |> maybe_put_merged_data(target_data, merged_data)
   end
+
+  # The schema types `data` as a map, but a NULL JSONB column loads as nil.
+  defp row_data(row), do: Map.get(row, :data) || %{}
 
   # Target-wins is the right convergence rule (the target is the canonical
   # dialect row), but silently DELETING a divergent non-blank legacy body is

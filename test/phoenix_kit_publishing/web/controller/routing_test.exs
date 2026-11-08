@@ -118,6 +118,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.RoutingTest do
 
     test "too many segments" do
       assert Routing.parse_path(["a", "b", "c", "d", "e"]) == {:error, :invalid_path}
+      assert Routing.parse_path(["a", "b", "c", "v", "1"]) == {:error, :invalid_path}
+    end
+
+    # Two posts on one date: the post URL carries the time, and `/v/N` follows it.
+    test "versioned timestamp post with a time" do
+      assert Routing.parse_path(["blog", "2026-03-16", "14:30", "v", "2"]) ==
+               {:versioned_post, "blog", "2026-03-16/14:30", 2}
+
+      assert Routing.parse_path(["blog", "2026-03-16", "14:30", "v", "0"]) ==
+               {:error, :invalid_version}
+
+      assert Routing.parse_path(["blog", "2026-03-16", "nope", "v", "2"]) ==
+               {:error, :invalid_path}
     end
   end
 

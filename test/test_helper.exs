@@ -6,6 +6,8 @@
 #
 # To enable integration tests:
 #   createdb phoenix_kit_publishing_test
+# A test database left behind by an older core is rebuilt with:
+#   mix test.reset
 
 alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
@@ -13,29 +15,23 @@ alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 db_config = Application.get_env(:phoenix_kit_publishing, TestRepo, [])
 db_name = db_config[:database] || "phoenix_kit_publishing_test"
 
-# The preflight ships in core, and this module's core floor (`~> 2.0`)
-# predates it — so it is used when the running core has it, and otherwise
-# this falls through to exactly the previous behaviour.
+# One classified connection attempt, with the repo's OWN credentials and
+# transport, before anything starts the pool (core's preflight, in every core
+# this module's floor allows).
+#
+# This replaces a `psql -lqt` listing. That check asked the wrong question: it
+# ran as the shell's user over a unix socket, so it reported "the database is
+# there" and said nothing about whether the CONFIGURED role could reach it over
+# TCP. When it could not, the answer arrived minutes later as a pool checkout
+# timeout that reads like a flaky test.
 db_check =
-  if Code.ensure_loaded?(PhoenixKit.TestSupport.PostgresPreflight) do
-    # One classified connection attempt, with the repo's OWN credentials and
-    # transport, before anything starts the pool.
-    #
-    # This replaces a `psql -lqt` listing. That check asked the wrong question:
-    # it ran as the shell's user over a unix socket, so it reported "the
-    # database is there" and said nothing about whether the CONFIGURED role
-    # could reach it over TCP. When it could not, the answer arrived minutes
-    # later as a pool checkout timeout that reads like a flaky test.
-    case PhoenixKit.TestSupport.PostgresPreflight.check(db_config) do
-      :ok ->
-        :exists
+  case PhoenixKit.TestSupport.PostgresPreflight.check(db_config) do
+    :ok ->
+      :exists
 
-      {:error, _reason, message} ->
-        IO.puts(:stderr, "\n" <> message)
-        :not_found
-    end
-  else
-    :try_connect
+    {:error, _reason, message} ->
+      IO.puts(:stderr, "\n" <> message)
+      :not_found
   end
 
 repo_available =
@@ -85,21 +81,23 @@ repo_available =
       Ecto.Adapters.SQL.Sandbox.mode(TestRepo, :manual)
       true
     rescue
+      # The database answered the preflight, so a failure here is a broken
+      # schema, not a missing database: a stale test database below core's
+      # migration floor, or a SQL error in this module's own chain. Skipping
+      # the integration tier then turned the run green with most of the suite
+      # excluded (and the migration tests that would catch it among them).
       e ->
-        IO.puts("""
-        \n  Could not connect to test database — integration tests excluded.           The reason is printed above.
-           Error: #{Exception.message(e)}
-        """)
+        reraise RuntimeError,
+                [
+                  message: """
+                  The test database "#{db_name}" is reachable, but building its schema failed:
 
-        false
-    catch
-      :exit, reason ->
-        IO.puts("""
-        \n  Could not connect to test database — integration tests excluded.           The reason is printed above.
-           Error: #{inspect(reason)}
-        """)
+                      #{Exception.message(e)}
 
-        false
+                  A stale test database is rebuilt with `mix test.reset`.
+                  """
+                ],
+                __STACKTRACE__
     end
   end
 
@@ -176,41 +174,8 @@ if Code.ensure_loaded?(PhoenixKit.Users.RateLimiter.Backend) do
   end
 end
 
-# Exclude integration tests when DB is not available. The `:core_api` tag marks only the tests
-# that run through core's executor; the library itself needs a core that has `PhoenixKit.API` to
-# compile, so the other API tests are not tagged. `:canonical_urls` marks the tests that need
-# core's `Routes.canonical_absolute_or_nil/2`, which the Hex 2.63.0 core lacks.
-exclude =
-  if(repo_available, do: [], else: [:integration]) ++
-    if(Code.ensure_loaded?(PhoenixKit.API.Executor), do: [], else: [:core_api]) ++
-    if Code.ensure_loaded?(PhoenixKit.Utils.Routes) and
-         function_exported?(PhoenixKit.Utils.Routes, :canonical_absolute_or_nil, 2),
-       do: [],
-       else: [:canonical_urls]
-
-# The builds-alone test needs `PhoenixKit.TestSupport.ModuleChainCheck`, which
-# ships in the first core release after 2.64.1; against an older core it is
-# excluded.
-chain_check_exclude =
-  if Code.ensure_loaded?(PhoenixKit.TestSupport.ModuleChainCheck),
-    do: [],
-    else: [:requires_module_chain_check]
-
-# The file-references test compares against core's own list, which the first
-# core release after 2.64.1 exposes as `Storage.builtin_file_references/0`;
-# against an older core it is excluded.
-file_refs_exclude =
-  if Code.ensure_loaded?(PhoenixKit.Modules.Storage) and
-       function_exported?(PhoenixKit.Modules.Storage, :builtin_file_references, 0),
-     do: [],
-     else: [:requires_core_file_references]
-
-ExUnit.start(exclude: chain_check_exclude ++ file_refs_exclude ++ exclude)
-
-# The manifest test builds the module's tables with `ModuleChainCheck.build_alone/4`
-# and hands the manifest to repair (`PhoenixKit.Module.expected_schema/0`); both
-# arrive in the first core release after 2.64.1.
-unless Code.ensure_loaded?(PhoenixKit.TestSupport.ModuleChainCheck) and
-         function_exported?(PhoenixKit.TestSupport.ModuleChainCheck, :build_alone, 4) do
-  ExUnit.configure(exclude: [:requires_core_expected_schema | ExUnit.configuration()[:exclude]])
-end
+# Integration tests are excluded only when the database cannot be reached. Every
+# core API the suite once probed for (the machine API's executor, the canonical URL
+# helpers, ModuleChainCheck, the built-in file references) ships in 2.65.0, this
+# module's floor, so nothing else is ever excluded.
+ExUnit.start(exclude: if(repo_available, do: [], else: [:integration]))

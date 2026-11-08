@@ -375,10 +375,17 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
       DBStorage.lock_post_row!(repo, db_post.uuid)
 
       with :ok <- validate_not_last_content(db_version, content.language),
-           {:ok, _} <- repo.delete(content) do
+           {:ok, _} <- repo.delete(content, stale_error_field: :uuid) do
         :ok
       else
-        {:error, reason} -> repo.rollback(reason)
+        # The row was read before the lock: a second tab that deleted it first
+        # leaves nothing to delete. That raised Ecto.StaleEntryError, which took
+        # the LiveView down and wrote no failure row; it is :not_found now.
+        {:error, %Ecto.Changeset{errors: [{:uuid, {_message, [stale: true]}} | _]}} ->
+          repo.rollback(:not_found)
+
+        {:error, reason} ->
+          repo.rollback(reason)
       end
     end)
   end

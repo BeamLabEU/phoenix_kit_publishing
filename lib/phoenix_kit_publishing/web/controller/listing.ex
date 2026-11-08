@@ -45,8 +45,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   def render_group_listing(conn, group_slug, language, params) do
     case fetch_group(group_slug) do
       {:ok, group} ->
-        # Only preserve pagination params for redirects
-        pagination_params = Map.take(params, ["page"])
+        # Only preserve pagination params for redirects. A string only: `?page[]=1`
+        # or `?page[x]=1` arrives as a list or map, which `URI.encode_query/1`
+        # refuses (a 500 on every group listing).
+        pagination_params =
+          case params do
+            %{"page" => page} when is_binary(page) -> %{"page" => page}
+            _ -> %{}
+          end
 
         # Check if we need to redirect to canonical URL
         canonical_language = Language.get_canonical_url_language(language)

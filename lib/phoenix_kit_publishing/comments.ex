@@ -21,6 +21,8 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
 
   alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Users.Auth
+  alias PhoenixKit.Utils.RecipientLocale
 
   @comments_mod PhoenixKitComments
   @compile {:no_warn_undefined, [PhoenixKitComments, PhoenixKitComments.Web.Markdown]}
@@ -246,15 +248,40 @@ defmodule PhoenixKit.Modules.Publishing.Comments do
         # The post row carries the slug; the title lives on the per-language
         # content row, so it isn't reachable from here without another read.
         "post_slug" => post && post.slug,
-        "notification_text" =>
-          if(reply?,
-            do: gettext("Someone replied to your comment"),
-            else: gettext("New comment on your post")
-          ),
+        "notification_text" => notification_text(reply?, recipient),
         "notification_icon" => "hero-chat-bubble-left-right"
       }
     })
   end
+
+  # Stored once and shown as stored (core renders `notification_text` verbatim,
+  # the email digest included), so it is written in the RECIPIENT's language:
+  # in the commenter's page language an English-UI author read a Russian
+  # notice. The controller sets this backend's own locale, which outranks the
+  # global one, so that is the locale switched.
+  defp notification_text(reply?, recipient_uuid) do
+    in_recipient_locale(recipient_uuid, fn ->
+      if reply?,
+        do: gettext("Someone replied to your comment"),
+        else: gettext("New comment on your post")
+    end)
+  end
+
+  defp in_recipient_locale(recipient_uuid, fun) when is_binary(recipient_uuid) do
+    locale =
+      recipient_uuid
+      |> Auth.get_user()
+      |> RecipientLocale.for_rendering()
+      |> String.split(["-", "_"])
+      |> hd()
+      |> String.downcase()
+
+    Gettext.with_locale(PhoenixKitPublishing.Gettext, locale, fun)
+  rescue
+    _ -> fun.()
+  end
+
+  defp in_recipient_locale(_recipient_uuid, fun), do: fun.()
 
   defp recipient_for(true, parent_uuid, post) do
     case @comments_mod.get_comment(parent_uuid) do

@@ -148,6 +148,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
     )
   end
 
+  # The button lives in the Trash view only; a crafted event for an active
+  # group must not wipe it (and its posts) past the trash step.
+  test "delete_group refuses an active group", %{conn: conn} do
+    {:ok, group} =
+      Groups.add_group("Index Delete Active #{System.unique_integer([:positive])}", mode: "slug")
+
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope(user_uuid: @click_actor))
+      |> live("/admin/publishing")
+
+    html = render_click(view, "delete_group", %{"slug" => group["slug"]})
+
+    assert html =~ "Move the group to the trash before deleting it."
+    assert DBStorage.get_group_by_slug(group["slug"])
+  end
+
   # Behind a TLS-terminating proxy the LiveView's connect URI is http, so the
   # "View public" link said http://. The `site_url` setting is the public origin.
   test "the site_url setting is the origin of a group's public link", %{conn: conn} do

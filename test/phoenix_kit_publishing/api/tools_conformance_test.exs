@@ -275,7 +275,6 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
     assert Enum.reject(used, &MapSet.member?(allowed, &1)) == []
   end
 
-  @tag :core_api
   test "ToolLint finds nothing wrong with the tools" do
     assert :ok = ToolLint.check_tools(Tools.all())
   end

@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
 
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  alias PhoenixKit.Modules.Publishing.Web.Editor
   alias PhoenixKit.Modules.Publishing.Web.Editor.Persistence
   alias PhoenixKitWeb.Actor
 
@@ -292,6 +293,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   end
 
   defp flush_source_before_enqueue(socket) do
+    if Editor.locked_with_pending_changes?(socket) do
+      {:blocked, Editor.refuse_locked_save(socket)}
+    else
+      do_flush_source_before_enqueue(socket)
+    end
+  end
+
+  defp do_flush_source_before_enqueue(socket) do
     if socket.assigns[:has_pending_changes] and not socket.assigns[:readonly?] do
       {:noreply, saved} = Persistence.perform_save(socket)
 

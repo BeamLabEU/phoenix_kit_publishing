@@ -388,24 +388,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       {:ok, new_post} ->
         uuid = new_post[:uuid]
 
-        result =
-          case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
-                 scope: scope,
-                 actor_uuid: actor_uuid,
-                 # Save only: a post created here stays a draft until it is published as a step of its own.
-                 publish: false
-               }) do
-            {:ok, updated_post} ->
-              # Preserve UUID from create_post (update_post may not include it)
-              {:ok, if(uuid, do: Map.put(updated_post, :uuid, uuid), else: updated_post)}
+        case Publishing.update_post(socket.assigns.group_slug, new_post, params, %{
+               scope: scope,
+               actor_uuid: actor_uuid,
+               # Save only: a post created here stays a draft until it is published as a step of its own.
+               publish: false
+             }) do
+          {:ok, updated_post} ->
+            # Preserve UUID from create_post (update_post may not include it)
+            result = {:ok, if(uuid, do: Map.put(updated_post, :uuid, uuid), else: updated_post)}
 
-            error ->
-              error
-          end
+            handle_post_update_result(socket, result, gettext("Post created and saved"), %{
+              is_new_post: false
+            })
 
-        handle_post_update_result(socket, result, gettext("Post created and saved"), %{
-          is_new_post: false
-        })
+          error ->
+            # The post exists now, whatever the save of its fields says. Left as a
+            # new post, the next autosave created ANOTHER one: a typed slug that was
+            # taken made one more `hello-N` draft on every pause.
+            socket
+            |> adopt_created_post(new_post)
+            |> handle_post_update_result(error, gettext("Post created and saved"), %{
+              is_new_post: false
+            })
+        end
 
       {:error, error} ->
         handle_post_creation_error(socket, error, gettext("Couldn't create this post."))
@@ -441,8 +447,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
             )
 
           error ->
-            handle_post_update_result(
-              socket,
+            # The language row exists now; a retry must save into it, not add it again.
+            socket
+            |> Phoenix.Component.assign(:post, new_post)
+            |> Phoenix.Component.assign(:is_new_translation, false)
+            |> handle_post_update_result(
               error,
               gettext("Translation created and saved"),
               %{is_new_translation: false}
@@ -457,6 +466,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
            gettext("Couldn't create this translation.") <> " " <> Errors.message(reason)
          )}
     end
+  end
+
+  defp adopt_created_post(socket, new_post) do
+    socket
+    |> Phoenix.Component.assign(:post, new_post)
+    |> Phoenix.Component.assign(:is_new_post, false)
+    |> Phoenix.Component.assign(:db_post_slug, new_post[:slug])
   end
 
   # ============================================================================
@@ -1082,8 +1098,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   it, which is a conflict a person can resolve; the tab that has nothing
   pending still reloads, which is what makes a reference tab follow along.
   """
-  @spec reload_post(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
-  def reload_post(socket) do
+  @spec reload_post(Phoenix.LiveView.Socket.t(), keyword()) :: Phoenix.LiveView.Socket.t()
+  def reload_post(socket, opts \\ []) do
     # A spectator's "pending" copy is the owner's own work mirrored here; the
     # owner just saved it, so the spectator follows instead of being warned.
     if socket.assigns[:has_pending_changes] && !socket.assigns[:readonly?] do
@@ -1095,11 +1111,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         )
       )
     else
-      do_reload_post(socket)
+      do_reload_post(socket, opts)
     end
   end
 
-  defp do_reload_post(socket) do
+  # `keep_buffer: true` — a save in ANOTHER language of this version (a sibling
+  # editor) changed the version-level fields and the language list, never this
+  # language's body. Handing Leaf the stored body anyway replaced its document
+  # wholesale (undo and caret reset) and dropped what was typed inside its
+  # debounce, on every pause of the other writer.
+  defp do_reload_post(socket, opts) do
+    keep_buffer? = Keyword.get(opts, :keep_buffer, false)
     group_slug = socket.assigns.group_slug
     current_language = socket.assigns[:current_language]
     current_version = socket.assigns[:current_version]
@@ -1117,8 +1139,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         # This socket now matches the row again, so a later promotion should
         # take the saved copy rather than re-adopting what it mirrored before.
         |> Collaborative.clear_synced_from_owner()
-        |> Helpers.set_editor_content(updated_post.content)
-        |> Phoenix.LiveView.put_flash(:info, gettext("Post updated by another user"))
+        |> maybe_hand_over_body(updated_post.content, keep_buffer?)
 
       {:error, _reason} ->
         socket
@@ -1127,6 +1148,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
           gettext("Could not reload post - it may have been moved or deleted")
         )
     end
+  end
+
+  defp maybe_hand_over_body(socket, _content, true = _keep_buffer?), do: socket
+
+  defp maybe_hand_over_body(socket, content, false) do
+    socket
+    |> Helpers.set_editor_content(content)
+    |> Phoenix.LiveView.put_flash(:info, gettext("Post updated by another user"))
   end
 
   @doc """

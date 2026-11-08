@@ -118,20 +118,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   end
 
   # Helper functions available to template
-  @spec format_datetime(map()) :: String.t()
-  def format_datetime(post) do
-    case {post[:date], post[:time]} do
-      {%Date{} = date, %Time{} = time} ->
-        {:ok, dt} = DateTime.new(date, time, "Etc/UTC")
-        UtilsDate.format_datetime_with_user_format(dt)
 
-      {%Date{} = date, _} ->
-        UtilsDate.format_date_with_user_format(date)
-
-      _ ->
-        ""
+  # A version's date arrives as an ISO 8601 UTC string (the mapper's
+  # `version_dates`); shown raw it read `2026-10-01T09:12:44.123456Z`. The
+  # site's date format, on the site's clock.
+  @spec format_version_date(term()) :: String.t()
+  def format_version_date(iso) when is_binary(iso) do
+    case DateTime.from_iso8601(iso) do
+      {:ok, dt, _offset} -> UtilsDate.format_datetime_with_user_format(dt)
+      _ -> iso
     end
   end
+
+  def format_version_date(_), do: ""
 
   @spec version_status_badge_class(term()) :: String.t()
   def version_status_badge_class(@status_published), do: "badge-success"
@@ -224,7 +223,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
                     </span>
                   </div>
                   <%= if date do %>
-                    <span class="text-xs text-base-content/50">{date}</span>
+                    <span class="text-xs text-base-content/50">{format_version_date(date)}</span>
                   <% end %>
                 </.pk_link>
               <% end %>
@@ -263,7 +262,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
               <%= if @post[:date] do %>
                 <div class="flex justify-between">
                   <dt class="text-base-content/60">{gettext("Date")}</dt>
-                  <dd class="font-medium font-mono">{Date.to_iso8601(@post.date)}</dd>
+                  <dd class="font-medium">{UtilsDate.format_date_with_user_format(@post.date)}</dd>
                 </div>
               <% end %>
               <div class="flex justify-between">

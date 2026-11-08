@@ -1,11 +1,9 @@
 defmodule PhoenixKit.Modules.Publishing.FileReferencesTest do
   @moduledoc """
   The file references this module hands to core's orphan-file check
-  (`PhoenixKit.Modules.Publishing.FileReferences`): the right tables, SQL that runs, and the very SQL
-  core's own built-in list holds for them, so moving the check changes nothing.
-
-  Needs core's `Storage.builtin_file_references/0`, from the first core release
-  after 2.64.1; against an older core the tests are excluded.
+  (`PhoenixKit.Modules.Publishing.FileReferences`): the right tables, SQL that runs, the very
+  SQL core's own built-in list holds for them (core's copy steps aside while this module
+  supplies one), and every place a post names a file.
   """
   use ExUnit.Case, async: false
 
@@ -19,10 +17,10 @@ defmodule PhoenixKit.Modules.Publishing.FileReferencesTest do
   alias PhoenixKit.Modules.Publishing.FileReferences
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Modules.Storage.File, as: StorageFile
+  alias PhoenixKitPublishing.Test.MediaFixtures
   alias PhoenixKitPublishing.Test.Repo
 
   @moduletag :integration
-  @moduletag :requires_core_file_references
 
   @tables [
     "phoenix_kit_publishing_contents",
@@ -41,7 +39,7 @@ defmodule PhoenixKit.Modules.Publishing.FileReferencesTest do
   test "names the tables of this module that hold a file reference, and only those" do
     pairs = FileReferences.pairs()
 
-    assert pairs |> Enum.map(&elem(&1, 0)) |> Enum.sort() == @tables
+    assert pairs |> Enum.map(&elem(&1, 0)) |> Enum.uniq() |> Enum.sort() == @tables
 
     assert Enum.all?(pairs, fn {table, condition} ->
              is_binary(table) and match?(%DynamicExpr{}, condition)
@@ -61,11 +59,13 @@ defmodule PhoenixKit.Modules.Publishing.FileReferencesTest do
     end
   end
 
-  test "each pair renders the same SQL as core's built-in one" do
-    builtin = Map.new(Storage.builtin_file_references())
+  # Core's copy steps aside while this module supplies a list, so this list must
+  # hold what core's did, unchanged; the other pairs add what core's never had.
+  test "holds core's built-in pair for each table, verbatim" do
+    mine = Enum.map(FileReferences.pairs(), fn {table, condition} -> {table, sql(condition)} end)
 
-    for {table, condition} <- FileReferences.pairs() do
-      assert sql(condition) == sql(Map.fetch!(builtin, table)), "SQL differs for #{table}"
+    for {table, condition} <- Storage.builtin_file_references(), table in @tables do
+      assert {table, sql(condition)} in mine, "core's check for #{table} is missing"
     end
   end
 
@@ -73,6 +73,63 @@ defmodule PhoenixKit.Modules.Publishing.FileReferencesTest do
     for {table, condition} <- FileReferences.pairs() do
       query = from(f in StorageFile, where: ^condition, select: count(f.uuid))
       assert is_integer(Repo.one(query)), "#{table} did not run"
+    end
+  end
+
+  defp orphan?(file) do
+    %{phoenix_kit_publishing: {:ok, FileReferences.pairs()}}
+    |> Storage.orphaned_files_query()
+    |> Ecto.Query.where([f], f.uuid == ^file.uuid)
+    |> Repo.exists?()
+  end
+
+  describe "a file a post names is not an orphan" do
+    setup do
+      %{group: MediaFixtures.group!("Refs"), stored: MediaFixtures.file!()}
+    end
+
+    test "nothing names it: an orphan", %{group: group, stored: file} do
+      MediaFixtures.post!(group, contents: [{"en", "no files here", %{}}])
+      assert orphan?(file)
+    end
+
+    test "a version's featured image", %{group: group, stored: file} do
+      MediaFixtures.post!(group, version_data: %{"featured_image_uuid" => file.uuid})
+      refute orphan?(file)
+    end
+
+    test "a version's audio", %{group: group, stored: file} do
+      MediaFixtures.post!(group, version_data: %{"audio_uuid" => file.uuid})
+      refute orphan?(file)
+    end
+
+    test "a content row's OG image and legacy featured_image_id", %{group: group, stored: file} do
+      MediaFixtures.post!(group, contents: [{"en", "", %{"og" => %{"image_uuid" => file.uuid}}}])
+      refute orphan?(file)
+
+      other = MediaFixtures.file!()
+      MediaFixtures.post!(group, contents: [{"en", "", %{"featured_image_id" => other.uuid}}])
+      refute orphan?(other)
+    end
+
+    test "an <Image> component in the body", %{group: group, stored: file} do
+      body = ~s(Intro\n\n<Image file_uuid="#{String.upcase(file.uuid)}" alt="x"/>)
+      MediaFixtures.post!(group, contents: [{"en", body, %{}}])
+      refute orphan?(file)
+    end
+
+    test "a baked /file/<uuid>/ URL in the body", %{group: group, stored: file} do
+      MediaFixtures.post!(group, contents: [{"en", "![x](/file/#{file.uuid}/large/abc)", %{}}])
+      refute orphan?(file)
+    end
+
+    test "a trashed post's body still counts", %{group: group, stored: file} do
+      MediaFixtures.post!(group,
+        trashed_at: DateTime.utc_now(),
+        contents: [{"en", ~s(<Audio file_uuid='#{file.uuid}'/>), %{}}]
+      )
+
+      refute orphan?(file)
     end
   end
 end

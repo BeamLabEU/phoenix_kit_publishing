@@ -3,9 +3,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
   The category/tag archive and the versioned-post view are the two public
   branches that skipped `PhoenixKitWeb.AdminEditHelper.assign_admin_edit/3`
   (unlike the group listing and the slug/date post views, which already
-  call it). Pins that an admin scope sees an "Edit Categories"/"Edit Post"
+  call it). Pins that an admin scope sees an "Edit categories"/"Edit post"
   link on both, and an anonymous request sees neither. Also pins that a
-  TAG archive never gets the "Edit Categories" link — tags have no admin
+  TAG archive never gets the "Edit categories" link — tags have no admin
   page of their own (they derive from body `#hashtags`), so linking there
   would send an admin to a page that can't touch the tag at all.
   """
@@ -73,14 +73,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
 
       html = get(conn, "/#{slug}/category/guides") |> html_response(200)
 
-      assert html =~ "Edit Categories"
+      assert html =~ "Edit categories"
       assert html =~ "/admin/publishing/categories/#{slug}"
     end
 
     test "an anonymous reader sees no edit link", %{conn: conn, slug: slug} do
       html = get(conn, "/#{slug}/category/guides") |> html_response(200)
 
-      refute html =~ "Edit Categories"
+      refute html =~ "Edit categories"
       refute html =~ "/admin/publishing/categories/#{slug}"
     end
 
@@ -89,7 +89,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
 
       html = get(conn, "/#{slug}/tag/howto") |> html_response(200)
 
-      refute html =~ "Edit Categories"
+      refute html =~ "Edit categories"
       refute html =~ "/admin/publishing/categories/#{slug}"
     end
   end
@@ -100,14 +100,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
 
       html = get(conn, "/#{slug}/archive-post/v/1") |> html_response(200)
 
-      assert html =~ "Edit Post"
+      assert html =~ "Edit post"
       assert html =~ "/admin/publishing/#{slug}/#{post.uuid}/edit"
     end
 
     test "an anonymous reader sees no edit link", %{conn: conn, slug: slug, post: post} do
       html = get(conn, "/#{slug}/archive-post/v/1") |> html_response(200)
 
-      refute html =~ "Edit Post"
+      refute html =~ "Edit post"
       refute html =~ "/admin/publishing/#{slug}/#{post.uuid}/edit"
     end
   end

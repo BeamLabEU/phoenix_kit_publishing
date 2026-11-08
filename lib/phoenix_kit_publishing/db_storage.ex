@@ -249,6 +249,21 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     |> repo().exists?()
   end
 
+  @doc """
+  Whether a post in the group, trashed or not, holds `slug`. The unique index
+  `idx_publishing_posts_group_slug` covers trashed posts too (a trashed post
+  can be restored under its slug), so a probe that skips them hands out a slug
+  the insert then refuses.
+  """
+  @spec post_slug_taken?(String.t(), String.t()) :: boolean()
+  def post_slug_taken?(group_slug, slug) do
+    from(p in PublishingPost,
+      join: g in assoc(p, :group),
+      where: g.slug == ^group_slug and p.slug == ^slug
+    )
+    |> repo().exists?()
+  end
+
   @doc "Gets a post by UUID with preloads."
   @spec get_post_by_uuid(String.t(), list(atom() | tuple())) :: PublishingPost.t() | nil
   def get_post_by_uuid(uuid, preloads \\ []) do
@@ -457,22 +472,30 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc """
-  Streams every post in a group (including trashed) for batch operations
-  that shouldn't materialise the whole listing in memory.
+  One page of every post in a group (including trashed), in uuid order, for
+  batch operations that shouldn't materialise the whole listing in memory.
 
-  Caller MUST be inside a `Repo.checkout/1` (or an explicit transaction) —
-  Postgres-backed Ecto streams require a checked-out connection. Yields raw
-  `%PublishingPost{}` structs with `:group` preloaded; no version/content
-  metadata (callers re-read what they need).
+  Keyset-paginated: pass the uuid of the last post of the previous page as
+  `after_uuid` (`nil` for the first page). Needs no checked-out connection or
+  transaction, unlike a `Repo.stream/2`, so each post can be fixed in its own
+  transaction. Yields raw `%PublishingPost{}` structs with `:group` preloaded;
+  no version/content metadata (callers re-read what they need).
   """
-  @spec stream_posts(String.t()) :: Enumerable.t()
-  def stream_posts(group_slug) do
-    from(p in PublishingPost,
-      join: g in assoc(p, :group),
-      where: g.slug == ^group_slug,
-      preload: [group: g]
-    )
-    |> repo().stream(max_rows: 200)
+  @spec list_posts_batch(String.t(), String.t() | nil, pos_integer()) :: [PublishingPost.t()]
+  def list_posts_batch(group_slug, after_uuid, limit) when is_integer(limit) and limit > 0 do
+    query =
+      from(p in PublishingPost,
+        join: g in assoc(p, :group),
+        where: g.slug == ^group_slug,
+        order_by: [asc: p.uuid],
+        limit: ^limit,
+        preload: [group: g]
+      )
+
+    query =
+      if after_uuid, do: from(p in query, where: p.uuid > ^after_uuid), else: query
+
+    repo().all(query)
   end
 
   @doc """

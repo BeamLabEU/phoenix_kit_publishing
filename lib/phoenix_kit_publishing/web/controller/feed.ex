@@ -121,7 +121,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
 
     case text do
       t when is_binary(t) and t != "" ->
-        ["<description>", cdata(truncate(t, 500)), "</description>\n"]
+        ["<description>", cdata(html_escape(truncate(t, 500))), "</description>\n"]
 
       _ ->
         []
@@ -206,12 +206,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
     Calendar.strftime(dt, "%a, %d %b %Y %H:%M:%S +0000")
   end
 
+  # A feed reader reads a <description> as HTML. The excerpt is plain text (decoded
+  # back from the rendered paragraph), so "Use the `<b>` tag" would come out as
+  # markup: its `<`, `>` and `&` are escaped for HTML inside the CDATA.
+  defp html_escape(text), do: text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
+
   defp element(tag, content) do
     ["<", tag, ">", escape(to_string(content)), "</", tag, ">\n"]
   end
 
   defp escape(text) do
     text
+    |> xml_chars()
     |> String.replace("&", "&amp;")
     |> String.replace("<", "&lt;")
     |> String.replace(">", "&gt;")
@@ -221,8 +227,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Feed do
   # CDATA keeps human prose readable in the raw feed; the one sequence CDATA
   # can't contain is its own terminator, so split any "]]>" across sections.
   defp cdata(text) do
-    ["<![CDATA[", String.replace(text, "]]>", "]]]]><![CDATA[>"), "]]>"]
+    ["<![CDATA[", text |> xml_chars() |> String.replace("]]>", "]]]]><![CDATA[>"), "]]>"]
   end
+
+  # XML 1.0 has no way to write the C0 controls other than tab, newline and carriage
+  # return, escaped or not: one in a title or body makes the whole feed unparseable.
+  defp xml_chars(text), do: String.replace(text, ~r/[\x00-\x08\x0B\x0C\x0E-\x1F]/, "")
 
   defp truncate(text, max) do
     if String.length(text) > max, do: String.slice(text, 0, max) <> "…", else: text

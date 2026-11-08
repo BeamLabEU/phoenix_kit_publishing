@@ -329,13 +329,13 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpers do
 
   @doc """
   Checks if a slug already exists within the given publishing group (DB-only).
+
+  A trashed post's slug counts: the unique index covers it, so the post can be
+  restored under it.
   """
   @spec slug_exists?(String.t(), String.t()) :: boolean()
   def slug_exists?(group_slug, post_slug) do
-    case DBStorage.get_post(group_slug, post_slug) do
-      nil -> false
-      _post -> true
-    end
+    DBStorage.post_slug_taken?(group_slug, post_slug)
   rescue
     error ->
       # Fails OPEN, unlike url_slug_exists?/4 below, on purpose: the post

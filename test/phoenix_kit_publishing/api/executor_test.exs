@@ -7,9 +7,6 @@ defmodule PhoenixKit.Modules.Publishing.API.ExecutorTest do
 
   use PhoenixKit.DataCase, async: false
 
-  # Runs only against a core that has the API (see test_helper.exs).
-  @moduletag :core_api
-
   import Plug.Conn
 
   alias PhoenixKit.API.{Approvals, Auth, Executor, Keys}

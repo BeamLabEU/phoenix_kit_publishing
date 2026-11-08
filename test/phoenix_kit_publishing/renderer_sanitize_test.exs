@@ -35,6 +35,25 @@ defmodule PhoenixKit.Modules.Publishing.RendererSanitizeTest do
       assert html =~ "after"
     end
 
+    test "data-* attributes a host script acts on (phoenix_html data-method / data-to, htmx)" do
+      html =
+        Renderer.render_markdown(
+          ~s|<div data-method="get" data-to="javascript:alert(1)" data-hx-get="/x">body</div>|
+        )
+
+      refute html =~ "data-method"
+      refute html =~ "data-to"
+      refute html =~ "data-hx"
+      refute html =~ "javascript"
+      assert html =~ "body"
+    end
+
+    test "only the notes' data-note survives, on a link" do
+      assert Sanitizer.page(~s|<a href="#n" data-note="x">r</a>|) =~ ~s|data-note="x"|
+      refute Sanitizer.page(~s|<span data-note="x">r</span>|) =~ "data-note"
+      assert Sanitizer.page(~s|<span aria-label="x">r</span>|) =~ ~s|aria-label="x"|
+    end
+
     test "on* event handler attributes" do
       html = Renderer.render_markdown(~s|<img src="/a.png" onerror="alert(1)" alt="x">|)
       refute html =~ "onerror"

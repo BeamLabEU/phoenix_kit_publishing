@@ -75,6 +75,20 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
       assert Errors.message(:ai_no_prompt) == "No AI prompt selected"
       assert Errors.message(:ai_endpoint_not_found) == "AI endpoint not found"
       assert Errors.message(:ai_endpoint_disabled) == "AI endpoint is disabled"
+
+      assert Errors.message(:comments_unavailable) == "Comments are not available"
+
+      assert Errors.message(:conflicts_with_previous_slug) ==
+               "URL slug is a previous address of another post"
+
+      assert Errors.message(:content_copy_failed) ==
+               "Could not copy the content to the new version"
+
+      assert Errors.message(:group_not_active) == "Group is in the trash"
+      assert Errors.message(:no_active_version) == "The post has no live version"
+      assert Errors.message(:no_version) == "The post has no version"
+      assert Errors.message(:source_not_found) == "Source version not found"
+      assert Errors.message(:version_not_found) == "Version not found"
     end
   end
 
@@ -97,6 +111,11 @@ defmodule PhoenixKit.Modules.Publishing.ErrorsTest do
     test "{:source_post_read_failed, reason} interpolates the reason" do
       assert Errors.message({:source_post_read_failed, :not_found}) ==
                "Failed to read source post: :not_found"
+    end
+
+    test "{:has_posts, count} counts the posts in the way" do
+      assert Errors.message({:has_posts, 1}) == "The group still holds 1 post"
+      assert Errors.message({:has_posts, 3}) == "The group still holds 3 posts"
     end
 
     test "{:publish_failed, reason} says the save stands and translates the inner reason" do

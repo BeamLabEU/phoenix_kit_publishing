@@ -84,9 +84,11 @@ defmodule PhoenixKit.Integration.Publishing.GroupsTest do
       assert {:error, :invalid_name} = Groups.add_group("   ")
     end
 
-    test "invalid mode falls back to default" do
-      {:ok, group} = Groups.add_group(unique_name(), mode: "invalid")
-      assert group["mode"] == "timestamp"
+    # The mode is locked at creation: an unknown one used to become a
+    # timestamp group for good, which left the `:invalid_mode` branches of
+    # add_group/2 and Web.New unreachable.
+    test "an invalid mode is refused, not replaced by the default" do
+      assert {:error, :invalid_mode} = Groups.add_group(unique_name(), mode: "invalid")
     end
 
     test "normalizes mode case" do

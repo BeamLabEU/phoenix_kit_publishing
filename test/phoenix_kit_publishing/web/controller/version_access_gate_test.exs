@@ -19,7 +19,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.VersionAccessGateTest do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
+  alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
   alias PhoenixKit.Settings
@@ -125,5 +127,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.VersionAccessGateTest do
     forged = get_version(ctx, 2)
     refute forged.status == 200
     refute forged.resp_body =~ "NEVER-SHIPPED"
+  end
+
+  # An embargoed post is hidden at its URL until its date; its `/v/N` must be too.
+  test "a scheduled post's history is not readable before its date" do
+    {:ok, group} =
+      Groups.add_group("vgate-ts-#{System.unique_integer([:positive])}", mode: "timestamp")
+
+    slug = group["slug"]
+    {:ok, post} = Posts.create_post(slug, %{title: "Soon", content: "EMBARGOED-BODY"})
+    {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
+    {:ok, _} = Posts.update_post(slug, read, %{"allow_version_access" => "true"}, %{})
+    :ok = Versions.publish_version(slug, post.uuid, 1)
+
+    today = Date.to_iso8601(Date.utc_today())
+    live = build_conn() |> get("/#{slug}/#{today}/v/1")
+    assert live.status == 200
+    assert live.resp_body =~ "EMBARGOED-BODY"
+
+    future = Date.add(Date.utc_today(), 30)
+    repo = PhoenixKit.RepoHelper.repo()
+
+    repo.get_by(PublishingPost, uuid: post.uuid)
+    |> Ecto.Changeset.change(post_date: future)
+    |> repo.update!()
+
+    ListingCache.invalidate(slug)
+
+    embargoed = build_conn() |> get("/#{slug}/#{Date.to_iso8601(future)}/v/1")
+    refute embargoed.status == 200
+    refute embargoed.resp_body =~ "EMBARGOED-BODY"
   end
 end

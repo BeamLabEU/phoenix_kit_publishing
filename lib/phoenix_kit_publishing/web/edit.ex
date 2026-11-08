@@ -753,6 +753,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     """
   end
 
+  # After a refused save the form keeps what was there under the submitted
+  # params, as "validate" does: a dependent block hidden while its toggle is off
+  # submits no inputs, and a form rebuilt from the raw params alone showed the
+  # first option of each select on re-ticking it, which the next Save stored.
+  defp failed_save_form(socket, params) do
+    socket.assigns.form.source
+    |> merge_form_params(params)
+    |> Component.to_form(as: :group)
+  end
+
   defp save_group(params, all_params, socket) do
     # The "Save and exit" submit button rides `name="exit" value="true"` into
     # the params (entities-form pattern); the plain Save button omits it.
@@ -796,7 +806,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
         {:noreply,
          socket
          |> put_flash(:error, gettext("Please provide a valid group name."))
-         |> assign(:form, Component.to_form(params, as: :group))}
+         |> assign(:form, failed_save_form(socket, params))}
 
       {:error, :invalid_slug} ->
         {:noreply,
@@ -807,7 +817,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
              "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
            )
          )
-         |> assign(:form, Component.to_form(params, as: :group))}
+         |> assign(:form, failed_save_form(socket, params))}
 
       {:error, :not_found} ->
         {:noreply,
@@ -823,7 +833,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
         {:noreply,
          socket
          |> put_flash(:error, group_changeset_message(changeset))
-         |> assign(:form, Component.to_form(params, as: :group))}
+         |> assign(:form, failed_save_form(socket, params))}
     end
   rescue
     # Narrow to the realistic failure classes (DB errors, optimistic-lock

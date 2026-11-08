@@ -19,15 +19,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
   use Phoenix.LiveView
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
+  alias PhoenixKit.Utils.RecipientLocale
   alias PhoenixKit.Utils.Routes
 
   @posts_limit 25
 
   @impl true
   def mount(_params, session, socket) do
+    # A `live_render` child starts with an empty process dictionary, so no
+    # Gettext locale: without this the tab was English on every locale, and
+    # `Routes.path/1` (which reads core's locale) linked to the default-locale
+    # admin. The hub hands the viewer's locale over in the session for this.
+    put_session_locale(session)
     group_slug = get_in(session, ["config", "group_slug"])
 
     group =
@@ -154,17 +162,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
     metadata = post_field(post, :metadata) || %{}
 
     map_field(metadata, :title) ||
-      post_field(post, :url_slug) || post_field(post, :slug) || "(untitled)"
+      post_field(post, :url_slug) || post_field(post, :slug) || gettext("(untitled)")
   end
 
   defp post_date(post) do
     metadata = post_field(post, :metadata) || %{}
 
+    # The listing map carries `published_at` as an ISO 8601 string; both go
+    # through the public pages' locale-aware date format.
     case map_field(metadata, :published_at) || post_field(post, :date) do
-      %Date{} = date -> Calendar.strftime(date, "%b %-d, %Y")
-      formatted when is_binary(formatted) -> formatted
+      %Date{} = date -> PublishingHTML.format_date(DateTime.new!(date, ~T[00:00:00]))
+      formatted when is_binary(formatted) -> PublishingHTML.format_date(formatted)
       _ -> ""
     end
+  end
+
+  defp put_session_locale(session) do
+    with locale when is_binary(locale) and locale != "" <- Map.get(session, "locale"),
+         nil <- Process.get(PhoenixKitWeb.Gettext) do
+      gettext_locale = RecipientLocale.gettext_locale(locale)
+      Gettext.put_locale(PhoenixKitWeb.Gettext, gettext_locale)
+      Gettext.put_locale(gettext_locale)
+      Languages.put_request_locale(locale)
+    end
+  rescue
+    _ -> nil
   end
 
   defp post_field(post, key) when is_map(post), do: map_field(post, key)

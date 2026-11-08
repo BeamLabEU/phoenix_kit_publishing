@@ -136,6 +136,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.CommentsTest do
     assert html =~ "Great read"
   end
 
+  # The GET hides the form while the group flag is off; a crafted POST must be
+  # refused all the same.
+  test "a POST is refused while the group's comments are off", %{
+    conn: conn,
+    slug: slug,
+    post: post,
+    user: user
+  } do
+    :ok = login(user)
+
+    conn = post_comment(conn, slug, base_params(post, "Sneaking one in"))
+
+    assert conn.status == 404
+    assert PublishingComments.list(post.uuid) == []
+  end
+
+  # The published-set guard was tested only with a random uuid; a real post
+  # that is not published must be refused too.
+  test "a POST to a draft post of the group is refused", %{
+    conn: conn,
+    slug: slug,
+    user: user
+  } do
+    {:ok, _} = Groups.update_group(slug, %{"comments_enabled" => "true"})
+    {:ok, draft} = Posts.create_post(slug, %{title: "Unseen", slug: "unseen", content: "Body."})
+    :ok = login(user)
+
+    conn = post_comment(conn, slug, base_params(draft, "On a draft"))
+
+    refute redirected_to(conn) =~ "unseen"
+    assert PublishingComments.list(draft.uuid) == []
+  end
+
   test "the honeypot swallows bot submissions silently", %{
     conn: conn,
     slug: slug,

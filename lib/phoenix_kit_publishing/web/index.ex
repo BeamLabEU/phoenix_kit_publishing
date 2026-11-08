@@ -236,7 +236,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     end
   end
 
+  # Forever is offered only from the trash; the server checks it too. A crafted
+  # event for an ACTIVE group wiped it, with every post in it, without the
+  # trash step in between.
   defp group_event("delete_group", %{"slug" => slug}, socket) do
+    case Publishing.fetch_group(slug) do
+      {:ok, %{"status" => "trashed"}} ->
+        delete_group_forever(slug, socket)
+
+      {:ok, _active} ->
+        {:noreply,
+         put_flash(socket, :error, gettext("Move the group to the trash before deleting it."))}
+
+      {:error, reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't delete this group.") <> " " <> Errors.message(reason)
+         )}
+    end
+  end
+
+  defp delete_group_forever(slug, socket) do
     case Publishing.remove_group(slug,
            force: true,
            actor_uuid: Shared.actor_uuid_from_socket(socket)
@@ -580,9 +602,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                     <%= if @view_mode == "active" do %>
                       <.button
                         navigate={Routes.path("/admin/publishing/#{insight.slug}")}
+                        aria-label={gettext("Open")}
                         variant="outline"
-                        size="sm"
-                        class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
+                        size="xs"
+                        class="sm:btn-sm flex-1 sm:flex-none min-w-0"
                       >
                         <.icon name="hero-arrow-right" class="w-4 h-4 sm:mr-1" />
                         <span class="hidden sm:inline">{gettext("Open")}</span>
@@ -590,9 +613,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                       <.button
                         :if={@can_manage_groups}
                         navigate={Routes.path("/admin/publishing/edit-group/#{insight.slug}")}
+                        aria-label={gettext("Settings")}
                         variant="outline"
-                        size="sm"
-                        class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
+                        size="xs"
+                        class="sm:btn-sm flex-1 sm:flex-none min-w-0"
                       >
                         <.icon name="hero-cog-6-tooth" class="w-4 h-4 sm:mr-1" />
                         <span class="hidden sm:inline">{gettext("Settings")}</span>
@@ -606,8 +630,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                           target="_blank"
                           rel="noopener"
                           variant="outline"
-                          size="sm"
-                          class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0"
+                          size="xs"
+                          class="sm:btn-sm flex-1 sm:flex-none min-w-0"
                           aria-label={gettext("View public site")}
                         >
                           <.icon name="hero-eye" class="w-4 h-4 sm:mr-1" />
@@ -621,9 +645,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                         phx-value-slug={insight.slug}
                         phx-disable-with={gettext("Trashing…")}
                         variant="outline"
-                        size="sm"
-                        class="btn-xs sm:btn-sm min-w-0 text-error hover:bg-error hover:text-error-content"
+                        size="xs"
+                        class="sm:btn-sm min-w-0 text-error hover:bg-error hover:text-error-content"
                         data-confirm={gettext("Move this group to trash?")}
+                        aria-label={gettext("Move to trash")}
+                        title={gettext("Move to trash")}
                       >
                         <.icon name="hero-trash" class="w-4 h-4" />
                       </.button>
@@ -634,9 +660,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                         phx-click="restore_group"
                         phx-value-slug={insight.slug}
                         phx-disable-with={gettext("Restoring…")}
+                        aria-label={gettext("Restore")}
                         variant="outline"
-                        size="sm"
-                        class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0 text-success"
+                        size="xs"
+                        class="sm:btn-sm flex-1 sm:flex-none min-w-0 text-success"
                       >
                         <.icon name="hero-arrow-uturn-left" class="w-4 h-4 sm:mr-1" />
                         <span class="hidden sm:inline">{gettext("Restore")}</span>
@@ -647,9 +674,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                         phx-click="delete_group"
                         phx-value-slug={insight.slug}
                         phx-disable-with={gettext("Deleting…")}
+                        aria-label={gettext("Delete Forever")}
                         variant="outline"
-                        size="sm"
-                        class="btn-xs sm:btn-sm flex-1 sm:flex-none min-w-0 text-error hover:bg-error hover:text-error-content"
+                        size="xs"
+                        class="sm:btn-sm flex-1 sm:flex-none min-w-0 text-error hover:bg-error hover:text-error-content"
                         data-confirm={
                           gettext(
                             "Permanently delete this group and all its posts? This cannot be undone."

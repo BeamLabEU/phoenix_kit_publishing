@@ -156,7 +156,9 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     Categories.backfill_version_categories(group_slug)
 
     if memory_cache_enabled?() do
-      do_regenerate(group_slug, broadcast?, started_seq, started_ms)
+      group_slug
+      |> do_regenerate(broadcast?, started_seq, started_ms)
+      |> erase_after_failed_rebuild(group_slug, broadcast?)
     else
       :ok
     end
@@ -166,8 +168,27 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
         "[ListingCache] Failed to regenerate cache for #{group_slug}: #{inspect(error)}"
       )
 
-      {:error, {:regenerate_failed, error}}
+      erase_after_failed_rebuild(
+        {:error, {:regenerate_failed, error}},
+        group_slug,
+        Keyword.get(opts, :broadcast, true)
+      )
   end
+
+  # A rebuild a mutation asked for (`broadcast: true`) that failed leaves the
+  # pre-mutation listing installed, and a warm `:persistent_term` never misses on
+  # its own: erase it everywhere so the next read rebuilds. An unknown group has
+  # nothing to erase.
+  defp erase_after_failed_rebuild({:error, :group_not_found} = error, _slug, _), do: error
+
+  defp erase_after_failed_rebuild({:error, _} = error, group_slug, true) do
+    invalidate(group_slug)
+    error
+  catch
+    _kind, _reason -> error
+  end
+
+  defp erase_after_failed_rebuild(result, _group_slug, _broadcast?), do: result
 
   # Maximum number of posts to cache in :persistent_term per group.
   # Groups exceeding this will still work but only cache the most recent posts.
@@ -256,7 +277,11 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
     # regeneration triggered by *receiving* `:cache_changed` must stay silent,
     # otherwise the consumer that rebuilt its node-local cache re-broadcasts to
     # every subscriber (itself included), which loops forever.
-    if broadcast?, do: PublishingPubSub.broadcast_cache_changed(group_slug)
+    if broadcast? do
+      PublishingPubSub.broadcast_cache_changed(group_slug)
+      PublishingPubSub.broadcast_cache_regenerated(group_slug)
+    end
+
     :ok
   end
 
