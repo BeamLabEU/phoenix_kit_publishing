@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.18.0 - 2026-11-08
+
+The open items of the 2026-11-08 audit (`dev_docs/2026-11-08-full-module-audit.md`, "Open items, second pass"). Requires no new core: everything here is in phoenix_kit 2.65.0, the floor.
+
+### Changed
+
+- **`list_posts/2` with a language answers a live post's URL fields from its live version** (`available_languages`, `language_slugs`, `language_previous_slugs`, `url_slug`). Core's Sitemap passes one, so it no longer advertises a draft's renamed URL (a 404) or drops the live one. Without a language, as the admin calls it, nothing changes.
+- **A post slug derived from the title is validated like a typed one:** a title that slugifies to a language code or a reserved route word gets a suffix.
+- **A refused group create says why** (`:invalid_name`, `:invalid_slug`, …) instead of always `:already_exists`, and the activity row records the name's length instead of the submitted text.
+- **New translations:** es, pl, uk and zh, so every locale core ships is covered, and a `leaf` domain that translates Leaf's editor strings in all ten languages.
+- Self-healing writes log activity rows (`mode: "auto"`): `publishing.content.url_slug_resolved`, `publishing.post.pointer_cleared`, `publishing.version.orphan_demoted`, `publishing.version.duplicate_archived`.
+- Every mutation passes its options to its activity rows, and a failed category reorder is logged against the group like a successful one.
+- Machine API: `set_translation`, `create_version` and `schedule_post` validation errors carry a reason (`primary_language`, `exclusive_fields`, `invalid_datetime`); upper-case category ids are accepted.
+- Admin UI: core's `status_badge` and `form_actions`; duplicate headings and breadcrumbs removed; version dates in the site's format and clock; accessible names on the remaining controls; PostShow shows the post's view count.
+- Public listings: the pager shows the first, last and nearby pages with previous/next, instead of one button per page.
+- Removed internal functions nothing called (`DBStorage.delete_post/1`, `list_languages/1`, `list_posts_slug_mode/2`, `update_content_status_except/3`, `upsert_group/1`, `Categories.categories_for_posts/1`, `categories_of_post/1`, `MediaFolders.post_folder_prefix/0`, `Web.Editor.Preview`). The `Publishing` facade is unchanged.
+
+### Fixed
+
+- A date-only URL with several embargoed posts redirected to, and so revealed, the first one's time.
+- A replayed session cookie counted a view on every request; the session marker now carries an id that is deduplicated for the day.
+- Public search matched text inside HTML comments, which the page never shows.
+- The duplicate-published repair could take a published post offline over two reads.
+- The view-dedup cap counted the previous day's visitors, so a busy day switched deduplication off for most of the next.
+- A category edit could be rolled back by a failed audit write, and `replace_post_categories` could overwrite a concurrent save of the version.
+- A group rename left its render-cache setting behind (a disabled cache came back on), and open editors and listings on the old slug (every autosave answered "Not found").
+- Back and a post-mention click left the editor without collecting Leaf's last keystrokes.
+- An unpublished post's language fallback cost about two queries per version per language.
+- The admin dashboard loaded every post body of every group on each refresh; it reads aggregates now.
+- `if_revision` never matched on a post whose primary content still had a legacy base-language code.
+- The missing-timestamp repair stamped UTC instead of the site clock.
+
 ## 0.17.0 - 2026-11-08
 
 A full audit of the module; the report is `dev_docs/2026-11-08-full-module-audit.md`.
