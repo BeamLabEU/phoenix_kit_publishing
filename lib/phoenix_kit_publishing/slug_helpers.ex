@@ -461,8 +461,12 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpers do
        when not is_nil(current_slug) and candidate == current_slug,
        do: false
 
+  # A slug derived from the title skipped `validate_slug/1`, which only the
+  # preferred slug went through: a post titled "EN" or "Admin" got the language
+  # code or route word as its slug. Such a candidate counts as taken, so the
+  # generator moves on to `en-2` / `admin-2`.
   defp slug_exists_for_generation?(group_slug, candidate, _current_slug) do
-    slug_exists?(group_slug, candidate)
+    not match?({:ok, _}, validate_slug(candidate)) or slug_exists?(group_slug, candidate)
   end
 
   defp find_conflicting_url_slugs(posts, post_slug) do

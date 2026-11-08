@@ -78,4 +78,24 @@ defmodule PhoenixKit.Modules.Publishing.Integration.SitemapSourceTest do
     assert has_loc?(locs, "/#{slug}/listed-post")
     refute has_loc?(locs, "/#{slug}/hidden-post")
   end
+
+  # The sitemap lists what readers can open: a draft v2 that renames the URL of
+  # a live v1 must not replace the live address with one that 404s.
+  test "a live post is listed under its live URL, not its draft's" do
+    n = System.unique_integer([:positive])
+    {:ok, group} = Groups.add_group("live-url-#{n}", mode: "slug")
+    post = published_post(group["slug"], "live-address", %{"url_slug" => "live-address"})
+
+    {:ok, _} = Versions.create_version_from(group["slug"], post.uuid, 1)
+    {:ok, draft} = Publishing.read_post_by_uuid(post.uuid, "en", 2)
+    {:ok, _} = Posts.update_post(group["slug"], draft, %{"url_slug" => "draft-address"}, %{})
+
+    locs = locs()
+    assert has_loc?(locs, "/#{group["slug"]}/live-address")
+    refute has_loc?(locs, "/#{group["slug"]}/draft-address")
+
+    # The admin keeps the newest revision's fields for editing.
+    [admin] = Publishing.list_posts(group["slug"])
+    assert admin.url_slug == "draft-address"
+  end
 end

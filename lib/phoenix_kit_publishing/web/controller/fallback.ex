@@ -235,25 +235,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
     end
   end
 
-  # Finds the latest published version for a specific language
-  defp find_published_version_for_language(group_slug, post_slug, language) do
-    versions = Publishing.list_versions(group_slug, post_slug)
-
-    published_version =
-      versions
-      |> Enum.sort(:desc)
-      |> Enum.find(fn version ->
-        Constants.published?(
-          Publishing.get_version_status(group_slug, post_slug, version, language)
-        )
-      end)
-
-    case published_version do
-      nil -> :not_found
-      version -> {:ok, version}
-    end
-  end
-
   # Tries other languages when requested language has no published versions
   defp try_other_languages(group_slug, post_slug, post, requested_language, default_lang) do
     available = post.available_languages
@@ -275,27 +256,38 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
     end
   end
 
-  # Tries each language in order until finding a published version
-  # Uses find_published_version_for_language to check across all versions
-  # fetch_post will automatically find the right version when the URL is visited
-  defp find_first_published_version(group_slug, post_slug, post, languages, fallback_lang) do
+  # The first language the post's LIVE version is published in. Status is
+  # version-level, so the read the caller already made answers it: with no
+  # version given it maps the active version, and its languages are the live
+  # ones. This used to walk every version and ask each one's status (two
+  # queries apiece) once per candidate language, ignoring the language: ~5 ×
+  # (versions + 1) queries on every hit of a withdrawn post, and a language the
+  # live version doesn't have counted as live.
+  defp find_first_published_version(group_slug, _post_slug, post, languages, fallback_lang) do
+    live_languages = if live_post?(post), do: post[:available_languages] || [], else: []
+
     result =
       Enum.find_value(languages, fn lang ->
-        # Check if any published version exists for this language
-        case find_published_version_for_language(group_slug, post_slug, lang) do
-          {:ok, _version} ->
-            # Published version exists - use base URL
-            # fetch_post will find the right version
-            {:ok, PublishingHTML.build_post_url(group_slug, post, lang)}
-
-          :not_found ->
-            nil
-        end
+        if Enum.any?(live_languages, &same_language?(&1, lang)),
+          do: {:ok, PublishingHTML.build_post_url(group_slug, post, lang)}
       end)
 
-    # If no published version found, fall back to group listing
     result || {:ok, PublishingHTML.group_listing_path(fallback_lang, group_slug)}
   end
+
+  defp live_post?(post) do
+    Constants.published?(get_in(post, [:metadata, :status])) and
+      not Constants.scheduled_ahead?(post)
+  end
+
+  # A stored dialect answers for its base code (`en-US` for `en`), any case.
+  defp same_language?(stored, candidate) when is_binary(stored) and is_binary(candidate) do
+    stored = String.downcase(stored)
+    candidate = String.downcase(candidate)
+    stored == candidate or String.starts_with?(stored, candidate <> "-")
+  end
+
+  defp same_language?(_stored, _candidate), do: false
 
   # ============================================================================
   # Timestamp Mode Fallback
@@ -358,7 +350,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
 
   # Fallback to another time on the same date
   defp fallback_to_other_time_on_date(group_slug, date, exclude_time, default_lang) do
-    case Publishing.list_times_on_date(group_slug, date) do
+    case Publishing.list_public_times_on_date(group_slug, date) do
       [] ->
         # No posts on this date at all - try other dates or fall back to group listing
         fallback_to_other_date(group_slug, default_lang)

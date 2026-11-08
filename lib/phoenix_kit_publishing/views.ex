@@ -13,7 +13,8 @@ defmodule PhoenixKit.Modules.Publishing.Views do
     rides the Phoenix session cookie (`mark_viewed/2`); the DB only ever
     stores accepted counts, never a reader, and
   - under `publishing_unique_views` (default on) the visitor hasn't opened
-    this post today: a session carrying the dedup marker IS the visitor, a
+    this post today: a session carrying the dedup marker's id IS the visitor
+    (its hashed id is held for the day, so a replayed cookie counts once), a
     cookieless request (a curl loop, a fresh session) is a hash of its
     address — the last `x-forwarded-for` hop when present — held for the
     day in `Views.VisitorTable`. The raw address is never stored. With the
@@ -128,16 +129,22 @@ defmodule PhoenixKit.Modules.Publishing.Views do
   @spec unique_views?() :: boolean()
   def unique_views?, do: Settings.get_boolean_setting(@unique_views_key, true)
 
-  # Unique views on, and this visitor already opened the post today. A
-  # session that carries the marker was answered by viewed_or_capped?/2 —
-  # it is the visitor, and it has not seen this post today. Everything else
-  # is identified by its hashed address for the day.
+  # Unique views on, and this visitor already opened the post today. A session
+  # that carries the marker's id IS the visitor, so two readers behind one
+  # address count apart; the id is checked against the day's table too, which
+  # is what stops a replayed cookie (one that never takes the updated marker
+  # back, `curl -b` without `-c`) from counting on every request — the marker
+  # alone used to skip the check. Everything else is its hashed address.
   defp repeat_visitor?(conn, post_uuid) do
-    not session_marked?(conn) and
-      not VisitorTable.first_view_today?(post_uuid, visitor_hash(conn))
+    not VisitorTable.first_view_today?(post_uuid, visitor_key(conn))
   end
 
-  defp session_marked?(conn), do: is_map(Plug.Conn.get_session(conn, @session_key))
+  defp visitor_key(conn) do
+    case Plug.Conn.get_session(conn, @session_key) do
+      %{"id" => id} when is_binary(id) -> digest("session:" <> id)
+      _ -> visitor_hash(conn)
+    end
+  end
 
   # Never the address itself, and never the client's word for it: the LAST
   # forwarded hop is the one the site's own proxy appended (the peer it saw);
@@ -167,11 +174,13 @@ defmodule PhoenixKit.Modules.Publishing.Views do
       |> Enum.reject(&(&1 == ""))
       |> List.last()
 
-    address = canonical_address(address) || inspect(conn.remote_ip)
+    digest(canonical_address(address) || inspect(conn.remote_ip))
+  end
 
+  defp digest(value) do
     case VisitorTable.pepper() do
-      nil -> :crypto.hash(:sha256, address) |> binary_part(0, 16)
-      pepper -> :crypto.mac(:hmac, :sha256, pepper, address) |> binary_part(0, 16)
+      nil -> :crypto.hash(:sha256, value) |> binary_part(0, 16)
+      pepper -> :crypto.mac(:hmac, :sha256, pepper, value) |> binary_part(0, 16)
     end
   end
 
@@ -206,10 +215,17 @@ defmodule PhoenixKit.Modules.Publishing.Views do
         _ -> []
       end
 
-    # Only today's map survives — yesterday's entries would just grow the
+    # A random id for this browser, kept across days (see repeat_visitor?/2).
+    id =
+      case seen do
+        %{"id" => id} when is_binary(id) -> id
+        _ -> 12 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
+      end
+
+    # Only today's list survives — yesterday's entries would just grow the
     # cookie for a dedup window that has already passed. (The cap was checked
     # in viewed_or_capped?/2 before anything was recorded.)
-    Plug.Conn.put_session(conn, @session_key, %{today => [post_uuid | today_list]})
+    Plug.Conn.put_session(conn, @session_key, %{"id" => id, today => [post_uuid | today_list]})
   end
 
   # ===========================================================================
@@ -248,7 +264,9 @@ defmodule PhoenixKit.Modules.Publishing.Views do
       on: p.uuid == type(v.post_uuid, UUIDv7),
       join: g in PublishingGroup,
       on: g.uuid == p.group_uuid,
-      where: g.slug == ^group_slug and v.view_date >= ^since,
+      # A trashed post keeps its counters (they come back with it) but is not
+      # a "top post" anyone can open.
+      where: g.slug == ^group_slug and v.view_date >= ^since and is_nil(p.trashed_at),
       group_by: v.post_uuid,
       order_by: [desc: sum(v.count)],
       select: {v.post_uuid, sum(v.count)},

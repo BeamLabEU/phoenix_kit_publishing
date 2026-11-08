@@ -282,10 +282,6 @@ defmodule PhoenixKit.Modules.Publishing.MediaFolders do
   @spec post_deterministic_name(PublishingPost.t()) :: String.t()
   def post_deterministic_name(%PublishingPost{uuid: uuid}), do: @post_prefix <> uuid
 
-  @doc "The prefix of a post folder's deterministic name."
-  @spec post_folder_prefix() :: String.t()
-  def post_folder_prefix, do: @post_prefix
-
   @doc """
   The live Media folder a post points at, or `nil`. A post has no JSONB of
   its own: the pointer is `data["media_folder_uuid"]` on each of its

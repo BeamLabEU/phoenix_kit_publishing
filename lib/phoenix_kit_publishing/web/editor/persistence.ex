@@ -12,7 +12,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Errors
-  alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
@@ -479,68 +478,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   # Update Operations
   # ============================================================================
 
+  # Saves write the version being edited; a new version is only ever made by
+  # "New version" (`Publishing.should_create_new_version?/3` answers false, so
+  # the save-time branch that used to sit here could never run).
   defp update_existing_post(socket, params) do
-    scope = socket.assigns[:phoenix_kit_current_scope]
-    post = socket.assigns.post
-    language = socket.assigns.current_language
-    # Check if we need to create a new version
-    should_create_version =
-      Publishing.should_create_new_version?(post, params, language)
-
-    if should_create_version do
-      create_new_version_from_edit(socket, params, scope)
-    else
-      update_post_in_place(socket, params, scope)
-    end
-  end
-
-  defp create_new_version_from_edit(socket, params, scope) do
-    group_slug = socket.assigns.group_slug
-    post = socket.assigns.post
-
-    case Publishing.create_new_version(group_slug, post, params, %{
-           scope: scope,
-           actor_uuid: Shared.actor_uuid_from_socket(socket)
-         }) do
-      {:ok, new_version_post} ->
-        invalidate_post_cache(group_slug, new_version_post)
-
-        socket =
-          socket
-          |> Phoenix.Component.assign(:post, new_version_post)
-          |> Phoenix.Component.assign(:content, new_version_post.content)
-          |> Phoenix.Component.assign(:current_version, new_version_post.version)
-          |> Phoenix.Component.assign(:available_versions, new_version_post.available_versions)
-          |> Phoenix.Component.assign(:version_statuses, new_version_post.version_statuses)
-          |> Phoenix.Component.assign(
-            :version_dates,
-            Map.get(new_version_post, :version_dates, %{})
-          )
-          |> Phoenix.Component.assign(:editing_published_version, false)
-          |> Helpers.mark_clean()
-          |> Phoenix.LiveView.put_flash(
-            :info,
-            gettext("Created new version %{version} (draft)",
-              version: new_version_post.version
-            )
-          )
-          |> Phoenix.LiveView.push_patch(
-            to:
-              Helpers.build_edit_url(group_slug, new_version_post,
-                version: new_version_post.version
-              )
-          )
-
-        {:noreply, socket}
-
-      {:error, reason} ->
-        {:noreply,
-         Phoenix.LiveView.put_flash(
-           socket,
-           :error,
-           gettext("Couldn't create a new version.") <> " " <> Errors.message(reason)
-         )}
-    end
+    update_post_in_place(socket, params, socket.assigns[:phoenix_kit_current_scope])
   end
 
   defp update_post_in_place(socket, params, scope) do
@@ -1156,13 +1098,5 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     socket
     |> Helpers.set_editor_content(content)
     |> Phoenix.LiveView.put_flash(:info, gettext("Post updated by another user"))
-  end
-
-  @doc """
-  Regenerates the listing cache for a group.
-  """
-  @spec regenerate_listing_cache(String.t()) :: :ok | {:error, term()}
-  def regenerate_listing_cache(group_slug) do
-    ListingCache.regenerate(group_slug)
   end
 end

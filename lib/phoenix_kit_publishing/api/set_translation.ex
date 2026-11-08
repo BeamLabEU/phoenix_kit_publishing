@@ -99,7 +99,12 @@ defmodule PhoenixKit.Modules.Publishing.API.SetTranslation do
     case Refs.resolve_language(code) do
       {:ok, resolved} ->
         if resolved == LanguageHelpers.get_primary_language(),
-          do: Common.invalid("language", "the primary language is edited with update_post"),
+          do:
+            Common.invalid(
+              "language",
+              "the primary language is edited with update_post",
+              "primary_language"
+            ),
           else: {:ok, resolved}
 
       {:error, {:language_not_enabled, allowed}} ->

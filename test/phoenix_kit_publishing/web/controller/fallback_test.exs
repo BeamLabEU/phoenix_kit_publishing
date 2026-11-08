@@ -186,4 +186,88 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.FallbackTest do
              ) == :not_found
     end
   end
+
+  # A date-only URL with several posts redirects to the first one's time; for
+  # embargoed posts that revealed the time before the release.
+  describe "a date of embargoed posts" do
+    test "its date-only URL does not reveal a post's time", %{conn: conn} do
+      {:ok, group} =
+        Groups.add_group("Embargo #{System.unique_integer([:positive])}", mode: "timestamp")
+
+      slug = group["slug"]
+      future = Date.add(Date.utc_today(), 30)
+      repo = PhoenixKit.RepoHelper.repo()
+
+      for {title, minute} <- [{"First", 10}, {"Second", 20}] do
+        {:ok, post} = Posts.create_post(slug, %{title: title, content: "Body"})
+
+        repo.get_by(PublishingPost, uuid: post[:uuid])
+        |> Ecto.Changeset.change(post_date: future, post_time: Time.new!(9, minute, 0))
+        |> repo.update!()
+
+        :ok = Versions.publish_version(slug, post[:uuid], 1)
+      end
+
+      conn = get(conn, "/#{slug}/#{Date.to_iso8601(future)}")
+
+      refute conn.status == 200
+      if conn.status in [301, 302], do: refute(redirected_to(conn) =~ "09:")
+    end
+  end
+
+  # A withdrawn post's URL used to walk every version, two queries apiece, once
+  # per fallback language. The live read the fallback already made answers it,
+  # so the cost no longer grows with the post's history.
+  describe "a withdrawn post's fallback" do
+    test "costs the same however many versions the post has", %{conn: conn} do
+      {:ok, group} =
+        Groups.add_group("Withdrawn #{System.unique_integer([:positive])}", mode: "slug")
+
+      slug = group["slug"]
+      withdrawn(slug, "short", 1)
+      withdrawn(slug, "long", 13)
+
+      short = queries_for(conn, "/#{slug}/short")
+      long = queries_for(build_conn(), "/#{slug}/long")
+
+      assert long == short, "#{long} queries for 13 versions, #{short} for one"
+    end
+  end
+
+  defp withdrawn(group_slug, post_slug, versions) do
+    {:ok, post} =
+      Posts.create_post(group_slug, %{title: post_slug, slug: post_slug, content: "Body"})
+
+    for n <- 1..(versions - 1)//1,
+        do: {:ok, _} = Versions.create_version_from(group_slug, post.uuid, n)
+
+    :ok = Versions.publish_version(group_slug, post.uuid, versions)
+    :ok = Versions.unpublish_post(group_slug, post.uuid)
+  end
+
+  defp queries_for(conn, path) do
+    ref = make_ref()
+    parent = self()
+    handler = "count-queries-#{inspect(ref)}"
+
+    :telemetry.attach(
+      handler,
+      [:phoenix_kit_publishing, :test, :repo, :query],
+      fn _event, _measure, _meta, _ -> send(parent, {ref, :query}) end,
+      nil
+    )
+
+    conn = get(conn, path)
+    :telemetry.detach(handler)
+    assert conn.status == 302
+    count_messages(ref)
+  end
+
+  defp count_messages(ref, n \\ 0) do
+    receive do
+      {^ref, :query} -> count_messages(ref, n + 1)
+    after
+      0 -> n
+    end
+  end
 end

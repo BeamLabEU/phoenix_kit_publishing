@@ -612,7 +612,7 @@ Controller tests run through a minimal `Phoenix.Endpoint` + `Router` + `Layouts`
 | `mdex` | Markdown rendering (comrak) and the HTML sanitiser (ammonia) |
 | `saxy` | XML parsing for PHK components |
 | `oban` | Background jobs (AI translation) |
-| `gettext` | This module's own translations (de, en, et, fr, it, ru) |
+| `gettext` | This module's own translations (de, en, es, et, fr, it, pl, ru, uk, zh), Leaf's editor strings included |
 
 ## License
 

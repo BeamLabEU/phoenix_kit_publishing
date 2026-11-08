@@ -84,6 +84,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ViewsTest do
     assert drain(post.uuid) == 2
   end
 
+  # A client that replays one marked cookie and never takes the updated one
+  # back (curl -b without -c) used to count on every request: the marker
+  # skipped the address check. The marker's id is the visitor now.
+  test "a replayed session cookie counts once, from any address", %{
+    conn: conn,
+    slug: slug,
+    post: post
+  } do
+    {:ok, _} = Groups.update_group(slug, %{"views_enabled" => "true"})
+    {:ok, other} = Posts.create_post(slug, %{title: "Other", slug: "other", content: "Body."})
+    :ok = Versions.publish_version(slug, other.uuid, 1)
+
+    # A marked session that has not seen `counted` yet.
+    replayed = conn |> browse("/#{slug}/other") |> recycle()
+
+    for n <- 1..3 do
+      %{replayed | remote_ip: {10, 9, 9, n}}
+      |> browse("/#{slug}/counted")
+      |> html_response(200)
+    end
+
+    assert drain(post.uuid) == 1
+  end
+
   describe "publishing_unique_views" do
     setup %{slug: slug} do
       {:ok, _} = Groups.update_group(slug, %{"views_enabled" => "true"})

@@ -44,24 +44,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShowTest do
     end
   end
 
-  describe "version_status_badge_class/1" do
-    test "maps published → badge-success" do
-      assert PostShow.version_status_badge_class("published") == "badge-success"
-    end
-
-    test "maps draft → badge-warning" do
-      assert PostShow.version_status_badge_class("draft") == "badge-warning"
-    end
-
-    test "maps archived → badge-ghost" do
-      assert PostShow.version_status_badge_class("archived") == "badge-ghost"
-    end
-
-    test "maps unknown → badge-ghost (catch-all)" do
-      assert PostShow.version_status_badge_class("trashed") == "badge-ghost"
-    end
-  end
-
   describe "language_status_variant/1" do
     test "maps published → :success" do
       assert PostShow.language_status_variant("published") == :success

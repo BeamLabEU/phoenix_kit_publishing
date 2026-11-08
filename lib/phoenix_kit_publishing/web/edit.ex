@@ -717,31 +717,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                 </p>
               </div>
 
-              <div class="flex flex-wrap gap-3 justify-end">
-                <%!-- Two submits, entities-form pattern: the exit button rides a
-                  name/value pair into the params; plain Save stays on the page. --%>
-                <.button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  class="btn-primary"
-                  phx-disable-with={gettext("Saving…")}
-                >
-                  <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save")}
-                </.button>
+              <%!-- Two submits, entities-form pattern: the exit button rides a
+                name/value pair into the params; plain Save stays on the page.
+                Core's footer order, as on New: extras, Cancel, Submit. --%>
+              <.form_actions
+                cancel_to={Routes.path("/admin/publishing")}
+                submit_label={gettext("Save")}
+                submit_icon="hero-check"
+                class="flex-wrap"
+              >
                 <.button
                   type="submit"
                   name="exit"
                   value="true"
-                  size="sm"
+                  variant="outline"
+                  class="btn-primary"
                   phx-disable-with={gettext("Saving…")}
                 >
                   <.icon name="hero-check" class="w-4 h-4 mr-1" /> {gettext("Save and exit")}
                 </.button>
-                <.button type="button" variant="ghost" size="sm" phx-click="cancel">
-                  <.icon name="hero-x-mark" class="w-4 h-4 mr-1" /> {gettext("Cancel")}
-                </.button>
-              </div>
+              </.form_actions>
             </.form>
             <%!-- Outside the group form — the modal carries its own selector
               <form>s and HTML forbids nesting them. --%>

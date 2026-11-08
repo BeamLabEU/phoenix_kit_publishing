@@ -1,0 +1,385 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: de\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Add Column Right"
+msgstr "Spalte rechts einfügen"
+
+msgid "Add Row Below"
+msgstr "Zeile unten einfügen"
+
+msgid "Align Center"
+msgstr "Zentriert"
+
+msgid "Align Left"
+msgstr "Linksbündig"
+
+msgid "Align Right"
+msgstr "Rechtsbündig"
+
+msgid "Align center"
+msgstr "Zentriert"
+
+msgid "Align left"
+msgstr "Linksbündig"
+
+msgid "Align right"
+msgstr "Rechtsbündig"
+
+msgid "Alt text (optional)"
+msgstr "Alternativtext (optional)"
+
+msgid "Alt text..."
+msgstr "Alternativtext..."
+
+msgid "Audio"
+msgstr "Audio"
+
+msgid "Blockquote"
+msgstr "Blockzitat"
+
+msgid "Bold"
+msgstr "Fett"
+
+msgid "Bullet List"
+msgstr "Aufzählungsliste"
+
+msgid "Button"
+msgstr "Schaltfläche"
+
+msgid "By URL"
+msgstr "Per URL"
+
+msgid "Callout"
+msgstr "Hinweisbox"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgid "Caption..."
+msgstr "Bildunterschrift..."
+
+msgid "Clean up"
+msgstr "Bereinigen"
+
+msgid "Code Block"
+msgstr "Codeblock"
+
+msgid "Code block"
+msgstr "Codeblock"
+
+msgid "Code language"
+msgstr "Codesprache"
+
+msgid "Column align"
+msgstr "Spaltenausrichtung"
+
+msgid "Columns"
+msgstr "Spalten"
+
+msgid "Components"
+msgstr "Komponenten"
+
+msgid "Copied"
+msgstr "Kopiert"
+
+msgid "Copy"
+msgstr "Kopieren"
+
+msgid "Copy as HTML"
+msgstr "Als HTML kopieren"
+
+msgid "Copy as Markdown"
+msgstr "Als Markdown kopieren"
+
+msgid "Create"
+msgstr "Erstellen"
+
+msgid "Decrease Indent"
+msgstr "Einzug verkleinern"
+
+msgid "Delete"
+msgstr "Löschen"
+
+msgid "Describe the image"
+msgstr "Bildbeschreibung"
+
+msgid "Details / Accordion"
+msgstr "Details / Akkordeon"
+
+msgid "Double-click to edit"
+msgstr "Zum Bearbeiten doppelklicken"
+
+msgid "Download .md"
+msgstr ".md herunterladen"
+
+msgid "Drag to resize · Double-click to fit content"
+msgstr "Ziehen, um die Größe zu ändern · Doppelklicken, um an den Inhalt anzupassen"
+
+msgid "Duplicate"
+msgstr "Duplizieren"
+
+msgid "Edit <{tag}> source"
+msgstr "<{tag}>-Quelltext bearbeiten"
+
+msgid "Edit image URL"
+msgstr "Bild-URL bearbeiten"
+
+msgid "Edit link"
+msgstr "Link bearbeiten"
+
+msgid "Edit link URL"
+msgstr "Link-URL bearbeiten"
+
+msgid "Embedded page"
+msgstr "Eingebettete Seite"
+
+msgid "Emoji"
+msgstr "Emoji"
+
+msgid "Exit fullscreen"
+msgstr "Vollbild beenden"
+
+msgid "Export"
+msgstr "Export"
+
+msgid "Format"
+msgstr "Format"
+
+msgid "Fullscreen"
+msgstr "Vollbild"
+
+msgid "HTML"
+msgstr "HTML"
+
+msgid "HTML mode"
+msgstr "HTML-Modus"
+
+msgid "Heading"
+msgstr "Überschrift"
+
+msgid "Heading 1"
+msgstr "Überschrift 1"
+
+msgid "Heading 2"
+msgstr "Überschrift 2"
+
+msgid "Heading 3"
+msgstr "Überschrift 3"
+
+msgid "Headings"
+msgstr "Überschriften"
+
+msgid "Headline text"
+msgstr "Schlagzeilentext"
+
+msgid "Horizontal Rule"
+msgstr "Horizontale Linie"
+
+msgid "Hybrid"
+msgstr "Hybrid"
+
+msgid "Hybrid mode"
+msgstr "Hybridmodus"
+
+msgid "Image"
+msgstr "Bild"
+
+msgid "Image URL"
+msgstr "Bild-URL"
+
+msgid "Image alt text"
+msgstr "Alternativtext des Bildes"
+
+msgid "Image caption"
+msgstr "Bildunterschrift"
+
+msgid "Image options"
+msgstr "Bildoptionen"
+
+msgid "Increase Indent"
+msgstr "Einzug vergrößern"
+
+msgid "Inline Code"
+msgstr "Inline-Code"
+
+msgid "Insert"
+msgstr "Einfügen"
+
+msgid "Insert Emoji"
+msgstr "Emoji einfügen"
+
+msgid "Insert Image"
+msgstr "Bild einfügen"
+
+msgid "Insert Link"
+msgstr "Link einfügen"
+
+msgid "Insert Table"
+msgstr "Tabelle einfügen"
+
+msgid "Insert Video"
+msgstr "Video einfügen"
+
+msgid "Insert date"
+msgstr "Datum einfügen"
+
+msgid "Insert time"
+msgstr "Uhrzeit einfügen"
+
+msgid "Italic"
+msgstr "Kursiv"
+
+msgid "Link"
+msgstr "Link"
+
+msgid "Link URL"
+msgstr "Link-URL"
+
+msgid "Lists"
+msgstr "Listen"
+
+msgid "Markdown"
+msgstr "Markdown"
+
+msgid "Markdown mode"
+msgstr "Markdown-Modus"
+
+msgid "Mode"
+msgstr "Modus"
+
+msgid "More editor options"
+msgstr "Weitere Editoroptionen"
+
+msgid "More formatting"
+msgstr "Weitere Formatierungen"
+
+msgid "More inserts"
+msgstr "Weitere Einfügeoptionen"
+
+msgid "No address yet"
+msgstr "Noch keine Adresse"
+
+msgid "No matches"
+msgstr "Keine Treffer"
+
+msgid "Numbered List"
+msgstr "Nummerierte Liste"
+
+msgid "Open image"
+msgstr "Bild öffnen"
+
+msgid "Picture"
+msgstr "Bild"
+
+msgid "Quote"
+msgstr "Zitat"
+
+msgid "Redo"
+msgstr "Wiederholen"
+
+msgid "Remove Column"
+msgstr "Spalte entfernen"
+
+msgid "Remove Formatting"
+msgstr "Formatierung entfernen"
+
+msgid "Remove Row"
+msgstr "Zeile entfernen"
+
+msgid "Remove image"
+msgstr "Bild entfernen"
+
+msgid "Remove link"
+msgstr "Link entfernen"
+
+msgid "Rows"
+msgstr "Zeilen"
+
+msgid "Saved"
+msgstr "Gespeichert"
+
+msgid "Saving…"
+msgstr "Speichern…"
+
+msgid "Search emoji..."
+msgstr "Emoji suchen..."
+
+msgid "Searching…"
+msgstr "Suche läuft…"
+
+msgid "Set language"
+msgstr "Sprache festlegen"
+
+msgid "Spoiler"
+msgstr "Spoiler"
+
+msgid "Strikethrough"
+msgstr "Durchgestrichen"
+
+msgid "Subscript"
+msgstr "Tiefgestellt"
+
+msgid "Summary"
+msgstr "Zusammenfassung"
+
+msgid "Superscript"
+msgstr "Hochgestellt"
+
+msgid "Symbols / Date"
+msgstr "Symbole / Datum"
+
+msgid "Table"
+msgstr "Tabelle"
+
+msgid "Task List"
+msgstr "Aufgabenliste"
+
+msgid "Text"
+msgstr "Text"
+
+msgid "Toggle Header Row"
+msgstr "Kopfzeile ein-/ausblenden"
+
+msgid "Toggle fullscreen"
+msgstr "Vollbild umschalten"
+
+msgid "Undo"
+msgstr "Rückgängig"
+
+msgid "Unsaved changes"
+msgstr "Nicht gespeicherte Änderungen"
+
+msgid "Upload"
+msgstr "Hochladen"
+
+msgid "Video"
+msgstr "Video"
+
+msgid "View"
+msgstr "Ansicht"
+
+msgid "Visual"
+msgstr "Visuell"
+
+msgid "Visual mode"
+msgstr "Visueller Modus"
+
+msgid "height"
+msgstr "Höhe"
+
+msgid "results"
+msgstr "Ergebnisse"
+
+msgid "stretch"
+msgstr "Streckung"

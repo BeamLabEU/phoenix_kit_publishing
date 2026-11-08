@@ -165,6 +165,16 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
              edit(ctx, %{"category_ids" => [foreign.uuid]})
   end
 
+  # Rows hold lower-case uuids; an upper-case id from a client is the same id.
+  test "an upper-case category id is the same category", ctx do
+    own = Fx.category!(ctx.g["slug"], "Upper")
+
+    assert {:ok, %{"action" => "updated"}} =
+             edit(ctx, %{"category_ids" => [String.upcase(own.uuid)]})
+
+    assert Fx.version(ctx.post[:uuid]).data["category_uuids"] == [own.uuid]
+  end
+
   test "null clears a text field (stored as an empty string)", ctx do
     {:ok, _} = edit(ctx, %{"description" => "d"})
 

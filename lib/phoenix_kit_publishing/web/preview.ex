@@ -263,14 +263,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
           <header class="mb-8 border-b pb-6">
             <%= if has_publication_date?(@post) do %>
               <div class="flex items-center gap-2 text-sm text-base-content/70">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
+                <.icon name="hero-calendar" class="w-4 h-4" />
                 <time datetime={@post.metadata.published_at || ""}>
                   {format_post_date(@post, @group_slug)}
                 </time>
@@ -290,23 +283,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Preview do
               <%= if @version_dropdown do %>
                 <div class="dropdown dropdown-end">
                   <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
+                    <.icon name="hero-clock" class="w-4 h-4" />
                     v{@version_dropdown.current_version}
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
+                    <.icon name="hero-chevron-down" class="w-3 h-3" />
                   </div>
                   <ul
                     tabindex="0"

@@ -47,12 +47,13 @@ defmodule PhoenixKit.Modules.Publishing.API.SchedulePost do
       _ ->
         Common.invalid(
           "publish_at",
-          "must be YYYY-MM-DDTHH:MM on the site clock, without seconds or a zone"
+          "must be YYYY-MM-DDTHH:MM on the site clock, without seconds or a zone",
+          "invalid_datetime"
         )
     end
   end
 
-  defp parse(_other), do: Common.invalid("publish_at", "must be a string")
+  defp parse(_other), do: Common.invalid("publish_at", "must be a string", "invalid_datetime")
 
   defp timestamp_group(%{mode: "timestamp"}), do: :ok
 

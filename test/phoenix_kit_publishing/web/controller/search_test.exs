@@ -36,6 +36,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SearchTest do
     publish.("Elixir Pipelines", "elixir-pipelines", "All about the |> operator.")
     publish.("Cooking Rice", "cooking-rice", "A 50% water ratio works best.")
 
+    publish.(
+      "Annotated",
+      "annotated",
+      "Visible prose.\n\n<!-- hidden-planning-note -->\n\nMore prose. <!-- trailing-secret"
+    )
+
     {:ok, draft} =
       Posts.create_post(group["slug"], %{
         title: "Elixir Draft",
@@ -63,6 +69,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SearchTest do
     html = get(conn, "/#{slug}?q=water+ratio") |> html_response(200)
     assert html =~ "Cooking Rice"
     refute html =~ "Elixir Pipelines"
+  end
+
+  # The page strips HTML comments, so a search must not reveal their text.
+  test "text inside an HTML comment is not searchable", %{conn: conn, group_slug: slug} do
+    refute get(conn, "/#{slug}?q=hidden-planning-note") |> html_response(200) =~ "Annotated"
+    refute get(conn, "/#{slug}?q=trailing-secret") |> html_response(200) =~ "Annotated"
+    assert get(conn, "/#{slug}?q=visible+prose") |> html_response(200) =~ "Annotated"
   end
 
   test "ILIKE metacharacters are literal", %{conn: conn, group_slug: slug} do

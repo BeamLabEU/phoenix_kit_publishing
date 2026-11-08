@@ -16,7 +16,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   - Editor.Versions - Version switching and creation
   - Editor.Forms - Form building and normalization
   - Editor.Persistence - Save operations
-  - Editor.Preview - Preview mode handling
   - Editor.Helpers - Shared utilities
   """
   use PhoenixKitWeb, :live_view
@@ -172,6 +171,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   def mount(params, _session, socket) do
     group_slug = params["group"] || params["category"] || params["type"]
 
+    # A rename of this group is followed in place (`{:group_updated, _}` below).
+    if connected?(socket), do: PublishingPubSub.subscribe_to_groups()
+
     ai_endpoints = Translation.list_ai_endpoints()
 
     socket =
@@ -315,19 +317,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   @impl true
 
   # Match both /admin/publishing/:group/new route AND legacy ?new=true
-  def handle_params(params, _uri, %{assigns: %{live_action: :new}} = socket)
-      when not is_map_key(params, "preview_token") do
+  def handle_params(_params, _uri, %{assigns: %{live_action: :new}} = socket) do
     handle_new_post(socket)
   end
 
-  def handle_params(%{"new" => "true"} = params, _uri, socket)
-      when not is_map_key(params, "preview_token") do
+  def handle_params(%{"new" => "true"}, _uri, socket) do
     handle_new_post(socket)
   end
 
   # UUID-based route: /admin/publishing/:group/:post_uuid/edit
-  def handle_params(%{"post_uuid" => post_uuid} = params, uri, socket)
-      when not is_map_key(params, "preview_token") do
+  def handle_params(%{"post_uuid" => post_uuid} = params, uri, socket) do
     socket =
       socket
       |> assign(:endpoint_url, extract_endpoint_url(uri))
@@ -336,8 +335,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     handle_uuid_post_params(socket, post_uuid, params)
   end
 
-  def handle_params(%{"path" => path} = params, uri, socket)
-      when not is_map_key(params, "preview_token") do
+  def handle_params(%{"path" => path} = params, uri, socket) do
     socket =
       socket
       |> assign(:endpoint_url, extract_endpoint_url(uri))
@@ -1327,14 +1325,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     after_flush(socket, &preview_after_flush/1)
   end
 
-  def handle_event("attempt_cancel", _params, %{assigns: %{has_pending_changes: false}} = socket) do
-    handle_event("cancel", %{}, socket)
-  end
-
+  # Decided once Leaf's buffer is in (`after_flush/2`): its blur flush, which
+  # the very click that got us here triggers, arrives AFTER the click, so a
+  # decision on `has_pending_changes` alone left without a prompt while the
+  # last keystrokes were still on the client.
   def handle_event("attempt_cancel", _params, socket) do
-    # Server-rendered confirm (was a JS confirm() via push_event, which broke
-    # under CSP / on navigation along with the rest of the inline script).
-    {:noreply, assign(socket, :show_cancel_confirm, true)}
+    after_flush(socket, &leave_after_flush/1)
   end
 
   def handle_event("dismiss_cancel_confirm", _params, socket) do
@@ -1350,6 +1346,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   def handle_event("back_to_list", _params, socket) do
     handle_event("attempt_cancel", %{}, socket)
   end
+
+  # Server-rendered confirm (was a JS confirm() via push_event, which broke
+  # under CSP / on navigation along with the rest of the inline script).
+  defp leave_after_flush(%{assigns: %{has_pending_changes: true}} = socket),
+    do: {:noreply, assign(socket, :show_cancel_confirm, true)}
+
+  defp leave_after_flush(socket), do: handle_event("cancel", %{}, socket)
 
   defp clear_translation_unguarded(socket) do
     group_slug = socket.assigns.group_slug
@@ -1915,12 +1918,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   # A `[[post:UUID|…]]` mention was clicked in the editor — jump to that
-  # post's editor. Unsaved body text here is covered by autosave's debounce
-  # plus Leaf's protect_navigation guard (which watches the body only).
+  # post's editor, after the switch's own flush and save: Leaf's
+  # protect_navigation listens to `beforeunload` only, so a live navigation
+  # dropped the pending autosave and whatever Leaf still held.
   def handle_info({:leaf_link_clicked, %{target: "post:" <> uuid}}, socket) do
     case Publishing.read_post_by_uuid(uuid) do
       {:ok, post} ->
-        {:noreply, push_navigate(socket, to: Helpers.build_edit_url(post.group, %{uuid: uuid}))}
+        url = Helpers.build_edit_url(post.group, %{uuid: uuid})
+        after_flush(socket, &follow_link_after_flush(&1, url))
 
       _ ->
         {:noreply, put_flash(socket, :warning, gettext("That publication no longer exists."))}
@@ -2229,6 +2234,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     end
   end
 
+  # The group was renamed while this editor is open. Every save looks the post
+  # up under `group_slug`, so the old slug turned each autosave into "Not
+  # found", and a reload of the old URL lost the buffer. The editor takes the
+  # new slug in place (no remount, no reload of the buffer) and says so; the
+  # collaborative topics are keyed by the old slug until a reload.
+  def handle_info({:group_updated, %{slug: new_slug}}, socket)
+      when is_binary(new_slug) and new_slug != socket.assigns.group_slug do
+    if post_now_in_group?(socket.assigns[:post], new_slug) do
+      {:noreply,
+       socket
+       |> assign(:group_slug, new_slug)
+       |> assign(:group_name, Publishing.group_name(new_slug) || new_slug)
+       |> assign(:post, Map.put(socket.assigns.post, :group, new_slug))
+       |> put_flash(
+         :info,
+         gettext(
+           "This group was renamed to %{slug}. Your edits keep saving; reload the page to see collaborators' changes.",
+           slug: new_slug
+         )
+       )}
+    else
+      {:noreply, socket}
+    end
+  end
+
   # Catch-all — log unknown PubSub messages at :debug instead of crashing
   # the LV. Matches the workspace precedent
   # (`phoenix_kit_sync/lib/phoenix_kit_sync/web/connections_live.ex:1042`).
@@ -2240,14 +2270,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
   defp leaf_dirty?(payload), do: Map.get(payload, :dirty, true) != false
 
+  defp post_now_in_group?(%{uuid: uuid}, group_slug) when is_binary(uuid) do
+    match?({:ok, %{group: ^group_slug}}, Publishing.read_post_by_uuid(uuid))
+  end
+
+  defp post_now_in_group?(_post, _group_slug), do: false
+
   defp version_status_label("published"), do: gettext("Published")
   defp version_status_label("draft"), do: gettext("Draft")
   defp version_status_label("archived"), do: gettext("Archived")
   defp version_status_label(_), do: gettext("Unknown")
-
-  defp version_status_badge_class("published"), do: "badge-success"
-  defp version_status_badge_class("draft"), do: "badge-warning"
-  defp version_status_badge_class(_), do: "badge-ghost"
 
   # Leaf said its body equals the saved one: the server copy is the row's
   # body again, and only the form can be pending.
@@ -2712,6 +2744,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     case flush_before_switch(socket) do
       {:blocked, socket} -> {:noreply, socket}
       {:ok, socket} -> do_switch_language(socket, new_language)
+    end
+  end
+
+  defp follow_link_after_flush(socket, url) do
+    case flush_before_switch(socket) do
+      {:blocked, socket} -> {:noreply, socket}
+      {:ok, socket} -> {:noreply, socket |> cancel_autosave_timer() |> push_navigate(to: url)}
     end
   end
 
@@ -3545,6 +3584,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   value={@ai_selected_endpoint_uuid}
                   options={ai_select_options(@ai_endpoints)}
                   prompt={gettext("Select an endpoint...")}
+                  aria-label={gettext("Select an endpoint...")}
                   class="select-sm"
                 />
               </form>
@@ -3572,6 +3612,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   value={@ai_selected_prompt_uuid}
                   options={ai_select_options(@ai_prompts)}
                   prompt={gettext("Select a prompt...")}
+                  aria-label={gettext("Select a prompt...")}
                   class="select-sm"
                 />
               </form>
@@ -3913,9 +3954,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   phx-debounce="300"
                   class={[
                     "text-2xl font-semibold",
-                    (edit_disabled? or @viewing_older_version) && "input-disabled bg-base-200"
+                    (edit_disabled? or @viewing_older_version) && "bg-base-200"
                   ]}
                   placeholder={gettext("Post title")}
+                  aria-label={gettext("Post title")}
                   readonly={edit_disabled? or @viewing_older_version}
                 />
                 <%!-- Content editor (Leaf), opened in markdown mode, plus the
@@ -4032,7 +4074,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         pattern="[a-z0-9]+(-[a-z0-9]+)*"
                         class={[
                           "lowercase",
-                          (edit_disabled? or @viewing_older_version) && "input-disabled bg-base-200"
+                          (edit_disabled? or @viewing_older_version) && "bg-base-200"
                         ]}
                         placeholder={gettext("auto-generated from title")}
                         title={
@@ -4079,7 +4121,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         pattern={SlugHelpers.html_input_pattern()}
                         class={[
                           "lowercase",
-                          (edit_disabled? or @viewing_older_version) && "input-disabled bg-base-200"
+                          (edit_disabled? or @viewing_older_version) && "bg-base-200"
                         ]}
                         placeholder={@form["slug"] || ""}
                         title={
@@ -4114,11 +4156,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                 <% end %>
 
                 <div>
-                  <label class="label">
+                  <%!-- A heading, not a <label>: there is no control to name. --%>
+                  <div class="label">
                     <span class="fieldset-legend text-sm font-semibold text-base-content">
                       {gettext("Featured Image")}
                     </span>
-                  </label>
+                  </div>
 
                   <%= if preview_url = featured_image_preview_url(@form["featured_image_uuid"]) do %>
                     <%!-- Image Preview with Actions --%>
@@ -4225,7 +4268,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                         value={@form["featured_image_uuid"]}
                         class={[
                           "input-sm font-mono text-xs",
-                          (edit_disabled? or @viewing_older_version) && "input-disabled bg-base-200"
+                          (edit_disabled? or @viewing_older_version) && "bg-base-200"
                         ]}
                         placeholder="018e3c4a-9f6b-7890-abcd-ef1234567890"
                         readonly={edit_disabled? or @viewing_older_version}
@@ -4369,7 +4412,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       wrapper_class="w-full"
                       class={[
                         "input-sm font-mono text-xs",
-                        (edit_disabled? or @viewing_older_version) && "input-disabled bg-base-200"
+                        (edit_disabled? or @viewing_older_version) && "bg-base-200"
                       ]}
                       placeholder="018e3c4a-9f6b-7890-abcd-ef1234567890"
                       readonly={edit_disabled? or @viewing_older_version}
@@ -4449,7 +4492,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       value={@form["og_title"]}
                       class={[
                         "input-sm",
-                        (edit_disabled? or @viewing_older_version) && "input-disabled bg-base-200"
+                        (edit_disabled? or @viewing_older_version) && "bg-base-200"
                       ]}
                       placeholder={
                         Map.get(@post.metadata, :title) || gettext("Defaults to post title")
@@ -4466,7 +4509,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       class={[
                         "textarea-sm",
                         (edit_disabled? or @viewing_older_version) &&
-                          "textarea-disabled bg-base-200"
+                          "bg-base-200"
                       ]}
                       placeholder={
                         Map.get(@post.metadata, :description) ||
@@ -4476,9 +4519,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     />
 
                     <div>
-                      <label class="label py-1">
+                      <div class="label py-1">
                         <span class="fieldset-legend text-xs font-medium">{gettext("OG image")}</span>
-                      </label>
+                      </div>
                       <%!-- Hidden field carries the UUID; the picker writes it. --%>
                       <input type="hidden" name="og_image_uuid" value={@form["og_image_uuid"]} />
                       <%= if preview_url = featured_image_preview_url(@form["og_image_uuid"]) do %>
@@ -4584,7 +4627,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     value={status_select_value(@form["status"], @viewing_older_version)}
                     options={status_options(@viewing_older_version)}
                     disabled={edit_disabled?}
-                    class={edit_disabled? && "select-disabled bg-base-200"}
+                    class={edit_disabled? && "bg-base-200"}
                   />
                   <p class="text-xs text-base-content/50 mt-1">
                     {gettext("Applies to all languages in this version.")}
@@ -4615,7 +4658,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                     label={gettext("Publication Date & Time (UTC)")}
                     value={datetime_local_value(@form["published_at"])}
                     class={
-                      (edit_disabled? or @viewing_older_version) && "input-disabled bg-base-200"
+                      (edit_disabled? or @viewing_older_version) && "bg-base-200"
                     }
                     readonly={edit_disabled? or @viewing_older_version}
                   />
@@ -4708,11 +4751,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   <span class="font-medium">
                     {gettext("Copy from v%{version}", version: version)}
                   </span>
-                  <%!-- Core's status_badge capitalises the raw status; the
-                        label here must be translated like everywhere else. --%>
-                  <span class={["badge badge-xs h-auto", version_status_badge_class(status)]}>
-                    {version_status_label(status)}
-                  </span>
+                  <.status_badge
+                    status={status}
+                    label={version_status_label(status)}
+                    size={:xs}
+                    class="h-auto"
+                  />
                 </div>
                 <div class="text-xs text-base-content/60">
                   {gettext("Duplicate all content and translations from version %{version}",

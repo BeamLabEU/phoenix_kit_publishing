@@ -183,6 +183,16 @@ defmodule PhoenixKit.Modules.Publishing.SlugHelpersDBTest do
     end
   end
 
+  describe "generate_unique_slug/4 from a title" do
+    # Only a preferred slug was validated; a title-derived one could be a route
+    # word or a language code.
+    test "a title that slugifies to a reserved word gets a suffix", %{group_slug: group_slug} do
+      assert {:ok, slug} = SlugHelpers.generate_unique_slug(group_slug, "Admin")
+      refute slug == "admin"
+      assert {:ok, ^slug} = SlugHelpers.validate_slug(slug)
+    end
+  end
+
   describe "validate_url_slug/4" do
     test "rejects invalid format", %{group_slug: group_slug} do
       assert {:error, :invalid_format} =

@@ -266,11 +266,8 @@ defmodule PhoenixKit.Modules.Publishing.ActivityAttributionTest do
   # deliberately keep the manual mode.
   @lib Path.expand("../../lib/phoenix_kit_publishing", __DIR__)
   @files ~w(posts versions groups categories translation_manager)
-  # The *_post_categories, clear/delete translation and delete functions (and their
-  # helpers) keep the manual mode; the API does not call them.
-  @untouched ~w(remove_group delete_and_broadcast_group reorder_categories replace_post_categories
-                do_replace_post_categories clear_translation delete_language
-                log_translation_failure delete_version)a
+  # Every mutation threads its options now; none is exempt.
+  @untouched []
   @log_calls [:log_manual, :log_failed_mutation]
   # The number of calls the scan checks today. A scan that finds fewer is
   # looking at the wrong thing.

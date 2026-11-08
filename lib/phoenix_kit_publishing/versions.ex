@@ -538,7 +538,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
               "group_slug" => group_slug,
               "post_uuid" => db_post.uuid,
               "version_number" => version
-            }
+            },
+            opts
           )
 
           :ok
@@ -553,7 +554,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
               "group_slug" => group_slug,
               "post_uuid" => db_post.uuid,
               "version_number" => version
-            }
+            },
+            opts
           )
 
           {:error, reason}
@@ -569,7 +571,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
             "group_slug" => group_slug,
             "version_number" => version,
             "reason" => "not_found"
-          }
+          },
+          opts
         )
 
         {:error, :not_found}
@@ -584,7 +587,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
             "group_slug" => group_slug,
             "version_number" => version,
             "reason" => to_string(reason)
-          }
+          },
+          opts
         )
 
         err

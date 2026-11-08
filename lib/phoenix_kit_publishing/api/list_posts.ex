@@ -102,6 +102,8 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
   defp category_allow_list(group, category_id) do
     categories = Common.categories!(group.slug)
 
+    category_id = Common.canonical_uuid(category_id)
+
     case Enum.find(categories, &(&1.uuid == category_id)) do
       nil ->
         Common.invalid("category_id", "is not a category of this group", "unknown_category")

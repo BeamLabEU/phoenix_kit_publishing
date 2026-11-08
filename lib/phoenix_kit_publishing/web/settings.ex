@@ -567,7 +567,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
 
     post_count =
       case :persistent_term.get(ListingCache.persistent_term_key(group_slug), :not_found) do
-        :not_found -> length(Publishing.list_posts(group_slug))
+        :not_found -> Publishing.group_post_stats(group_slug).posts
         posts -> length(posts)
       end
 
@@ -693,6 +693,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             </div>
             <input
               type="checkbox"
+              aria-label={gettext("In-Page Language Switcher")}
               class="toggle toggle-primary"
               checked={@show_language_switcher}
               phx-click="toggle_show_language_switcher"
@@ -713,6 +714,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             </div>
             <input
               type="checkbox"
+              aria-label={gettext("In-Page OpenGraph Tags")}
               class="toggle toggle-primary"
               checked={@render_og_tags}
               phx-click="toggle_render_og_tags"
@@ -733,6 +735,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             </div>
             <input
               type="checkbox"
+              aria-label={gettext("RSS Feeds")}
               class="toggle toggle-primary"
               checked={@feeds_enabled}
               phx-click="toggle_feeds_enabled"
@@ -753,6 +756,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             </div>
             <input
               type="checkbox"
+              aria-label={gettext("JSON-LD Structured Data")}
               class="toggle toggle-primary"
               checked={@render_jsonld}
               phx-click="toggle_render_jsonld"
@@ -773,6 +777,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             </div>
             <input
               type="checkbox"
+              aria-label={gettext("Unique Views")}
               class="toggle toggle-primary"
               checked={@unique_views}
               phx-click="toggle_unique_views"
@@ -798,6 +803,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                 name="slug_style"
                 value={@slug_style}
                 class="select-sm"
+                aria-label={gettext("Slug Style")}
                 options={[
                   {gettext("Transliterate — privet"), "transliterate"},
                   {gettext("Unicode — привет"), "unicode"},
@@ -906,6 +912,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               </div>
               <input
                 type="checkbox"
+                aria-label={gettext("Memory Cache")}
                 class="toggle toggle-primary"
                 checked={@memory_cache_enabled}
                 phx-click="toggle_memory_cache"
@@ -1081,6 +1088,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
             </div>
             <input
               type="checkbox"
+              aria-label={gettext("Render Cache")}
               class="toggle toggle-primary"
               checked={@render_cache_enabled}
               phx-click="toggle_render_cache"
@@ -1150,6 +1158,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                           checked={enabled}
                           phx-click="toggle_group_render_cache"
                           phx-value-slug={slug}
+                          aria-label={gettext("Render cache for %{group}", group: group["name"])}
                         />
                       </.table_default_cell>
                       <.table_default_cell class="text-right">
@@ -1223,6 +1232,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
           phx-debounce="600"
           class="input-sm"
           wrapper_class="w-24"
+          aria-label={@label}
         />
       </form>
     </div>

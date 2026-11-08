@@ -40,6 +40,7 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   import Ecto.Query
 
   alias PhoenixKit.Modules.Publishing.ActivityLog
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.PublishingGroup
@@ -227,33 +228,44 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       end
     end)
     |> log_category_failure("publishing.category.updated", opts, uuid, %{})
+    |> after_commit(fn updated ->
+      ActivityLog.log_manual(
+        "publishing.category.updated",
+        ActivityLog.actor_uuid(opts),
+        "publishing_category",
+        updated.uuid,
+        %{"slug" => updated.slug},
+        opts
+      )
+
+      invalidate_group_cache(updated.group_uuid)
+    end)
     |> broadcast_changed()
   end
 
   # Runs inside `update_category/3`'s transaction — `rollback/1` throws, so
   # returning the struct is the only success path out of here.
-  defp write_category_update(category, attrs, opts) do
+  defp write_category_update(category, attrs, _opts) do
     category
     |> PublishingCategory.changeset(attrs |> stringify_keys() |> resolve_position(category))
     |> repo().update()
     |> case do
-      {:ok, updated} ->
-        ActivityLog.log_manual(
-          "publishing.category.updated",
-          ActivityLog.actor_uuid(opts),
-          "publishing_category",
-          updated.uuid,
-          %{"slug" => updated.slug},
-          opts
-        )
-
-        invalidate_group_cache(updated.group_uuid)
-        updated
-
-      {:error, changeset} ->
-        repo().rollback(changeset)
+      {:ok, updated} -> updated
+      {:error, changeset} -> repo().rollback(changeset)
     end
   end
+
+  # The audit row and the listing invalidation of a transactional mutation run
+  # after COMMIT. Inside it, an audit write that failed aborted the transaction
+  # (Postgres refuses every later statement), so the edit rolled back with its
+  # own log line — against "an audit failure never undoes its mutation" — and
+  # a peer rebuilding on the invalidation could read the tree before commit.
+  defp after_commit({:ok, record} = ok, fun) do
+    fun.(record)
+    ok
+  end
+
+  defp after_commit(other, _fun), do: other
 
   # `move_category/3` asks for the end of the new sibling group with
   # `"position" => :append`; it is resolved here, after the group lock, so two
@@ -408,27 +420,34 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         end)
         |> Enum.sum()
 
-      if changed > 0 do
-        group_uuid = hd(categories).group_uuid
-
+      {changed, changed > 0 && hd(categories).group_uuid}
+    end)
+    |> log_category_failure(
+      "publishing.category.reordered",
+      opts,
+      nil,
+      %{"group" => group_slug},
+      "publishing_group"
+    )
+    |> after_commit(fn
+      {changed, group_uuid} when changed > 0 ->
         ActivityLog.log_manual(
           "publishing.category.reordered",
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           group_uuid,
-          %{"group" => group_slug, "changed" => changed}
+          %{"group" => group_slug, "changed" => changed},
+          opts
         )
 
         invalidate_group_cache(group_uuid)
-      end
 
-      changed
+      _nothing_changed ->
+        :ok
     end)
-    |> log_category_failure("publishing.category.reordered", opts, nil, %{
-      "group" => group_slug
-    })
     |> case do
-      {:ok, changed} = ok when changed > 0 -> broadcast_changed(ok, group_slug)
+      {:ok, {changed, _}} when changed > 0 -> broadcast_changed({:ok, changed}, group_slug)
+      {:ok, {changed, _}} -> {:ok, changed}
       other -> other
     end
   end
@@ -439,7 +458,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
       "publishing.category.reordered",
       opts,
       nil,
-      %{"group" => group_slug}
+      %{"group" => group_slug},
+      "publishing_group"
     )
   end
 
@@ -630,7 +650,8 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
           ActivityLog.actor_uuid(opts),
           "publishing_post",
           post_uuid,
-          %{"reason" => ActivityLog.reason_string(reason)}
+          %{"reason" => ActivityLog.reason_string(reason)},
+          opts
         )
 
         result
@@ -658,31 +679,50 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
         )
         |> repo().all()
 
-      {:ok, _} =
-        version
-        |> Ecto.Changeset.change(
-          data: Map.put(version.data || %{}, "category_uuids", valid_uuids)
+      with {:ok, _} <- write_version_categories(post, version, valid_uuids) do
+        ActivityLog.log_manual(
+          "publishing.post.categorized",
+          ActivityLog.actor_uuid(opts),
+          "publishing_post",
+          post_uuid,
+          %{"category_count" => length(valid_uuids)},
+          opts
         )
-        |> repo().update()
 
-      ActivityLog.log_manual(
-        "publishing.post.categorized",
-        ActivityLog.actor_uuid(opts),
-        "publishing_post",
-        post_uuid,
-        %{"category_count" => length(valid_uuids)}
-      )
-
-      invalidate_group_cache(post.group_uuid)
-
-      # Membership moves the per-category counts the categories page shows.
-      case group_slug_of(post) do
-        nil -> :ok
-        slug -> PublishingPubSub.broadcast_categories_changed(slug)
+        after_categorized(post, valid_uuids)
       end
-
-      {:ok, valid_uuids}
     end
+  end
+
+  # Under the post's row lock, on the version re-read inside it: `version.data`
+  # holds the featured image, SEO fields and the media folder pointer too, and
+  # writing back the copy read before the lock overwrote a save (or a media
+  # filing) that committed in between.
+  defp write_version_categories(post, version, valid_uuids) do
+    repo().transaction(fn ->
+      DBStorage.lock_post_row!(repo(), post.uuid)
+      fresh = repo().get(PublishingVersion, version.uuid) || version
+
+      fresh
+      |> Ecto.Changeset.change(data: Map.put(fresh.data || %{}, "category_uuids", valid_uuids))
+      |> repo().update()
+      |> case do
+        {:ok, updated} -> updated
+        {:error, changeset} -> repo().rollback(changeset)
+      end
+    end)
+  end
+
+  defp after_categorized(post, valid_uuids) do
+    invalidate_group_cache(post.group_uuid)
+
+    # Membership moves the per-category counts the categories page shows.
+    case group_slug_of(post) do
+      nil -> :ok
+      slug -> PublishingPubSub.broadcast_categories_changed(slug)
+    end
+
+    {:ok, valid_uuids}
   end
 
   @doc """
@@ -712,26 +752,6 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   end
 
   def categories_by_uuids(_group_slug, _uuids), do: []
-
-  @doc """
-  Full category structs on a post's ACTIVE version, position-ordered.
-
-  For a specific version, read `category_uuids` off the post map you already
-  have and resolve with `categories_by_uuids/2` — the public post page does
-  that, so `?v=2` shows how v2 was filed.
-  """
-  @spec categories_of_post(String.t()) :: [PublishingCategory.t()]
-  def categories_of_post(post_uuid) do
-    with {:ok, post} <- fetch_post(post_uuid),
-         {:ok, version} <- target_version(post) do
-      group_slug = group_slug_of(post)
-      categories_by_uuids(group_slug, PublishingVersion.get_category_uuids(version))
-    else
-      _ -> []
-    end
-  rescue
-    _ -> []
-  end
 
   # The version a post-level caller means: the live one if there is one,
   # otherwise the newest draft. A post that has never been published has no
@@ -787,30 +807,6 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     end
   rescue
     _ -> []
-  end
-
-  @doc """
-  Category uuids per post, from each post's ACTIVE version —
-  `%{post_uuid => [category_uuid]}`.
-
-  The listing cache no longer needs this (it has the version in hand while
-  building each entry), but bulk callers that only hold post uuids still do.
-  """
-  @spec categories_for_posts([String.t()]) :: %{optional(String.t()) => [String.t()]}
-  def categories_for_posts(post_uuids) when is_list(post_uuids) do
-    from(p in PublishingPost,
-      join: v in PublishingVersion,
-      on: v.uuid == p.active_version_uuid,
-      where: p.uuid in ^post_uuids,
-      select: {p.uuid, fragment("? -> 'category_uuids'", v.data)}
-    )
-    |> repo().all()
-    |> Map.new(fn {post_uuid, uuids} ->
-      {post_uuid, uuids |> List.wrap() |> Enum.filter(&is_binary/1)}
-    end)
-  rescue
-    # Must degrade to "no categories", never take a public listing down.
-    _ -> %{}
   end
 
   @doc """
@@ -994,11 +990,21 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
   # Failure chokepoint — the success row is written at each mutation site;
   # this records the error branch (db_pending) so a failed admin action
   # still leaves an audit trail, matching groups/posts/versions.
-  defp log_category_failure({:error, reason} = err, action, opts, resource_uuid, metadata) do
+  # `resource_type` follows the success row's: a reorder logs against its group.
+  defp log_category_failure(
+         result,
+         action,
+         opts,
+         resource_uuid,
+         metadata,
+         resource_type \\ "publishing_category"
+       )
+
+  defp log_category_failure({:error, reason} = err, action, opts, resource_uuid, metadata, type) do
     ActivityLog.log_failed_mutation(
       action,
       ActivityLog.actor_uuid(opts),
-      "publishing_category",
+      type,
       resource_uuid,
       Map.put(metadata, "reason", ActivityLog.reason_string(reason)),
       opts
@@ -1007,5 +1013,5 @@ defmodule PhoenixKit.Modules.Publishing.Categories do
     err
   end
 
-  defp log_category_failure(result, _action, _opts, _resource_uuid, _metadata), do: result
+  defp log_category_failure(result, _action, _opts, _uuid, _metadata, _type), do: result
 end

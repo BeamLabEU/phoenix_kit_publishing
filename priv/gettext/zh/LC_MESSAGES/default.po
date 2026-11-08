@@ -1,0 +1,4006 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: zh\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1027
+#, elixir-autogen, elixir-format
+msgid "\"In Memory\" means the cache is loaded into :persistent_term for sub-microsecond reads."
+msgstr "“内存中”表示缓存已加载到 :persistent_term 中，读取耗时不到一微秒。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3774
+#, elixir-autogen, elixir-format
+msgid "\"Translate Missing\" will only create translations for languages that don't have one yet."
+msgstr "“仅翻译缺失项”只会为尚无翻译的语言创建翻译。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3768
+#, elixir-autogen, elixir-format
+msgid "\"Translate to All\" will create or overwrite translations for all enabled languages."
+msgstr "“翻译为所有语言”将为所有已启用的语言创建或覆盖翻译。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2591
+#: lib/phoenix_kit_publishing/web/html.ex:2599
+#: lib/phoenix_kit_publishing/web/html.ex:2614
+#: lib/phoenix_kit_publishing/web/html.ex:2622
+#: lib/phoenix_kit_publishing/web/html.ex:2851
+#: lib/phoenix_kit_publishing/web/html.ex:2855
+#, elixir-autogen, elixir-format
+msgid "%B %-d, %Y"
+msgstr "%Y年%-m月%-d日"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1855
+#: lib/phoenix_kit_publishing/web/html.ex:781
+#: lib/phoenix_kit_publishing/web/html.ex:853
+#, elixir-autogen, elixir-format
+msgid "%{count} post"
+msgid_plural "%{count} posts"
+msgstr[0] "%{count} 篇帖子"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1168
+#, elixir-autogen, elixir-format
+msgid "%{count} version"
+msgid_plural "%{count} versions"
+msgstr[0] "%{count} 个版本"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2616
+#: lib/phoenix_kit_publishing/web/html.ex:2624
+#: lib/phoenix_kit_publishing/web/html.ex:2868
+#: lib/phoenix_kit_publishing/web/listing.ex:772
+#: lib/phoenix_kit_publishing/web/listing.ex:797
+#, elixir-autogen, elixir-format
+msgid "%{date} at %{time}"
+msgstr "%{date} %{time}"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3494
+#, elixir-autogen, elixir-format
+msgid "%{email} is currently editing this post. You can view but not make changes."
+msgstr "%{email} 正在编辑此帖子。您可以查看，但无法进行更改。"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:564
+#, elixir-autogen, elixir-format
+msgid "%{language} (source) is currently being edited by %{user}. They will be locked out during translation."
+msgstr "%{language}（源语言）正在由 %{user} 编辑。翻译期间该用户将被锁定。"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:457
+#, elixir-autogen, elixir-format
+msgid "%{language} is currently being edited by %{user}. They will be locked out and unsaved changes will be discarded."
+msgstr "%{language} 正在由 %{user} 编辑。该用户将被锁定，未保存的更改将被丢弃。"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:156
+#, elixir-autogen, elixir-format
+msgid "(live)"
+msgstr "（线上）"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2166
+#, elixir-autogen, elixir-format
+msgid "A new version was created by another editor"
+msgstr "其他编辑者创建了一个新版本"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3457
+#, elixir-autogen, elixir-format
+msgid "AI Translate"
+msgstr "AI 翻译"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3562
+#, elixir-autogen, elixir-format
+msgid "AI Translation"
+msgstr "AI 翻译"
+
+#: lib/phoenix_kit_publishing/errors.ex:195
+#, elixir-autogen, elixir-format
+msgid "AI endpoint is disabled"
+msgstr "AI 端点已停用"
+
+#: lib/phoenix_kit_publishing/errors.ex:194
+#, elixir-autogen, elixir-format
+msgid "AI endpoint not found"
+msgstr "未找到 AI 端点"
+
+#: lib/phoenix_kit_publishing/errors.ex:192
+#, elixir-autogen, elixir-format
+msgid "AI module is not enabled"
+msgstr "AI 模块未启用"
+
+#: lib/phoenix_kit_publishing/errors.ex:206
+#, elixir-autogen, elixir-format
+msgid "AI request failed: %{reason}"
+msgstr "AI 请求失败：%{reason}"
+
+#: lib/phoenix_kit_publishing/errors.ex:198
+#, elixir-autogen, elixir-format
+msgid "AI translation failed: %{reason}"
+msgstr "AI 翻译失败：%{reason}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:530
+#, elixir-autogen, elixir-format
+msgid "ASCII only"
+msgstr "仅 ASCII"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:810
+#, elixir-autogen, elixir-format
+msgid "ASCII only — strip"
+msgstr "仅 ASCII — 删除其他字符"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:958
+#: lib/phoenix_kit_publishing/web/settings.ex:1144
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr "操作"
+
+#: lib/phoenix_kit_publishing/web/index.ex:453
+#, elixir-autogen, elixir-format
+msgid "Active"
+msgstr "活跃"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4263
+#, elixir-autogen, elixir-format
+msgid "Advanced: Manual Media ID"
+msgstr "高级：手动输入媒体 ID"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1172
+#, elixir-autogen, elixir-format
+msgid "All languages already have translations"
+msgstr "所有语言均已有翻译"
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:224
+#, elixir-autogen, elixir-format
+msgid "All versions of this post have been deleted. Please navigate away."
+msgstr "此帖子的所有版本均已被删除。请离开此页面。"
+
+#: lib/phoenix_kit_publishing/errors.ex:119
+#, elixir-autogen, elixir-format
+msgid "Already exists"
+msgstr "已存在"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4806
+#, elixir-autogen, elixir-format
+msgid "Another post"
+msgstr "另一篇帖子"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3499
+#, elixir-autogen, elixir-format
+msgid "Another user is currently editing this post. You can view but not make changes."
+msgstr "另一位用户正在编辑此帖子。您可以查看，但无法进行更改。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4633
+#, elixir-autogen, elixir-format
+msgid "Applies to all languages in this version."
+msgstr "适用于此版本中的所有语言。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3068
+#, elixir-autogen, elixir-format
+msgid "Apr"
+msgstr "4月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3051
+#, elixir-autogen, elixir-format
+msgid "April"
+msgstr "4月"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:221
+#: lib/phoenix_kit_publishing/web/editor.ex:2281
+#: lib/phoenix_kit_publishing/web/editor.ex:3006
+#: lib/phoenix_kit_publishing/web/editor.ex:3012
+#: lib/phoenix_kit_publishing/web/listing.ex:948
+#: lib/phoenix_kit_publishing/web/listing.ex:1042
+#: lib/phoenix_kit_publishing/web/listing.ex:1254
+#: lib/phoenix_kit_publishing/web/post_show.ex:160
+#, elixir-autogen, elixir-format
+msgid "Archived"
+msgstr "已归档"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3075
+#, elixir-autogen, elixir-format
+msgid "Aug"
+msgstr "8月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3055
+#, elixir-autogen, elixir-format
+msgid "August"
+msgstr "8月"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3567
+#, elixir-autogen, elixir-format
+msgid "Automatically translate this post to other languages using AI. Each translation runs as a background job — you can keep editing while it finishes, or safely leave this page."
+msgstr "使用 AI 自动将此帖子翻译为其他语言。每个翻译都作为后台任务运行——您可以在其完成期间继续编辑，也可以放心离开此页面。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1568
+#, elixir-autogen, elixir-format
+msgid "Autosave failed — click Save to retry"
+msgstr "自动保存失败——点击“保存”重试"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3351
+#: lib/phoenix_kit_publishing/web/html.ex:2037
+#: lib/phoenix_kit_publishing/web/html.ex:2310
+#: lib/phoenix_kit_publishing/web/preview.ex:333
+#, elixir-autogen, elixir-format
+msgid "Back to %{group}"
+msgstr "返回 %{group}"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:232
+#, elixir-autogen, elixir-format
+msgid "Back to Editor"
+msgstr "返回编辑器"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1109
+#, elixir-autogen, elixir-format
+msgid "Cache Hits"
+msgstr "缓存命中"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1113
+#, elixir-autogen, elixir-format
+msgid "Cache Misses"
+msgstr "缓存未命中"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:166
+#, elixir-autogen, elixir-format
+msgid "Cache cleared for %{group}"
+msgstr "已清除 %{group} 的缓存"
+
+#: lib/phoenix_kit_publishing/errors.ex:120
+#, elixir-autogen, elixir-format
+msgid "Cache miss"
+msgstr "缓存未命中"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:147
+#, elixir-autogen, elixir-format
+msgid "Cache regenerated for %{group}"
+msgstr "已重新生成 %{group} 的缓存"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:880
+#, elixir-autogen, elixir-format
+msgid "Cached listing data speeds up listing pages. Cache is automatically updated when posts change."
+msgstr "缓存的列表数据可加快列表页面的加载。帖子变更时缓存会自动更新。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1053
+#, elixir-autogen, elixir-format
+msgid "Cached rendered HTML for published posts. Uses content-hash keys so edits auto-invalidate."
+msgstr "已发布帖子的渲染 HTML 缓存。使用内容哈希作为键，因此编辑后会自动失效。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4773
+#: lib/phoenix_kit_publishing/web/editor.ex:4834
+#, elixir-autogen, elixir-format
+msgid "Cancel"
+msgstr "取消"
+
+#: lib/phoenix_kit_publishing/errors.ex:154
+#, elixir-autogen, elixir-format
+msgid "Cannot delete the last language"
+msgstr "无法删除最后一种语言"
+
+#: lib/phoenix_kit_publishing/errors.ex:155
+#, elixir-autogen, elixir-format
+msgid "Cannot delete the last version"
+msgstr "无法删除最后一个版本"
+
+#: lib/phoenix_kit_publishing/errors.ex:121
+#, elixir-autogen, elixir-format
+msgid "Cannot delete the live version"
+msgstr "无法删除线上版本"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1387
+#, elixir-autogen, elixir-format
+msgid "Cannot remove the last language from a post"
+msgstr "无法从帖子中移除最后一种语言"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:993
+#, elixir-autogen, elixir-format
+msgid "Cannot save - you are spectating"
+msgstr "无法保存——您正在以旁观者身份查看"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:997
+#: lib/phoenix_kit_publishing/web/editor.ex:1006
+#: lib/phoenix_kit_publishing/web/editor.ex:2839
+#, elixir-autogen, elixir-format
+msgid "Cannot save while translation is in progress"
+msgstr "翻译进行中，无法保存"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4192
+#: lib/phoenix_kit_publishing/web/editor.ex:4221
+#: lib/phoenix_kit_publishing/web/editor.ex:4547
+#, elixir-autogen, elixir-format
+msgid "Change"
+msgstr "更改"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4580
+#, elixir-autogen, elixir-format
+msgid "Choose OG image"
+msgstr "选择 OG 图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4820
+#, elixir-autogen, elixir-format
+msgid "Choose a different URL slug for this post, or change the other post's slug."
+msgstr "请为此帖子选择其他 URL slug，或更改另一篇帖子的 slug。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4715
+#, elixir-autogen, elixir-format
+msgid "Choose how to create the new version:"
+msgstr "选择创建新版本的方式："
+
+#: lib/phoenix_kit_publishing/web/edit.ex:454
+#, elixir-autogen, elixir-format
+msgid "Chronological URLs ideal for news and updates."
+msgstr "按时间顺序排列的 URL，非常适合新闻和动态。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1073
+#, elixir-autogen, elixir-format
+msgid "Clear All"
+msgstr "全部清除"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1067
+#, elixir-autogen, elixir-format
+msgid "Clear all cached rendered posts? They will be re-rendered on next view."
+msgstr "清除所有已缓存的渲染帖子？它们将在下次浏览时重新渲染。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:994
+#: lib/phoenix_kit_publishing/web/settings.ex:998
+#, elixir-autogen, elixir-format
+msgid "Clear cache"
+msgstr "清除缓存"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1174
+#: lib/phoenix_kit_publishing/web/settings.ex:1178
+#, elixir-autogen, elixir-format
+msgid "Clear cache for this group"
+msgstr "清除此分组的缓存"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4687
+#, elixir-autogen, elixir-format
+msgid "Clear the %{language} translation content? You can always add a new translation for this language later."
+msgstr "清除 %{language} 翻译内容？您以后随时可以为该语言添加新的翻译。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4694
+#, elixir-autogen, elixir-format
+msgid "Clear translation"
+msgstr "清除翻译"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4681
+#: lib/phoenix_kit_publishing/web/settings.ex:992
+#: lib/phoenix_kit_publishing/web/settings.ex:1064
+#: lib/phoenix_kit_publishing/web/settings.ex:1172
+#, elixir-autogen, elixir-format
+msgid "Clearing…"
+msgstr "正在清除…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4253
+#, elixir-autogen, elixir-format
+msgid "Click to choose from media library"
+msgstr "点击从媒体库中选择"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3667
+#, elixir-autogen, elixir-format
+msgid "Complete"
+msgstr "已完成"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4829
+#, elixir-autogen, elixir-format
+msgid "Confirm Translation"
+msgstr "确认翻译"
+
+#: lib/phoenix_kit_publishing/web/new.ex:402
+#: lib/phoenix_kit_publishing/web/new.ex:465
+#, elixir-autogen, elixir-format
+msgid "Content Type"
+msgstr "内容类型"
+
+#: lib/phoenix_kit_publishing/web/new.ex:482
+#, elixir-autogen, elixir-format
+msgid "Content type determines default item naming and may affect how content is displayed."
+msgstr "内容类型决定默认的条目命名，并可能影响内容的显示方式。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:647
+#, elixir-autogen, elixir-format
+msgid "Control whether the default language keeps its locale segment in public URLs."
+msgstr "控制默认语言在公开 URL 中是否保留其语言段。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4752
+#, elixir-autogen, elixir-format
+msgid "Copy from v%{version}"
+msgstr "从 v%{version} 复制"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1090
+#, elixir-autogen, elixir-format
+msgid "Could not reload post - it may have been moved or deleted"
+msgstr "无法重新加载帖子——它可能已被移动或删除"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:426
+#, elixir-autogen, elixir-format
+msgid "Couldn't clear the cache for this group."
+msgstr "无法清除此分组的缓存。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1394
+#, elixir-autogen, elixir-format
+msgid "Couldn't clear this translation."
+msgstr "无法清除此翻译。"
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:154
+#, elixir-autogen, elixir-format
+msgid "Couldn't create a new version."
+msgstr "无法创建新版本。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1123
+#, elixir-autogen, elixir-format
+msgid "Couldn't create the default translation prompt."
+msgstr "无法创建默认翻译提示词。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:416
+#, elixir-autogen, elixir-format
+msgid "Couldn't create this post."
+msgstr "无法创建此帖子。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:465
+#, elixir-autogen, elixir-format
+msgid "Couldn't create this translation."
+msgstr "无法创建此翻译。"
+
+#: lib/phoenix_kit_publishing/web/index.ex:256
+#: lib/phoenix_kit_publishing/web/index.ex:279
+#, elixir-autogen, elixir-format
+msgid "Couldn't delete this group."
+msgstr "无法删除此分组。"
+
+#: lib/phoenix_kit_publishing/web/index.ex:214
+#, elixir-autogen, elixir-format
+msgid "Couldn't move this group to trash."
+msgstr "无法将此分组移至回收站。"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:172
+#, elixir-autogen, elixir-format
+msgid "Couldn't move this post to trash."
+msgstr "无法将此帖子移至回收站。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:154
+#, elixir-autogen, elixir-format
+msgid "Couldn't regenerate the cache for this group."
+msgstr "无法重新生成此分组的缓存。"
+
+#: lib/phoenix_kit_publishing/web/index.ex:234
+#, elixir-autogen, elixir-format
+msgid "Couldn't restore this group."
+msgstr "无法恢复此分组。"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:207
+#, elixir-autogen, elixir-format
+msgid "Couldn't restore this post."
+msgstr "无法恢复此帖子。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:763
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:873
+#, elixir-autogen, elixir-format
+msgid "Couldn't save this post."
+msgstr "无法保存此帖子。"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:381
+#, elixir-autogen, elixir-format
+msgid "Couldn't start the translation job."
+msgstr "无法启动翻译任务。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1145
+#, elixir-autogen, elixir-format
+msgid "Couldn't update the default translation prompt."
+msgstr "无法更新默认翻译提示词。"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:892
+#, elixir-autogen, elixir-format
+msgid "Couldn't update the post status."
+msgstr "无法更新帖子状态。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4712
+#, elixir-autogen, elixir-format
+msgid "Create New Version"
+msgstr "创建新版本"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1031
+#, elixir-autogen, elixir-format
+msgid "Create Post"
+msgstr "创建帖子"
+
+#: lib/phoenix_kit_publishing/web/index.ex:442
+#: lib/phoenix_kit_publishing/web/index.ex:667
+#: lib/phoenix_kit_publishing/web/index.ex:673
+#: lib/phoenix_kit_publishing/web/new.ex:597
+#, elixir-autogen, elixir-format
+msgid "Create Publishing Group"
+msgstr "创建发布分组"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4783
+#, elixir-autogen, elixir-format
+msgid "Create Version"
+msgstr "创建版本"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:937
+#, elixir-autogen, elixir-format
+msgid "Create a publishing group to manage its cache."
+msgstr "创建一个发布分组以管理其缓存。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4732
+#, elixir-autogen, elixir-format
+msgid "Create an empty version with no content"
+msgstr "创建一个不含内容的空版本"
+
+#: lib/phoenix_kit_publishing/web/index.ex:435
+#, elixir-autogen, elixir-format
+msgid "Create your first publishing group to start drafting posts."
+msgstr "创建您的第一个发布分组，开始撰写帖子草稿。"
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:125
+#, elixir-autogen, elixir-format
+msgid "Created new blank version %{version}"
+msgstr "已创建新的空白版本 %{version}"
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:120
+#, elixir-autogen, elixir-format
+msgid "Created new version %{version} from v%{source}"
+msgstr "已从 v%{source} 创建新版本 %{version}"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:229
+#, elixir-autogen, elixir-format
+msgid "Created:"
+msgstr "创建于："
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4779
+#: lib/phoenix_kit_publishing/web/listing.ex:1029
+#: lib/phoenix_kit_publishing/web/new.ex:598
+#, elixir-autogen, elixir-format
+msgid "Creating…"
+msgstr "正在创建…"
+
+#: lib/phoenix_kit_publishing/web/new.ex:455
+#, elixir-autogen, elixir-format
+msgid "Custom"
+msgstr "自定义"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4135
+#, elixir-autogen, elixir-format
+msgid "Custom URL for this language. Leave empty to use default: %{slug}"
+msgstr "此语言的自定义 URL。留空则使用默认值：%{slug}"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:296
+#, elixir-autogen, elixir-format
+msgid "Custom URL slug '%{slug}' for %{language} was cleared because it conflicts with another post's post slug"
+msgstr "%{language} 的自定义 URL slug“%{slug}”已被清除，因为它与另一篇帖子的帖子 slug 冲突"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:288
+#, elixir-autogen, elixir-format
+msgid "Custom URL slug '%{slug}' was cleared from %{count} translations because it conflicts with another post's post slug"
+msgstr "自定义 URL slug“%{slug}”已从 %{count} 个翻译中清除，因为它与另一篇帖子的帖子 slug 冲突"
+
+#: lib/phoenix_kit_publishing/errors.ex:133
+#, elixir-autogen, elixir-format
+msgid "Database update failed"
+msgstr "数据库更新失败"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:258
+#, elixir-autogen, elixir-format
+msgid "Date"
+msgstr "日期"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3079
+#, elixir-autogen, elixir-format
+msgid "Dec"
+msgstr "12月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3059
+#, elixir-autogen, elixir-format
+msgid "December"
+msgstr "12月"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:263
+#, elixir-autogen, elixir-format
+msgid "Default Language"
+msgstr "默认语言"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:657
+#, elixir-autogen, elixir-format
+msgid "Default Language Without Prefix"
+msgstr "默认语言不带前缀"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1116
+#, elixir-autogen, elixir-format
+msgid "Default translation prompt created"
+msgstr "已创建默认翻译提示词"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1138
+#, elixir-autogen, elixir-format
+msgid "Default translation prompt updated"
+msgstr "已更新默认翻译提示词"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4516
+#, elixir-autogen, elixir-format
+msgid "Defaults to post description"
+msgstr "默认使用帖子描述"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4498
+#, elixir-autogen, elixir-format
+msgid "Defaults to post title"
+msgstr "默认使用帖子标题"
+
+#: lib/phoenix_kit_publishing/web/new.ex:457
+#, elixir-autogen, elixir-format
+msgid "Define your own content type and item names."
+msgstr "定义您自己的内容类型和条目名称。"
+
+#: lib/phoenix_kit_publishing/web/index.ex:642
+#: lib/phoenix_kit_publishing/web/index.ex:653
+#, elixir-autogen, elixir-format
+msgid "Delete Forever"
+msgstr "永久删除"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:557
+#: lib/phoenix_kit_publishing/web/index.ex:641
+#, elixir-autogen, elixir-format
+msgid "Deleting…"
+msgstr "正在删除…"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:611
+#: lib/phoenix_kit_publishing/web/post_show.ex:268
+#, elixir-autogen, elixir-format
+msgid "Description"
+msgstr "描述"
+
+#: lib/phoenix_kit_publishing/errors.ex:134
+#, elixir-autogen, elixir-format
+msgid "Destination already exists"
+msgstr "目标已存在"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:250
+#, elixir-autogen, elixir-format
+msgid "Details"
+msgstr "详情"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3525
+#, elixir-autogen, elixir-format
+msgid "Disabled language:"
+msgstr "已停用的语言："
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4832
+#, elixir-autogen, elixir-format
+msgid "Do you want to continue with the translation?"
+msgstr "是否继续翻译？"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:220
+#: lib/phoenix_kit_publishing/web/editor.ex:2280
+#: lib/phoenix_kit_publishing/web/editor.ex:3010
+#: lib/phoenix_kit_publishing/web/listing.ex:946
+#: lib/phoenix_kit_publishing/web/listing.ex:1041
+#: lib/phoenix_kit_publishing/web/listing.ex:1248
+#: lib/phoenix_kit_publishing/web/post_show.ex:159
+#, elixir-autogen, elixir-format
+msgid "Draft"
+msgstr "草稿"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4762
+#, elixir-autogen, elixir-format
+msgid "Duplicate all content and translations from version %{version}"
+msgstr "复制版本 %{version} 的所有内容和翻译"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:538
+#: lib/phoenix_kit_publishing/web/edit.ex:82
+#: lib/phoenix_kit_publishing/web/editor.ex:182
+#: lib/phoenix_kit_publishing/web/editor.ex:297
+#: lib/phoenix_kit_publishing/web/html.ex:788
+#: lib/phoenix_kit_publishing/web/html.ex:2121
+#: lib/phoenix_kit_publishing/web/post_show.ex:190
+#, elixir-autogen, elixir-format
+msgid "Edit"
+msgstr "编辑"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3544
+#, elixir-autogen, elixir-format
+msgid "Editing is paused while AI translates this content. It will unlock automatically when finished."
+msgstr "AI 翻译此内容期间，编辑已暂停。完成后将自动解锁。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1141
+#, elixir-autogen, elixir-format
+msgid "Enabled"
+msgstr "已启用"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3713
+#: lib/phoenix_kit_publishing/web/editor.ex:3731
+#, elixir-autogen, elixir-format
+msgid "Enqueueing…"
+msgstr "正在加入队列…"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1119
+#, elixir-autogen, elixir-format
+msgid "Entries Cached"
+msgstr "缓存条目数"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1100
+#, elixir-autogen, elixir-format
+msgid "Error rendering markdown"
+msgstr "渲染 Markdown 时出错"
+
+#: lib/phoenix_kit_publishing/errors.ex:183
+#, elixir-autogen, elixir-format
+msgid "Every time slot on this post's date is taken. Change the date or time, then try again."
+msgstr "此帖子日期的所有时间段均已被占用。请更改日期或时间，然后重试。"
+
+#: lib/phoenix_kit_publishing/web/new.ex:521
+#, elixir-autogen, elixir-format
+msgid "Examples: \"Create new %{singular}\", \"View all %{plural}\""
+msgstr "示例：“新建 %{singular}”、“查看所有 %{plural}”"
+
+#: lib/phoenix_kit_publishing/errors.ex:202
+#, elixir-autogen, elixir-format
+msgid "Failed to extract AI response: %{reason}"
+msgstr "提取 AI 响应失败：%{reason}"
+
+#: lib/phoenix_kit_publishing/errors.ex:210
+#, elixir-autogen, elixir-format
+msgid "Failed to read source post: %{reason}"
+msgstr "读取源帖子失败：%{reason}"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:205
+#, elixir-autogen, elixir-format
+msgid "Failed to render preview."
+msgstr "预览渲染失败。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4162
+#, elixir-autogen, elixir-format
+msgid "Featured Image"
+msgstr "特色图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4175
+#: lib/phoenix_kit_publishing/web/html.ex:1112
+#: lib/phoenix_kit_publishing/web/html.ex:1123
+#: lib/phoenix_kit_publishing/web/html.ex:1278
+#: lib/phoenix_kit_publishing/web/html.ex:1289
+#: lib/phoenix_kit_publishing/web/html.ex:1580
+#: lib/phoenix_kit_publishing/web/html.ex:1591
+#, elixir-autogen, elixir-format
+msgid "Featured image"
+msgstr "特色图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1072
+#, elixir-autogen, elixir-format
+msgid "Featured image cleared"
+msgstr "已清除特色图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3340
+#, elixir-autogen, elixir-format
+msgid "Featured image selected"
+msgstr "已选择特色图片"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3066
+#, elixir-autogen, elixir-format
+msgid "Feb"
+msgstr "2月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3049
+#, elixir-autogen, elixir-format
+msgid "February"
+msgstr "2月"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:431
+#: lib/phoenix_kit_publishing/web/new.ex:376
+#, elixir-autogen, elixir-format
+msgid "Format"
+msgstr "格式"
+
+#: lib/phoenix_kit_publishing/web/new.ex:426
+#, elixir-autogen, elixir-format
+msgid "Frequently asked questions. Items called \"%{plural}\"."
+msgstr "常见问题。条目称为“%{plural}”。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3638
+#, elixir-autogen, elixir-format
+msgid "Generate Default Prompt"
+msgstr "生成默认提示词"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4601
+#, elixir-autogen, elixir-format
+msgid "Generated OG image"
+msgstr "生成的 OG 图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4613
+#, elixir-autogen, elixir-format
+msgid "Generated OG image preview"
+msgstr "生成的 OG 图片预览"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3352
+#: lib/phoenix_kit_publishing/web/settings.ex:945
+#: lib/phoenix_kit_publishing/web/settings.ex:1139
+#, elixir-autogen, elixir-format
+msgid "Group"
+msgstr "分组"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:394
+#: lib/phoenix_kit_publishing/web/new.ex:352
+#, elixir-autogen, elixir-format
+msgid "Group Name"
+msgstr "分组名称"
+
+#: lib/phoenix_kit_publishing/web/new.ex:365
+#, elixir-autogen, elixir-format
+msgid "Group Slug"
+msgstr "分组 slug"
+
+#: lib/phoenix_kit_publishing/web/index.ex:205
+#, elixir-autogen, elixir-format
+msgid "Group moved to trash"
+msgstr "分组已移至回收站"
+
+#: lib/phoenix_kit_publishing/errors.ex:136
+#: lib/phoenix_kit_publishing/web/edit.ex:820
+#, elixir-autogen, elixir-format
+msgid "Group not found"
+msgstr "未找到分组"
+
+#: lib/phoenix_kit_publishing/web/index.ex:270
+#, elixir-autogen, elixir-format
+msgid "Group permanently deleted"
+msgstr "分组已永久删除"
+
+#: lib/phoenix_kit_publishing/web/index.ex:225
+#, elixir-autogen, elixir-format
+msgid "Group restored"
+msgstr "分组已恢复"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:781
+#, elixir-autogen, elixir-format
+msgid "Group updated"
+msgstr "分组已更新"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1123
+#, elixir-autogen, elixir-format
+msgid "Hit Rate"
+msgstr "命中率"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:793
+#, elixir-autogen, elixir-format
+msgid "How titles in non-Latin scripts (e.g. Cyrillic) are turned into URL slugs."
+msgstr "非拉丁文字（如西里尔字母）的标题如何转换为 URL slug。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3286
+#, elixir-autogen, elixir-format
+msgid "Image component inserted"
+msgstr "已插入图片组件"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:686
+#: lib/phoenix_kit_publishing/web/settings.ex:696
+#, elixir-autogen, elixir-format
+msgid "In-Page Language Switcher"
+msgstr "页内语言切换器"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:707
+#: lib/phoenix_kit_publishing/web/settings.ex:717
+#, elixir-autogen, elixir-format
+msgid "In-Page OpenGraph Tags"
+msgstr "页内 OpenGraph 标签"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:265
+#, elixir-autogen, elixir-format
+msgid "In-page OpenGraph tags disabled — your host layout should render the forwarded :og assign in <head>"
+msgstr "页内 OpenGraph 标签已停用——您的宿主布局应在 <head> 中渲染转发的 :og assign"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:261
+#, elixir-autogen, elixir-format
+msgid "In-page OpenGraph tags enabled — publishing pages will render their own social meta tags"
+msgstr "页内 OpenGraph 标签已启用——发布页面将渲染自己的社交 meta 标签"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:238
+#, elixir-autogen, elixir-format
+msgid "In-page language switcher disabled — host layout / custom switcher should render translations"
+msgstr "页内语言切换器已停用——宿主布局/自定义切换器应渲染翻译链接"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:234
+#, elixir-autogen, elixir-format
+msgid "In-page language switcher enabled — publishing pages will render their own switcher"
+msgstr "页内语言切换器已启用——发布页面将渲染自己的切换器"
+
+#: lib/phoenix_kit_publishing/web/new.ex:672
+#, elixir-autogen, elixir-format
+msgid "Invalid URL mode"
+msgstr "无效的 URL 模式"
+
+#: lib/phoenix_kit_publishing/errors.ex:137
+#, elixir-autogen, elixir-format
+msgid "Invalid content"
+msgstr "无效的内容"
+
+#: lib/phoenix_kit_publishing/web/new.ex:673
+#, elixir-autogen, elixir-format
+msgid "Invalid content type"
+msgstr "无效的内容类型"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:441
+#: lib/phoenix_kit_publishing/web/new.ex:386
+#, elixir-autogen, elixir-format
+msgid "Invalid examples"
+msgstr "无效的示例"
+
+#: lib/phoenix_kit_publishing/errors.ex:138
+#, elixir-autogen, elixir-format
+msgid "Invalid format"
+msgstr "无效的格式"
+
+#: lib/phoenix_kit_publishing/errors.ex:139
+#, elixir-autogen, elixir-format
+msgid "Invalid mode"
+msgstr "无效的模式"
+
+#: lib/phoenix_kit_publishing/errors.ex:140
+#, elixir-autogen, elixir-format
+msgid "Invalid name"
+msgstr "无效的名称"
+
+#: lib/phoenix_kit_publishing/errors.ex:142
+#, elixir-autogen, elixir-format
+msgid "Invalid path"
+msgstr "无效的路径"
+
+#: lib/phoenix_kit_publishing/errors.ex:143
+#, elixir-autogen, elixir-format
+msgid "Invalid slug"
+msgstr "无效的 slug"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:811
+#: lib/phoenix_kit_publishing/web/new.ex:677
+#, elixir-autogen, elixir-format
+msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
+msgstr "slug 格式无效。请仅使用小写字母、数字和连字符（例如 my-group-name）"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:734
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:835
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:911
+#, elixir-autogen, elixir-format
+msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
+msgstr "slug 格式无效。请仅使用小写字母、数字和连字符（例如 my-post-title）"
+
+#: lib/phoenix_kit_publishing/errors.ex:144
+#, elixir-autogen, elixir-format
+msgid "Invalid status"
+msgstr "无效的状态"
+
+#: lib/phoenix_kit_publishing/errors.ex:145
+#, elixir-autogen, elixir-format
+msgid "Invalid type"
+msgstr "无效的类型"
+
+#: lib/phoenix_kit_publishing/errors.ex:146
+#, elixir-autogen, elixir-format
+msgid "Invalid version"
+msgstr "无效的版本"
+
+#: lib/phoenix_kit_publishing/web/new.ex:492
+#, elixir-autogen, elixir-format
+msgid "Item Naming"
+msgstr "条目命名"
+
+#: lib/phoenix_kit_publishing/web/new.ex:435
+#, elixir-autogen, elixir-format
+msgid "Items called \"%{plural}\"."
+msgstr "条目称为“%{plural}”。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3065
+#, elixir-autogen, elixir-format
+msgid "Jan"
+msgstr "1月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3048
+#, elixir-autogen, elixir-format
+msgid "January"
+msgstr "1月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3074
+#, elixir-autogen, elixir-format
+msgid "Jul"
+msgstr "7月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3054
+#, elixir-autogen, elixir-format
+msgid "July"
+msgstr "7月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3073
+#, elixir-autogen, elixir-format
+msgid "Jun"
+msgstr "6月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3053
+#, elixir-autogen, elixir-format
+msgid "June"
+msgstr "6月"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4847
+#, elixir-autogen, elixir-format
+msgid "Keep editing"
+msgstr "继续编辑"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3855
+#, elixir-autogen, elixir-format
+msgid "Language:"
+msgstr "语言："
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:231
+#, elixir-autogen, elixir-format
+msgid "Languages"
+msgstr "语言"
+
+#: lib/phoenix_kit_publishing/web/index.ex:546
+#, elixir-autogen, elixir-format
+msgid "Languages used"
+msgstr "已使用的语言"
+
+#: lib/phoenix_kit_publishing/web/index.ex:504
+#, elixir-autogen, elixir-format
+msgid "Last published"
+msgstr "最近发布"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4846
+#, elixir-autogen, elixir-format
+msgid "Leave"
+msgstr "离开"
+
+#: lib/phoenix_kit_publishing/web/new.ex:430
+#, elixir-autogen, elixir-format
+msgid "Legal pages like terms and privacy policy. Items called \"%{plural}\"."
+msgstr "法律页面，例如服务条款和隐私政策。条目称为“%{plural}”。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:625
+#: lib/phoenix_kit_publishing/web/settings.ex:877
+#, elixir-autogen, elixir-format
+msgid "Listing Cache"
+msgstr "列表缓存"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:677
+#, elixir-autogen, elixir-format
+msgid "Manage"
+msgstr "管理"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3595
+#, elixir-autogen, elixir-format
+msgid "Manage Endpoints"
+msgstr "管理端点"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3624
+#, elixir-autogen, elixir-format
+msgid "Manage Prompts"
+msgstr "管理提示词"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:67
+#, elixir-autogen, elixir-format
+msgid "Manage caching and performance settings for the publishing module."
+msgstr "管理发布模块的缓存和性能设置。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3067
+#, elixir-autogen, elixir-format
+msgid "Mar"
+msgstr "3月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3050
+#, elixir-autogen, elixir-format
+msgid "March"
+msgstr "3月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3052
+#, elixir-autogen, elixir-format
+msgid "May"
+msgstr "5月"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:953
+#, elixir-autogen, elixir-format
+msgid "Memory"
+msgstr "内存"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:907
+#: lib/phoenix_kit_publishing/web/settings.ex:915
+#, elixir-autogen, elixir-format
+msgid "Memory Cache"
+msgstr "内存缓存"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:538
+#, elixir-autogen, elixir-format
+msgid "Memory cache disabled"
+msgstr "内存缓存已停用"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:537
+#, elixir-autogen, elixir-format
+msgid "Memory cache enabled"
+msgstr "内存缓存已启用"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:927
+#, elixir-autogen, elixir-format
+msgid "Memory cache is disabled. Listing pages will query the database on every request."
+msgstr "内存缓存已停用。列表页面在每次请求时都会查询数据库。"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:253
+#, elixir-autogen, elixir-format
+msgid "Mode"
+msgstr "模式"
+
+#: lib/phoenix_kit_publishing/web/index.ex:615
+#, elixir-autogen, elixir-format
+msgid "Move this group to trash?"
+msgstr "将此分组移至回收站？"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1268
+#, elixir-autogen, elixir-format
+msgid "Move this post to trash?"
+msgstr "将此帖子移至回收站？"
+
+#: lib/phoenix_kit_publishing/web/index.ex:616
+#: lib/phoenix_kit_publishing/web/index.ex:617
+#: lib/phoenix_kit_publishing/web/listing.ex:1269
+#, elixir-autogen, elixir-format
+msgid "Move to trash"
+msgstr "移至回收站"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3918
+#, elixir-autogen, elixir-format
+msgid "New"
+msgstr "新"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3445
+#, elixir-autogen, elixir-format
+msgid "New Version"
+msgstr "新版本"
+
+#: lib/phoenix_kit_publishing/errors.ex:193
+#, elixir-autogen, elixir-format
+msgid "No AI prompt selected"
+msgstr "未选择 AI 提示词"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4567
+#, elixir-autogen, elixir-format
+msgid "No OG image set."
+msgstr "未设置 OG 图片。"
+
+#: lib/phoenix_kit_publishing/errors.ex:159
+#, elixir-autogen, elixir-format
+msgid "No UUID"
+msgstr "缺少 UUID"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1160
+#, elixir-autogen, elixir-format
+msgid "No other languages enabled to translate to"
+msgstr "没有其他已启用的语言可供翻译"
+
+#: lib/phoenix_kit_publishing/errors.ex:157
+#, elixir-autogen, elixir-format
+msgid "No post"
+msgstr "缺少帖子"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:129
+#, elixir-autogen, elixir-format
+msgid "No post specified"
+msgstr "未指定帖子"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1116
+#, elixir-autogen, elixir-format
+msgid "No posts found"
+msgstr "未找到帖子"
+
+#: lib/phoenix_kit_publishing/web/index.ex:508
+#, elixir-autogen, elixir-format
+msgid "No published posts yet"
+msgstr "尚无已发布的帖子"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1023
+#, elixir-autogen, elixir-format
+msgid "No published posts yet."
+msgstr "尚无已发布的帖子。"
+
+#: lib/phoenix_kit_publishing/errors.ex:158
+#, elixir-autogen, elixir-format
+msgid "No published version"
+msgstr "没有已发布的版本"
+
+#: lib/phoenix_kit_publishing/web/index.ex:434
+#, elixir-autogen, elixir-format
+msgid "No publishing groups yet"
+msgstr "尚无发布分组"
+
+#: lib/phoenix_kit_publishing/web/index.ex:560
+#, elixir-autogen, elixir-format
+msgid "None"
+msgstr "无"
+
+#: lib/phoenix_kit_publishing/errors.ex:161
+#, elixir-autogen, elixir-format
+msgid "Not found"
+msgstr "未找到"
+
+#: lib/phoenix_kit_publishing/errors.ex:162
+#, elixir-autogen, elixir-format
+msgid "Not published"
+msgstr "未发布"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3078
+#, elixir-autogen, elixir-format
+msgid "Nov"
+msgstr "11月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3058
+#, elixir-autogen, elixir-format
+msgid "November"
+msgstr "11月"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:664
+#, elixir-autogen, elixir-format
+msgid "OFF — primary language URLs include the locale prefix (e.g. /en/blog/post). Managed on the Languages page."
+msgstr "关闭——主要语言的 URL 包含语言前缀（例如 /en/blog/post）。在“语言”页面中管理。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4506
+#, elixir-autogen, elixir-format
+msgid "OG description"
+msgstr "OG 描述"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4523
+#, elixir-autogen, elixir-format
+msgid "OG image"
+msgstr "OG 图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1075
+#, elixir-autogen, elixir-format
+msgid "OG image cleared"
+msgstr "已清除 OG 图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4531
+#, elixir-autogen, elixir-format
+msgid "OG image preview"
+msgstr "OG 图片预览"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3338
+#, elixir-autogen, elixir-format
+msgid "OG image selected"
+msgstr "已选择 OG 图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4491
+#, elixir-autogen, elixir-format
+msgid "OG title"
+msgstr "OG 标题"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4793
+#, elixir-autogen, elixir-format
+msgid "OK"
+msgstr "确定"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:660
+#, elixir-autogen, elixir-format
+msgid "ON — primary language URLs are prefixless (e.g. /blog/post). Managed on the Languages page."
+msgstr "开启——主要语言的 URL 不带前缀（例如 /blog/post）。在“语言”页面中管理。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3077
+#, elixir-autogen, elixir-format
+msgid "Oct"
+msgstr "10月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3057
+#, elixir-autogen, elixir-format
+msgid "October"
+msgstr "10月"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:432
+#: lib/phoenix_kit_publishing/web/new.ex:377
+#, elixir-autogen, elixir-format
+msgid "Only lowercase letters (a-z), numbers (0-9), and hyphens (-) are allowed. Must not start or end with a hyphen."
+msgstr "仅允许使用小写字母（a-z）、数字（0-9）和连字符（-）。不能以连字符开头或结尾。"
+
+#: lib/phoenix_kit_publishing/web/index.ex:570
+#: lib/phoenix_kit_publishing/web/index.ex:576
+#, elixir-autogen, elixir-format
+msgid "Open"
+msgstr "打开"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4814
+#, elixir-autogen, elixir-format
+msgid "Open that post"
+msgstr "打开该帖子"
+
+#: lib/phoenix_kit_publishing/web/new.ex:546
+#, elixir-autogen, elixir-format
+msgid "Organizes posts by date/time in URLs. Great for news, updates, and chronological feeds."
+msgstr "按日期/时间在 URL 中组织帖子。非常适合新闻、动态和按时间顺序排列的 Feed。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4471
+#, elixir-autogen, elixir-format
+msgid "Override how this post looks when shared on social media. Leave a field blank to use the post's own title, description, or featured image."
+msgstr "覆盖此帖子在社交媒体上分享时的显示方式。将字段留空则使用帖子自身的标题、描述或特色图片。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4277
+#, elixir-autogen, elixir-format
+msgid "Paste a Phoenix Kit Media ID if you know it."
+msgstr "如果您知道 Phoenix Kit 媒体 ID，请将其粘贴到此处。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:860
+#, elixir-autogen, elixir-format
+msgid "Per-translation URLs are always exposed on the conn under :phoenix_kit_publishing_translations — your host layout can read them whether the in-page switcher is enabled or not."
+msgstr "每个翻译的 URL 始终在 conn 的 :phoenix_kit_publishing_translations 下公开——无论页内切换器是否启用，您的宿主布局都可以读取它们。"
+
+#: lib/phoenix_kit_publishing/web/index.ex:647
+#, elixir-autogen, elixir-format
+msgid "Permanently delete this group and all its posts? This cannot be undone."
+msgstr "永久删除此分组及其所有帖子？此操作无法撤销。"
+
+#: lib/phoenix_kit_publishing/web/new.ex:671
+#, elixir-autogen, elixir-format
+msgid "Please enter a valid name"
+msgstr "请输入有效的名称"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:803
+#, elixir-autogen, elixir-format
+msgid "Please provide a valid group name."
+msgstr "请提供有效的分组名称。"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:241
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:682
+#, elixir-autogen, elixir-format
+msgid "Please save the post first before translating"
+msgstr "请先保存帖子，然后再进行翻译"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:246
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:687
+#, elixir-autogen, elixir-format
+msgid "Please select an AI endpoint"
+msgstr "请选择 AI 端点"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:250
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:691
+#, elixir-autogen, elixir-format
+msgid "Please select an AI prompt"
+msgstr "请选择 AI 提示词"
+
+#: lib/phoenix_kit_publishing/web/new.ex:513
+#, elixir-autogen, elixir-format
+msgid "Plural"
+msgstr "复数"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:400
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:410
+#, elixir-autogen, elixir-format
+msgid "Post created and saved"
+msgstr "帖子已创建并保存"
+
+#: lib/phoenix_kit_publishing/errors.ex:170
+#, elixir-autogen, elixir-format
+msgid "Post is trashed"
+msgstr "帖子位于回收站中"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:163
+#, elixir-autogen, elixir-format
+msgid "Post moved to trash"
+msgstr "帖子已移至回收站"
+
+#: lib/phoenix_kit_publishing/errors.ex:169
+#: lib/phoenix_kit_publishing/web/editor.ex:356
+#: lib/phoenix_kit_publishing/web/editor.ex:523
+#: lib/phoenix_kit_publishing/web/editor.ex:632
+#: lib/phoenix_kit_publishing/web/listing.ex:198
+#: lib/phoenix_kit_publishing/web/post_show.ex:83
+#: lib/phoenix_kit_publishing/web/preview.ex:121
+#, elixir-autogen, elixir-format
+msgid "Post not found"
+msgstr "未找到帖子"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:190
+#, elixir-autogen, elixir-format
+msgid "Post restored as draft"
+msgstr "帖子已恢复为草稿"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:678
+#, elixir-autogen, elixir-format
+msgid "Post saved"
+msgstr "帖子已保存"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3959
+#: lib/phoenix_kit_publishing/web/editor.ex:3960
+#, elixir-autogen, elixir-format
+msgid "Post title"
+msgstr "帖子标题"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1100
+#, elixir-autogen, elixir-format
+msgid "Post updated by another user"
+msgstr "帖子已被其他用户更新"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:497
+#: lib/phoenix_kit_publishing/web/index.ex:524
+#: lib/phoenix_kit_publishing/web/settings.ex:947
+#, elixir-autogen, elixir-format
+msgid "Posts"
+msgstr "帖子"
+
+#: lib/phoenix_kit_publishing/web/new.ex:421
+#, elixir-autogen, elixir-format
+msgid "Posts, news articles, and updates. Items called \"%{plural}\"."
+msgstr "帖子、新闻文章和动态。条目称为“%{plural}”。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3370
+#: lib/phoenix_kit_publishing/web/post_show.ex:197
+#: lib/phoenix_kit_publishing/web/preview.ex:33
+#, elixir-autogen, elixir-format
+msgid "Preview"
+msgstr "预览"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:244
+#, elixir-autogen, elixir-format
+msgid "Preview Error"
+msgstr "预览错误"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:224
+#, elixir-autogen, elixir-format
+msgid "Preview Mode"
+msgstr "预览模式"
+
+#: lib/phoenix_kit_publishing/web/index.ex:603
+#, elixir-autogen, elixir-format
+msgid "Public"
+msgstr "公开页面"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3404
+#: lib/phoenix_kit_publishing/web/listing.ex:986
+#: lib/phoenix_kit_publishing/web/listing.ex:1200
+#: lib/phoenix_kit_publishing/web/new.ex:553
+#: lib/phoenix_kit_publishing/web/new.ex:578
+#, elixir-autogen, elixir-format
+msgid "Public URL"
+msgstr "公开 URL"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:644
+#, elixir-autogen, elixir-format
+msgid "Public URL Language"
+msgstr "公开 URL 语言"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4658
+#, elixir-autogen, elixir-format
+msgid "Publication Date & Time (UTC)"
+msgstr "发布日期和时间（UTC）"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:219
+#: lib/phoenix_kit_publishing/web/editor.ex:2279
+#: lib/phoenix_kit_publishing/web/editor.ex:3006
+#: lib/phoenix_kit_publishing/web/editor.ex:3011
+#: lib/phoenix_kit_publishing/web/index.ex:532
+#: lib/phoenix_kit_publishing/web/listing.ex:947
+#: lib/phoenix_kit_publishing/web/listing.ex:1040
+#: lib/phoenix_kit_publishing/web/listing.ex:1251
+#: lib/phoenix_kit_publishing/web/post_show.ex:158
+#, elixir-autogen, elixir-format
+msgid "Published"
+msgstr "已发布"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:218
+#, elixir-autogen, elixir-format
+msgid "Published (Live)"
+msgstr "已发布（线上）"
+
+#: lib/phoenix_kit_publishing/publishing.ex:542
+#: lib/phoenix_kit_publishing/publishing.ex:574
+#: lib/phoenix_kit_publishing/web/categories_live.ex:40
+#: lib/phoenix_kit_publishing/web/edit.ex:83
+#: lib/phoenix_kit_publishing/web/editor.ex:183
+#: lib/phoenix_kit_publishing/web/index.ex:75
+#: lib/phoenix_kit_publishing/web/listing.ex:44
+#: lib/phoenix_kit_publishing/web/new.ex:42
+#: lib/phoenix_kit_publishing/web/post_show.ex:53
+#: lib/phoenix_kit_publishing/web/preview.ex:34
+#: lib/phoenix_kit_publishing/web/settings.ex:64
+#, elixir-autogen, elixir-format
+msgid "Publishing"
+msgstr "发布"
+
+#: lib/phoenix_kit_publishing/web/new.ex:654
+#, elixir-autogen, elixir-format
+msgid "Publishing group \"%{name}\" created"
+msgstr "发布分组“%{name}”已创建"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1170
+#: lib/phoenix_kit_publishing/web/html.ex:1312
+#: lib/phoenix_kit_publishing/web/html.ex:1491
+#: lib/phoenix_kit_publishing/web/html.ex:1642
+#, elixir-autogen, elixir-format
+msgid "Read More →"
+msgstr "阅读更多 →"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3600
+#, elixir-autogen, elixir-format
+msgid "Reasoning (\"thinking\") models are slower and may return unstructured output — a standard model is recommended for translation."
+msgstr "推理（“思考”）模型速度较慢，且可能返回非结构化输出——建议使用标准模型进行翻译。"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1006
+#, elixir-autogen, elixir-format
+msgid "Refresh"
+msgstr "刷新"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1004
+#, elixir-autogen, elixir-format
+msgid "Refreshing…"
+msgstr "正在刷新…"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:895
+#, elixir-autogen, elixir-format
+msgid "Regenerate All"
+msgstr "全部重新生成"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3654
+#, elixir-autogen, elixir-format
+msgid "Regenerate Default Prompt"
+msgstr "重新生成默认提示词"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1010
+#: lib/phoenix_kit_publishing/web/settings.ex:1014
+#, elixir-autogen, elixir-format
+msgid "Regenerate cache"
+msgstr "重新生成缓存"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1033
+#, elixir-autogen, elixir-format
+msgid "Regenerate scans all posts and rebuilds the cache."
+msgstr "重新生成会扫描所有帖子并重建缓存。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:891
+#: lib/phoenix_kit_publishing/web/settings.ex:1008
+#, elixir-autogen, elixir-format
+msgid "Regenerating…"
+msgstr "正在重新生成…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4204
+#: lib/phoenix_kit_publishing/web/editor.ex:4233
+#: lib/phoenix_kit_publishing/web/editor.ex:4559
+#, elixir-autogen, elixir-format
+msgid "Remove"
+msgstr "移除"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4198
+#: lib/phoenix_kit_publishing/web/editor.ex:4227
+#: lib/phoenix_kit_publishing/web/editor.ex:4443
+#: lib/phoenix_kit_publishing/web/editor.ex:4553
+#, elixir-autogen, elixir-format
+msgid "Removing…"
+msgstr "正在移除…"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:631
+#: lib/phoenix_kit_publishing/web/settings.ex:1050
+#: lib/phoenix_kit_publishing/web/settings.ex:1083
+#: lib/phoenix_kit_publishing/web/settings.ex:1091
+#, elixir-autogen, elixir-format
+msgid "Render Cache"
+msgstr "渲染缓存"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:709
+#, elixir-autogen, elixir-format
+msgid "Render OpenGraph + Twitter Card meta tags on listing + post pages so link previews work out of the box. Disable when your host layout renders the forwarded :og assign in <head>."
+msgstr "在列表和帖子页面上渲染 OpenGraph + Twitter Card meta 标签，使链接预览开箱即用。如果您的宿主布局在 <head> 中渲染转发的 :og assign，请停用此项。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:402
+#, elixir-autogen, elixir-format
+msgid "Render cache cleared"
+msgstr "渲染缓存已清除"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:541
+#, elixir-autogen, elixir-format
+msgid "Render cache disabled"
+msgstr "渲染缓存已停用"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:540
+#, elixir-autogen, elixir-format
+msgid "Render cache enabled"
+msgstr "渲染缓存已启用"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:547
+#, elixir-autogen, elixir-format
+msgid "Render cache for %{group} disabled"
+msgstr "%{group} 的渲染缓存已停用"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:544
+#, elixir-autogen, elixir-format
+msgid "Render cache for %{group} enabled"
+msgstr "%{group} 的渲染缓存已启用"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1102
+#, elixir-autogen, elixir-format
+msgid "Render cache is disabled. Posts will be rendered on every request."
+msgstr "渲染缓存已停用。每次请求时都会渲染帖子。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:688
+#, elixir-autogen, elixir-format
+msgid "Render the language switcher on listing + post pages. Disable when your host layout already provides one."
+msgstr "在列表和帖子页面上渲染语言切换器。如果您的宿主布局已提供语言切换器，请停用此项。"
+
+#: lib/phoenix_kit_publishing/errors.ex:171
+#, elixir-autogen, elixir-format
+msgid "Resource not found"
+msgstr "未找到资源"
+
+#: lib/phoenix_kit_publishing/web/index.ex:628
+#: lib/phoenix_kit_publishing/web/index.ex:634
+#: lib/phoenix_kit_publishing/web/listing.ex:1286
+#: lib/phoenix_kit_publishing/web/listing.ex:1289
+#, elixir-autogen, elixir-format
+msgid "Restore"
+msgstr "恢复"
+
+#: lib/phoenix_kit_publishing/web/index.ex:627
+#: lib/phoenix_kit_publishing/web/listing.ex:1278
+#, elixir-autogen, elixir-format
+msgid "Restoring…"
+msgstr "正在恢复…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3943
+#, elixir-autogen, elixir-format
+msgid "Save now"
+msgstr "立即保存"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1302
+#, elixir-autogen, elixir-format
+msgid "Save the post to enable language switching"
+msgstr "保存帖子后即可切换语言"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3922
+#, elixir-autogen, elixir-format
+msgid "Saved"
+msgstr "已保存"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3903
+#: lib/phoenix_kit_publishing/web/editor.ex:3940
+#, elixir-autogen, elixir-format
+msgid "Saving..."
+msgstr "正在保存…"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:735
+#: lib/phoenix_kit_publishing/web/editor.ex:3929
+#, elixir-autogen, elixir-format
+msgid "Saving…"
+msgstr "正在保存…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4250
+#, elixir-autogen, elixir-format
+msgid "Select Featured Image"
+msgstr "选择特色图片"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3614
+#: lib/phoenix_kit_publishing/web/editor.ex:3615
+#, elixir-autogen, elixir-format
+msgid "Select a prompt..."
+msgstr "选择提示词…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3586
+#: lib/phoenix_kit_publishing/web/editor.ex:3587
+#, elixir-autogen, elixir-format
+msgid "Select an endpoint..."
+msgstr "选择端点…"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:452
+#, elixir-autogen, elixir-format
+msgid "Semantic URLs ideal for evergreen content."
+msgstr "语义化 URL，非常适合长期有效的内容。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3076
+#, elixir-autogen, elixir-format
+msgid "Sep"
+msgstr "9月"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3056
+#, elixir-autogen, elixir-format
+msgid "September"
+msgstr "9月"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3472
+#, elixir-autogen, elixir-format
+msgid "Session paused:"
+msgstr "会话已暂停："
+
+#: lib/phoenix_kit_publishing/web/index.ex:581
+#: lib/phoenix_kit_publishing/web/index.ex:587
+#: lib/phoenix_kit_publishing/web/listing.ex:1023
+#: lib/phoenix_kit_publishing/web/settings.ex:69
+#, elixir-autogen, elixir-format
+msgid "Settings"
+msgstr "设置"
+
+#: lib/phoenix_kit_publishing/web/new.ex:504
+#, elixir-autogen, elixir-format
+msgid "Singular"
+msgstr "单数"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:495
+#: lib/phoenix_kit_publishing/web/categories_live.ex:596
+#: lib/phoenix_kit_publishing/web/edit.ex:422
+#: lib/phoenix_kit_publishing/web/editor.ex:4071
+#: lib/phoenix_kit_publishing/web/index.ex:501
+#: lib/phoenix_kit_publishing/web/post_show.ex:181
+#, elixir-autogen, elixir-format
+msgid "Slug"
+msgstr "Slug"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:791
+#: lib/phoenix_kit_publishing/web/settings.ex:806
+#, elixir-autogen, elixir-format
+msgid "Slug Style"
+msgstr "Slug 样式"
+
+#: lib/phoenix_kit_publishing/errors.ex:177
+#, elixir-autogen, elixir-format
+msgid "Slug already exists"
+msgstr "Slug 已存在"
+
+#: lib/phoenix_kit_publishing/errors.ex:174
+#, elixir-autogen, elixir-format
+msgid "Slug conflicts with a reserved language code"
+msgstr "Slug 与保留的语言代码冲突"
+
+#: lib/phoenix_kit_publishing/errors.ex:176
+#, elixir-autogen, elixir-format
+msgid "Slug conflicts with a reserved route word"
+msgstr "Slug 与保留的路由词冲突"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:52
+#, elixir-autogen, elixir-format
+msgid "Slug is required. Enter a title to auto-generate one, or type a slug manually."
+msgstr "Slug 为必填项。输入标题即可自动生成，或手动输入 slug。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:348
+#, elixir-autogen, elixir-format
+msgid "Slug style updated to %{style}"
+msgstr "Slug 样式已更新为 %{style}"
+
+#: lib/phoenix_kit_publishing/errors.ex:178
+#, elixir-autogen, elixir-format
+msgid "Slug taken"
+msgstr "Slug 已被占用"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:452
+#: lib/phoenix_kit_publishing/web/index.ex:514
+#: lib/phoenix_kit_publishing/web/new.ex:569
+#, elixir-autogen, elixir-format
+msgid "Slug-based"
+msgstr "基于 slug"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4465
+#, elixir-autogen, elixir-format
+msgid "Social / OpenGraph"
+msgstr "社交 / OpenGraph"
+
+#: lib/phoenix_kit_publishing/errors.ex:237
+#, elixir-autogen, elixir-format
+msgid "Some fields are invalid. Please review and try again."
+msgstr "部分字段无效。请检查后重试。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:852
+#, elixir-autogen, elixir-format
+msgid "Something went wrong while saving this group."
+msgstr "保存此分组时出错。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1018
+#, elixir-autogen, elixir-format
+msgid "Something went wrong while saving this post."
+msgstr "保存此帖子时出错。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4730
+#, elixir-autogen, elixir-format
+msgid "Start blank"
+msgstr "从空白开始"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3683
+#, elixir-autogen, elixir-format
+msgid "Starting..."
+msgstr "正在启动…"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:279
+#, elixir-autogen, elixir-format
+msgid "Stats"
+msgstr "统计"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4626
+#: lib/phoenix_kit_publishing/web/listing.ex:1246
+#, elixir-autogen, elixir-format
+msgid "Status"
+msgstr "状态"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:883
+#, elixir-autogen, elixir-format
+msgid "Status updated to %{status}"
+msgstr "状态已更新为 %{status}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:909
+#, elixir-autogen, elixir-format
+msgid "Store in :persistent_term for sub-microsecond reads"
+msgstr "存储在 :persistent_term 中，读取耗时不到一微秒"
+
+#: lib/phoenix_kit_publishing/web/new.ex:670
+#, elixir-autogen, elixir-format
+msgid "That publishing group already exists"
+msgstr "该发布分组已存在"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:884
+#, elixir-autogen, elixir-format
+msgid "That slug is already used by another post in this group. Please choose a different one."
+msgstr "此分组中的另一篇帖子已使用该 slug。请选择其他 slug。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4481
+#, elixir-autogen, elixir-format
+msgid "The OpenGraph plugin is enabled — the final image is generated from a template. Values you set below feed into that template (title, description, image) in place of the post's own; leave a field blank to use the post default."
+msgstr "OpenGraph 插件已启用——最终图片由模板生成。您在下方设置的值（标题、描述、图片）将代替帖子自身的值填入该模板；将字段留空则使用帖子的默认值。"
+
+#: lib/phoenix_kit_publishing/web/new.ex:588
+#, elixir-autogen, elixir-format
+msgid "The URL mode locks in after creation to keep your structure consistent."
+msgstr "URL 模式在创建后即被锁定，以保持结构一致。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4799
+#, elixir-autogen, elixir-format
+msgid "The URL slug %{slug} is already used by another post in this group:"
+msgstr "此分组中的另一篇帖子已使用 URL slug %{slug}："
+
+#: lib/phoenix_kit_publishing/web/controller/fallback.ex:58
+#, elixir-autogen, elixir-format
+msgid "The page you requested was not found. Showing closest match."
+msgstr "未找到您请求的页面。正在显示最接近的匹配项。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:61
+#: lib/phoenix_kit_publishing/web/edit.ex:73
+#, elixir-autogen, elixir-format
+msgid "The requested group could not be found."
+msgstr "找不到请求的分组。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:888
+#, elixir-autogen, elixir-format
+msgid "The slug \"%{slug}\" is already used by another post in this group. Choose a different slug or change the title."
+msgstr "此分组中的另一篇帖子已使用 slug“%{slug}”。请选择其他 slug 或更改标题。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:428
+#, elixir-autogen, elixir-format
+msgid "The slug is used in URLs for this group's public pages."
+msgstr "该 slug 用于此分组公开页面的 URL。"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:414
+#, elixir-autogen, elixir-format
+msgid "The source has no body content — only the title will be translated."
+msgstr "源内容没有正文——只会翻译标题。"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:407
+#, elixir-autogen, elixir-format
+msgid "The source has no title or content — the translations will be empty."
+msgstr "源内容没有标题和正文——翻译将为空。"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:421
+#, elixir-autogen, elixir-format
+msgid "The source has no title — only the body content will be translated."
+msgstr "源内容没有标题——只会翻译正文。"
+
+#: lib/phoenix_kit_publishing/web/editor/forms.ex:377
+#, elixir-autogen, elixir-format
+msgid "The title was too long for a URL, so the slug was shortened. Edit it manually if you'd like a different one."
+msgstr "标题过长，不适合用作 URL，因此 slug 已被缩短。如需其他 slug，请手动编辑。"
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:206
+#, elixir-autogen, elixir-format
+msgid "The version you were editing was deleted and no other versions are available."
+msgstr "您正在编辑的版本已被删除，且没有其他可用版本。"
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:270
+#, elixir-autogen, elixir-format
+msgid "The version you were editing was deleted. Switched to version %{version}."
+msgstr "您正在编辑的版本已被删除。已切换到版本 %{version}。"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:226
+#, elixir-autogen, elixir-format
+msgid "This is how the post will appear to visitors"
+msgstr "帖子将以此样式向访客显示"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4607
+#, elixir-autogen, elixir-format
+msgid "This is the image the OG plugin will show on social shares for this post — rendered from the assigned template using the values set above."
+msgstr "这是 OG 插件在社交分享此帖子时显示的图片——使用上方设置的值，从指定的模板渲染而成。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3519
+#, elixir-autogen, elixir-format
+msgid "This language (%{code}) doesn't match a recognized language code. The publishing status will still be respected."
+msgstr "此语言（%{code}）与任何可识别的语言代码都不匹配。发布状态仍会生效。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3527
+#, elixir-autogen, elixir-format
+msgid "This language (%{code}) is no longer enabled in the Languages module. The publishing status will still be respected for legacy content."
+msgstr "此语言（%{code}）已不再在“语言”模块中启用。对于旧内容，发布状态仍会生效。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3649
+#, elixir-autogen, elixir-format
+msgid "This prompt predates the current format and may mistranslate. Click to update it."
+msgstr "此提示词早于当前格式，可能导致翻译错误。点击以更新。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:745
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:846
+#, elixir-autogen, elixir-format
+msgid "This slug is reserved because it's a language code (like 'en', 'es', 'fr'). Please choose a different slug to avoid routing conflicts."
+msgstr "此 slug 为保留值，因为它是语言代码（如“en”、“es”、“fr”）。请选择其他 slug 以避免路由冲突。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1038
+#, elixir-autogen, elixir-format
+msgid "This translation is currently locked by another editor"
+msgstr "此翻译当前已被另一位编辑者锁定"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4090
+#, elixir-autogen, elixir-format
+msgid "This will be the default URL for all languages."
+msgstr "这将作为所有语言的默认 URL。"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:438
+#, elixir-autogen, elixir-format
+msgid "This will overwrite existing content in: %{languages}"
+msgstr "这将覆盖以下语言中的现有内容：%{languages}"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3781
+#, elixir-autogen, elixir-format
+msgid "This will translate the %{source} content to %{target}, overwriting any existing content."
+msgstr "这会将 %{source} 内容翻译为 %{target}，并覆盖所有现有内容。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:454
+#: lib/phoenix_kit_publishing/web/index.ex:516
+#: lib/phoenix_kit_publishing/web/new.ex:544
+#, elixir-autogen, elixir-format
+msgid "Timestamp-based"
+msgstr "基于时间戳"
+
+#: lib/phoenix_kit_publishing/errors.ex:187
+#, elixir-autogen, elixir-format
+msgid "Title is required to publish"
+msgstr "发布需要填写标题"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2678
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:46
+#, elixir-autogen, elixir-format
+msgid "Title is required to save."
+msgstr "保存需要填写标题。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:861
+#, elixir-autogen, elixir-format
+msgid "Title is required."
+msgstr "标题为必填项。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4833
+#, elixir-autogen, elixir-format
+msgid "Translate"
+msgstr "翻译"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3740
+#, elixir-autogen, elixir-format
+msgid "Translate Missing Only"
+msgstr "仅翻译缺失项"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3571
+#, elixir-autogen, elixir-format
+msgid "Translate the %{source} post to %{target} using AI. It runs as a background job — you can keep editing while it finishes, or safely leave this page."
+msgstr "使用 AI 将 %{source} 帖子翻译为 %{target}。它作为后台任务运行——您可以在其完成期间继续编辑，也可以放心离开此页面。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3722
+#, elixir-autogen, elixir-format
+msgid "Translate to All Languages"
+msgstr "翻译为所有语言"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3758
+#, elixir-autogen, elixir-format
+msgid "Translate to This Language"
+msgstr "翻译为此语言"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3671
+#, elixir-autogen, elixir-format
+msgid "Translating to %{languages}..."
+msgstr "正在翻译为 %{languages}…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3675
+#, elixir-autogen, elixir-format
+msgid "Translating..."
+msgstr "正在翻译…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3749
+#, elixir-autogen, elixir-format
+msgid "Translating…"
+msgstr "正在翻译…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1382
+#, elixir-autogen, elixir-format
+msgid "Translation cleared"
+msgstr "翻译已清除"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2478
+#, elixir-autogen, elixir-format
+msgid "Translation completed with %{success} succeeded, %{failed} failed"
+msgstr "翻译完成：%{success} 个成功，%{failed} 个失败"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:444
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:455
+#, elixir-autogen, elixir-format
+msgid "Translation created and saved"
+msgstr "翻译已创建并保存"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3542
+#, elixir-autogen, elixir-format
+msgid "Translation in progress"
+msgstr "正在翻译"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:370
+#, elixir-autogen, elixir-format
+msgid "Translation job enqueued for: %{languages}"
+msgstr "已为以下语言加入翻译任务队列：%{languages}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:531
+#, elixir-autogen, elixir-format
+msgid "Transliterate"
+msgstr "音译"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#, elixir-autogen, elixir-format
+msgid "Transliterate — privet"
+msgstr "音译 — privet"
+
+#: lib/phoenix_kit_publishing/web/index.ex:454
+#: lib/phoenix_kit_publishing/web/listing.ex:1043
+#, elixir-autogen, elixir-format
+msgid "Trash"
+msgstr "回收站"
+
+#: lib/phoenix_kit_publishing/web/index.ex:682
+#: lib/phoenix_kit_publishing/web/listing.ex:1112
+#, elixir-autogen, elixir-format
+msgid "Trash is empty"
+msgstr "回收站为空"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:949
+#: lib/phoenix_kit_publishing/web/post_show.ex:161
+#, elixir-autogen, elixir-format
+msgid "Trashed"
+msgstr "已移至回收站"
+
+#: lib/phoenix_kit_publishing/web/index.ex:611
+#: lib/phoenix_kit_publishing/web/listing.ex:1266
+#, elixir-autogen, elixir-format
+msgid "Trashing…"
+msgstr "正在移至回收站…"
+
+#: lib/phoenix_kit_publishing/web/new.ex:532
+#, elixir-autogen, elixir-format
+msgid "URL Mode"
+msgstr "URL 模式"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4117
+#, elixir-autogen, elixir-format
+msgid "URL Slug"
+msgstr "URL slug"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:449
+#, elixir-autogen, elixir-format
+msgid "URL mode"
+msgstr "URL 模式"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4794
+#, elixir-autogen, elixir-format
+msgid "URL slug already in use"
+msgstr "URL slug 已被使用"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:307
+#, elixir-autogen, elixir-format
+msgid "URL slug cannot be a language code"
+msgstr "URL slug 不能是语言代码"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:310
+#, elixir-autogen, elixir-format
+msgid "URL slug cannot be a reserved word (admin, api, assets, etc.)"
+msgstr "URL slug 不能是保留词（admin、api、assets 等）"
+
+#: lib/phoenix_kit_publishing/errors.ex:127
+#, elixir-autogen, elixir-format
+msgid "URL slug conflicts with another post"
+msgstr "URL slug 与另一篇帖子冲突"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:314
+#, elixir-autogen, elixir-format
+msgid "URL slug is a previous address of another post — using it would hijack that post's redirect"
+msgstr "该 URL slug 是另一篇帖子以前的地址——使用它会劫持该帖子的重定向"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:304
+#, elixir-autogen, elixir-format
+msgid "URL slug must be lowercase letters, numbers, and hyphens only"
+msgstr "URL slug 只能包含小写字母、数字和连字符"
+
+#: lib/phoenix_kit_publishing/errors.ex:247
+#, elixir-autogen, elixir-format
+msgid "Unexpected error: %{reason}"
+msgstr "意外错误：%{reason}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:529
+#, elixir-autogen, elixir-format
+msgid "Unicode"
+msgstr "Unicode"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:809
+#, elixir-autogen, elixir-format
+msgid "Unicode — привет"
+msgstr "Unicode — привет"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:222
+#: lib/phoenix_kit_publishing/web/editor.ex:2282
+#, elixir-autogen, elixir-format
+msgid "Unknown"
+msgstr "未知"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3517
+#, elixir-autogen, elixir-format
+msgid "Unknown language:"
+msgstr "未知语言："
+
+#: lib/phoenix_kit_publishing/errors.ex:188
+#, elixir-autogen, elixir-format
+msgid "Unpublished"
+msgstr "未发布"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3914
+#: lib/phoenix_kit_publishing/web/editor.ex:4843
+#, elixir-autogen, elixir-format
+msgid "Unsaved changes"
+msgstr "未保存的更改"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:800
+#: lib/phoenix_kit_publishing/web/listing.ex:804
+#, elixir-autogen, elixir-format
+msgid "Unsaved draft"
+msgstr "未保存的草稿"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:291
+#: lib/phoenix_kit_publishing/web/editor.ex:2614
+#: lib/phoenix_kit_publishing/web/post_show.ex:52
+#: lib/phoenix_kit_publishing/web/post_show.ex:75
+#, elixir-autogen, elixir-format
+msgid "Untitled"
+msgstr "无标题"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1179
+#: lib/phoenix_kit_publishing/web/listing.ex:1193
+#, elixir-autogen, elixir-format
+msgid "Untitled post"
+msgstr "无标题帖子"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4089
+#, elixir-autogen, elixir-format
+msgid "Use lowercase letters, numbers, and hyphens only."
+msgstr "仅使用小写字母、数字和连字符。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4128
+#, elixir-autogen, elixir-format
+msgid "Use lowercase letters, numbers, and hyphens only. Leave empty to use the default slug."
+msgstr "仅使用小写字母、数字和连字符。留空则使用默认 slug。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4081
+#, elixir-autogen, elixir-format
+msgid "Use lowercase letters, numbers, and hyphens only. No spaces or special characters."
+msgstr "仅使用小写字母、数字和连字符。不能包含空格或特殊字符。"
+
+#: lib/phoenix_kit_publishing/web/new.ex:357
+#, elixir-autogen, elixir-format
+msgid "Used for display in the navigation and admin sections."
+msgstr "用于在导航和管理区域中显示。"
+
+#: lib/phoenix_kit_publishing/web/new.ex:373
+#, elixir-autogen, elixir-format
+msgid "Used for the URL and as the unique identifier for this group."
+msgstr "用于 URL，并作为此分组的唯一标识符。"
+
+#: lib/phoenix_kit_publishing/web/new.ex:571
+#, elixir-autogen, elixir-format
+msgid "Uses semantic URLs and editable slugs. Ideal for documentation, guides, and evergreen content."
+msgstr "使用语义化 URL 和可编辑的 slug。非常适合文档、指南和长期有效的内容。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:437
+#: lib/phoenix_kit_publishing/web/new.ex:382
+#, elixir-autogen, elixir-format
+msgid "Valid examples"
+msgstr "有效示例"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:225
+#, elixir-autogen, elixir-format
+msgid "Version %{version} - %{status}"
+msgstr "版本 %{version} - %{status}"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2210
+#, elixir-autogen, elixir-format
+msgid "Version %{version} was published by another editor"
+msgstr "版本 %{version} 已被另一位编辑者发布"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4059
+#, elixir-autogen, elixir-format
+msgid "Version Settings"
+msgstr "版本设置"
+
+#: lib/phoenix_kit_publishing/errors.ex:189
+#, elixir-autogen, elixir-format
+msgid "Version access is disabled"
+msgstr "版本访问已停用"
+
+#: lib/phoenix_kit_publishing/errors.ex:190
+#: lib/phoenix_kit_publishing/web/editor.ex:1227
+#: lib/phoenix_kit_publishing/web/editor.ex:1233
+#: lib/phoenix_kit_publishing/web/editor.ex:2715
+#, elixir-autogen, elixir-format
+msgid "Version not found"
+msgstr "未找到版本"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3421
+#: lib/phoenix_kit_publishing/web/editor.ex:3432
+#, elixir-autogen, elixir-format
+msgid "Version:"
+msgstr "版本："
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:206
+#, elixir-autogen, elixir-format
+msgid "Versions"
+msgstr "版本"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3394
+#, elixir-autogen, elixir-format
+msgid "View Public"
+msgstr "查看公开页面"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3491
+#, elixir-autogen, elixir-format
+msgid "View only mode:"
+msgstr "仅查看模式："
+
+#: lib/phoenix_kit_publishing/web/index.ex:600
+#, elixir-autogen, elixir-format
+msgid "View public site"
+msgstr "查看公开站点"
+
+#: lib/phoenix_kit_publishing/web/new.ex:495
+#, elixir-autogen, elixir-format
+msgid "What do you call items in this publishing group? These names appear in the UI."
+msgstr "您如何称呼此发布分组中的条目？这些名称会显示在界面中。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:854
+#, elixir-autogen, elixir-format
+msgid "When enabled, default-language public URLs become prefixless and prefixed default-language URLs redirect to the canonical prefixless version."
+msgstr "启用后，默认语言的公开 URL 将不带前缀，带前缀的默认语言 URL 会重定向到规范的无前缀版本。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4000
+#, elixir-autogen, elixir-format
+msgid "Write your content here..."
+msgstr "在此处撰写内容…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1031
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to clear translations"
+msgstr "您没有清除翻译的权限"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4845
+#, elixir-autogen, elixir-format
+msgid "You have unsaved changes. Leave without saving?"
+msgstr "您有未保存的更改。确定不保存就离开吗？"
+
+#: lib/phoenix_kit_publishing/web/editor/collaborative.ex:636
+#, elixir-autogen, elixir-format
+msgid "Your editing lock was released due to inactivity. Click anywhere to reclaim it."
+msgstr "由于长时间未操作，您的编辑锁已被释放。点击任意位置即可重新获取。"
+
+#: lib/phoenix_kit_publishing/web/editor/collaborative.ex:577
+#, elixir-autogen, elixir-format
+msgid "Your editing lock will expire in %{minutes} minutes due to inactivity"
+msgstr "由于长时间未操作，您的编辑锁将在 %{minutes} 分钟后过期"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4079
+#, elixir-autogen, elixir-format
+msgid "auto-generated from title"
+msgstr "根据标题自动生成"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:395
+#: lib/phoenix_kit_publishing/web/new.ex:353
+#, elixir-autogen, elixir-format
+msgid "e.g. Product Updates"
+msgstr "例如：产品更新"
+
+#: lib/phoenix_kit_publishing/web/new.ex:505
+#, elixir-autogen, elixir-format
+msgid "e.g. post, question"
+msgstr "例如：帖子、问题"
+
+#: lib/phoenix_kit_publishing/web/new.ex:514
+#, elixir-autogen, elixir-format
+msgid "e.g. posts, questions"
+msgstr "例如：帖子、问题"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:423
+#: lib/phoenix_kit_publishing/web/new.ex:366
+#, elixir-autogen, elixir-format
+msgid "e.g. product-updates"
+msgstr "例如：product-updates"
+
+#: lib/phoenix_kit_publishing/web/new.ex:466
+#, elixir-autogen, elixir-format
+msgid "e.g. tutorials, recipes"
+msgstr "例如：教程、食谱"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4117
+#, elixir-autogen, elixir-format
+msgid "optional"
+msgstr "可选"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1173
+#, elixir-autogen, elixir-format
+msgid "showing"
+msgstr "正在显示"
+
+#: lib/phoenix_kit_publishing/web/new.ex:391
+#, elixir-autogen, elixir-format
+msgid "your-group"
+msgstr "your-group"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2821
+#, elixir-autogen, elixir-format
+msgid "%{count} min read"
+msgid_plural "%{count} min read"
+msgstr[0] "%{count} 分钟阅读"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:559
+#, elixir-autogen, elixir-format
+msgid "A clickable date rail down the side to jump through the archive."
+msgstr "沿侧边显示可点击的日期导航栏，用于在归档中跳转。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:618
+#, elixir-autogen, elixir-format
+msgid "A large hero image above the title."
+msgstr "标题上方的大幅主图。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:692
+#, elixir-autogen, elixir-format
+msgid "A side rail of the post's headings; hidden on short posts."
+msgstr "帖子各级标题的侧边导航栏；短帖子中不显示。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:685
+#, elixir-autogen, elixir-format
+msgid "A thin bar at the top that fills as the reader scrolls."
+msgstr "页面顶部的细条，随读者滚动而填充。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:301
+#, elixir-autogen, elixir-format
+msgid "Above the title"
+msgstr "标题上方"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:678
+#, elixir-autogen, elixir-format
+msgid "An estimated 'N min read' under the title."
+msgstr "在标题下方显示预计的“N 分钟阅读”。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:701
+#, elixir-autogen, elixir-format
+msgid "Appearance"
+msgstr "外观"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:704
+#, elixir-autogen, elixir-format
+msgid "Applies to every public page in this group."
+msgstr "适用于此分组中的所有公开页面。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:245
+#, elixir-autogen, elixir-format
+msgid "Automatic (fit to the posts)"
+msgstr "自动（根据帖子调整）"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:300
+#, elixir-autogen, elixir-format
+msgid "Below the title"
+msgstr "标题下方"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:331
+#, elixir-autogen, elixir-format
+msgid "Branded — recolored to match the theme"
+msgstr "品牌化——重新着色以匹配主题"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:248
+#, elixir-autogen, elixir-format
+msgid "By day"
+msgstr "按日"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:247
+#, elixir-autogen, elixir-format
+msgid "By month"
+msgstr "按月"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:246
+#, elixir-autogen, elixir-format
+msgid "By year"
+msgstr "按年"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:592
+#, elixir-autogen, elixir-format
+msgid "Content width"
+msgstr "内容宽度"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:330
+#, elixir-autogen, elixir-format
+msgid "Default — the browser's native scrollbar"
+msgstr "默认——浏览器原生滚动条"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4310
+#, elixir-autogen, elixir-format
+msgid "Feature this post"
+msgstr "设为精选帖子"
+
+#: lib/phoenix_kit_publishing/web/html.ex:879
+#: lib/phoenix_kit_publishing/web/html.ex:1132
+#: lib/phoenix_kit_publishing/web/html.ex:1616
+#, elixir-autogen, elixir-format
+msgid "Featured"
+msgstr "精选"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:510
+#, elixir-autogen, elixir-format
+msgid "Featured layout"
+msgstr "精选布局"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:408
+#, elixir-autogen, elixir-format
+msgid "Group Name (%{lang})"
+msgstr "分组名称（%{lang}）"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:256
+#, elixir-autogen, elixir-format
+msgid "Hero band — a large banner above the list"
+msgstr "主图横幅——列表上方的大幅横幅"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:302
+#, elixir-autogen, elixir-format
+msgid "Hidden"
+msgstr "隐藏"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:499
+#, elixir-autogen, elixir-format
+msgid "Highlight featured posts"
+msgstr "突出显示精选帖子"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:257
+#, elixir-autogen, elixir-format
+msgid "Highlighted card — a larger card within the grid"
+msgstr "突出卡片——网格中较大的卡片"
+
+#: lib/phoenix_kit_publishing/web/html.ex:519
+#, elixir-autogen, elixir-format
+msgid "Jump to date"
+msgstr "跳转到日期"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:412
+#, elixir-autogen, elixir-format
+msgid "Leave blank to use the primary-language name."
+msgstr "留空则使用主要语言的名称。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:465
+#, elixir-autogen, elixir-format
+msgid "Listing page"
+msgstr "列表页面"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:310
+#, elixir-autogen, elixir-format
+msgid "Narrow"
+msgstr "窄"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:281
+#, elixir-autogen, elixir-format
+msgid "Newest first (by publish date)"
+msgstr "最新优先（按发布日期）"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:311
+#, elixir-autogen, elixir-format
+msgid "Normal"
+msgstr "正常"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:282
+#, elixir-autogen, elixir-format
+msgid "Oldest first (by publish date)"
+msgstr "最早优先（按发布日期）"
+
+#: lib/phoenix_kit_publishing/web/html.ex:258
+#, elixir-autogen, elixir-format
+msgid "On this page"
+msgstr "本页内容"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:714
+#, elixir-autogen, elixir-format
+msgid "Only recolors the real scrollbar — keyboard and touch scrolling stay normal."
+msgstr "仅重新着色真实的滚动条——键盘和触摸滚动保持不变。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4314
+#, elixir-autogen, elixir-format
+msgid "Pins this post to the top of its listing and shows it larger. The group's settings control whether featured posts appear and how they're displayed."
+msgstr "将此帖子固定在其列表顶部并以更大尺寸显示。分组的设置决定精选帖子是否显示以及如何显示。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:598
+#, elixir-autogen, elixir-format
+msgid "Post date position"
+msgstr "帖子日期位置"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:474
+#, elixir-autogen, elixir-format
+msgid "Post order"
+msgstr "帖子排序"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:583
+#, elixir-autogen, elixir-format
+msgid "Post page"
+msgstr "帖子页面"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:501
+#, elixir-autogen, elixir-format
+msgid "Posts marked featured in the editor are pinned to the top and shown larger."
+msgstr "在编辑器中标记为精选的帖子会固定在顶部并以更大尺寸显示。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:710
+#, elixir-autogen, elixir-format
+msgid "Scrollbar style"
+msgstr "滚动条样式"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:557
+#, elixir-autogen, elixir-format
+msgid "Show a date-timeline rail"
+msgstr "显示日期时间线导航栏"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:690
+#, elixir-autogen, elixir-format
+msgid "Show a heading navigation rail"
+msgstr "显示标题导航栏"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:683
+#, elixir-autogen, elixir-format
+msgid "Show a reading-progress bar"
+msgstr "显示阅读进度条"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:609
+#, elixir-autogen, elixir-format
+msgid "Show the breadcrumb trail"
+msgstr "显示面包屑导航"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:616
+#, elixir-autogen, elixir-format
+msgid "Show the featured image"
+msgstr "显示特色图片"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:492
+#, elixir-autogen, elixir-format
+msgid "Show the post count"
+msgstr "显示帖子数量"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:676
+#, elixir-autogen, elixir-format
+msgid "Show the reading time"
+msgstr "显示阅读时间"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:611
+#, elixir-autogen, elixir-format
+msgid "The 'Home / Blog / …' navigation trail above the title."
+msgstr "标题上方的“首页 / 博客 / …”导航路径。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:468
+#, elixir-autogen, elixir-format
+msgid "The public page that lists this group's posts (e.g. /blog)."
+msgstr "列出此分组帖子的公开页面（例如 /blog）。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:494
+#, elixir-autogen, elixir-format
+msgid "The total number of posts, shown under the listing title."
+msgstr "帖子总数，显示在列表标题下方。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:332
+#, elixir-autogen, elixir-format
+msgid "Thin — branded and slimmer"
+msgstr "纤细——品牌化且更窄"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:566
+#, elixir-autogen, elixir-format
+msgid "Timeline markers"
+msgstr "时间线标记"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:586
+#, elixir-autogen, elixir-format
+msgid "What shows on an individual post and how it's laid out."
+msgstr "单篇帖子页面上显示的内容及其布局。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:312
+#, elixir-autogen, elixir-format
+msgid "Wide"
+msgstr "宽"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:545
+#, elixir-autogen, elixir-format
+msgid "A post card's image clicks through to the post, same as the title."
+msgstr "帖子卡片的图片可点击进入帖子，与标题相同。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:625
+#, elixir-autogen, elixir-format
+msgid "A subtle 'Back to %{group}' link above the post, mirroring the footer button."
+msgstr "帖子上方的低调“返回 %{group}”链接，与页脚按钮相呼应。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:543
+#, elixir-autogen, elixir-format
+msgid "Clickable card images"
+msgstr "可点击的卡片图片"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:521
+#, elixir-autogen, elixir-format
+msgid "Highlight the latest post"
+msgstr "突出显示最新帖子"
+
+#: lib/phoenix_kit_publishing/web/html.ex:907
+#: lib/phoenix_kit_publishing/web/html.ex:1135
+#: lib/phoenix_kit_publishing/web/html.ex:1619
+#, elixir-autogen, elixir-format
+msgid "Latest"
+msgstr "最新"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:532
+#, elixir-autogen, elixir-format
+msgid "Latest layout"
+msgstr "最新布局"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:623
+#, elixir-autogen, elixir-format
+msgid "Show the top back link"
+msgstr "显示顶部返回链接"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:523
+#, elixir-autogen, elixir-format
+msgid "The most recent post is pinned into its own 'Latest' band under any featured posts and shown larger."
+msgstr "最新的帖子会固定在精选帖子下方单独的“最新”区块中，并以更大尺寸显示。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:614
+#: lib/phoenix_kit_publishing/web/edit.ex:725
+#, elixir-autogen, elixir-format
+msgid "Save"
+msgstr "保存"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:737
+#, elixir-autogen, elixir-format
+msgid "Save and exit"
+msgstr "保存并退出"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:269
+#, elixir-autogen, elixir-format
+msgid "Classic — image beside or above the text"
+msgstr "经典——图片位于文字旁边或上方"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:271
+#, elixir-autogen, elixir-format
+msgid "Cover panel — background image with a solid text panel"
+msgstr "封面面板——背景图片配实色文字面板"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:270
+#, elixir-autogen, elixir-format
+msgid "Cover — the image is the background, text overlaid"
+msgstr "封面——图片作为背景，文字叠加其上"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:515
+#, elixir-autogen, elixir-format
+msgid "Featured style"
+msgstr "精选样式"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:537
+#, elixir-autogen, elixir-format
+msgid "Latest style"
+msgstr "最新样式"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:272
+#, elixir-autogen, elixir-format
+msgid "Minimal — text only, no image"
+msgstr "极简——仅文字，无图片"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:273
+#, elixir-autogen, elixir-format
+msgid "Top image — a wide image banner above the text"
+msgstr "顶部图片——文字上方的宽幅图片横幅"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:550
+#, elixir-autogen, elixir-format
+msgid "Card hover animations"
+msgstr "卡片悬停动画"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:552
+#, elixir-autogen, elixir-format
+msgid "Cards lift slightly on hover as a click cue."
+msgstr "鼠标悬停时卡片会轻微上浮，提示可点击。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:830
+#, elixir-autogen, elixir-format
+msgid "%{count} result for “%{query}”"
+msgid_plural "%{count} results for “%{query}”"
+msgstr[0] "找到 %{count} 个“%{query}”的结果"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:453
+#, elixir-autogen, elixir-format
+msgid "A category can't be moved under one of its own subcategories."
+msgstr "分类不能移到其自身的子分类下。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:860
+#, elixir-autogen, elixir-format
+msgid "All posts"
+msgstr "所有帖子"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:38
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:181
+#: lib/phoenix_kit_publishing/web/listing.ex:1014
+#, elixir-autogen, elixir-format
+msgid "Categories"
+msgstr "分类"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:135
+#, elixir-autogen, elixir-format
+msgid "Category created"
+msgstr "分类已创建"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:276
+#, elixir-autogen, elixir-format
+msgid "Category deleted — its children moved to the top level"
+msgstr "分类已删除——其子分类已移至顶层"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:94
+#: lib/phoenix_kit_publishing/web/categories_live.ex:175
+#, elixir-autogen, elixir-format
+msgid "Category not found"
+msgstr "未找到分类"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:134
+#, elixir-autogen, elixir-format
+msgid "Category updated"
+msgstr "分类已更新"
+
+#: lib/phoenix_kit_publishing/web/html.ex:848
+#, elixir-autogen, elixir-format
+msgid "Category: %{name}"
+msgstr "分类：%{name}"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:669
+#, elixir-autogen, elixir-format
+msgid "Chronological newer/older post links at the bottom of the post page."
+msgstr "帖子页面底部按时间顺序排列的较新/较早帖子链接。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:841
+#, elixir-autogen, elixir-format
+msgid "Clear search"
+msgstr "清除搜索"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:280
+#, elixir-autogen, elixir-format
+msgid "Couldn't delete this category."
+msgstr "无法删除此分类。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:448
+#, elixir-autogen, elixir-format
+msgid "Couldn't save this category — check the fields and try again."
+msgstr "无法保存此分类——请检查字段后重试。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:461
+#, elixir-autogen, elixir-format
+msgid "Couldn't save this category."
+msgstr "无法保存此分类。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:614
+#, elixir-autogen, elixir-format
+msgid "Create"
+msgstr "创建"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:559
+#, elixir-autogen, elixir-format
+msgid "Delete"
+msgstr "删除"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:562
+#, elixir-autogen, elixir-format
+msgid "Delete “%{name}”? Its subcategories move to the top level and posts lose this category."
+msgstr "删除“%{name}”？其子分类将移至顶层，帖子将失去此分类。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:581
+#, elixir-autogen, elixir-format
+msgid "Edit category"
+msgstr "编辑分类"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:751
+#, elixir-autogen, elixir-format
+msgid "Emit a schema.org Article script on post pages for richer search results. Disable if your host builds its own structured data."
+msgstr "在帖子页面上输出 schema.org Article 脚本，以获得更丰富的搜索结果。如果您的宿主应用自行构建结构化数据，请停用此项。"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1069
+#, elixir-autogen, elixir-format
+msgid "Filter posts…"
+msgstr "筛选帖子…"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:290
+#, elixir-autogen, elixir-format
+msgid "Grid — cards with images"
+msgstr "网格——带图片的卡片"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:749
+#: lib/phoenix_kit_publishing/web/settings.ex:759
+#, elixir-autogen, elixir-format
+msgid "JSON-LD Structured Data"
+msgstr "JSON-LD 结构化数据"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:309
+#, elixir-autogen, elixir-format
+msgid "JSON-LD structured data disabled"
+msgstr "JSON-LD 结构化数据已停用"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:308
+#, elixir-autogen, elixir-format
+msgid "JSON-LD structured data enabled on post pages"
+msgstr "已在帖子页面上启用 JSON-LD 结构化数据"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:635
+#, elixir-autogen, elixir-format
+msgid "Linked category badges above the post content."
+msgstr "帖子内容上方带链接的分类徽章。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:291
+#, elixir-autogen, elixir-format
+msgid "List — horizontal rows with a thumbnail"
+msgstr "列表——带缩略图的横向行"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:480
+#, elixir-autogen, elixir-format
+msgid "Listing layout"
+msgstr "列表布局"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:292
+#, elixir-autogen, elixir-format
+msgid "Minimal — date and title only, no images"
+msgstr "极简——仅日期和标题，无图片"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2222
+#, elixir-autogen, elixir-format
+msgid "More posts"
+msgstr "更多帖子"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:494
+#: lib/phoenix_kit_publishing/web/categories_live.ex:593
+#, elixir-autogen, elixir-format
+msgid "Name"
+msgstr "名称"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:471
+#: lib/phoenix_kit_publishing/web/categories_live.ex:486
+#: lib/phoenix_kit_publishing/web/categories_live.ex:583
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:257
+#, elixir-autogen, elixir-format
+msgid "New category"
+msgstr "新建分类"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2230
+#, elixir-autogen, elixir-format
+msgid "Newer"
+msgstr "较新"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1108
+#, elixir-autogen, elixir-format
+msgid "No posts match your filter"
+msgstr "没有符合筛选条件的帖子"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1021
+#, elixir-autogen, elixir-format
+msgid "No posts match your search."
+msgstr "没有符合搜索条件的帖子。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:431
+#, elixir-autogen, elixir-format
+msgid "None (top level)"
+msgstr "无（顶层）"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2240
+#, elixir-autogen, elixir-format
+msgid "Older"
+msgstr "较早"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:600
+#, elixir-autogen, elixir-format
+msgid "Parent"
+msgstr "父级分类"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:610
+#, elixir-autogen, elixir-format
+msgid "Position"
+msgstr "位置"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:728
+#: lib/phoenix_kit_publishing/web/settings.ex:738
+#, elixir-autogen, elixir-format
+msgid "RSS Feeds"
+msgstr "RSS 订阅源"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:288
+#, elixir-autogen, elixir-format
+msgid "RSS feeds disabled — feed URLs return 404"
+msgstr "RSS 订阅源已停用——订阅源 URL 返回 404"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:287
+#, elixir-autogen, elixir-format
+msgid "RSS feeds enabled — every group serves /<group>/feed.xml"
+msgstr "RSS 订阅源已启用——每个分组都在 /<group>/feed.xml 提供订阅源"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:487
+#, elixir-autogen, elixir-format
+msgid "Readers can search this group's published posts by title and text."
+msgstr "读者可以按标题和正文搜索此分组的已发布帖子。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:823
+#, elixir-autogen, elixir-format
+msgid "Search"
+msgstr "搜索"
+
+#: lib/phoenix_kit_publishing/web/html.ex:818
+#, elixir-autogen, elixir-format
+msgid "Search posts…"
+msgstr "搜索帖子…"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:730
+#, elixir-autogen, elixir-format
+msgid "Serve an RSS 2.0 feed for every group at /<group>/feed.xml (newest 50 published posts, per language)."
+msgstr "为每个分组在 /<group>/feed.xml 提供 RSS 2.0 订阅源（每种语言最新的 50 篇已发布帖子）。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:485
+#, elixir-autogen, elixir-format
+msgid "Show a search box"
+msgstr "显示搜索框"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:633
+#, elixir-autogen, elixir-format
+msgid "Show category chips"
+msgstr "显示分类标签"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:667
+#, elixir-autogen, elixir-format
+msgid "Show previous/next navigation"
+msgstr "显示上一篇/下一篇导航"
+
+#: lib/phoenix_kit_publishing/web/html.ex:850
+#, elixir-autogen, elixir-format
+msgid "Tag: %{name}"
+msgstr "标签：%{name}"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:447
+#, elixir-autogen, elixir-format
+msgid "That slug is already used in this group."
+msgstr "此分组中已使用该 slug。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:456
+#, elixir-autogen, elixir-format
+msgid "The parent must belong to the same group."
+msgstr "父级分类必须属于同一分组。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:597
+#, elixir-autogen, elixir-format
+msgid "auto from the name"
+msgstr "根据名称自动生成"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2097
+#: lib/phoenix_kit_publishing/web/post_show.ex:282
+#, elixir-autogen, elixir-format
+msgid "%{count} view"
+msgid_plural "%{count} views"
+msgstr[0] "%{count} 次浏览"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:661
+#, elixir-autogen, elixir-format
+msgid "A subtle 'N views' line on the post page."
+msgstr "帖子页面上低调的“N 次浏览”一行。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:649
+#, elixir-autogen, elixir-format
+msgid "Count views"
+msgstr "统计浏览量"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:651
+#, elixir-autogen, elixir-format
+msgid "Per-day view counts; bot-filtered and session-deduped, no reader data stored."
+msgstr "按日统计浏览量；已过滤机器人并按会话去重，不存储任何读者数据。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:659
+#, elixir-autogen, elixir-format
+msgid "Show view counts"
+msgstr "显示浏览量"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2261
+#, elixir-autogen, elixir-format
+msgid "%{count} comment"
+msgid_plural "%{count} comments"
+msgstr[0] "%{count} 条评论"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:642
+#, elixir-autogen, elixir-format
+msgid "A comment thread under each post. Requires the Comments module; logged-in readers can post."
+msgstr "每篇帖子下方的评论区。需要评论模块；已登录的读者可以发表评论。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4403
+#, elixir-autogen, elixir-format
+msgid "Audio version"
+msgstr "音频版本"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:333
+#, elixir-autogen, elixir-format
+msgid "Comment posted."
+msgstr "评论已发布。"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:347
+#, elixir-autogen, elixir-format
+msgid "Couldn't post your comment — please try again."
+msgstr "无法发表您的评论——请重试。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:640
+#, elixir-autogen, elixir-format
+msgid "Enable comments"
+msgstr "启用评论"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2166
+#, elixir-autogen, elixir-format
+msgid "Listen to this post"
+msgstr "收听此帖子"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1941
+#: lib/phoenix_kit_publishing/web/html.ex:2285
+#, elixir-autogen, elixir-format
+msgid "Log in"
+msgstr "登录"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2264
+#, elixir-autogen, elixir-format
+msgid "No comments yet — be the first."
+msgstr "暂无评论——来发表第一条吧。"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:263
+#, elixir-autogen, elixir-format
+msgid "Please log in to comment."
+msgstr "请登录后发表评论。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1835
+#, elixir-autogen, elixir-format
+msgid "Post comment"
+msgstr "发表评论"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1658
+#: lib/phoenix_kit_publishing/web/html.ex:1662
+#, elixir-autogen, elixir-format
+msgid "Reader"
+msgstr "读者"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:339
+#, elixir-autogen, elixir-format
+msgid "That comment is too long."
+msgstr "评论过长。"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:251
+#, elixir-autogen, elixir-format
+msgid "That post is no longer available."
+msgstr "该帖子已不可用。"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:338
+#, elixir-autogen, elixir-format
+msgid "The comment can't be empty."
+msgstr "评论不能为空。"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:260
+#, elixir-autogen, elixir-format
+msgid "The form expired — please try again."
+msgstr "表单已过期——请重试。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1834
+#, elixir-autogen, elixir-format
+msgid "Write a comment… (Markdown supported)"
+msgstr "写下评论…（支持 Markdown）"
+
+#: lib/phoenix_kit_publishing/page_builder/components/audio.ex:39
+#: lib/phoenix_kit_publishing/web/html.ex:2163
+#, elixir-autogen, elixir-format
+msgid "Your browser does not support the audio element."
+msgstr "您的浏览器不支持 audio 元素。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2287
+#, elixir-autogen, elixir-format
+msgid "to join the conversation."
+msgstr "后即可参与讨论。"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:203
+#, elixir-autogen, elixir-format
+msgid "Category moved"
+msgstr "分类已移动"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:509
+#, elixir-autogen, elixir-format
+msgid "Drag to reorder (among siblings)"
+msgstr "拖动以重新排序（同级之间）"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:247
+#: lib/phoenix_kit_publishing/web/categories_live.ex:255
+#, elixir-autogen, elixir-format
+msgid "Failed to save the new order"
+msgstr "保存新顺序失败"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:640
+#, elixir-autogen, elixir-format
+msgid "Move"
+msgstr "移动"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:550
+#, elixir-autogen, elixir-format
+msgid "Move to…"
+msgstr "移动到…"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:624
+#, elixir-autogen, elixir-format
+msgid "Move “%{name}”"
+msgstr "移动“%{name}”"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:628
+#, elixir-autogen, elixir-format
+msgid "New parent"
+msgstr "新的父级分类"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:544
+#, elixir-autogen, elixir-format
+msgid "New subcategory"
+msgstr "新建子分类"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:481
+#, elixir-autogen, elixir-format
+msgid "No categories yet — create the first one."
+msgstr "暂无分类——创建第一个吧。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1912
+#, elixir-autogen, elixir-format
+msgid "%{count} comment on this note"
+msgid_plural "%{count} comments on this note"
+msgstr[0] "此注释有 %{count} 条评论"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1876
+#, elixir-autogen, elixir-format
+msgid "Author notes"
+msgstr "作者注释"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:604
+#, elixir-autogen, elixir-format
+msgid "Author notes style"
+msgstr "作者注释样式"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1888
+#: lib/phoenix_kit_publishing/web/html.ex:1904
+#, elixir-autogen, elixir-format
+msgid "Close note"
+msgstr "关闭注释"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1936
+#, elixir-autogen, elixir-format
+msgid "Comment on this note…"
+msgstr "评论此注释…"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:321
+#, elixir-autogen, elixir-format
+msgid "Footnotes — numbered refs, notes collected at the bottom"
+msgstr "脚注——带编号的引用，注释集中在底部"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1899
+#, elixir-autogen, elixir-format
+msgid "Note"
+msgstr "注释"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1892
+#, elixir-autogen, elixir-format
+msgid "Note %{number}"
+msgstr "注释 %{number}"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1803
+#, elixir-autogen, elixir-format
+msgid "Post reply"
+msgstr "发表回复"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1786
+#, elixir-autogen, elixir-format
+msgid "Reply"
+msgstr "回复"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:322
+#, elixir-autogen, elixir-format
+msgid "Slide-out panel — click the phrase, note opens on the right"
+msgstr "滑出面板——点击短语，注释在右侧打开"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:342
+#, elixir-autogen, elixir-format
+msgid "The comment you replied to is no longer available."
+msgstr "您回复的评论已不可用。"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:345
+#, elixir-autogen, elixir-format
+msgid "This thread is too deep to reply to."
+msgstr "此讨论串层级过深，无法回复。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1802
+#, elixir-autogen, elixir-format
+msgid "Write a reply…"
+msgstr "写下回复…"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1943
+#, elixir-autogen, elixir-format
+msgid "to comment on this note."
+msgstr "后即可评论此注释。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4454
+#, elixir-autogen, elixir-format
+msgid "An audio file (e.g. a narration). Shows a player above the post and rides the RSS feed as a podcast enclosure."
+msgstr "音频文件（例如旁白朗读）。在帖子上方显示播放器，并作为播客附件随 RSS 订阅源发布。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3339
+#, elixir-autogen, elixir-format
+msgid "Audio version selected"
+msgstr "已选择音频版本"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4434
+#, elixir-autogen, elixir-format
+msgid "Choose"
+msgstr "选择"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4448
+#, elixir-autogen, elixir-format
+msgid "Remove the audio version"
+msgstr "移除音频版本"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1068
+#, elixir-autogen, elixir-format
+msgid "Audio version removed"
+msgstr "音频版本已移除"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:235
+#, elixir-autogen, elixir-format
+msgid "Order unchanged — use “Move to…” to change a parent."
+msgstr "顺序未变——使用“移动到…”更改父级分类。"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:336
+#, elixir-autogen, elixir-format
+msgid "Thanks — your comment is awaiting review."
+msgstr "谢谢——您的评论正在等待审核。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3296
+#, elixir-autogen, elixir-format
+msgid "That file isn't audio — pick an audio file."
+msgstr "该文件不是音频——请选择音频文件。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:143
+#, elixir-autogen, elixir-format
+msgid "That slug is taken — pick another to save."
+msgstr "该 slug 已被占用——请选择其他 slug 后保存。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4349
+#, elixir-autogen, elixir-format
+msgid "Adds ?v=N access to this post's published versions. Off by default — only the live version is public."
+msgstr "允许通过 ?v=N 访问此帖子的已发布版本。默认关闭——只有线上版本是公开的。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4106
+#, elixir-autogen, elixir-format
+msgid "From title"
+msgstr "根据标题"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4345
+#, elixir-autogen, elixir-format
+msgid "Let readers browse older versions"
+msgstr "允许读者浏览旧版本"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4103
+#, elixir-autogen, elixir-format
+msgid "Re-derive the slug from the current title"
+msgstr "根据当前标题重新生成 slug"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4099
+#, elixir-autogen, elixir-format
+msgid "Working…"
+msgstr "正在处理…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3488
+#, elixir-autogen, elixir-format
+msgid "Resume editing"
+msgstr "恢复编辑"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3482
+#, elixir-autogen, elixir-format
+msgid "Resuming…"
+msgstr "正在恢复…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2679
+#, elixir-autogen, elixir-format
+msgid "Slug is required to save."
+msgstr "保存需要填写 slug。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:947
+#, elixir-autogen, elixir-format
+msgid "Someone else is editing this post now — you can still watch."
+msgstr "其他人正在编辑此帖子——您仍可以旁观。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:950
+#, elixir-autogen, elixir-format
+msgid "You're editing again."
+msgstr "您已重新开始编辑。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3474
+#, elixir-autogen, elixir-format
+msgid "Your editing lock expired due to inactivity."
+msgstr "由于长时间未操作，您的编辑锁已过期。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2521
+#, elixir-autogen, elixir-format
+msgid "You're the editor now. The previous editor's unsaved changes were kept."
+msgstr "您现在是编辑者。上一位编辑者未保存的更改已保留。"
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:235
+#, elixir-autogen, elixir-format
+msgid "No matching categories"
+msgstr "没有匹配的分类"
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:209
+#, elixir-autogen, elixir-format
+msgid "Remove %{name}"
+msgstr "移除 %{name}"
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:261
+#, elixir-autogen, elixir-format
+msgid "Saved with the version, so each version keeps its own filing."
+msgstr "随版本保存，因此每个版本都保留各自的分类。"
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:232
+#, elixir-autogen, elixir-format
+msgid "Search categories…"
+msgstr "搜索分类…"
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:234
+#, elixir-autogen, elixir-format
+msgid "Searching…"
+msgstr "正在搜索…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3153
+#, elixir-autogen, elixir-format
+msgid "Someone else is editing this post — nothing was changed."
+msgstr "其他人正在编辑此帖子——未做任何更改。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3062
+#, elixir-autogen, elixir-format
+msgid "Author note"
+msgstr "作者注释"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3067
+#, elixir-autogen, elixir-format
+msgid "Call to action"
+msgstr "行动号召"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3095
+#, elixir-autogen, elixir-format
+msgid "Heading"
+msgstr "标题"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3042
+#, elixir-autogen, elixir-format
+msgid "Headline (wide)"
+msgstr "大标题（宽）"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3086
+#, elixir-autogen, elixir-format
+msgid "Headline text"
+msgstr "大标题文本"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3047
+#, elixir-autogen, elixir-format
+msgid "Showcase band"
+msgstr "展示横幅"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3114
+#, elixir-autogen, elixir-format
+msgid "What should the reader do next?"
+msgstr "读者接下来应该做什么？"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3091
+#, elixir-autogen, elixir-format
+msgid "Words beside the picture."
+msgstr "图片旁边的文字。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3107
+#, elixir-autogen, elixir-format
+msgid "Your note here"
+msgstr "在此处填写注释"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3106
+#, elixir-autogen, elixir-format
+msgid "the phrase"
+msgstr "这段文字"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3057
+#, elixir-autogen, elixir-format
+msgid "Audio player"
+msgstr "音频播放器"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3260
+#, elixir-autogen, elixir-format
+msgid "Audio player inserted"
+msgstr "已插入音频播放器"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3052
+#, elixir-autogen, elixir-format
+msgid "Gallery (helix)"
+msgstr "图库（螺旋）"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3272
+#, elixir-autogen, elixir-format
+msgid "Gallery inserted"
+msgstr "已插入图库"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4645
+#, elixir-autogen, elixir-format
+msgid "Saving will publish this version and archive v%{version}, which is live now."
+msgstr "保存将发布此版本，并归档当前线上的 v%{version}。"
+
+#: lib/phoenix_kit_publishing/comments.ex:266
+#, elixir-autogen, elixir-format
+msgid "New comment on your post"
+msgstr "您的帖子有新评论"
+
+#: lib/phoenix_kit_publishing/comments.ex:265
+#, elixir-autogen, elixir-format
+msgid "Someone replied to your comment"
+msgstr "有人回复了您的评论"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:830
+#, elixir-autogen, elixir-format
+msgid "Drives the \"min read\" estimate. 200 suits English prose; lower it for dense or technical writing."
+msgstr "用于估算“分钟阅读”时间。200 适合英文文本；对于密集或技术性文字，请调低此值。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:841
+#, elixir-autogen, elixir-format
+msgid "Editing lock timeout (minutes)"
+msgstr "编辑锁超时（分钟）"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:843
+#, elixir-autogen, elixir-format
+msgid "How long an idle editor keeps a post before it is released for someone else. A warning appears five minutes before."
+msgstr "闲置的编辑者保留帖子多长时间后释放给其他人。释放前五分钟会显示警告。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:820
+#, elixir-autogen, elixir-format
+msgid "How many posts a listing page shows before paginating."
+msgstr "列表页面在分页前显示的帖子数量。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:819
+#, elixir-autogen, elixir-format
+msgid "Posts per page"
+msgstr "每页帖子数"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:828
+#, elixir-autogen, elixir-format
+msgid "Reading speed (words per minute)"
+msgstr "阅读速度（每分钟字数）"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:387
+#, elixir-autogen, elixir-format
+msgid "Setting updated"
+msgstr "设置已更新"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1051
+#, elixir-autogen, elixir-format
+msgid "This post was saved somewhere else. Your unsaved changes are still here — saving will overwrite that copy."
+msgstr "此帖子已在其他地方保存。您未保存的更改仍在此处——保存将覆盖该副本。"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1002
+#, elixir-autogen, elixir-format
+msgid "Back to text"
+msgstr "返回正文"
+
+#: lib/phoenix_kit_publishing/web/controller/listing.ex:128
+#, elixir-autogen, elixir-format
+msgid "No posts in this language yet. Showing closest match."
+msgstr "此语言尚无帖子。正在显示最接近的匹配项。"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1015
+#, elixir-autogen, elixir-format
+msgid "Notes"
+msgstr "注释"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2144
+#: lib/phoenix_kit_publishing/web/preview.ex:299
+#, elixir-autogen, elixir-format
+msgid "live"
+msgstr "线上"
+
+#: lib/phoenix_kit_publishing/errors.ex:124
+#, elixir-autogen, elixir-format
+msgid "A category can't be moved inside itself or one of its own children"
+msgstr "分类不能移动到其自身或其子分类内部"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:161
+#, elixir-autogen, elixir-format
+msgid "Couldn't save the group — please check the values and try again."
+msgstr "无法保存分组——请检查各项值后重试。"
+
+#: lib/phoenix_kit_publishing/errors.ex:141
+#, elixir-autogen, elixir-format
+msgid "Invalid order"
+msgstr "无效的顺序"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:641
+#, elixir-autogen, elixir-format
+msgid "Moving…"
+msgstr "正在移动…"
+
+#: lib/phoenix_kit_publishing/errors.ex:168
+#, elixir-autogen, elixir-format
+msgid "Parent category belongs to another group"
+msgstr "父级分类属于另一个分组"
+
+#: lib/phoenix_kit_publishing/errors.ex:167
+#, elixir-autogen, elixir-format
+msgid "Parent category not found"
+msgstr "未找到父级分类"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:600
+#, elixir-autogen, elixir-format
+msgid "Post saved as a draft, but it can't be published: the primary language needs a title."
+msgstr "帖子已保存为草稿，但无法发布：主要语言需要标题。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:605
+#, elixir-autogen, elixir-format
+msgid "Post saved, but publishing failed."
+msgstr "帖子已保存，但发布失败。"
+
+#: lib/phoenix_kit_publishing/errors.ex:165
+#, elixir-autogen, elixir-format
+msgid "Save the changes against the new version — creating one doesn't apply them"
+msgstr "请在新版本上保存更改——创建新版本不会应用这些更改"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:159
+#, elixir-autogen, elixir-format
+msgid "That slug is already used by another group."
+msgstr "另一个分组已使用该 slug。"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:558
+#, elixir-autogen, elixir-format
+msgid "The live version stays published — to take it offline, use Unpublish on the group page."
+msgstr "线上版本仍保持发布状态——如需下线，请在分组页面上使用“取消发布”。"
+
+#: lib/phoenix_kit_publishing/errors.ex:150
+#, elixir-autogen, elixir-format
+msgid "The primary language's content anchors the post and can't be deleted — edit it instead"
+msgstr "主要语言的内容是帖子的基础，无法删除——请改为编辑它"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:619
+#, elixir-autogen, elixir-format
+msgid "General"
+msgstr "常规"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4671
+#, elixir-autogen, elixir-format
+msgid "Displays as:"
+msgstr "显示为："
+
+#: lib/phoenix_kit_publishing/page_builder/components/embed.ex:47
+#, elixir-autogen, elixir-format
+msgid "Interactive demo"
+msgstr "交互式演示"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4045
+#, elixir-autogen, elixir-format
+msgid "Link a publication"
+msgstr "链接到帖子"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3072
+#, elixir-autogen, elixir-format
+msgid "Live demo (iframe)"
+msgstr "实时演示（iframe）"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1931
+#, elixir-autogen, elixir-format
+msgid "That publication no longer exists."
+msgstr "该帖子已不存在。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3119
+#, elixir-autogen, elixir-format
+msgid "Try it"
+msgstr "试一试"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:459
+#, elixir-autogen, elixir-format
+msgid "That parent no longer exists."
+msgstr "该父级分类已不存在。"
+
+#: lib/phoenix_kit_publishing/web/new.ex:41
+#, elixir-autogen, elixir-format
+msgid "New group"
+msgstr "新建分组"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:287
+#, elixir-autogen, elixir-format
+msgid "New post"
+msgstr "新建帖子"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:157
+#, elixir-autogen, elixir-format
+msgid "%{count} published entry"
+msgid_plural "%{count} published entries"
+msgstr[0] "%{count} 个已发布条目"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:136
+#, elixir-autogen, elixir-format
+msgid "Available groups:"
+msgstr "可用分组："
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:87
+#, elixir-autogen, elixir-format
+msgid "New entry"
+msgstr "新建条目"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:128
+#, elixir-autogen, elixir-format
+msgid "No publishing group linked to this project yet."
+msgstr "尚未有发布分组关联到此项目。"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:154
+#, elixir-autogen, elixir-format
+msgid "Nothing published"
+msgstr "暂无已发布内容"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:100
+#, elixir-autogen, elixir-format
+msgid "Nothing published in this group yet."
+msgstr "此分组中尚无已发布内容。"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:93
+#, elixir-autogen, elixir-format
+msgid "Open in Publishing"
+msgstr "在发布模块中打开"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:131
+#, elixir-autogen, elixir-format
+msgid "Paste a group slug into this tab's settings in the project's Modules & features panel."
+msgstr "请在项目的“模块与功能”面板中，将分组 slug 粘贴到此标签页的设置中。"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:118
+#, elixir-autogen, elixir-format
+msgid "Showing %{shown} of %{total} — the full list lives in the Publishing admin."
+msgstr "正在显示 %{shown} / %{total} 项——完整列表位于发布模块管理后台。"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1322
+#, elixir-autogen, elixir-format
+msgid "posts"
+msgstr "帖子"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3898
+#, elixir-autogen, elixir-format
+msgid "Collecting your edits…"
+msgstr "正在收集您的编辑…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4377
+#, elixir-autogen, elixir-format
+msgid "Exclude from the sitemap"
+msgstr "从站点地图中排除"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:572
+#, elixir-autogen, elixir-format
+msgid "Exclude this group from the sitemap"
+msgstr "从站点地图中排除此分组"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4381
+#, elixir-autogen, elixir-format
+msgid "Leaves this post out of the site's sitemap. The post stays public at its URL."
+msgstr "将此帖子排除在网站的站点地图之外。帖子在其 URL 上仍保持公开。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:574
+#, elixir-autogen, elixir-format
+msgid "Neither the listing nor any post in this group is listed in the sitemap."
+msgstr "此分组的列表页面和所有帖子都不会列入站点地图。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1690
+#, elixir-autogen, elixir-format
+msgid "The editor did not answer, so nothing was switched. Your last edits may not be saved yet — please try again."
+msgstr "编辑器没有响应，因此未进行切换。您最近的编辑可能尚未保存——请重试。"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:770
+#: lib/phoenix_kit_publishing/web/settings.ex:780
+#, elixir-autogen, elixir-format
+msgid "Unique Views"
+msgstr "去重浏览量"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:330
+#, elixir-autogen, elixir-format
+msgid "Unique views disabled — every page open counts"
+msgstr "去重浏览量已停用——每次打开页面都会计数"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:329
+#, elixir-autogen, elixir-format
+msgid "Unique views enabled — one view per visitor per post per day"
+msgstr "去重浏览量已启用——每位访客每篇帖子每天计一次浏览"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:772
+#, elixir-autogen, elixir-format
+msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
+msgstr "开启：每位访客每篇帖子每天只计一次——依据会话，否则依据地址的带密钥哈希，因此共享同一地址的读者在其浏览器保留标记之前只计一次。关闭：每次打开页面都计数。"
+
+#: lib/phoenix_kit_publishing/errors.ex:225
+#, elixir-autogen, elixir-format
+msgid "Saved as a draft, but it could not be published: %{reason}"
+msgstr "已保存为草稿，但无法发布：%{reason}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:48
+#: lib/phoenix_kit_publishing/web/settings.ex:136
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to change the Publishing settings"
+msgstr "您没有更改发布设置的权限"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:53
+#: lib/phoenix_kit_publishing/web/edit.ex:67
+#: lib/phoenix_kit_publishing/web/edit.ex:138
+#: lib/phoenix_kit_publishing/web/index.ex:195
+#: lib/phoenix_kit_publishing/web/new.ex:29
+#: lib/phoenix_kit_publishing/web/new.ex:144
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to manage publishing groups"
+msgstr "您没有管理发布分组的权限"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3880
+#, elixir-autogen, elixir-format
+msgid "%{count} other viewing"
+msgid_plural "%{count} others viewing"
+msgstr[0] "另有 %{count} 人正在查看"
+
+#: lib/phoenix_kit_publishing/errors.ex:255
+#, elixir-autogen, elixir-format
+msgid "%{field} %{message}"
+msgstr "%{field} %{message}"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:165
+#, elixir-autogen, elixir-format
+msgid "(untitled)"
+msgstr "（无标题）"
+
+#: lib/phoenix_kit_publishing/publishing.ex:543
+#, elixir-autogen, elixir-format
+msgid "Activity on posts you wrote"
+msgstr "您撰写的帖子上的动态"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1085
+#, elixir-autogen, elixir-format
+msgid "Cache rendered HTML for published posts (24-hour TTL)"
+msgstr "缓存已发布帖子的渲染 HTML（TTL 为 24 小时）"
+
+#: lib/phoenix_kit_publishing/publishing.ex:597
+#, elixir-autogen, elixir-format
+msgid "Change the module's settings"
+msgstr "更改模块设置"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:413
+#, elixir-autogen, elixir-format
+msgid "Cleared %{count} cached post for %{group}"
+msgid_plural "Cleared %{count} cached posts for %{group}"
+msgstr[0] "已清除 %{group} 的 %{count} 篇缓存帖子"
+
+#: lib/phoenix_kit_publishing/errors.ex:126
+#, elixir-autogen, elixir-format
+msgid "Comments are not available"
+msgstr "评论不可用"
+
+#: lib/phoenix_kit_publishing/publishing.ex:552
+#, elixir-autogen, elixir-format
+msgid "Comments on your posts"
+msgstr "您帖子上的评论"
+
+#: lib/phoenix_kit_publishing/errors.ex:132
+#, elixir-autogen, elixir-format
+msgid "Could not copy the content to the new version"
+msgstr "无法将内容复制到新版本"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:470
+#, elixir-autogen, elixir-format
+msgid "Couldn't save this setting. Please try again."
+msgstr "无法保存此设置。请重试。"
+
+#: lib/phoenix_kit_publishing/publishing.ex:591
+#, elixir-autogen, elixir-format
+msgid "Create, edit, trash, restore and permanently delete publishing groups with all their posts"
+msgstr "创建、编辑、移至回收站、恢复和永久删除发布分组及其所有帖子"
+
+#: lib/phoenix_kit_publishing/publishing.ex:576
+#, elixir-autogen, elixir-format
+msgid "Database-backed CMS pages and multi-language content"
+msgstr "基于数据库的 CMS 页面和多语言内容"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:1246
+#, elixir-autogen, elixir-format
+msgid "Edit categories"
+msgstr "编辑分类"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:521
+#, elixir-autogen, elixir-format
+msgid "Edit group"
+msgstr "编辑分组"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:708
+#: lib/phoenix_kit_publishing/web/controller.ex:754
+#: lib/phoenix_kit_publishing/web/controller.ex:789
+#, elixir-autogen, elixir-format
+msgid "Edit post"
+msgstr "编辑帖子"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1398
+#, elixir-autogen, elixir-format
+msgid "Error rendering audio"
+msgstr "渲染音频时出错"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1757
+#, elixir-autogen, elixir-format
+msgid "Error rendering component"
+msgstr "渲染组件时出错"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1419
+#, elixir-autogen, elixir-format
+msgid "Error rendering embed"
+msgstr "渲染嵌入内容时出错"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1442
+#, elixir-autogen, elixir-format
+msgid "Error rendering entity form"
+msgstr "渲染实体表单时出错"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1356
+#, elixir-autogen, elixir-format
+msgid "Error rendering image"
+msgstr "渲染图片时出错"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1824
+#, elixir-autogen, elixir-format
+msgid "Error rendering showcase"
+msgstr "渲染展示横幅时出错"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1377
+#, elixir-autogen, elixir-format
+msgid "Error rendering video"
+msgstr "渲染视频时出错"
+
+#: lib/phoenix_kit_publishing/errors.ex:135
+#, elixir-autogen, elixir-format
+msgid "Group is in the trash"
+msgstr "分组位于回收站中"
+
+#: lib/phoenix_kit_publishing/publishing.ex:589
+#, elixir-autogen, elixir-format
+msgid "Manage groups"
+msgstr "管理分组"
+
+#: lib/phoenix_kit_publishing/publishing.ex:599
+#, elixir-autogen, elixir-format
+msgid "Open the Publishing settings page and change settings and caches there"
+msgstr "打开发布设置页面，并在其中更改设置和缓存"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:189
+#, elixir-autogen, elixir-format
+msgid "Post restored and live again"
+msgstr "帖子已恢复并重新上线"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4144
+#, elixir-autogen, elixir-format
+msgid "Preview: %{path}"
+msgstr "预览：%{path}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:182
+#, elixir-autogen, elixir-format
+msgid "Regenerated %{count} cache"
+msgid_plural "Regenerated %{count} caches"
+msgstr[0] "已重新生成 %{count} 个缓存"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:185
+#, elixir-autogen, elixir-format
+msgid "Regenerated %{count} of %{total} caches; the others failed"
+msgid_plural "Regenerated %{count} of %{total} caches; the others failed"
+msgstr[0] "已重新生成 %{count} / %{total} 个缓存；其余失败"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1193
+#, elixir-autogen, elixir-format
+msgid "Render cache stores pre-rendered HTML for published posts. Cache keys include content hashes, so edits automatically use fresh renders. TTL: 24 hours."
+msgstr "渲染缓存存储已发布帖子的预渲染 HTML。缓存键包含内容哈希，因此编辑后会自动使用新的渲染结果。TTL：24 小时。"
+
+#: lib/phoenix_kit_publishing/publishing.ex:559
+#, elixir-autogen, elixir-format
+msgid "Replies to your comments"
+msgstr "对您评论的回复"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3388
+#, elixir-autogen, elixir-format
+msgid "Save the post before viewing the public page"
+msgstr "请先保存帖子，再查看公开页面"
+
+#: lib/phoenix_kit_publishing/publishing.ex:553
+#, elixir-autogen, elixir-format
+msgid "Someone commented on a post you wrote"
+msgstr "有人评论了您撰写的帖子"
+
+#: lib/phoenix_kit_publishing/publishing.ex:560
+#, elixir-autogen, elixir-format
+msgid "Someone replied to a comment you left"
+msgstr "有人回复了您留下的评论"
+
+#: lib/phoenix_kit_publishing/errors.ex:179
+#, elixir-autogen, elixir-format
+msgid "Source version not found"
+msgstr "未找到源版本"
+
+#: lib/phoenix_kit_publishing/errors.ex:217
+#, elixir-autogen, elixir-format
+msgid "The group still holds %{count} post"
+msgid_plural "The group still holds %{count} posts"
+msgstr[0] "该分组仍包含 %{count} 篇帖子"
+
+#: lib/phoenix_kit_publishing/errors.ex:156
+#, elixir-autogen, elixir-format
+msgid "The post has no live version"
+msgstr "该帖子没有线上版本"
+
+#: lib/phoenix_kit_publishing/errors.ex:160
+#, elixir-autogen, elixir-format
+msgid "The post has no version"
+msgstr "该帖子没有版本"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1281
+#, elixir-autogen, elixir-format
+msgid "This post has a live version: restoring it puts it back on the public site. Restore?"
+msgstr "此帖子有线上版本：恢复后它将重新出现在公开网站上。确定恢复吗？"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2469
+#, elixir-autogen, elixir-format
+msgid "Translation completed successfully for %{count} language"
+msgid_plural "Translation completed successfully for %{count} languages"
+msgstr[0] "已成功完成 %{count} 种语言的翻译"
+
+#: lib/phoenix_kit_publishing/errors.ex:130
+#, elixir-autogen, elixir-format
+msgid "URL slug is a previous address of another post"
+msgstr "该 URL slug 是另一篇帖子以前的地址"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3389
+#, elixir-autogen, elixir-format
+msgid "View this post on the public site"
+msgstr "在公开网站上查看此帖子"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3072
+#, elixir-autogen, elixir-format
+msgctxt "month abbreviation"
+msgid "May"
+msgstr "5月"
+
+#: lib/phoenix_kit_publishing/web/index.ex:249
+#, elixir-autogen, elixir-format
+msgid "Move the group to the trash before deleting it."
+msgstr "删除分组前，请先将其移至回收站。"
+
+#: lib/phoenix_kit_publishing/web/new.ex:682
+#, elixir-autogen, elixir-format
+msgid "Couldn't create this group."
+msgstr "无法创建此分组。"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1008
+#, elixir-autogen, elixir-format
+msgid "Next page"
+msgstr "下一页"
+
+#: lib/phoenix_kit_publishing/web/html.ex:978
+#, elixir-autogen, elixir-format
+msgid "Pagination"
+msgstr "分页"
+
+#: lib/phoenix_kit_publishing/web/html.ex:984
+#, elixir-autogen, elixir-format
+msgid "Previous page"
+msgstr "上一页"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1161
+#, elixir-autogen, elixir-format
+msgid "Render cache for %{group}"
+msgstr "%{group} 的渲染缓存"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:396
+#, elixir-autogen, elixir-format
+msgid "This group was renamed to %{slug}."
+msgstr "此分组已重命名为 %{slug}。"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2252
+#, elixir-autogen, elixir-format
+msgid "This group was renamed to %{slug}. Your edits keep saving; reload the page to see collaborators' changes."
+msgstr "此分组已重命名为 %{slug}。您的修改仍会保存；刷新页面即可看到其他人的修改。"

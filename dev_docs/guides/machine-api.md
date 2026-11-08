@@ -283,6 +283,9 @@ Reasons:
 | `cursor_stale` | the `list_posts` cursor no longer matches the list |
 | `empty_translation` | a blank `set_translation` title or body, or an empty primary body in `translate_post` |
 | `language_missing` | `update_post` was asked to edit a language the version has no row for |
+| `primary_language` | `set_translation` was given the primary language (that is `update_post`'s) |
+| `exclusive_fields` | `create_version` was given both `blank` and `from_version` |
+| `invalid_datetime` | `schedule_post`'s `publish_at` is not `YYYY-MM-DDTHH:MM` |
 
 Warnings (`warnings: [{code, message}]` in an answer): `language_missing` (`get_post` fell back to another language), `limit_trimmed` (`list_posts` trimmed the limit), `empty_translation` (a `publish_post` preview: a language whose body is empty) and `unfile_incomplete` (on a `delete_categories` row: the category is gone but some versions still name it; `count` says how many).
 

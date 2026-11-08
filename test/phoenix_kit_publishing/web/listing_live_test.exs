@@ -480,4 +480,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.ListingLiveTest do
     send(view.pid, {:version_deleted, post[:slug], 1})
     assert is_binary(render(view))
   end
+
+  # Renamed while open: the list lives under the new slug now.
+  test "a rename of this group moves the listing to the new slug", %{conn: conn, group: group} do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}")
+
+    new_slug = group["slug"] <> "-renamed"
+    {:ok, _} = Groups.update_group(group["slug"], %{"slug" => new_slug})
+
+    {path, _flash} = assert_redirect(view, 1000)
+    assert String.ends_with?(path, "/admin/publishing/#{new_slug}")
+  end
 end

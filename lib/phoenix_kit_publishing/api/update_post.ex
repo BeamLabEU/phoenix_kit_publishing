@@ -161,6 +161,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
 
   defp categories(group, %{"category_ids" => ids}) when is_list(ids) do
     known = MapSet.new(Common.categories!(group.slug), & &1.uuid)
+    ids = Enum.map(ids, &Common.canonical_uuid/1)
 
     case Enum.reject(ids, &MapSet.member?(known, &1)) do
       [] ->

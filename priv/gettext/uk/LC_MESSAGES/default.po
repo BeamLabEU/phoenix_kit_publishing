@@ -1,0 +1,4034 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: uk\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1027
+#, elixir-autogen, elixir-format
+msgid "\"In Memory\" means the cache is loaded into :persistent_term for sub-microsecond reads."
+msgstr "«У пам'яті» означає, що кеш завантажено в :persistent_term для читання за частки мікросекунди."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3774
+#, elixir-autogen, elixir-format
+msgid "\"Translate Missing\" will only create translations for languages that don't have one yet."
+msgstr "«Перекласти лише відсутні» створить переклади лише для мов, які їх ще не мають."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3768
+#, elixir-autogen, elixir-format
+msgid "\"Translate to All\" will create or overwrite translations for all enabled languages."
+msgstr "«Перекласти на всі мови» створить або перезапише переклади для всіх увімкнених мов."
+
+#: lib/phoenix_kit_publishing/web/html.ex:2591
+#: lib/phoenix_kit_publishing/web/html.ex:2599
+#: lib/phoenix_kit_publishing/web/html.ex:2614
+#: lib/phoenix_kit_publishing/web/html.ex:2622
+#: lib/phoenix_kit_publishing/web/html.ex:2851
+#: lib/phoenix_kit_publishing/web/html.ex:2855
+#, elixir-autogen, elixir-format
+msgid "%B %-d, %Y"
+msgstr "%-d %B %Y р."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1855
+#: lib/phoenix_kit_publishing/web/html.ex:781
+#: lib/phoenix_kit_publishing/web/html.ex:853
+#, elixir-autogen, elixir-format
+msgid "%{count} post"
+msgid_plural "%{count} posts"
+msgstr[0] "%{count} допис"
+msgstr[1] "%{count} дописи"
+msgstr[2] "%{count} дописів"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1168
+#, elixir-autogen, elixir-format
+msgid "%{count} version"
+msgid_plural "%{count} versions"
+msgstr[0] "%{count} версія"
+msgstr[1] "%{count} версії"
+msgstr[2] "%{count} версій"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2616
+#: lib/phoenix_kit_publishing/web/html.ex:2624
+#: lib/phoenix_kit_publishing/web/html.ex:2868
+#: lib/phoenix_kit_publishing/web/listing.ex:772
+#: lib/phoenix_kit_publishing/web/listing.ex:797
+#, elixir-autogen, elixir-format
+msgid "%{date} at %{time}"
+msgstr "%{date} о %{time}"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3494
+#, elixir-autogen, elixir-format
+msgid "%{email} is currently editing this post. You can view but not make changes."
+msgstr "%{email} зараз редагує цей допис. Ви можете переглядати його, але не можете вносити зміни."
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:564
+#, elixir-autogen, elixir-format
+msgid "%{language} (source) is currently being edited by %{user}. They will be locked out during translation."
+msgstr "%{language} (джерело) зараз редагує %{user}. На час перекладу доступ до редагування буде заблоковано."
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:457
+#, elixir-autogen, elixir-format
+msgid "%{language} is currently being edited by %{user}. They will be locked out and unsaved changes will be discarded."
+msgstr "%{language} зараз редагує %{user}. Доступ до редагування буде заблоковано, а незбережені зміни буде скасовано."
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:156
+#, elixir-autogen, elixir-format
+msgid "(live)"
+msgstr "(активна)"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2166
+#, elixir-autogen, elixir-format
+msgid "A new version was created by another editor"
+msgstr "Інший редактор створив нову версію"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3457
+#, elixir-autogen, elixir-format
+msgid "AI Translate"
+msgstr "Перекласти за допомогою ШІ"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3562
+#, elixir-autogen, elixir-format
+msgid "AI Translation"
+msgstr "Переклад за допомогою ШІ"
+
+#: lib/phoenix_kit_publishing/errors.ex:195
+#, elixir-autogen, elixir-format
+msgid "AI endpoint is disabled"
+msgstr "Кінцеву точку ШІ вимкнено"
+
+#: lib/phoenix_kit_publishing/errors.ex:194
+#, elixir-autogen, elixir-format
+msgid "AI endpoint not found"
+msgstr "Кінцеву точку ШІ не знайдено"
+
+#: lib/phoenix_kit_publishing/errors.ex:192
+#, elixir-autogen, elixir-format
+msgid "AI module is not enabled"
+msgstr "Модуль «ШІ» не ввімкнено"
+
+#: lib/phoenix_kit_publishing/errors.ex:206
+#, elixir-autogen, elixir-format
+msgid "AI request failed: %{reason}"
+msgstr "Не вдалося виконати запит до ШІ: %{reason}"
+
+#: lib/phoenix_kit_publishing/errors.ex:198
+#, elixir-autogen, elixir-format
+msgid "AI translation failed: %{reason}"
+msgstr "Не вдалося виконати переклад за допомогою ШІ: %{reason}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:530
+#, elixir-autogen, elixir-format
+msgid "ASCII only"
+msgstr "Лише ASCII"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:810
+#, elixir-autogen, elixir-format
+msgid "ASCII only — strip"
+msgstr "Лише ASCII — вилучення решти"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:958
+#: lib/phoenix_kit_publishing/web/settings.ex:1144
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr "Дії"
+
+#: lib/phoenix_kit_publishing/web/index.ex:453
+#, elixir-autogen, elixir-format
+msgid "Active"
+msgstr "Активні"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4263
+#, elixir-autogen, elixir-format
+msgid "Advanced: Manual Media ID"
+msgstr "Додатково: ID медіафайлу вручну"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1172
+#, elixir-autogen, elixir-format
+msgid "All languages already have translations"
+msgstr "Для всіх мов уже є переклади"
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:224
+#, elixir-autogen, elixir-format
+msgid "All versions of this post have been deleted. Please navigate away."
+msgstr "Усі версії цього допису видалено. Перейдіть на іншу сторінку."
+
+#: lib/phoenix_kit_publishing/errors.ex:119
+#, elixir-autogen, elixir-format
+msgid "Already exists"
+msgstr "Уже існує"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4806
+#, elixir-autogen, elixir-format
+msgid "Another post"
+msgstr "Інший допис"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3499
+#, elixir-autogen, elixir-format
+msgid "Another user is currently editing this post. You can view but not make changes."
+msgstr "Цей допис зараз редагує інший користувач. Ви можете переглядати його, але не можете вносити зміни."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4633
+#, elixir-autogen, elixir-format
+msgid "Applies to all languages in this version."
+msgstr "Застосовується до всіх мов цієї версії."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3068
+#, elixir-autogen, elixir-format
+msgid "Apr"
+msgstr "квіт."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3051
+#, elixir-autogen, elixir-format
+msgid "April"
+msgstr "квітня"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:221
+#: lib/phoenix_kit_publishing/web/editor.ex:2281
+#: lib/phoenix_kit_publishing/web/editor.ex:3006
+#: lib/phoenix_kit_publishing/web/editor.ex:3012
+#: lib/phoenix_kit_publishing/web/listing.ex:948
+#: lib/phoenix_kit_publishing/web/listing.ex:1042
+#: lib/phoenix_kit_publishing/web/listing.ex:1254
+#: lib/phoenix_kit_publishing/web/post_show.ex:160
+#, elixir-autogen, elixir-format
+msgid "Archived"
+msgstr "В архіві"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3075
+#, elixir-autogen, elixir-format
+msgid "Aug"
+msgstr "серп."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3055
+#, elixir-autogen, elixir-format
+msgid "August"
+msgstr "серпня"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3567
+#, elixir-autogen, elixir-format
+msgid "Automatically translate this post to other languages using AI. Each translation runs as a background job — you can keep editing while it finishes, or safely leave this page."
+msgstr "Автоматично перекладіть цей допис на інші мови за допомогою ШІ. Кожен переклад виконується як фонове завдання — ви можете продовжувати редагування, поки він завершується, або спокійно залишити цю сторінку."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1568
+#, elixir-autogen, elixir-format
+msgid "Autosave failed — click Save to retry"
+msgstr "Не вдалося виконати автозбереження — натисніть «Зберегти», щоб спробувати ще раз"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3351
+#: lib/phoenix_kit_publishing/web/html.ex:2037
+#: lib/phoenix_kit_publishing/web/html.ex:2310
+#: lib/phoenix_kit_publishing/web/preview.ex:333
+#, elixir-autogen, elixir-format
+msgid "Back to %{group}"
+msgstr "Назад до %{group}"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:232
+#, elixir-autogen, elixir-format
+msgid "Back to Editor"
+msgstr "Назад до редактора"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1109
+#, elixir-autogen, elixir-format
+msgid "Cache Hits"
+msgstr "Влучання в кеш"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1113
+#, elixir-autogen, elixir-format
+msgid "Cache Misses"
+msgstr "Промахи кешу"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:166
+#, elixir-autogen, elixir-format
+msgid "Cache cleared for %{group}"
+msgstr "Кеш для %{group} очищено"
+
+#: lib/phoenix_kit_publishing/errors.ex:120
+#, elixir-autogen, elixir-format
+msgid "Cache miss"
+msgstr "Промах кешу"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:147
+#, elixir-autogen, elixir-format
+msgid "Cache regenerated for %{group}"
+msgstr "Кеш для %{group} перебудовано"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:880
+#, elixir-autogen, elixir-format
+msgid "Cached listing data speeds up listing pages. Cache is automatically updated when posts change."
+msgstr "Кешовані дані списків прискорюють завантаження сторінок зі списками. Кеш автоматично оновлюється, коли дописи змінюються."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1053
+#, elixir-autogen, elixir-format
+msgid "Cached rendered HTML for published posts. Uses content-hash keys so edits auto-invalidate."
+msgstr "Кешований згенерований HTML опублікованих дописів. Використовує ключі на основі хешу вмісту, тож редагування автоматично скидає кеш."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4773
+#: lib/phoenix_kit_publishing/web/editor.ex:4834
+#, elixir-autogen, elixir-format
+msgid "Cancel"
+msgstr "Скасувати"
+
+#: lib/phoenix_kit_publishing/errors.ex:154
+#, elixir-autogen, elixir-format
+msgid "Cannot delete the last language"
+msgstr "Не можна видалити останню мову"
+
+#: lib/phoenix_kit_publishing/errors.ex:155
+#, elixir-autogen, elixir-format
+msgid "Cannot delete the last version"
+msgstr "Не можна видалити останню версію"
+
+#: lib/phoenix_kit_publishing/errors.ex:121
+#, elixir-autogen, elixir-format
+msgid "Cannot delete the live version"
+msgstr "Не можна видалити активну версію"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1387
+#, elixir-autogen, elixir-format
+msgid "Cannot remove the last language from a post"
+msgstr "Не можна вилучити з допису останню мову"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:993
+#, elixir-autogen, elixir-format
+msgid "Cannot save - you are spectating"
+msgstr "Зберегти неможливо — ви в режимі спостереження"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:997
+#: lib/phoenix_kit_publishing/web/editor.ex:1006
+#: lib/phoenix_kit_publishing/web/editor.ex:2839
+#, elixir-autogen, elixir-format
+msgid "Cannot save while translation is in progress"
+msgstr "Зберегти неможливо, поки триває переклад"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4192
+#: lib/phoenix_kit_publishing/web/editor.ex:4221
+#: lib/phoenix_kit_publishing/web/editor.ex:4547
+#, elixir-autogen, elixir-format
+msgid "Change"
+msgstr "Змінити"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4580
+#, elixir-autogen, elixir-format
+msgid "Choose OG image"
+msgstr "Вибрати OG-зображення"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4820
+#, elixir-autogen, elixir-format
+msgid "Choose a different URL slug for this post, or change the other post's slug."
+msgstr "Виберіть інший URL-slug для цього допису або змініть slug іншого допису."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4715
+#, elixir-autogen, elixir-format
+msgid "Choose how to create the new version:"
+msgstr "Виберіть, як створити нову версію:"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:454
+#, elixir-autogen, elixir-format
+msgid "Chronological URLs ideal for news and updates."
+msgstr "Хронологічні URL — ідеально для новин і оновлень."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1073
+#, elixir-autogen, elixir-format
+msgid "Clear All"
+msgstr "Очистити все"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1067
+#, elixir-autogen, elixir-format
+msgid "Clear all cached rendered posts? They will be re-rendered on next view."
+msgstr "Очистити весь кеш згенерованих дописів? Їх буде згенеровано заново під час наступного перегляду."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:994
+#: lib/phoenix_kit_publishing/web/settings.ex:998
+#, elixir-autogen, elixir-format
+msgid "Clear cache"
+msgstr "Очистити кеш"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1174
+#: lib/phoenix_kit_publishing/web/settings.ex:1178
+#, elixir-autogen, elixir-format
+msgid "Clear cache for this group"
+msgstr "Очистити кеш цієї групи"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4687
+#, elixir-autogen, elixir-format
+msgid "Clear the %{language} translation content? You can always add a new translation for this language later."
+msgstr "Очистити вміст перекладу (%{language})? Ви завжди зможете пізніше додати новий переклад для цієї мови."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4694
+#, elixir-autogen, elixir-format
+msgid "Clear translation"
+msgstr "Очистити переклад"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4681
+#: lib/phoenix_kit_publishing/web/settings.ex:992
+#: lib/phoenix_kit_publishing/web/settings.ex:1064
+#: lib/phoenix_kit_publishing/web/settings.ex:1172
+#, elixir-autogen, elixir-format
+msgid "Clearing…"
+msgstr "Очищення…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4253
+#, elixir-autogen, elixir-format
+msgid "Click to choose from media library"
+msgstr "Натисніть, щоб вибрати з медіабібліотеки"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3667
+#, elixir-autogen, elixir-format
+msgid "Complete"
+msgstr "Готово"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4829
+#, elixir-autogen, elixir-format
+msgid "Confirm Translation"
+msgstr "Підтвердити переклад"
+
+#: lib/phoenix_kit_publishing/web/new.ex:402
+#: lib/phoenix_kit_publishing/web/new.ex:465
+#, elixir-autogen, elixir-format
+msgid "Content Type"
+msgstr "Тип вмісту"
+
+#: lib/phoenix_kit_publishing/web/new.ex:482
+#, elixir-autogen, elixir-format
+msgid "Content type determines default item naming and may affect how content is displayed."
+msgstr "Тип вмісту визначає типові назви елементів і може впливати на те, як відображається вміст."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:647
+#, elixir-autogen, elixir-format
+msgid "Control whether the default language keeps its locale segment in public URLs."
+msgstr "Визначає, чи зберігає мова за замовчуванням свій мовний сегмент у публічних URL."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4752
+#, elixir-autogen, elixir-format
+msgid "Copy from v%{version}"
+msgstr "Копіювати з v%{version}"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1090
+#, elixir-autogen, elixir-format
+msgid "Could not reload post - it may have been moved or deleted"
+msgstr "Не вдалося перезавантажити допис — можливо, його переміщено або видалено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:426
+#, elixir-autogen, elixir-format
+msgid "Couldn't clear the cache for this group."
+msgstr "Не вдалося очистити кеш цієї групи."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1394
+#, elixir-autogen, elixir-format
+msgid "Couldn't clear this translation."
+msgstr "Не вдалося очистити цей переклад."
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:154
+#, elixir-autogen, elixir-format
+msgid "Couldn't create a new version."
+msgstr "Не вдалося створити нову версію."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1123
+#, elixir-autogen, elixir-format
+msgid "Couldn't create the default translation prompt."
+msgstr "Не вдалося створити промпт перекладу за замовчуванням."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:416
+#, elixir-autogen, elixir-format
+msgid "Couldn't create this post."
+msgstr "Не вдалося створити цей допис."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:465
+#, elixir-autogen, elixir-format
+msgid "Couldn't create this translation."
+msgstr "Не вдалося створити цей переклад."
+
+#: lib/phoenix_kit_publishing/web/index.ex:256
+#: lib/phoenix_kit_publishing/web/index.ex:279
+#, elixir-autogen, elixir-format
+msgid "Couldn't delete this group."
+msgstr "Не вдалося видалити цю групу."
+
+#: lib/phoenix_kit_publishing/web/index.ex:214
+#, elixir-autogen, elixir-format
+msgid "Couldn't move this group to trash."
+msgstr "Не вдалося перемістити цю групу в кошик."
+
+#: lib/phoenix_kit_publishing/web/listing.ex:172
+#, elixir-autogen, elixir-format
+msgid "Couldn't move this post to trash."
+msgstr "Не вдалося перемістити цей допис у кошик."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:154
+#, elixir-autogen, elixir-format
+msgid "Couldn't regenerate the cache for this group."
+msgstr "Не вдалося перебудувати кеш цієї групи."
+
+#: lib/phoenix_kit_publishing/web/index.ex:234
+#, elixir-autogen, elixir-format
+msgid "Couldn't restore this group."
+msgstr "Не вдалося відновити цю групу."
+
+#: lib/phoenix_kit_publishing/web/listing.ex:207
+#, elixir-autogen, elixir-format
+msgid "Couldn't restore this post."
+msgstr "Не вдалося відновити цей допис."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:763
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:873
+#, elixir-autogen, elixir-format
+msgid "Couldn't save this post."
+msgstr "Не вдалося зберегти цей допис."
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:381
+#, elixir-autogen, elixir-format
+msgid "Couldn't start the translation job."
+msgstr "Не вдалося запустити завдання перекладу."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1145
+#, elixir-autogen, elixir-format
+msgid "Couldn't update the default translation prompt."
+msgstr "Не вдалося оновити промпт перекладу за замовчуванням."
+
+#: lib/phoenix_kit_publishing/web/listing.ex:892
+#, elixir-autogen, elixir-format
+msgid "Couldn't update the post status."
+msgstr "Не вдалося оновити статус допису."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4712
+#, elixir-autogen, elixir-format
+msgid "Create New Version"
+msgstr "Створити нову версію"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1031
+#, elixir-autogen, elixir-format
+msgid "Create Post"
+msgstr "Створити допис"
+
+#: lib/phoenix_kit_publishing/web/index.ex:442
+#: lib/phoenix_kit_publishing/web/index.ex:667
+#: lib/phoenix_kit_publishing/web/index.ex:673
+#: lib/phoenix_kit_publishing/web/new.ex:597
+#, elixir-autogen, elixir-format
+msgid "Create Publishing Group"
+msgstr "Створити групу публікацій"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4783
+#, elixir-autogen, elixir-format
+msgid "Create Version"
+msgstr "Створити версію"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:937
+#, elixir-autogen, elixir-format
+msgid "Create a publishing group to manage its cache."
+msgstr "Створіть групу публікацій, щоб керувати її кешем."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4732
+#, elixir-autogen, elixir-format
+msgid "Create an empty version with no content"
+msgstr "Створити порожню версію без вмісту"
+
+#: lib/phoenix_kit_publishing/web/index.ex:435
+#, elixir-autogen, elixir-format
+msgid "Create your first publishing group to start drafting posts."
+msgstr "Створіть свою першу групу публікацій, щоб почати писати дописи."
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:125
+#, elixir-autogen, elixir-format
+msgid "Created new blank version %{version}"
+msgstr "Створено нову порожню версію %{version}"
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:120
+#, elixir-autogen, elixir-format
+msgid "Created new version %{version} from v%{source}"
+msgstr "Створено нову версію %{version} з v%{source}"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:229
+#, elixir-autogen, elixir-format
+msgid "Created:"
+msgstr "Створено:"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4779
+#: lib/phoenix_kit_publishing/web/listing.ex:1029
+#: lib/phoenix_kit_publishing/web/new.ex:598
+#, elixir-autogen, elixir-format
+msgid "Creating…"
+msgstr "Створення…"
+
+#: lib/phoenix_kit_publishing/web/new.ex:455
+#, elixir-autogen, elixir-format
+msgid "Custom"
+msgstr "Власний"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4135
+#, elixir-autogen, elixir-format
+msgid "Custom URL for this language. Leave empty to use default: %{slug}"
+msgstr "Власний URL для цієї мови. Залиште порожнім, щоб використовувати значення за замовчуванням: %{slug}"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:296
+#, elixir-autogen, elixir-format
+msgid "Custom URL slug '%{slug}' for %{language} was cleared because it conflicts with another post's post slug"
+msgstr "Власний URL-slug '%{slug}' для %{language} очищено, оскільки він конфліктує зі slug іншого допису"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:288
+#, elixir-autogen, elixir-format
+msgid "Custom URL slug '%{slug}' was cleared from %{count} translations because it conflicts with another post's post slug"
+msgstr "Власний URL-slug '%{slug}' очищено в перекладах (%{count}), оскільки він конфліктує зі slug іншого допису"
+
+#: lib/phoenix_kit_publishing/errors.ex:133
+#, elixir-autogen, elixir-format
+msgid "Database update failed"
+msgstr "Не вдалося оновити базу даних"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:258
+#, elixir-autogen, elixir-format
+msgid "Date"
+msgstr "Дата"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3079
+#, elixir-autogen, elixir-format
+msgid "Dec"
+msgstr "груд."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3059
+#, elixir-autogen, elixir-format
+msgid "December"
+msgstr "грудня"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:263
+#, elixir-autogen, elixir-format
+msgid "Default Language"
+msgstr "Мова за замовчуванням"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:657
+#, elixir-autogen, elixir-format
+msgid "Default Language Without Prefix"
+msgstr "Мова за замовчуванням без префікса"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1116
+#, elixir-autogen, elixir-format
+msgid "Default translation prompt created"
+msgstr "Промпт перекладу за замовчуванням створено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1138
+#, elixir-autogen, elixir-format
+msgid "Default translation prompt updated"
+msgstr "Промпт перекладу за замовчуванням оновлено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4516
+#, elixir-autogen, elixir-format
+msgid "Defaults to post description"
+msgstr "За замовчуванням — опис допису"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4498
+#, elixir-autogen, elixir-format
+msgid "Defaults to post title"
+msgstr "За замовчуванням — заголовок допису"
+
+#: lib/phoenix_kit_publishing/web/new.ex:457
+#, elixir-autogen, elixir-format
+msgid "Define your own content type and item names."
+msgstr "Визначте власний тип вмісту та назви елементів."
+
+#: lib/phoenix_kit_publishing/web/index.ex:642
+#: lib/phoenix_kit_publishing/web/index.ex:653
+#, elixir-autogen, elixir-format
+msgid "Delete Forever"
+msgstr "Видалити остаточно"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:557
+#: lib/phoenix_kit_publishing/web/index.ex:641
+#, elixir-autogen, elixir-format
+msgid "Deleting…"
+msgstr "Видалення…"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:611
+#: lib/phoenix_kit_publishing/web/post_show.ex:268
+#, elixir-autogen, elixir-format
+msgid "Description"
+msgstr "Опис"
+
+#: lib/phoenix_kit_publishing/errors.ex:134
+#, elixir-autogen, elixir-format
+msgid "Destination already exists"
+msgstr "Місце призначення вже існує"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:250
+#, elixir-autogen, elixir-format
+msgid "Details"
+msgstr "Деталі"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3525
+#, elixir-autogen, elixir-format
+msgid "Disabled language:"
+msgstr "Вимкнена мова:"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4832
+#, elixir-autogen, elixir-format
+msgid "Do you want to continue with the translation?"
+msgstr "Продовжити переклад?"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:220
+#: lib/phoenix_kit_publishing/web/editor.ex:2280
+#: lib/phoenix_kit_publishing/web/editor.ex:3010
+#: lib/phoenix_kit_publishing/web/listing.ex:946
+#: lib/phoenix_kit_publishing/web/listing.ex:1041
+#: lib/phoenix_kit_publishing/web/listing.ex:1248
+#: lib/phoenix_kit_publishing/web/post_show.ex:159
+#, elixir-autogen, elixir-format
+msgid "Draft"
+msgstr "Чернетка"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4762
+#, elixir-autogen, elixir-format
+msgid "Duplicate all content and translations from version %{version}"
+msgstr "Дублювати весь вміст і переклади з версії %{version}"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:538
+#: lib/phoenix_kit_publishing/web/edit.ex:82
+#: lib/phoenix_kit_publishing/web/editor.ex:182
+#: lib/phoenix_kit_publishing/web/editor.ex:297
+#: lib/phoenix_kit_publishing/web/html.ex:788
+#: lib/phoenix_kit_publishing/web/html.ex:2121
+#: lib/phoenix_kit_publishing/web/post_show.ex:190
+#, elixir-autogen, elixir-format
+msgid "Edit"
+msgstr "Редагувати"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3544
+#, elixir-autogen, elixir-format
+msgid "Editing is paused while AI translates this content. It will unlock automatically when finished."
+msgstr "Редагування призупинено, поки ШІ перекладає цей вміст. Його буде автоматично розблоковано після завершення."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1141
+#, elixir-autogen, elixir-format
+msgid "Enabled"
+msgstr "Увімкнено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3713
+#: lib/phoenix_kit_publishing/web/editor.ex:3731
+#, elixir-autogen, elixir-format
+msgid "Enqueueing…"
+msgstr "Постановка в чергу…"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1119
+#, elixir-autogen, elixir-format
+msgid "Entries Cached"
+msgstr "Записів у кеші"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1100
+#, elixir-autogen, elixir-format
+msgid "Error rendering markdown"
+msgstr "Помилка обробки Markdown"
+
+#: lib/phoenix_kit_publishing/errors.ex:183
+#, elixir-autogen, elixir-format
+msgid "Every time slot on this post's date is taken. Change the date or time, then try again."
+msgstr "Усі часові слоти на дату цього допису зайнято. Змініть дату або час і спробуйте ще раз."
+
+#: lib/phoenix_kit_publishing/web/new.ex:521
+#, elixir-autogen, elixir-format
+msgid "Examples: \"Create new %{singular}\", \"View all %{plural}\""
+msgstr "Приклади: «Створити %{singular}», «Переглянути всі %{plural}»"
+
+#: lib/phoenix_kit_publishing/errors.ex:202
+#, elixir-autogen, elixir-format
+msgid "Failed to extract AI response: %{reason}"
+msgstr "Не вдалося отримати відповідь ШІ: %{reason}"
+
+#: lib/phoenix_kit_publishing/errors.ex:210
+#, elixir-autogen, elixir-format
+msgid "Failed to read source post: %{reason}"
+msgstr "Не вдалося прочитати вихідний допис: %{reason}"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:205
+#, elixir-autogen, elixir-format
+msgid "Failed to render preview."
+msgstr "Не вдалося сформувати попередній перегляд."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4162
+#, elixir-autogen, elixir-format
+msgid "Featured Image"
+msgstr "Головне зображення"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4175
+#: lib/phoenix_kit_publishing/web/html.ex:1112
+#: lib/phoenix_kit_publishing/web/html.ex:1123
+#: lib/phoenix_kit_publishing/web/html.ex:1278
+#: lib/phoenix_kit_publishing/web/html.ex:1289
+#: lib/phoenix_kit_publishing/web/html.ex:1580
+#: lib/phoenix_kit_publishing/web/html.ex:1591
+#, elixir-autogen, elixir-format
+msgid "Featured image"
+msgstr "Головне зображення"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1072
+#, elixir-autogen, elixir-format
+msgid "Featured image cleared"
+msgstr "Головне зображення прибрано"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3340
+#, elixir-autogen, elixir-format
+msgid "Featured image selected"
+msgstr "Головне зображення вибрано"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3066
+#, elixir-autogen, elixir-format
+msgid "Feb"
+msgstr "лют."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3049
+#, elixir-autogen, elixir-format
+msgid "February"
+msgstr "лютого"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:431
+#: lib/phoenix_kit_publishing/web/new.ex:376
+#, elixir-autogen, elixir-format
+msgid "Format"
+msgstr "Формат"
+
+#: lib/phoenix_kit_publishing/web/new.ex:426
+#, elixir-autogen, elixir-format
+msgid "Frequently asked questions. Items called \"%{plural}\"."
+msgstr "Поширені запитання. Елементи називаються «%{plural}»."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3638
+#, elixir-autogen, elixir-format
+msgid "Generate Default Prompt"
+msgstr "Згенерувати промпт за замовчуванням"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4601
+#, elixir-autogen, elixir-format
+msgid "Generated OG image"
+msgstr "Згенероване OG-зображення"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4613
+#, elixir-autogen, elixir-format
+msgid "Generated OG image preview"
+msgstr "Попередній перегляд згенерованого OG-зображення"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3352
+#: lib/phoenix_kit_publishing/web/settings.ex:945
+#: lib/phoenix_kit_publishing/web/settings.ex:1139
+#, elixir-autogen, elixir-format
+msgid "Group"
+msgstr "Група"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:394
+#: lib/phoenix_kit_publishing/web/new.ex:352
+#, elixir-autogen, elixir-format
+msgid "Group Name"
+msgstr "Назва групи"
+
+#: lib/phoenix_kit_publishing/web/new.ex:365
+#, elixir-autogen, elixir-format
+msgid "Group Slug"
+msgstr "Slug групи"
+
+#: lib/phoenix_kit_publishing/web/index.ex:205
+#, elixir-autogen, elixir-format
+msgid "Group moved to trash"
+msgstr "Групу переміщено в кошик"
+
+#: lib/phoenix_kit_publishing/errors.ex:136
+#: lib/phoenix_kit_publishing/web/edit.ex:820
+#, elixir-autogen, elixir-format
+msgid "Group not found"
+msgstr "Групу не знайдено"
+
+#: lib/phoenix_kit_publishing/web/index.ex:270
+#, elixir-autogen, elixir-format
+msgid "Group permanently deleted"
+msgstr "Групу остаточно видалено"
+
+#: lib/phoenix_kit_publishing/web/index.ex:225
+#, elixir-autogen, elixir-format
+msgid "Group restored"
+msgstr "Групу відновлено"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:781
+#, elixir-autogen, elixir-format
+msgid "Group updated"
+msgstr "Групу оновлено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1123
+#, elixir-autogen, elixir-format
+msgid "Hit Rate"
+msgstr "Частка влучань"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:793
+#, elixir-autogen, elixir-format
+msgid "How titles in non-Latin scripts (e.g. Cyrillic) are turned into URL slugs."
+msgstr "Як заголовки нелатинськими алфавітами (наприклад, кирилицею) перетворюються на URL-slug."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3286
+#, elixir-autogen, elixir-format
+msgid "Image component inserted"
+msgstr "Компонент зображення вставлено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:686
+#: lib/phoenix_kit_publishing/web/settings.ex:696
+#, elixir-autogen, elixir-format
+msgid "In-Page Language Switcher"
+msgstr "Перемикач мови на сторінці"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:707
+#: lib/phoenix_kit_publishing/web/settings.ex:717
+#, elixir-autogen, elixir-format
+msgid "In-Page OpenGraph Tags"
+msgstr "Теги OpenGraph на сторінці"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:265
+#, elixir-autogen, elixir-format
+msgid "In-page OpenGraph tags disabled — your host layout should render the forwarded :og assign in <head>"
+msgstr "Теги OpenGraph на сторінці вимкнено — макет вашого сайту має виводити передане значення :og у <head>"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:261
+#, elixir-autogen, elixir-format
+msgid "In-page OpenGraph tags enabled — publishing pages will render their own social meta tags"
+msgstr "Теги OpenGraph на сторінці ввімкнено — сторінки публікацій виводитимуть власні метатеги для соцмереж"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:238
+#, elixir-autogen, elixir-format
+msgid "In-page language switcher disabled — host layout / custom switcher should render translations"
+msgstr "Перемикач мови на сторінці вимкнено — переклади має відображати макет сайту або власний перемикач"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:234
+#, elixir-autogen, elixir-format
+msgid "In-page language switcher enabled — publishing pages will render their own switcher"
+msgstr "Перемикач мови на сторінці ввімкнено — сторінки публікацій виводитимуть власний перемикач"
+
+#: lib/phoenix_kit_publishing/web/new.ex:672
+#, elixir-autogen, elixir-format
+msgid "Invalid URL mode"
+msgstr "Недійсний режим URL"
+
+#: lib/phoenix_kit_publishing/errors.ex:137
+#, elixir-autogen, elixir-format
+msgid "Invalid content"
+msgstr "Недійсний вміст"
+
+#: lib/phoenix_kit_publishing/web/new.ex:673
+#, elixir-autogen, elixir-format
+msgid "Invalid content type"
+msgstr "Недійсний тип вмісту"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:441
+#: lib/phoenix_kit_publishing/web/new.ex:386
+#, elixir-autogen, elixir-format
+msgid "Invalid examples"
+msgstr "Недійсні приклади"
+
+#: lib/phoenix_kit_publishing/errors.ex:138
+#, elixir-autogen, elixir-format
+msgid "Invalid format"
+msgstr "Недійсний формат"
+
+#: lib/phoenix_kit_publishing/errors.ex:139
+#, elixir-autogen, elixir-format
+msgid "Invalid mode"
+msgstr "Недійсний режим"
+
+#: lib/phoenix_kit_publishing/errors.ex:140
+#, elixir-autogen, elixir-format
+msgid "Invalid name"
+msgstr "Недійсна назва"
+
+#: lib/phoenix_kit_publishing/errors.ex:142
+#, elixir-autogen, elixir-format
+msgid "Invalid path"
+msgstr "Недійсний шлях"
+
+#: lib/phoenix_kit_publishing/errors.ex:143
+#, elixir-autogen, elixir-format
+msgid "Invalid slug"
+msgstr "Недійсний slug"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:811
+#: lib/phoenix_kit_publishing/web/new.ex:677
+#, elixir-autogen, elixir-format
+msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
+msgstr "Недійсний формат slug. Використовуйте лише малі латинські літери, цифри та дефіси (наприклад, my-group-name)"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:734
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:835
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:911
+#, elixir-autogen, elixir-format
+msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
+msgstr "Недійсний формат slug. Використовуйте лише малі латинські літери, цифри та дефіси (наприклад, my-post-title)"
+
+#: lib/phoenix_kit_publishing/errors.ex:144
+#, elixir-autogen, elixir-format
+msgid "Invalid status"
+msgstr "Недійсний статус"
+
+#: lib/phoenix_kit_publishing/errors.ex:145
+#, elixir-autogen, elixir-format
+msgid "Invalid type"
+msgstr "Недійсний тип"
+
+#: lib/phoenix_kit_publishing/errors.ex:146
+#, elixir-autogen, elixir-format
+msgid "Invalid version"
+msgstr "Недійсна версія"
+
+#: lib/phoenix_kit_publishing/web/new.ex:492
+#, elixir-autogen, elixir-format
+msgid "Item Naming"
+msgstr "Назви елементів"
+
+#: lib/phoenix_kit_publishing/web/new.ex:435
+#, elixir-autogen, elixir-format
+msgid "Items called \"%{plural}\"."
+msgstr "Елементи називаються «%{plural}»."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3065
+#, elixir-autogen, elixir-format
+msgid "Jan"
+msgstr "січ."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3048
+#, elixir-autogen, elixir-format
+msgid "January"
+msgstr "січня"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3074
+#, elixir-autogen, elixir-format
+msgid "Jul"
+msgstr "лип."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3054
+#, elixir-autogen, elixir-format
+msgid "July"
+msgstr "липня"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3073
+#, elixir-autogen, elixir-format
+msgid "Jun"
+msgstr "черв."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3053
+#, elixir-autogen, elixir-format
+msgid "June"
+msgstr "червня"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4847
+#, elixir-autogen, elixir-format
+msgid "Keep editing"
+msgstr "Продовжити редагування"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3855
+#, elixir-autogen, elixir-format
+msgid "Language:"
+msgstr "Мова:"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:231
+#, elixir-autogen, elixir-format
+msgid "Languages"
+msgstr "Мови"
+
+#: lib/phoenix_kit_publishing/web/index.ex:546
+#, elixir-autogen, elixir-format
+msgid "Languages used"
+msgstr "Використані мови"
+
+#: lib/phoenix_kit_publishing/web/index.ex:504
+#, elixir-autogen, elixir-format
+msgid "Last published"
+msgstr "Остання публікація"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4846
+#, elixir-autogen, elixir-format
+msgid "Leave"
+msgstr "Вийти"
+
+#: lib/phoenix_kit_publishing/web/new.ex:430
+#, elixir-autogen, elixir-format
+msgid "Legal pages like terms and privacy policy. Items called \"%{plural}\"."
+msgstr "Юридичні сторінки, як-от умови використання та політика конфіденційності. Елементи називаються «%{plural}»."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:625
+#: lib/phoenix_kit_publishing/web/settings.ex:877
+#, elixir-autogen, elixir-format
+msgid "Listing Cache"
+msgstr "Кеш списків"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:677
+#, elixir-autogen, elixir-format
+msgid "Manage"
+msgstr "Керувати"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3595
+#, elixir-autogen, elixir-format
+msgid "Manage Endpoints"
+msgstr "Керувати кінцевими точками"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3624
+#, elixir-autogen, elixir-format
+msgid "Manage Prompts"
+msgstr "Керувати промптами"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:67
+#, elixir-autogen, elixir-format
+msgid "Manage caching and performance settings for the publishing module."
+msgstr "Керуйте налаштуваннями кешування та продуктивності модуля «Публікації»."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3067
+#, elixir-autogen, elixir-format
+msgid "Mar"
+msgstr "бер."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3050
+#, elixir-autogen, elixir-format
+msgid "March"
+msgstr "березня"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3052
+#, elixir-autogen, elixir-format
+msgid "May"
+msgstr "травня"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:953
+#, elixir-autogen, elixir-format
+msgid "Memory"
+msgstr "Пам'ять"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:907
+#: lib/phoenix_kit_publishing/web/settings.ex:915
+#, elixir-autogen, elixir-format
+msgid "Memory Cache"
+msgstr "Кеш у пам'яті"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:538
+#, elixir-autogen, elixir-format
+msgid "Memory cache disabled"
+msgstr "Кеш у пам'яті вимкнено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:537
+#, elixir-autogen, elixir-format
+msgid "Memory cache enabled"
+msgstr "Кеш у пам'яті ввімкнено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:927
+#, elixir-autogen, elixir-format
+msgid "Memory cache is disabled. Listing pages will query the database on every request."
+msgstr "Кеш у пам'яті вимкнено. Сторінки зі списками звертатимуться до бази даних під час кожного запиту."
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:253
+#, elixir-autogen, elixir-format
+msgid "Mode"
+msgstr "Режим"
+
+#: lib/phoenix_kit_publishing/web/index.ex:615
+#, elixir-autogen, elixir-format
+msgid "Move this group to trash?"
+msgstr "Перемістити цю групу в кошик?"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1268
+#, elixir-autogen, elixir-format
+msgid "Move this post to trash?"
+msgstr "Перемістити цей допис у кошик?"
+
+#: lib/phoenix_kit_publishing/web/index.ex:616
+#: lib/phoenix_kit_publishing/web/index.ex:617
+#: lib/phoenix_kit_publishing/web/listing.ex:1269
+#, elixir-autogen, elixir-format
+msgid "Move to trash"
+msgstr "Перемістити в кошик"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3918
+#, elixir-autogen, elixir-format
+msgid "New"
+msgstr "Новий"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3445
+#, elixir-autogen, elixir-format
+msgid "New Version"
+msgstr "Нова версія"
+
+#: lib/phoenix_kit_publishing/errors.ex:193
+#, elixir-autogen, elixir-format
+msgid "No AI prompt selected"
+msgstr "Промпт ШІ не вибрано"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4567
+#, elixir-autogen, elixir-format
+msgid "No OG image set."
+msgstr "OG-зображення не задано."
+
+#: lib/phoenix_kit_publishing/errors.ex:159
+#, elixir-autogen, elixir-format
+msgid "No UUID"
+msgstr "Немає UUID"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1160
+#, elixir-autogen, elixir-format
+msgid "No other languages enabled to translate to"
+msgstr "Немає інших увімкнених мов для перекладу"
+
+#: lib/phoenix_kit_publishing/errors.ex:157
+#, elixir-autogen, elixir-format
+msgid "No post"
+msgstr "Немає допису"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:129
+#, elixir-autogen, elixir-format
+msgid "No post specified"
+msgstr "Допис не вказано"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1116
+#, elixir-autogen, elixir-format
+msgid "No posts found"
+msgstr "Дописів не знайдено"
+
+#: lib/phoenix_kit_publishing/web/index.ex:508
+#, elixir-autogen, elixir-format
+msgid "No published posts yet"
+msgstr "Опублікованих дописів ще немає"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1023
+#, elixir-autogen, elixir-format
+msgid "No published posts yet."
+msgstr "Опублікованих дописів ще немає."
+
+#: lib/phoenix_kit_publishing/errors.ex:158
+#, elixir-autogen, elixir-format
+msgid "No published version"
+msgstr "Немає опублікованої версії"
+
+#: lib/phoenix_kit_publishing/web/index.ex:434
+#, elixir-autogen, elixir-format
+msgid "No publishing groups yet"
+msgstr "Груп публікацій ще немає"
+
+#: lib/phoenix_kit_publishing/web/index.ex:560
+#, elixir-autogen, elixir-format
+msgid "None"
+msgstr "Немає"
+
+#: lib/phoenix_kit_publishing/errors.ex:161
+#, elixir-autogen, elixir-format
+msgid "Not found"
+msgstr "Не знайдено"
+
+#: lib/phoenix_kit_publishing/errors.ex:162
+#, elixir-autogen, elixir-format
+msgid "Not published"
+msgstr "Не опубліковано"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3078
+#, elixir-autogen, elixir-format
+msgid "Nov"
+msgstr "лист."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3058
+#, elixir-autogen, elixir-format
+msgid "November"
+msgstr "листопада"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:664
+#, elixir-autogen, elixir-format
+msgid "OFF — primary language URLs include the locale prefix (e.g. /en/blog/post). Managed on the Languages page."
+msgstr "ВИМК — URL основної мови містять мовний префікс (наприклад, /en/blog/post). Налаштовується на сторінці «Мови»."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4506
+#, elixir-autogen, elixir-format
+msgid "OG description"
+msgstr "OG-опис"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4523
+#, elixir-autogen, elixir-format
+msgid "OG image"
+msgstr "OG-зображення"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1075
+#, elixir-autogen, elixir-format
+msgid "OG image cleared"
+msgstr "OG-зображення прибрано"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4531
+#, elixir-autogen, elixir-format
+msgid "OG image preview"
+msgstr "Попередній перегляд OG-зображення"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3338
+#, elixir-autogen, elixir-format
+msgid "OG image selected"
+msgstr "OG-зображення вибрано"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4491
+#, elixir-autogen, elixir-format
+msgid "OG title"
+msgstr "OG-заголовок"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4793
+#, elixir-autogen, elixir-format
+msgid "OK"
+msgstr "OK"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:660
+#, elixir-autogen, elixir-format
+msgid "ON — primary language URLs are prefixless (e.g. /blog/post). Managed on the Languages page."
+msgstr "УВІМК — URL основної мови не мають префікса (наприклад, /blog/post). Налаштовується на сторінці «Мови»."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3077
+#, elixir-autogen, elixir-format
+msgid "Oct"
+msgstr "жовт."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3057
+#, elixir-autogen, elixir-format
+msgid "October"
+msgstr "жовтня"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:432
+#: lib/phoenix_kit_publishing/web/new.ex:377
+#, elixir-autogen, elixir-format
+msgid "Only lowercase letters (a-z), numbers (0-9), and hyphens (-) are allowed. Must not start or end with a hyphen."
+msgstr "Дозволено лише малі латинські літери (a-z), цифри (0-9) і дефіси (-). Не може починатися чи закінчуватися дефісом."
+
+#: lib/phoenix_kit_publishing/web/index.ex:570
+#: lib/phoenix_kit_publishing/web/index.ex:576
+#, elixir-autogen, elixir-format
+msgid "Open"
+msgstr "Відкрити"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4814
+#, elixir-autogen, elixir-format
+msgid "Open that post"
+msgstr "Відкрити той допис"
+
+#: lib/phoenix_kit_publishing/web/new.ex:546
+#, elixir-autogen, elixir-format
+msgid "Organizes posts by date/time in URLs. Great for news, updates, and chronological feeds."
+msgstr "Упорядковує дописи в URL за датою та часом. Чудово підходить для новин, оновлень і хронологічних стрічок."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4471
+#, elixir-autogen, elixir-format
+msgid "Override how this post looks when shared on social media. Leave a field blank to use the post's own title, description, or featured image."
+msgstr "Перевизначте, як виглядатиме цей допис, коли ним діляться в соцмережах. Залиште поле порожнім, щоб використати власні заголовок, опис чи головне зображення допису."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4277
+#, elixir-autogen, elixir-format
+msgid "Paste a Phoenix Kit Media ID if you know it."
+msgstr "Вставте ID медіафайлу Phoenix Kit, якщо ви його знаєте."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:860
+#, elixir-autogen, elixir-format
+msgid "Per-translation URLs are always exposed on the conn under :phoenix_kit_publishing_translations — your host layout can read them whether the in-page switcher is enabled or not."
+msgstr "URL для кожного перекладу завжди доступні в conn під ключем :phoenix_kit_publishing_translations — макет вашого сайту може їх читати незалежно від того, чи ввімкнено перемикач на сторінці."
+
+#: lib/phoenix_kit_publishing/web/index.ex:647
+#, elixir-autogen, elixir-format
+msgid "Permanently delete this group and all its posts? This cannot be undone."
+msgstr "Остаточно видалити цю групу та всі її дописи? Цю дію не можна скасувати."
+
+#: lib/phoenix_kit_publishing/web/new.ex:671
+#, elixir-autogen, elixir-format
+msgid "Please enter a valid name"
+msgstr "Введіть коректну назву"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:803
+#, elixir-autogen, elixir-format
+msgid "Please provide a valid group name."
+msgstr "Укажіть коректну назву групи."
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:241
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:682
+#, elixir-autogen, elixir-format
+msgid "Please save the post first before translating"
+msgstr "Збережіть допис, перш ніж перекладати"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:246
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:687
+#, elixir-autogen, elixir-format
+msgid "Please select an AI endpoint"
+msgstr "Виберіть кінцеву точку ШІ"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:250
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:691
+#, elixir-autogen, elixir-format
+msgid "Please select an AI prompt"
+msgstr "Виберіть промпт ШІ"
+
+#: lib/phoenix_kit_publishing/web/new.ex:513
+#, elixir-autogen, elixir-format
+msgid "Plural"
+msgstr "Множина"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:400
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:410
+#, elixir-autogen, elixir-format
+msgid "Post created and saved"
+msgstr "Допис створено й збережено"
+
+#: lib/phoenix_kit_publishing/errors.ex:170
+#, elixir-autogen, elixir-format
+msgid "Post is trashed"
+msgstr "Допис у кошику"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:163
+#, elixir-autogen, elixir-format
+msgid "Post moved to trash"
+msgstr "Допис переміщено в кошик"
+
+#: lib/phoenix_kit_publishing/errors.ex:169
+#: lib/phoenix_kit_publishing/web/editor.ex:356
+#: lib/phoenix_kit_publishing/web/editor.ex:523
+#: lib/phoenix_kit_publishing/web/editor.ex:632
+#: lib/phoenix_kit_publishing/web/listing.ex:198
+#: lib/phoenix_kit_publishing/web/post_show.ex:83
+#: lib/phoenix_kit_publishing/web/preview.ex:121
+#, elixir-autogen, elixir-format
+msgid "Post not found"
+msgstr "Допис не знайдено"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:190
+#, elixir-autogen, elixir-format
+msgid "Post restored as draft"
+msgstr "Допис відновлено як чернетку"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:678
+#, elixir-autogen, elixir-format
+msgid "Post saved"
+msgstr "Допис збережено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3959
+#: lib/phoenix_kit_publishing/web/editor.ex:3960
+#, elixir-autogen, elixir-format
+msgid "Post title"
+msgstr "Заголовок допису"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1100
+#, elixir-autogen, elixir-format
+msgid "Post updated by another user"
+msgstr "Інший користувач оновив допис"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:497
+#: lib/phoenix_kit_publishing/web/index.ex:524
+#: lib/phoenix_kit_publishing/web/settings.ex:947
+#, elixir-autogen, elixir-format
+msgid "Posts"
+msgstr "Дописи"
+
+#: lib/phoenix_kit_publishing/web/new.ex:421
+#, elixir-autogen, elixir-format
+msgid "Posts, news articles, and updates. Items called \"%{plural}\"."
+msgstr "Дописи, новинні статті та оновлення. Елементи називаються «%{plural}»."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3370
+#: lib/phoenix_kit_publishing/web/post_show.ex:197
+#: lib/phoenix_kit_publishing/web/preview.ex:33
+#, elixir-autogen, elixir-format
+msgid "Preview"
+msgstr "Попередній перегляд"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:244
+#, elixir-autogen, elixir-format
+msgid "Preview Error"
+msgstr "Помилка попереднього перегляду"
+
+#: lib/phoenix_kit_publishing/web/preview.ex:224
+#, elixir-autogen, elixir-format
+msgid "Preview Mode"
+msgstr "Режим попереднього перегляду"
+
+#: lib/phoenix_kit_publishing/web/index.ex:603
+#, elixir-autogen, elixir-format
+msgid "Public"
+msgstr "На сайті"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3404
+#: lib/phoenix_kit_publishing/web/listing.ex:986
+#: lib/phoenix_kit_publishing/web/listing.ex:1200
+#: lib/phoenix_kit_publishing/web/new.ex:553
+#: lib/phoenix_kit_publishing/web/new.ex:578
+#, elixir-autogen, elixir-format
+msgid "Public URL"
+msgstr "Публічний URL"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:644
+#, elixir-autogen, elixir-format
+msgid "Public URL Language"
+msgstr "Мова публічного URL"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4658
+#, elixir-autogen, elixir-format
+msgid "Publication Date & Time (UTC)"
+msgstr "Дата й час публікації (UTC)"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:219
+#: lib/phoenix_kit_publishing/web/editor.ex:2279
+#: lib/phoenix_kit_publishing/web/editor.ex:3006
+#: lib/phoenix_kit_publishing/web/editor.ex:3011
+#: lib/phoenix_kit_publishing/web/index.ex:532
+#: lib/phoenix_kit_publishing/web/listing.ex:947
+#: lib/phoenix_kit_publishing/web/listing.ex:1040
+#: lib/phoenix_kit_publishing/web/listing.ex:1251
+#: lib/phoenix_kit_publishing/web/post_show.ex:158
+#, elixir-autogen, elixir-format
+msgid "Published"
+msgstr "Опубліковано"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:218
+#, elixir-autogen, elixir-format
+msgid "Published (Live)"
+msgstr "Опубліковано (активна версія)"
+
+#: lib/phoenix_kit_publishing/publishing.ex:542
+#: lib/phoenix_kit_publishing/publishing.ex:574
+#: lib/phoenix_kit_publishing/web/categories_live.ex:40
+#: lib/phoenix_kit_publishing/web/edit.ex:83
+#: lib/phoenix_kit_publishing/web/editor.ex:183
+#: lib/phoenix_kit_publishing/web/index.ex:75
+#: lib/phoenix_kit_publishing/web/listing.ex:44
+#: lib/phoenix_kit_publishing/web/new.ex:42
+#: lib/phoenix_kit_publishing/web/post_show.ex:53
+#: lib/phoenix_kit_publishing/web/preview.ex:34
+#: lib/phoenix_kit_publishing/web/settings.ex:64
+#, elixir-autogen, elixir-format
+msgid "Publishing"
+msgstr "Публікації"
+
+#: lib/phoenix_kit_publishing/web/new.ex:654
+#, elixir-autogen, elixir-format
+msgid "Publishing group \"%{name}\" created"
+msgstr "Групу публікацій «%{name}» створено"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1170
+#: lib/phoenix_kit_publishing/web/html.ex:1312
+#: lib/phoenix_kit_publishing/web/html.ex:1491
+#: lib/phoenix_kit_publishing/web/html.ex:1642
+#, elixir-autogen, elixir-format
+msgid "Read More →"
+msgstr "Читати далі →"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3600
+#, elixir-autogen, elixir-format
+msgid "Reasoning (\"thinking\") models are slower and may return unstructured output — a standard model is recommended for translation."
+msgstr "Моделі з міркуваннями («thinking») працюють повільніше й можуть повертати неструктуровану відповідь — для перекладу рекомендовано стандартну модель."
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1006
+#, elixir-autogen, elixir-format
+msgid "Refresh"
+msgstr "Оновити"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1004
+#, elixir-autogen, elixir-format
+msgid "Refreshing…"
+msgstr "Оновлення…"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:895
+#, elixir-autogen, elixir-format
+msgid "Regenerate All"
+msgstr "Перебудувати все"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3654
+#, elixir-autogen, elixir-format
+msgid "Regenerate Default Prompt"
+msgstr "Згенерувати промпт за замовчуванням заново"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1010
+#: lib/phoenix_kit_publishing/web/settings.ex:1014
+#, elixir-autogen, elixir-format
+msgid "Regenerate cache"
+msgstr "Перебудувати кеш"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1033
+#, elixir-autogen, elixir-format
+msgid "Regenerate scans all posts and rebuilds the cache."
+msgstr "Перебудова сканує всі дописи й наново будує кеш."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:891
+#: lib/phoenix_kit_publishing/web/settings.ex:1008
+#, elixir-autogen, elixir-format
+msgid "Regenerating…"
+msgstr "Перебудова…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4204
+#: lib/phoenix_kit_publishing/web/editor.ex:4233
+#: lib/phoenix_kit_publishing/web/editor.ex:4559
+#, elixir-autogen, elixir-format
+msgid "Remove"
+msgstr "Прибрати"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4198
+#: lib/phoenix_kit_publishing/web/editor.ex:4227
+#: lib/phoenix_kit_publishing/web/editor.ex:4443
+#: lib/phoenix_kit_publishing/web/editor.ex:4553
+#, elixir-autogen, elixir-format
+msgid "Removing…"
+msgstr "Вилучення…"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:631
+#: lib/phoenix_kit_publishing/web/settings.ex:1050
+#: lib/phoenix_kit_publishing/web/settings.ex:1083
+#: lib/phoenix_kit_publishing/web/settings.ex:1091
+#, elixir-autogen, elixir-format
+msgid "Render Cache"
+msgstr "Кеш рендерингу"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:709
+#, elixir-autogen, elixir-format
+msgid "Render OpenGraph + Twitter Card meta tags on listing + post pages so link previews work out of the box. Disable when your host layout renders the forwarded :og assign in <head>."
+msgstr "Виводити метатеги OpenGraph і Twitter Card на сторінках списків і дописів, щоб попередній перегляд посилань працював одразу. Вимкніть, якщо макет вашого сайту сам виводить передане значення :og у <head>."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:402
+#, elixir-autogen, elixir-format
+msgid "Render cache cleared"
+msgstr "Кеш рендерингу очищено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:541
+#, elixir-autogen, elixir-format
+msgid "Render cache disabled"
+msgstr "Кеш рендерингу вимкнено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:540
+#, elixir-autogen, elixir-format
+msgid "Render cache enabled"
+msgstr "Кеш рендерингу ввімкнено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:547
+#, elixir-autogen, elixir-format
+msgid "Render cache for %{group} disabled"
+msgstr "Кеш рендерингу для %{group} вимкнено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:544
+#, elixir-autogen, elixir-format
+msgid "Render cache for %{group} enabled"
+msgstr "Кеш рендерингу для %{group} ввімкнено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1102
+#, elixir-autogen, elixir-format
+msgid "Render cache is disabled. Posts will be rendered on every request."
+msgstr "Кеш рендерингу вимкнено. Дописи формуватимуться заново під час кожного запиту."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:688
+#, elixir-autogen, elixir-format
+msgid "Render the language switcher on listing + post pages. Disable when your host layout already provides one."
+msgstr "Виводити перемикач мови на сторінках списків і дописів. Вимкніть, якщо макет вашого сайту вже має власний перемикач."
+
+#: lib/phoenix_kit_publishing/errors.ex:171
+#, elixir-autogen, elixir-format
+msgid "Resource not found"
+msgstr "Ресурс не знайдено"
+
+#: lib/phoenix_kit_publishing/web/index.ex:628
+#: lib/phoenix_kit_publishing/web/index.ex:634
+#: lib/phoenix_kit_publishing/web/listing.ex:1286
+#: lib/phoenix_kit_publishing/web/listing.ex:1289
+#, elixir-autogen, elixir-format
+msgid "Restore"
+msgstr "Відновити"
+
+#: lib/phoenix_kit_publishing/web/index.ex:627
+#: lib/phoenix_kit_publishing/web/listing.ex:1278
+#, elixir-autogen, elixir-format
+msgid "Restoring…"
+msgstr "Відновлення…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3943
+#, elixir-autogen, elixir-format
+msgid "Save now"
+msgstr "Зберегти зараз"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1302
+#, elixir-autogen, elixir-format
+msgid "Save the post to enable language switching"
+msgstr "Збережіть допис, щоб увімкнути перемикання мов"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3922
+#, elixir-autogen, elixir-format
+msgid "Saved"
+msgstr "Збережено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3903
+#: lib/phoenix_kit_publishing/web/editor.ex:3940
+#, elixir-autogen, elixir-format
+msgid "Saving..."
+msgstr "Збереження..."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:735
+#: lib/phoenix_kit_publishing/web/editor.ex:3929
+#, elixir-autogen, elixir-format
+msgid "Saving…"
+msgstr "Збереження…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4250
+#, elixir-autogen, elixir-format
+msgid "Select Featured Image"
+msgstr "Вибрати головне зображення"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3614
+#: lib/phoenix_kit_publishing/web/editor.ex:3615
+#, elixir-autogen, elixir-format
+msgid "Select a prompt..."
+msgstr "Виберіть промпт..."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3586
+#: lib/phoenix_kit_publishing/web/editor.ex:3587
+#, elixir-autogen, elixir-format
+msgid "Select an endpoint..."
+msgstr "Виберіть кінцеву точку..."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:452
+#, elixir-autogen, elixir-format
+msgid "Semantic URLs ideal for evergreen content."
+msgstr "Семантичні URL — ідеально для вмісту, що не застаріває."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3076
+#, elixir-autogen, elixir-format
+msgid "Sep"
+msgstr "вер."
+
+#: lib/phoenix_kit_publishing/web/html.ex:3056
+#, elixir-autogen, elixir-format
+msgid "September"
+msgstr "вересня"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3472
+#, elixir-autogen, elixir-format
+msgid "Session paused:"
+msgstr "Сеанс призупинено:"
+
+#: lib/phoenix_kit_publishing/web/index.ex:581
+#: lib/phoenix_kit_publishing/web/index.ex:587
+#: lib/phoenix_kit_publishing/web/listing.ex:1023
+#: lib/phoenix_kit_publishing/web/settings.ex:69
+#, elixir-autogen, elixir-format
+msgid "Settings"
+msgstr "Налаштування"
+
+#: lib/phoenix_kit_publishing/web/new.ex:504
+#, elixir-autogen, elixir-format
+msgid "Singular"
+msgstr "Однина"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:495
+#: lib/phoenix_kit_publishing/web/categories_live.ex:596
+#: lib/phoenix_kit_publishing/web/edit.ex:422
+#: lib/phoenix_kit_publishing/web/editor.ex:4071
+#: lib/phoenix_kit_publishing/web/index.ex:501
+#: lib/phoenix_kit_publishing/web/post_show.ex:181
+#, elixir-autogen, elixir-format
+msgid "Slug"
+msgstr "Slug"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:791
+#: lib/phoenix_kit_publishing/web/settings.ex:806
+#, elixir-autogen, elixir-format
+msgid "Slug Style"
+msgstr "Стиль slug"
+
+#: lib/phoenix_kit_publishing/errors.ex:177
+#, elixir-autogen, elixir-format
+msgid "Slug already exists"
+msgstr "Такий slug уже існує"
+
+#: lib/phoenix_kit_publishing/errors.ex:174
+#, elixir-autogen, elixir-format
+msgid "Slug conflicts with a reserved language code"
+msgstr "Slug конфліктує із зарезервованим кодом мови"
+
+#: lib/phoenix_kit_publishing/errors.ex:176
+#, elixir-autogen, elixir-format
+msgid "Slug conflicts with a reserved route word"
+msgstr "Slug конфліктує із зарезервованим словом маршруту"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:52
+#, elixir-autogen, elixir-format
+msgid "Slug is required. Enter a title to auto-generate one, or type a slug manually."
+msgstr "Slug обов'язковий. Введіть заголовок, щоб згенерувати його автоматично, або вкажіть slug вручну."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:348
+#, elixir-autogen, elixir-format
+msgid "Slug style updated to %{style}"
+msgstr "Стиль slug змінено на %{style}"
+
+#: lib/phoenix_kit_publishing/errors.ex:178
+#, elixir-autogen, elixir-format
+msgid "Slug taken"
+msgstr "Slug зайнято"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:452
+#: lib/phoenix_kit_publishing/web/index.ex:514
+#: lib/phoenix_kit_publishing/web/new.ex:569
+#, elixir-autogen, elixir-format
+msgid "Slug-based"
+msgstr "На основі slug"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4465
+#, elixir-autogen, elixir-format
+msgid "Social / OpenGraph"
+msgstr "Соцмережі / OpenGraph"
+
+#: lib/phoenix_kit_publishing/errors.ex:237
+#, elixir-autogen, elixir-format
+msgid "Some fields are invalid. Please review and try again."
+msgstr "Деякі поля заповнено неправильно. Перевірте їх і спробуйте ще раз."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:852
+#, elixir-autogen, elixir-format
+msgid "Something went wrong while saving this group."
+msgstr "Під час збереження цієї групи сталася помилка."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1018
+#, elixir-autogen, elixir-format
+msgid "Something went wrong while saving this post."
+msgstr "Під час збереження цього допису сталася помилка."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4730
+#, elixir-autogen, elixir-format
+msgid "Start blank"
+msgstr "Почати з нуля"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3683
+#, elixir-autogen, elixir-format
+msgid "Starting..."
+msgstr "Запуск..."
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:279
+#, elixir-autogen, elixir-format
+msgid "Stats"
+msgstr "Статистика"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4626
+#: lib/phoenix_kit_publishing/web/listing.ex:1246
+#, elixir-autogen, elixir-format
+msgid "Status"
+msgstr "Статус"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:883
+#, elixir-autogen, elixir-format
+msgid "Status updated to %{status}"
+msgstr "Статус змінено на %{status}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:909
+#, elixir-autogen, elixir-format
+msgid "Store in :persistent_term for sub-microsecond reads"
+msgstr "Зберігати в :persistent_term для читання за частки мікросекунди"
+
+#: lib/phoenix_kit_publishing/web/new.ex:670
+#, elixir-autogen, elixir-format
+msgid "That publishing group already exists"
+msgstr "Така група публікацій уже існує"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:884
+#, elixir-autogen, elixir-format
+msgid "That slug is already used by another post in this group. Please choose a different one."
+msgstr "Цей slug уже використовує інший допис у цій групі. Виберіть інший."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4481
+#, elixir-autogen, elixir-format
+msgid "The OpenGraph plugin is enabled — the final image is generated from a template. Values you set below feed into that template (title, description, image) in place of the post's own; leave a field blank to use the post default."
+msgstr "Плагін OpenGraph увімкнено — підсумкове зображення генерується за шаблоном. Значення, які ви вкажете нижче (заголовок, опис, зображення), підставляються в цей шаблон замість власних значень допису; залиште поле порожнім, щоб використати значення допису за замовчуванням."
+
+#: lib/phoenix_kit_publishing/web/new.ex:588
+#, elixir-autogen, elixir-format
+msgid "The URL mode locks in after creation to keep your structure consistent."
+msgstr "Режим URL фіксується після створення, щоб структура залишалася узгодженою."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4799
+#, elixir-autogen, elixir-format
+msgid "The URL slug %{slug} is already used by another post in this group:"
+msgstr "URL-slug %{slug} уже використовує інший допис у цій групі:"
+
+#: lib/phoenix_kit_publishing/web/controller/fallback.ex:58
+#, elixir-autogen, elixir-format
+msgid "The page you requested was not found. Showing closest match."
+msgstr "Запитану сторінку не знайдено. Показано найближчий відповідник."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:61
+#: lib/phoenix_kit_publishing/web/edit.ex:73
+#, elixir-autogen, elixir-format
+msgid "The requested group could not be found."
+msgstr "Запитану групу не знайдено."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:888
+#, elixir-autogen, elixir-format
+msgid "The slug \"%{slug}\" is already used by another post in this group. Choose a different slug or change the title."
+msgstr "Slug «%{slug}» уже використовує інший допис у цій групі. Виберіть інший slug або змініть заголовок."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:428
+#, elixir-autogen, elixir-format
+msgid "The slug is used in URLs for this group's public pages."
+msgstr "Slug використовується в URL публічних сторінок цієї групи."
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:414
+#, elixir-autogen, elixir-format
+msgid "The source has no body content — only the title will be translated."
+msgstr "У джерелі немає основного тексту — буде перекладено лише заголовок."
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:407
+#, elixir-autogen, elixir-format
+msgid "The source has no title or content — the translations will be empty."
+msgstr "У джерелі немає ні заголовка, ні вмісту — переклади будуть порожніми."
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:421
+#, elixir-autogen, elixir-format
+msgid "The source has no title — only the body content will be translated."
+msgstr "У джерелі немає заголовка — буде перекладено лише основний текст."
+
+#: lib/phoenix_kit_publishing/web/editor/forms.ex:377
+#, elixir-autogen, elixir-format
+msgid "The title was too long for a URL, so the slug was shortened. Edit it manually if you'd like a different one."
+msgstr "Заголовок задовгий для URL, тому slug скорочено. За потреби відредагуйте його вручну."
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:206
+#, elixir-autogen, elixir-format
+msgid "The version you were editing was deleted and no other versions are available."
+msgstr "Версію, яку ви редагували, видалено, а інших версій немає."
+
+#: lib/phoenix_kit_publishing/web/editor/versions.ex:270
+#, elixir-autogen, elixir-format
+msgid "The version you were editing was deleted. Switched to version %{version}."
+msgstr "Версію, яку ви редагували, видалено. Перемкнено на версію %{version}."
+
+#: lib/phoenix_kit_publishing/web/preview.ex:226
+#, elixir-autogen, elixir-format
+msgid "This is how the post will appear to visitors"
+msgstr "Так допис побачать відвідувачі"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4607
+#, elixir-autogen, elixir-format
+msgid "This is the image the OG plugin will show on social shares for this post — rendered from the assigned template using the values set above."
+msgstr "Це зображення плагін OG показуватиме, коли цим дописом діляться в соцмережах, — його згенеровано з призначеного шаблону на основі значень, указаних вище."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3519
+#, elixir-autogen, elixir-format
+msgid "This language (%{code}) doesn't match a recognized language code. The publishing status will still be respected."
+msgstr "Ця мова (%{code}) не відповідає жодному відомому коду мови. Статус публікації все одно враховуватиметься."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3527
+#, elixir-autogen, elixir-format
+msgid "This language (%{code}) is no longer enabled in the Languages module. The publishing status will still be respected for legacy content."
+msgstr "Ця мова (%{code}) більше не ввімкнена в модулі «Мови». Для наявного вмісту статус публікації все одно враховуватиметься."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3649
+#, elixir-autogen, elixir-format
+msgid "This prompt predates the current format and may mistranslate. Click to update it."
+msgstr "Цей промпт створено до появи поточного формату, і він може перекладати неправильно. Натисніть, щоб оновити його."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:745
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:846
+#, elixir-autogen, elixir-format
+msgid "This slug is reserved because it's a language code (like 'en', 'es', 'fr'). Please choose a different slug to avoid routing conflicts."
+msgstr "Цей slug зарезервовано, оскільки це код мови (як-от 'en', 'es', 'fr'). Виберіть інший slug, щоб уникнути конфліктів маршрутизації."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1038
+#, elixir-autogen, elixir-format
+msgid "This translation is currently locked by another editor"
+msgstr "Цей переклад зараз заблоковано іншим редактором"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4090
+#, elixir-autogen, elixir-format
+msgid "This will be the default URL for all languages."
+msgstr "Це буде URL за замовчуванням для всіх мов."
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:438
+#, elixir-autogen, elixir-format
+msgid "This will overwrite existing content in: %{languages}"
+msgstr "Буде перезаписано наявний вміст для мов: %{languages}"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3781
+#, elixir-autogen, elixir-format
+msgid "This will translate the %{source} content to %{target}, overwriting any existing content."
+msgstr "Вміст буде перекладено з %{source} на %{target}, а весь наявний вміст буде перезаписано."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:454
+#: lib/phoenix_kit_publishing/web/index.ex:516
+#: lib/phoenix_kit_publishing/web/new.ex:544
+#, elixir-autogen, elixir-format
+msgid "Timestamp-based"
+msgstr "На основі часу"
+
+#: lib/phoenix_kit_publishing/errors.ex:187
+#, elixir-autogen, elixir-format
+msgid "Title is required to publish"
+msgstr "Для публікації потрібен заголовок"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2678
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:46
+#, elixir-autogen, elixir-format
+msgid "Title is required to save."
+msgstr "Для збереження потрібен заголовок."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:861
+#, elixir-autogen, elixir-format
+msgid "Title is required."
+msgstr "Потрібен заголовок."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4833
+#, elixir-autogen, elixir-format
+msgid "Translate"
+msgstr "Перекласти"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3740
+#, elixir-autogen, elixir-format
+msgid "Translate Missing Only"
+msgstr "Перекласти лише відсутні"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3571
+#, elixir-autogen, elixir-format
+msgid "Translate the %{source} post to %{target} using AI. It runs as a background job — you can keep editing while it finishes, or safely leave this page."
+msgstr "Перекласти допис з %{source} на %{target} за допомогою ШІ. Переклад виконується як фонове завдання — ви можете продовжувати редагування, поки він завершується, або спокійно залишити цю сторінку."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3722
+#, elixir-autogen, elixir-format
+msgid "Translate to All Languages"
+msgstr "Перекласти на всі мови"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3758
+#, elixir-autogen, elixir-format
+msgid "Translate to This Language"
+msgstr "Перекласти на цю мову"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3671
+#, elixir-autogen, elixir-format
+msgid "Translating to %{languages}..."
+msgstr "Переклад на %{languages}..."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3675
+#, elixir-autogen, elixir-format
+msgid "Translating..."
+msgstr "Переклад..."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3749
+#, elixir-autogen, elixir-format
+msgid "Translating…"
+msgstr "Переклад…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1382
+#, elixir-autogen, elixir-format
+msgid "Translation cleared"
+msgstr "Переклад очищено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2478
+#, elixir-autogen, elixir-format
+msgid "Translation completed with %{success} succeeded, %{failed} failed"
+msgstr "Переклад завершено: успішно — %{success}, з помилкою — %{failed}"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:444
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:455
+#, elixir-autogen, elixir-format
+msgid "Translation created and saved"
+msgstr "Переклад створено й збережено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3542
+#, elixir-autogen, elixir-format
+msgid "Translation in progress"
+msgstr "Виконується переклад"
+
+#: lib/phoenix_kit_publishing/web/editor/translation.ex:370
+#, elixir-autogen, elixir-format
+msgid "Translation job enqueued for: %{languages}"
+msgstr "Завдання перекладу поставлено в чергу для: %{languages}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:531
+#, elixir-autogen, elixir-format
+msgid "Transliterate"
+msgstr "Транслітерація"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#, elixir-autogen, elixir-format
+msgid "Transliterate — privet"
+msgstr "Транслітерація — privet"
+
+#: lib/phoenix_kit_publishing/web/index.ex:454
+#: lib/phoenix_kit_publishing/web/listing.ex:1043
+#, elixir-autogen, elixir-format
+msgid "Trash"
+msgstr "Кошик"
+
+#: lib/phoenix_kit_publishing/web/index.ex:682
+#: lib/phoenix_kit_publishing/web/listing.ex:1112
+#, elixir-autogen, elixir-format
+msgid "Trash is empty"
+msgstr "Кошик порожній"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:949
+#: lib/phoenix_kit_publishing/web/post_show.ex:161
+#, elixir-autogen, elixir-format
+msgid "Trashed"
+msgstr "У кошику"
+
+#: lib/phoenix_kit_publishing/web/index.ex:611
+#: lib/phoenix_kit_publishing/web/listing.ex:1266
+#, elixir-autogen, elixir-format
+msgid "Trashing…"
+msgstr "Переміщення в кошик…"
+
+#: lib/phoenix_kit_publishing/web/new.ex:532
+#, elixir-autogen, elixir-format
+msgid "URL Mode"
+msgstr "Режим URL"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4117
+#, elixir-autogen, elixir-format
+msgid "URL Slug"
+msgstr "URL-slug"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:449
+#, elixir-autogen, elixir-format
+msgid "URL mode"
+msgstr "Режим URL"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4794
+#, elixir-autogen, elixir-format
+msgid "URL slug already in use"
+msgstr "URL-slug уже використовується"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:307
+#, elixir-autogen, elixir-format
+msgid "URL slug cannot be a language code"
+msgstr "URL-slug не може бути кодом мови"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:310
+#, elixir-autogen, elixir-format
+msgid "URL slug cannot be a reserved word (admin, api, assets, etc.)"
+msgstr "URL-slug не може бути зарезервованим словом (admin, api, assets тощо)"
+
+#: lib/phoenix_kit_publishing/errors.ex:127
+#, elixir-autogen, elixir-format
+msgid "URL slug conflicts with another post"
+msgstr "URL-slug конфліктує з іншим дописом"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:314
+#, elixir-autogen, elixir-format
+msgid "URL slug is a previous address of another post — using it would hijack that post's redirect"
+msgstr "URL-slug — це попередня адреса іншого допису: його використання перехопило б переспрямування того допису"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:304
+#, elixir-autogen, elixir-format
+msgid "URL slug must be lowercase letters, numbers, and hyphens only"
+msgstr "URL-slug може містити лише малі латинські літери, цифри та дефіси"
+
+#: lib/phoenix_kit_publishing/errors.ex:247
+#, elixir-autogen, elixir-format
+msgid "Unexpected error: %{reason}"
+msgstr "Неочікувана помилка: %{reason}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:529
+#, elixir-autogen, elixir-format
+msgid "Unicode"
+msgstr "Unicode"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:809
+#, elixir-autogen, elixir-format
+msgid "Unicode — привет"
+msgstr "Unicode — привет"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:222
+#: lib/phoenix_kit_publishing/web/editor.ex:2282
+#, elixir-autogen, elixir-format
+msgid "Unknown"
+msgstr "Невідомо"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3517
+#, elixir-autogen, elixir-format
+msgid "Unknown language:"
+msgstr "Невідома мова:"
+
+#: lib/phoenix_kit_publishing/errors.ex:188
+#, elixir-autogen, elixir-format
+msgid "Unpublished"
+msgstr "Не опубліковано"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3914
+#: lib/phoenix_kit_publishing/web/editor.ex:4843
+#, elixir-autogen, elixir-format
+msgid "Unsaved changes"
+msgstr "Незбережені зміни"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:800
+#: lib/phoenix_kit_publishing/web/listing.ex:804
+#, elixir-autogen, elixir-format
+msgid "Unsaved draft"
+msgstr "Незбережена чернетка"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:291
+#: lib/phoenix_kit_publishing/web/editor.ex:2614
+#: lib/phoenix_kit_publishing/web/post_show.ex:52
+#: lib/phoenix_kit_publishing/web/post_show.ex:75
+#, elixir-autogen, elixir-format
+msgid "Untitled"
+msgstr "Без назви"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1179
+#: lib/phoenix_kit_publishing/web/listing.ex:1193
+#, elixir-autogen, elixir-format
+msgid "Untitled post"
+msgstr "Допис без назви"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4089
+#, elixir-autogen, elixir-format
+msgid "Use lowercase letters, numbers, and hyphens only."
+msgstr "Використовуйте лише малі латинські літери, цифри та дефіси."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4128
+#, elixir-autogen, elixir-format
+msgid "Use lowercase letters, numbers, and hyphens only. Leave empty to use the default slug."
+msgstr "Використовуйте лише малі латинські літери, цифри та дефіси. Залиште порожнім, щоб використовувати slug за замовчуванням."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4081
+#, elixir-autogen, elixir-format
+msgid "Use lowercase letters, numbers, and hyphens only. No spaces or special characters."
+msgstr "Використовуйте лише малі латинські літери, цифри та дефіси. Без пробілів і спеціальних символів."
+
+#: lib/phoenix_kit_publishing/web/new.ex:357
+#, elixir-autogen, elixir-format
+msgid "Used for display in the navigation and admin sections."
+msgstr "Використовується для відображення в навігації та розділах адміністрування."
+
+#: lib/phoenix_kit_publishing/web/new.ex:373
+#, elixir-autogen, elixir-format
+msgid "Used for the URL and as the unique identifier for this group."
+msgstr "Використовується в URL і як унікальний ідентифікатор цієї групи."
+
+#: lib/phoenix_kit_publishing/web/new.ex:571
+#, elixir-autogen, elixir-format
+msgid "Uses semantic URLs and editable slugs. Ideal for documentation, guides, and evergreen content."
+msgstr "Використовує семантичні URL і slug, які можна редагувати. Ідеально для документації, посібників і вмісту, що не застаріває."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:437
+#: lib/phoenix_kit_publishing/web/new.ex:382
+#, elixir-autogen, elixir-format
+msgid "Valid examples"
+msgstr "Коректні приклади"
+
+#: lib/phoenix_kit_publishing/web/components/version_switcher.ex:225
+#, elixir-autogen, elixir-format
+msgid "Version %{version} - %{status}"
+msgstr "Версія %{version} - %{status}"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2210
+#, elixir-autogen, elixir-format
+msgid "Version %{version} was published by another editor"
+msgstr "Версію %{version} опублікував інший редактор"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4059
+#, elixir-autogen, elixir-format
+msgid "Version Settings"
+msgstr "Налаштування версії"
+
+#: lib/phoenix_kit_publishing/errors.ex:189
+#, elixir-autogen, elixir-format
+msgid "Version access is disabled"
+msgstr "Доступ до версій вимкнено"
+
+#: lib/phoenix_kit_publishing/errors.ex:190
+#: lib/phoenix_kit_publishing/web/editor.ex:1227
+#: lib/phoenix_kit_publishing/web/editor.ex:1233
+#: lib/phoenix_kit_publishing/web/editor.ex:2715
+#, elixir-autogen, elixir-format
+msgid "Version not found"
+msgstr "Версію не знайдено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3421
+#: lib/phoenix_kit_publishing/web/editor.ex:3432
+#, elixir-autogen, elixir-format
+msgid "Version:"
+msgstr "Версія:"
+
+#: lib/phoenix_kit_publishing/web/post_show.ex:206
+#, elixir-autogen, elixir-format
+msgid "Versions"
+msgstr "Версії"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3394
+#, elixir-autogen, elixir-format
+msgid "View Public"
+msgstr "Переглянути на сайті"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3491
+#, elixir-autogen, elixir-format
+msgid "View only mode:"
+msgstr "Режим лише перегляду:"
+
+#: lib/phoenix_kit_publishing/web/index.ex:600
+#, elixir-autogen, elixir-format
+msgid "View public site"
+msgstr "Переглянути публічний сайт"
+
+#: lib/phoenix_kit_publishing/web/new.ex:495
+#, elixir-autogen, elixir-format
+msgid "What do you call items in this publishing group? These names appear in the UI."
+msgstr "Як ви називаєте елементи в цій групі публікацій? Ці назви відображаються в інтерфейсі."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:854
+#, elixir-autogen, elixir-format
+msgid "When enabled, default-language public URLs become prefixless and prefixed default-language URLs redirect to the canonical prefixless version."
+msgstr "Якщо ввімкнено, публічні URL мови за замовчуванням стають без префікса, а URL мови за замовчуванням із префіксом переспрямовуються на канонічну версію без префікса."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4000
+#, elixir-autogen, elixir-format
+msgid "Write your content here..."
+msgstr "Напишіть тут свій вміст..."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1031
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to clear translations"
+msgstr "У вас немає дозволу очищати переклади"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4845
+#, elixir-autogen, elixir-format
+msgid "You have unsaved changes. Leave without saving?"
+msgstr "У вас є незбережені зміни. Вийти без збереження?"
+
+#: lib/phoenix_kit_publishing/web/editor/collaborative.ex:636
+#, elixir-autogen, elixir-format
+msgid "Your editing lock was released due to inactivity. Click anywhere to reclaim it."
+msgstr "Ваше блокування редагування знято через неактивність. Натисніть будь-де, щоб повернути його."
+
+#: lib/phoenix_kit_publishing/web/editor/collaborative.ex:577
+#, elixir-autogen, elixir-format
+msgid "Your editing lock will expire in %{minutes} minutes due to inactivity"
+msgstr "Через неактивність ваше блокування редагування спливе за %{minutes} хв"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4079
+#, elixir-autogen, elixir-format
+msgid "auto-generated from title"
+msgstr "генерується автоматично із заголовка"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:395
+#: lib/phoenix_kit_publishing/web/new.ex:353
+#, elixir-autogen, elixir-format
+msgid "e.g. Product Updates"
+msgstr "наприклад, Оновлення продукту"
+
+#: lib/phoenix_kit_publishing/web/new.ex:505
+#, elixir-autogen, elixir-format
+msgid "e.g. post, question"
+msgstr "наприклад, допис, запитання"
+
+#: lib/phoenix_kit_publishing/web/new.ex:514
+#, elixir-autogen, elixir-format
+msgid "e.g. posts, questions"
+msgstr "наприклад, дописи, запитання"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:423
+#: lib/phoenix_kit_publishing/web/new.ex:366
+#, elixir-autogen, elixir-format
+msgid "e.g. product-updates"
+msgstr "наприклад, product-updates"
+
+#: lib/phoenix_kit_publishing/web/new.ex:466
+#, elixir-autogen, elixir-format
+msgid "e.g. tutorials, recipes"
+msgstr "наприклад, уроки, рецепти"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4117
+#, elixir-autogen, elixir-format
+msgid "optional"
+msgstr "необов'язково"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1173
+#, elixir-autogen, elixir-format
+msgid "showing"
+msgstr "показано"
+
+#: lib/phoenix_kit_publishing/web/new.ex:391
+#, elixir-autogen, elixir-format
+msgid "your-group"
+msgstr "your-group"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2821
+#, elixir-autogen, elixir-format
+msgid "%{count} min read"
+msgid_plural "%{count} min read"
+msgstr[0] "%{count} хв читання"
+msgstr[1] "%{count} хв читання"
+msgstr[2] "%{count} хв читання"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:559
+#, elixir-autogen, elixir-format
+msgid "A clickable date rail down the side to jump through the archive."
+msgstr "Клікабельна шкала дат збоку, щоб швидко переходити архівом."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:618
+#, elixir-autogen, elixir-format
+msgid "A large hero image above the title."
+msgstr "Велике зображення-обкладинка над заголовком."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:692
+#, elixir-autogen, elixir-format
+msgid "A side rail of the post's headings; hidden on short posts."
+msgstr "Бічна панель із заголовками допису; прихована в коротких дописах."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:685
+#, elixir-autogen, elixir-format
+msgid "A thin bar at the top that fills as the reader scrolls."
+msgstr "Тонка смуга вгорі, що заповнюється під час прокручування."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:301
+#, elixir-autogen, elixir-format
+msgid "Above the title"
+msgstr "Над заголовком"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:678
+#, elixir-autogen, elixir-format
+msgid "An estimated 'N min read' under the title."
+msgstr "Орієнтовне «N хв читання» під заголовком."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:701
+#, elixir-autogen, elixir-format
+msgid "Appearance"
+msgstr "Зовнішній вигляд"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:704
+#, elixir-autogen, elixir-format
+msgid "Applies to every public page in this group."
+msgstr "Застосовується до всіх публічних сторінок цієї групи."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:245
+#, elixir-autogen, elixir-format
+msgid "Automatic (fit to the posts)"
+msgstr "Автоматично (за дописами)"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:300
+#, elixir-autogen, elixir-format
+msgid "Below the title"
+msgstr "Під заголовком"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:331
+#, elixir-autogen, elixir-format
+msgid "Branded — recolored to match the theme"
+msgstr "Фірмовий — перефарбований у кольори теми"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:248
+#, elixir-autogen, elixir-format
+msgid "By day"
+msgstr "За днями"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:247
+#, elixir-autogen, elixir-format
+msgid "By month"
+msgstr "За місяцями"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:246
+#, elixir-autogen, elixir-format
+msgid "By year"
+msgstr "За роками"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:592
+#, elixir-autogen, elixir-format
+msgid "Content width"
+msgstr "Ширина вмісту"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:330
+#, elixir-autogen, elixir-format
+msgid "Default — the browser's native scrollbar"
+msgstr "Стандартний — власна смуга прокручування браузера"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4310
+#, elixir-autogen, elixir-format
+msgid "Feature this post"
+msgstr "Зробити допис головним"
+
+#: lib/phoenix_kit_publishing/web/html.ex:879
+#: lib/phoenix_kit_publishing/web/html.ex:1132
+#: lib/phoenix_kit_publishing/web/html.ex:1616
+#, elixir-autogen, elixir-format
+msgid "Featured"
+msgstr "Головне"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:510
+#, elixir-autogen, elixir-format
+msgid "Featured layout"
+msgstr "Макет головних дописів"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:408
+#, elixir-autogen, elixir-format
+msgid "Group Name (%{lang})"
+msgstr "Назва групи (%{lang})"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:256
+#, elixir-autogen, elixir-format
+msgid "Hero band — a large banner above the list"
+msgstr "Широка смуга — великий банер над списком"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:302
+#, elixir-autogen, elixir-format
+msgid "Hidden"
+msgstr "Приховано"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:499
+#, elixir-autogen, elixir-format
+msgid "Highlight featured posts"
+msgstr "Виділяти головні дописи"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:257
+#, elixir-autogen, elixir-format
+msgid "Highlighted card — a larger card within the grid"
+msgstr "Виділена картка — більша картка в сітці"
+
+#: lib/phoenix_kit_publishing/web/html.ex:519
+#, elixir-autogen, elixir-format
+msgid "Jump to date"
+msgstr "Перейти до дати"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:412
+#, elixir-autogen, elixir-format
+msgid "Leave blank to use the primary-language name."
+msgstr "Залиште порожнім, щоб використати назву основною мовою."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:465
+#, elixir-autogen, elixir-format
+msgid "Listing page"
+msgstr "Сторінка списку"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:310
+#, elixir-autogen, elixir-format
+msgid "Narrow"
+msgstr "Вузька"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:281
+#, elixir-autogen, elixir-format
+msgid "Newest first (by publish date)"
+msgstr "Спершу новіші (за датою публікації)"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:311
+#, elixir-autogen, elixir-format
+msgid "Normal"
+msgstr "Звичайна"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:282
+#, elixir-autogen, elixir-format
+msgid "Oldest first (by publish date)"
+msgstr "Спершу старіші (за датою публікації)"
+
+#: lib/phoenix_kit_publishing/web/html.ex:258
+#, elixir-autogen, elixir-format
+msgid "On this page"
+msgstr "На цій сторінці"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:714
+#, elixir-autogen, elixir-format
+msgid "Only recolors the real scrollbar — keyboard and touch scrolling stay normal."
+msgstr "Змінює лише колір самої смуги прокручування — прокручування з клавіатури та на сенсорних екранах працює як зазвичай."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4314
+#, elixir-autogen, elixir-format
+msgid "Pins this post to the top of its listing and shows it larger. The group's settings control whether featured posts appear and how they're displayed."
+msgstr "Закріплює цей допис угорі списку та показує його більшим. Від налаштувань групи залежить, чи з'являються головні дописи і як вони відображаються."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:598
+#, elixir-autogen, elixir-format
+msgid "Post date position"
+msgstr "Розташування дати допису"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:474
+#, elixir-autogen, elixir-format
+msgid "Post order"
+msgstr "Порядок дописів"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:583
+#, elixir-autogen, elixir-format
+msgid "Post page"
+msgstr "Сторінка допису"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:501
+#, elixir-autogen, elixir-format
+msgid "Posts marked featured in the editor are pinned to the top and shown larger."
+msgstr "Дописи, позначені в редакторі як головні, закріплюються вгорі й показуються більшими."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:710
+#, elixir-autogen, elixir-format
+msgid "Scrollbar style"
+msgstr "Стиль смуги прокручування"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:557
+#, elixir-autogen, elixir-format
+msgid "Show a date-timeline rail"
+msgstr "Показувати шкалу дат"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:690
+#, elixir-autogen, elixir-format
+msgid "Show a heading navigation rail"
+msgstr "Показувати навігацію за заголовками"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:683
+#, elixir-autogen, elixir-format
+msgid "Show a reading-progress bar"
+msgstr "Показувати індикатор прогресу читання"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:609
+#, elixir-autogen, elixir-format
+msgid "Show the breadcrumb trail"
+msgstr "Показувати навігаційний ланцюжок"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:616
+#, elixir-autogen, elixir-format
+msgid "Show the featured image"
+msgstr "Показувати головне зображення"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:492
+#, elixir-autogen, elixir-format
+msgid "Show the post count"
+msgstr "Показувати кількість дописів"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:676
+#, elixir-autogen, elixir-format
+msgid "Show the reading time"
+msgstr "Показувати час читання"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:611
+#, elixir-autogen, elixir-format
+msgid "The 'Home / Blog / …' navigation trail above the title."
+msgstr "Навігаційний ланцюжок «Головна / Блог / …» над заголовком."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:468
+#, elixir-autogen, elixir-format
+msgid "The public page that lists this group's posts (e.g. /blog)."
+msgstr "Публічна сторінка зі списком дописів цієї групи (наприклад, /blog)."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:494
+#, elixir-autogen, elixir-format
+msgid "The total number of posts, shown under the listing title."
+msgstr "Загальна кількість дописів, що показується під заголовком списку."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:332
+#, elixir-autogen, elixir-format
+msgid "Thin — branded and slimmer"
+msgstr "Тонкий — фірмовий і вужчий"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:566
+#, elixir-autogen, elixir-format
+msgid "Timeline markers"
+msgstr "Позначки шкали дат"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:586
+#, elixir-autogen, elixir-format
+msgid "What shows on an individual post and how it's laid out."
+msgstr "Що відображається на сторінці окремого допису і як її скомпоновано."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:312
+#, elixir-autogen, elixir-format
+msgid "Wide"
+msgstr "Широка"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:545
+#, elixir-autogen, elixir-format
+msgid "A post card's image clicks through to the post, same as the title."
+msgstr "Зображення в картці допису веде на допис, так само як заголовок."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:625
+#, elixir-autogen, elixir-format
+msgid "A subtle 'Back to %{group}' link above the post, mirroring the footer button."
+msgstr "Ненав'язливе посилання «Назад до %{group}» над дописом, що повторює кнопку внизу."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:543
+#, elixir-autogen, elixir-format
+msgid "Clickable card images"
+msgstr "Клікабельні зображення карток"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:521
+#, elixir-autogen, elixir-format
+msgid "Highlight the latest post"
+msgstr "Виділяти найновіший допис"
+
+#: lib/phoenix_kit_publishing/web/html.ex:907
+#: lib/phoenix_kit_publishing/web/html.ex:1135
+#: lib/phoenix_kit_publishing/web/html.ex:1619
+#, elixir-autogen, elixir-format
+msgid "Latest"
+msgstr "Найновіше"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:532
+#, elixir-autogen, elixir-format
+msgid "Latest layout"
+msgstr "Макет найновішого допису"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:623
+#, elixir-autogen, elixir-format
+msgid "Show the top back link"
+msgstr "Показувати верхнє посилання «Назад»"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:523
+#, elixir-autogen, elixir-format
+msgid "The most recent post is pinned into its own 'Latest' band under any featured posts and shown larger."
+msgstr "Найновіший допис закріплюється в окремій смузі «Найновіше» під головними дописами й показується більшим."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:614
+#: lib/phoenix_kit_publishing/web/edit.ex:725
+#, elixir-autogen, elixir-format
+msgid "Save"
+msgstr "Зберегти"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:737
+#, elixir-autogen, elixir-format
+msgid "Save and exit"
+msgstr "Зберегти й вийти"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:269
+#, elixir-autogen, elixir-format
+msgid "Classic — image beside or above the text"
+msgstr "Класичний — зображення поруч із текстом або над ним"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:271
+#, elixir-autogen, elixir-format
+msgid "Cover panel — background image with a solid text panel"
+msgstr "Панель-обкладинка — фонове зображення із суцільною текстовою панеллю"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:270
+#, elixir-autogen, elixir-format
+msgid "Cover — the image is the background, text overlaid"
+msgstr "Обкладинка — зображення як фон, текст поверх"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:515
+#, elixir-autogen, elixir-format
+msgid "Featured style"
+msgstr "Стиль головних дописів"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:537
+#, elixir-autogen, elixir-format
+msgid "Latest style"
+msgstr "Стиль найновішого допису"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:272
+#, elixir-autogen, elixir-format
+msgid "Minimal — text only, no image"
+msgstr "Мінімальний — лише текст, без зображення"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:273
+#, elixir-autogen, elixir-format
+msgid "Top image — a wide image banner above the text"
+msgstr "Зображення вгорі — широкий банер над текстом"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:550
+#, elixir-autogen, elixir-format
+msgid "Card hover animations"
+msgstr "Анімація карток під час наведення"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:552
+#, elixir-autogen, elixir-format
+msgid "Cards lift slightly on hover as a click cue."
+msgstr "Картки трохи піднімаються під час наведення, підказуючи, що на них можна натиснути."
+
+#: lib/phoenix_kit_publishing/web/html.ex:830
+#, elixir-autogen, elixir-format
+msgid "%{count} result for “%{query}”"
+msgid_plural "%{count} results for “%{query}”"
+msgstr[0] "%{count} результат за запитом «%{query}»"
+msgstr[1] "%{count} результати за запитом «%{query}»"
+msgstr[2] "%{count} результатів за запитом «%{query}»"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:453
+#, elixir-autogen, elixir-format
+msgid "A category can't be moved under one of its own subcategories."
+msgstr "Категорію не можна перемістити в одну з її власних підкатегорій."
+
+#: lib/phoenix_kit_publishing/web/html.ex:860
+#, elixir-autogen, elixir-format
+msgid "All posts"
+msgstr "Усі дописи"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:38
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:181
+#: lib/phoenix_kit_publishing/web/listing.ex:1014
+#, elixir-autogen, elixir-format
+msgid "Categories"
+msgstr "Категорії"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:135
+#, elixir-autogen, elixir-format
+msgid "Category created"
+msgstr "Категорію створено"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:276
+#, elixir-autogen, elixir-format
+msgid "Category deleted — its children moved to the top level"
+msgstr "Категорію видалено — її підкатегорії переміщено на верхній рівень"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:94
+#: lib/phoenix_kit_publishing/web/categories_live.ex:175
+#, elixir-autogen, elixir-format
+msgid "Category not found"
+msgstr "Категорію не знайдено"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:134
+#, elixir-autogen, elixir-format
+msgid "Category updated"
+msgstr "Категорію оновлено"
+
+#: lib/phoenix_kit_publishing/web/html.ex:848
+#, elixir-autogen, elixir-format
+msgid "Category: %{name}"
+msgstr "Категорія: %{name}"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:669
+#, elixir-autogen, elixir-format
+msgid "Chronological newer/older post links at the bottom of the post page."
+msgstr "Хронологічні посилання на новіший/старіший допис унизу сторінки допису."
+
+#: lib/phoenix_kit_publishing/web/html.ex:841
+#, elixir-autogen, elixir-format
+msgid "Clear search"
+msgstr "Очистити пошук"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:280
+#, elixir-autogen, elixir-format
+msgid "Couldn't delete this category."
+msgstr "Не вдалося видалити цю категорію."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:448
+#, elixir-autogen, elixir-format
+msgid "Couldn't save this category — check the fields and try again."
+msgstr "Не вдалося зберегти цю категорію — перевірте поля й спробуйте ще раз."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:461
+#, elixir-autogen, elixir-format
+msgid "Couldn't save this category."
+msgstr "Не вдалося зберегти цю категорію."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:614
+#, elixir-autogen, elixir-format
+msgid "Create"
+msgstr "Створити"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:559
+#, elixir-autogen, elixir-format
+msgid "Delete"
+msgstr "Видалити"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:562
+#, elixir-autogen, elixir-format
+msgid "Delete “%{name}”? Its subcategories move to the top level and posts lose this category."
+msgstr "Видалити «%{name}»? Її підкатегорії буде переміщено на верхній рівень, а дописи втратять цю категорію."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:581
+#, elixir-autogen, elixir-format
+msgid "Edit category"
+msgstr "Редагувати категорію"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:751
+#, elixir-autogen, elixir-format
+msgid "Emit a schema.org Article script on post pages for richer search results. Disable if your host builds its own structured data."
+msgstr "Додає на сторінки дописів скрипт schema.org Article для багатших результатів пошуку. Вимкніть, якщо ваш сайт сам формує структуровані дані."
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1069
+#, elixir-autogen, elixir-format
+msgid "Filter posts…"
+msgstr "Фільтрувати дописи…"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:290
+#, elixir-autogen, elixir-format
+msgid "Grid — cards with images"
+msgstr "Сітка — картки із зображеннями"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:749
+#: lib/phoenix_kit_publishing/web/settings.ex:759
+#, elixir-autogen, elixir-format
+msgid "JSON-LD Structured Data"
+msgstr "Структуровані дані JSON-LD"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:309
+#, elixir-autogen, elixir-format
+msgid "JSON-LD structured data disabled"
+msgstr "Структуровані дані JSON-LD вимкнено"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:308
+#, elixir-autogen, elixir-format
+msgid "JSON-LD structured data enabled on post pages"
+msgstr "Структуровані дані JSON-LD увімкнено на сторінках дописів"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:635
+#, elixir-autogen, elixir-format
+msgid "Linked category badges above the post content."
+msgstr "Значки-посилання категорій над вмістом допису."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:291
+#, elixir-autogen, elixir-format
+msgid "List — horizontal rows with a thumbnail"
+msgstr "Список — горизонтальні рядки з мініатюрою"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:480
+#, elixir-autogen, elixir-format
+msgid "Listing layout"
+msgstr "Макет списку"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:292
+#, elixir-autogen, elixir-format
+msgid "Minimal — date and title only, no images"
+msgstr "Мінімальний — лише дата й заголовок, без зображень"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2222
+#, elixir-autogen, elixir-format
+msgid "More posts"
+msgstr "Більше дописів"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:494
+#: lib/phoenix_kit_publishing/web/categories_live.ex:593
+#, elixir-autogen, elixir-format
+msgid "Name"
+msgstr "Назва"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:471
+#: lib/phoenix_kit_publishing/web/categories_live.ex:486
+#: lib/phoenix_kit_publishing/web/categories_live.ex:583
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:257
+#, elixir-autogen, elixir-format
+msgid "New category"
+msgstr "Нова категорія"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2230
+#, elixir-autogen, elixir-format
+msgid "Newer"
+msgstr "Новіші"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1108
+#, elixir-autogen, elixir-format
+msgid "No posts match your filter"
+msgstr "Жоден допис не відповідає фільтру"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1021
+#, elixir-autogen, elixir-format
+msgid "No posts match your search."
+msgstr "Жоден допис не відповідає пошуку."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:431
+#, elixir-autogen, elixir-format
+msgid "None (top level)"
+msgstr "Немає (верхній рівень)"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2240
+#, elixir-autogen, elixir-format
+msgid "Older"
+msgstr "Старіші"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:600
+#, elixir-autogen, elixir-format
+msgid "Parent"
+msgstr "Батьківська категорія"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:610
+#, elixir-autogen, elixir-format
+msgid "Position"
+msgstr "Позиція"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:728
+#: lib/phoenix_kit_publishing/web/settings.ex:738
+#, elixir-autogen, elixir-format
+msgid "RSS Feeds"
+msgstr "RSS-стрічки"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:288
+#, elixir-autogen, elixir-format
+msgid "RSS feeds disabled — feed URLs return 404"
+msgstr "RSS-стрічки вимкнено — URL стрічок повертають 404"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:287
+#, elixir-autogen, elixir-format
+msgid "RSS feeds enabled — every group serves /<group>/feed.xml"
+msgstr "RSS-стрічки ввімкнено — кожна група віддає /<group>/feed.xml"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:487
+#, elixir-autogen, elixir-format
+msgid "Readers can search this group's published posts by title and text."
+msgstr "Читачі можуть шукати опубліковані дописи цієї групи за заголовком і текстом."
+
+#: lib/phoenix_kit_publishing/web/html.ex:823
+#, elixir-autogen, elixir-format
+msgid "Search"
+msgstr "Пошук"
+
+#: lib/phoenix_kit_publishing/web/html.ex:818
+#, elixir-autogen, elixir-format
+msgid "Search posts…"
+msgstr "Пошук дописів…"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:730
+#, elixir-autogen, elixir-format
+msgid "Serve an RSS 2.0 feed for every group at /<group>/feed.xml (newest 50 published posts, per language)."
+msgstr "Віддавати стрічку RSS 2.0 для кожної групи за адресою /<group>/feed.xml (50 найновіших опублікованих дописів для кожної мови)."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:485
+#, elixir-autogen, elixir-format
+msgid "Show a search box"
+msgstr "Показувати поле пошуку"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:633
+#, elixir-autogen, elixir-format
+msgid "Show category chips"
+msgstr "Показувати значки категорій"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:667
+#, elixir-autogen, elixir-format
+msgid "Show previous/next navigation"
+msgstr "Показувати навігацію «попередній/наступний»"
+
+#: lib/phoenix_kit_publishing/web/html.ex:850
+#, elixir-autogen, elixir-format
+msgid "Tag: %{name}"
+msgstr "Тег: %{name}"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:447
+#, elixir-autogen, elixir-format
+msgid "That slug is already used in this group."
+msgstr "Цей slug уже використовується в цій групі."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:456
+#, elixir-autogen, elixir-format
+msgid "The parent must belong to the same group."
+msgstr "Батьківська категорія має належати до тієї самої групи."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:597
+#, elixir-autogen, elixir-format
+msgid "auto from the name"
+msgstr "автоматично з назви"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2097
+#: lib/phoenix_kit_publishing/web/post_show.ex:282
+#, elixir-autogen, elixir-format
+msgid "%{count} view"
+msgid_plural "%{count} views"
+msgstr[0] "%{count} перегляд"
+msgstr[1] "%{count} перегляди"
+msgstr[2] "%{count} переглядів"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:661
+#, elixir-autogen, elixir-format
+msgid "A subtle 'N views' line on the post page."
+msgstr "Ненав'язливий рядок «N переглядів» на сторінці допису."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:649
+#, elixir-autogen, elixir-format
+msgid "Count views"
+msgstr "Рахувати перегляди"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:651
+#, elixir-autogen, elixir-format
+msgid "Per-day view counts; bot-filtered and session-deduped, no reader data stored."
+msgstr "Кількість переглядів за днями; боти відфільтровані, повтори в межах сеансу не враховуються, дані читачів не зберігаються."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:659
+#, elixir-autogen, elixir-format
+msgid "Show view counts"
+msgstr "Показувати кількість переглядів"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2261
+#, elixir-autogen, elixir-format
+msgid "%{count} comment"
+msgid_plural "%{count} comments"
+msgstr[0] "%{count} коментар"
+msgstr[1] "%{count} коментарі"
+msgstr[2] "%{count} коментарів"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:642
+#, elixir-autogen, elixir-format
+msgid "A comment thread under each post. Requires the Comments module; logged-in readers can post."
+msgstr "Гілка коментарів під кожним дописом. Потрібен модуль «Коментарі»; коментувати можуть читачі, які ввійшли в систему."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4403
+#, elixir-autogen, elixir-format
+msgid "Audio version"
+msgstr "Аудіоверсія"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:333
+#, elixir-autogen, elixir-format
+msgid "Comment posted."
+msgstr "Коментар опубліковано."
+
+#: lib/phoenix_kit_publishing/web/controller.ex:347
+#, elixir-autogen, elixir-format
+msgid "Couldn't post your comment — please try again."
+msgstr "Не вдалося опублікувати коментар — спробуйте ще раз."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:640
+#, elixir-autogen, elixir-format
+msgid "Enable comments"
+msgstr "Увімкнути коментарі"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2166
+#, elixir-autogen, elixir-format
+msgid "Listen to this post"
+msgstr "Прослухати цей допис"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1941
+#: lib/phoenix_kit_publishing/web/html.ex:2285
+#, elixir-autogen, elixir-format
+msgid "Log in"
+msgstr "Увійти"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2264
+#, elixir-autogen, elixir-format
+msgid "No comments yet — be the first."
+msgstr "Коментарів ще немає — залиште перший."
+
+#: lib/phoenix_kit_publishing/web/controller.ex:263
+#, elixir-autogen, elixir-format
+msgid "Please log in to comment."
+msgstr "Увійдіть, щоб коментувати."
+
+#: lib/phoenix_kit_publishing/web/html.ex:1835
+#, elixir-autogen, elixir-format
+msgid "Post comment"
+msgstr "Опублікувати коментар"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1658
+#: lib/phoenix_kit_publishing/web/html.ex:1662
+#, elixir-autogen, elixir-format
+msgid "Reader"
+msgstr "Читач"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:339
+#, elixir-autogen, elixir-format
+msgid "That comment is too long."
+msgstr "Цей коментар задовгий."
+
+#: lib/phoenix_kit_publishing/web/controller.ex:251
+#, elixir-autogen, elixir-format
+msgid "That post is no longer available."
+msgstr "Цей допис більше недоступний."
+
+#: lib/phoenix_kit_publishing/web/controller.ex:338
+#, elixir-autogen, elixir-format
+msgid "The comment can't be empty."
+msgstr "Коментар не може бути порожнім."
+
+#: lib/phoenix_kit_publishing/web/controller.ex:260
+#, elixir-autogen, elixir-format
+msgid "The form expired — please try again."
+msgstr "Термін дії форми минув — спробуйте ще раз."
+
+#: lib/phoenix_kit_publishing/web/html.ex:1834
+#, elixir-autogen, elixir-format
+msgid "Write a comment… (Markdown supported)"
+msgstr "Напишіть коментар… (підтримується Markdown)"
+
+#: lib/phoenix_kit_publishing/page_builder/components/audio.ex:39
+#: lib/phoenix_kit_publishing/web/html.ex:2163
+#, elixir-autogen, elixir-format
+msgid "Your browser does not support the audio element."
+msgstr "Ваш браузер не підтримує аудіоелемент."
+
+#: lib/phoenix_kit_publishing/web/html.ex:2287
+#, elixir-autogen, elixir-format
+msgid "to join the conversation."
+msgstr "щоб долучитися до обговорення."
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:203
+#, elixir-autogen, elixir-format
+msgid "Category moved"
+msgstr "Категорію переміщено"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:509
+#, elixir-autogen, elixir-format
+msgid "Drag to reorder (among siblings)"
+msgstr "Перетягніть, щоб змінити порядок (серед сусідніх)"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:247
+#: lib/phoenix_kit_publishing/web/categories_live.ex:255
+#, elixir-autogen, elixir-format
+msgid "Failed to save the new order"
+msgstr "Не вдалося зберегти новий порядок"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:640
+#, elixir-autogen, elixir-format
+msgid "Move"
+msgstr "Перемістити"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:550
+#, elixir-autogen, elixir-format
+msgid "Move to…"
+msgstr "Перемістити до…"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:624
+#, elixir-autogen, elixir-format
+msgid "Move “%{name}”"
+msgstr "Перемістити «%{name}»"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:628
+#, elixir-autogen, elixir-format
+msgid "New parent"
+msgstr "Нова батьківська категорія"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:544
+#, elixir-autogen, elixir-format
+msgid "New subcategory"
+msgstr "Нова підкатегорія"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:481
+#, elixir-autogen, elixir-format
+msgid "No categories yet — create the first one."
+msgstr "Категорій ще немає — створіть першу."
+
+#: lib/phoenix_kit_publishing/web/html.ex:1912
+#, elixir-autogen, elixir-format
+msgid "%{count} comment on this note"
+msgid_plural "%{count} comments on this note"
+msgstr[0] "%{count} коментар до цієї нотатки"
+msgstr[1] "%{count} коментарі до цієї нотатки"
+msgstr[2] "%{count} коментарів до цієї нотатки"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1876
+#, elixir-autogen, elixir-format
+msgid "Author notes"
+msgstr "Нотатки автора"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:604
+#, elixir-autogen, elixir-format
+msgid "Author notes style"
+msgstr "Стиль нотаток автора"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1888
+#: lib/phoenix_kit_publishing/web/html.ex:1904
+#, elixir-autogen, elixir-format
+msgid "Close note"
+msgstr "Закрити нотатку"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1936
+#, elixir-autogen, elixir-format
+msgid "Comment on this note…"
+msgstr "Прокоментуйте цю нотатку…"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:321
+#, elixir-autogen, elixir-format
+msgid "Footnotes — numbered refs, notes collected at the bottom"
+msgstr "Виноски — нумеровані посилання, нотатки зібрано внизу"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1899
+#, elixir-autogen, elixir-format
+msgid "Note"
+msgstr "Нотатка"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1892
+#, elixir-autogen, elixir-format
+msgid "Note %{number}"
+msgstr "Нотатка %{number}"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1803
+#, elixir-autogen, elixir-format
+msgid "Post reply"
+msgstr "Опублікувати відповідь"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1786
+#, elixir-autogen, elixir-format
+msgid "Reply"
+msgstr "Відповісти"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:322
+#, elixir-autogen, elixir-format
+msgid "Slide-out panel — click the phrase, note opens on the right"
+msgstr "Висувна панель — натисніть на фразу, і нотатка відкриється праворуч"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:342
+#, elixir-autogen, elixir-format
+msgid "The comment you replied to is no longer available."
+msgstr "Коментар, на який ви відповідали, більше недоступний."
+
+#: lib/phoenix_kit_publishing/web/controller.ex:345
+#, elixir-autogen, elixir-format
+msgid "This thread is too deep to reply to."
+msgstr "Ця гілка надто глибока, щоб на неї відповісти."
+
+#: lib/phoenix_kit_publishing/web/html.ex:1802
+#, elixir-autogen, elixir-format
+msgid "Write a reply…"
+msgstr "Напишіть відповідь…"
+
+#: lib/phoenix_kit_publishing/web/html.ex:1943
+#, elixir-autogen, elixir-format
+msgid "to comment on this note."
+msgstr "щоб прокоментувати цю нотатку."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4454
+#, elixir-autogen, elixir-format
+msgid "An audio file (e.g. a narration). Shows a player above the post and rides the RSS feed as a podcast enclosure."
+msgstr "Аудіофайл (наприклад, начитка). Показує програвач над дописом і потрапляє в RSS-стрічку як вкладення подкасту."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3339
+#, elixir-autogen, elixir-format
+msgid "Audio version selected"
+msgstr "Аудіоверсію вибрано"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4434
+#, elixir-autogen, elixir-format
+msgid "Choose"
+msgstr "Вибрати"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4448
+#, elixir-autogen, elixir-format
+msgid "Remove the audio version"
+msgstr "Прибрати аудіоверсію"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1068
+#, elixir-autogen, elixir-format
+msgid "Audio version removed"
+msgstr "Аудіоверсію прибрано"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:235
+#, elixir-autogen, elixir-format
+msgid "Order unchanged — use “Move to…” to change a parent."
+msgstr "Порядок не змінився — щоб змінити батьківську категорію, скористайтеся «Перемістити до…»."
+
+#: lib/phoenix_kit_publishing/web/controller.ex:336
+#, elixir-autogen, elixir-format
+msgid "Thanks — your comment is awaiting review."
+msgstr "Дякуємо — ваш коментар очікує на перевірку."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3296
+#, elixir-autogen, elixir-format
+msgid "That file isn't audio — pick an audio file."
+msgstr "Цей файл не є аудіо — виберіть аудіофайл."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:143
+#, elixir-autogen, elixir-format
+msgid "That slug is taken — pick another to save."
+msgstr "Цей slug зайнято — виберіть інший, щоб зберегти."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4349
+#, elixir-autogen, elixir-format
+msgid "Adds ?v=N access to this post's published versions. Off by default — only the live version is public."
+msgstr "Додає доступ ?v=N до опублікованих версій цього допису. За замовчуванням вимкнено — публічна лише активна версія."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4106
+#, elixir-autogen, elixir-format
+msgid "From title"
+msgstr "Із заголовка"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4345
+#, elixir-autogen, elixir-format
+msgid "Let readers browse older versions"
+msgstr "Дозволити читачам переглядати старіші версії"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4103
+#, elixir-autogen, elixir-format
+msgid "Re-derive the slug from the current title"
+msgstr "Заново створити slug із поточного заголовка"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4099
+#, elixir-autogen, elixir-format
+msgid "Working…"
+msgstr "Виконується…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3488
+#, elixir-autogen, elixir-format
+msgid "Resume editing"
+msgstr "Відновити редагування"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3482
+#, elixir-autogen, elixir-format
+msgid "Resuming…"
+msgstr "Відновлення…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2679
+#, elixir-autogen, elixir-format
+msgid "Slug is required to save."
+msgstr "Для збереження потрібен slug."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:947
+#, elixir-autogen, elixir-format
+msgid "Someone else is editing this post now — you can still watch."
+msgstr "Цей допис зараз редагує хтось інший — ви все одно можете спостерігати."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:950
+#, elixir-autogen, elixir-format
+msgid "You're editing again."
+msgstr "Ви знову редагуєте."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3474
+#, elixir-autogen, elixir-format
+msgid "Your editing lock expired due to inactivity."
+msgstr "Ваше блокування редагування спливло через неактивність."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2521
+#, elixir-autogen, elixir-format
+msgid "You're the editor now. The previous editor's unsaved changes were kept."
+msgstr "Тепер редактор — ви. Незбережені зміни попереднього редактора збережено."
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:235
+#, elixir-autogen, elixir-format
+msgid "No matching categories"
+msgstr "Немає відповідних категорій"
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:209
+#, elixir-autogen, elixir-format
+msgid "Remove %{name}"
+msgstr "Прибрати %{name}"
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:261
+#, elixir-autogen, elixir-format
+msgid "Saved with the version, so each version keeps its own filing."
+msgstr "Зберігається разом із версією, тож кожна версія має власну категоризацію."
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:232
+#, elixir-autogen, elixir-format
+msgid "Search categories…"
+msgstr "Пошук категорій…"
+
+#: lib/phoenix_kit_publishing/web/components/categories_picker.ex:234
+#, elixir-autogen, elixir-format
+msgid "Searching…"
+msgstr "Пошук…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3153
+#, elixir-autogen, elixir-format
+msgid "Someone else is editing this post — nothing was changed."
+msgstr "Цей допис редагує хтось інший — нічого не змінено."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3062
+#, elixir-autogen, elixir-format
+msgid "Author note"
+msgstr "Нотатка автора"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3067
+#, elixir-autogen, elixir-format
+msgid "Call to action"
+msgstr "Заклик до дії"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3095
+#, elixir-autogen, elixir-format
+msgid "Heading"
+msgstr "Заголовок"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3042
+#, elixir-autogen, elixir-format
+msgid "Headline (wide)"
+msgstr "Великий заголовок (широкий)"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3086
+#, elixir-autogen, elixir-format
+msgid "Headline text"
+msgstr "Текст заголовка"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3047
+#, elixir-autogen, elixir-format
+msgid "Showcase band"
+msgstr "Вітринна смуга"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3114
+#, elixir-autogen, elixir-format
+msgid "What should the reader do next?"
+msgstr "Що читачеві зробити далі?"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3091
+#, elixir-autogen, elixir-format
+msgid "Words beside the picture."
+msgstr "Текст поруч із зображенням."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3107
+#, elixir-autogen, elixir-format
+msgid "Your note here"
+msgstr "Ваша нотатка тут"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3106
+#, elixir-autogen, elixir-format
+msgid "the phrase"
+msgstr "фраза"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3057
+#, elixir-autogen, elixir-format
+msgid "Audio player"
+msgstr "Аудіопрогравач"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3260
+#, elixir-autogen, elixir-format
+msgid "Audio player inserted"
+msgstr "Аудіопрогравач вставлено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3052
+#, elixir-autogen, elixir-format
+msgid "Gallery (helix)"
+msgstr "Галерея (спіраль)"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3272
+#, elixir-autogen, elixir-format
+msgid "Gallery inserted"
+msgstr "Галерею вставлено"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4645
+#, elixir-autogen, elixir-format
+msgid "Saving will publish this version and archive v%{version}, which is live now."
+msgstr "Збереження опублікує цю версію та перемістить в архів v%{version}, яка зараз активна."
+
+#: lib/phoenix_kit_publishing/comments.ex:266
+#, elixir-autogen, elixir-format
+msgid "New comment on your post"
+msgstr "Новий коментар до вашого допису"
+
+#: lib/phoenix_kit_publishing/comments.ex:265
+#, elixir-autogen, elixir-format
+msgid "Someone replied to your comment"
+msgstr "Хтось відповів на ваш коментар"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:830
+#, elixir-autogen, elixir-format
+msgid "Drives the \"min read\" estimate. 200 suits English prose; lower it for dense or technical writing."
+msgstr "Визначає оцінку «хв читання». 200 підходить для англійської прози; для щільних або технічних текстів зменште це значення."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:841
+#, elixir-autogen, elixir-format
+msgid "Editing lock timeout (minutes)"
+msgstr "Тайм-аут блокування редагування (хвилини)"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:843
+#, elixir-autogen, elixir-format
+msgid "How long an idle editor keeps a post before it is released for someone else. A warning appears five minutes before."
+msgstr "Як довго неактивний редактор утримує допис, перш ніж його звільнять для інших. Попередження з'являється за п'ять хвилин до цього."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:820
+#, elixir-autogen, elixir-format
+msgid "How many posts a listing page shows before paginating."
+msgstr "Скільки дописів показує сторінка списку до розбиття на сторінки."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:819
+#, elixir-autogen, elixir-format
+msgid "Posts per page"
+msgstr "Дописів на сторінці"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:828
+#, elixir-autogen, elixir-format
+msgid "Reading speed (words per minute)"
+msgstr "Швидкість читання (слів за хвилину)"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:387
+#, elixir-autogen, elixir-format
+msgid "Setting updated"
+msgstr "Налаштування оновлено"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1051
+#, elixir-autogen, elixir-format
+msgid "This post was saved somewhere else. Your unsaved changes are still here — saving will overwrite that copy."
+msgstr "Цей допис збережено в іншому місці. Ваші незбережені зміни все ще тут — збереження перезапише ту копію."
+
+#: lib/phoenix_kit_publishing/renderer.ex:1002
+#, elixir-autogen, elixir-format
+msgid "Back to text"
+msgstr "Назад до тексту"
+
+#: lib/phoenix_kit_publishing/web/controller/listing.ex:128
+#, elixir-autogen, elixir-format
+msgid "No posts in this language yet. Showing closest match."
+msgstr "Цією мовою ще немає дописів. Показано найближчий відповідник."
+
+#: lib/phoenix_kit_publishing/renderer.ex:1015
+#, elixir-autogen, elixir-format
+msgid "Notes"
+msgstr "Примітки"
+
+#: lib/phoenix_kit_publishing/web/html.ex:2144
+#: lib/phoenix_kit_publishing/web/preview.ex:299
+#, elixir-autogen, elixir-format
+msgid "live"
+msgstr "активна"
+
+#: lib/phoenix_kit_publishing/errors.ex:124
+#, elixir-autogen, elixir-format
+msgid "A category can't be moved inside itself or one of its own children"
+msgstr "Категорію не можна перемістити всередину неї самої або в одну з її підкатегорій"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:161
+#, elixir-autogen, elixir-format
+msgid "Couldn't save the group — please check the values and try again."
+msgstr "Не вдалося зберегти групу — перевірте значення й спробуйте ще раз."
+
+#: lib/phoenix_kit_publishing/errors.ex:141
+#, elixir-autogen, elixir-format
+msgid "Invalid order"
+msgstr "Недійсний порядок"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:641
+#, elixir-autogen, elixir-format
+msgid "Moving…"
+msgstr "Переміщення…"
+
+#: lib/phoenix_kit_publishing/errors.ex:168
+#, elixir-autogen, elixir-format
+msgid "Parent category belongs to another group"
+msgstr "Батьківська категорія належить до іншої групи"
+
+#: lib/phoenix_kit_publishing/errors.ex:167
+#, elixir-autogen, elixir-format
+msgid "Parent category not found"
+msgstr "Батьківську категорію не знайдено"
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:600
+#, elixir-autogen, elixir-format
+msgid "Post saved as a draft, but it can't be published: the primary language needs a title."
+msgstr "Допис збережено як чернетку, але його не можна опублікувати: для основної мови потрібен заголовок."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:605
+#, elixir-autogen, elixir-format
+msgid "Post saved, but publishing failed."
+msgstr "Допис збережено, але опублікувати не вдалося."
+
+#: lib/phoenix_kit_publishing/errors.ex:165
+#, elixir-autogen, elixir-format
+msgid "Save the changes against the new version — creating one doesn't apply them"
+msgstr "Збережіть зміни в новій версії — її створення саме по собі їх не застосовує"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:159
+#, elixir-autogen, elixir-format
+msgid "That slug is already used by another group."
+msgstr "Цей slug уже використовує інша група."
+
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:558
+#, elixir-autogen, elixir-format
+msgid "The live version stays published — to take it offline, use Unpublish on the group page."
+msgstr "Активна версія залишається опублікованою — щоб зняти її з публікації, скористайтеся «Зняти з публікації» на сторінці групи."
+
+#: lib/phoenix_kit_publishing/errors.ex:150
+#, elixir-autogen, elixir-format
+msgid "The primary language's content anchors the post and can't be deleted — edit it instead"
+msgstr "Вміст основної мови — основа допису, і його не можна видалити; натомість відредагуйте його"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:619
+#, elixir-autogen, elixir-format
+msgid "General"
+msgstr "Загальні"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4671
+#, elixir-autogen, elixir-format
+msgid "Displays as:"
+msgstr "Відображається як:"
+
+#: lib/phoenix_kit_publishing/page_builder/components/embed.ex:47
+#, elixir-autogen, elixir-format
+msgid "Interactive demo"
+msgstr "Інтерактивна демонстрація"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4045
+#, elixir-autogen, elixir-format
+msgid "Link a publication"
+msgstr "Послатися на публікацію"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3072
+#, elixir-autogen, elixir-format
+msgid "Live demo (iframe)"
+msgstr "Жива демонстрація (iframe)"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1931
+#, elixir-autogen, elixir-format
+msgid "That publication no longer exists."
+msgstr "Цієї публікації більше не існує."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3119
+#, elixir-autogen, elixir-format
+msgid "Try it"
+msgstr "Спробувати"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:459
+#, elixir-autogen, elixir-format
+msgid "That parent no longer exists."
+msgstr "Цієї батьківської категорії більше не існує."
+
+#: lib/phoenix_kit_publishing/web/new.ex:41
+#, elixir-autogen, elixir-format
+msgid "New group"
+msgstr "Нова група"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:287
+#, elixir-autogen, elixir-format
+msgid "New post"
+msgstr "Новий допис"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:157
+#, elixir-autogen, elixir-format
+msgid "%{count} published entry"
+msgid_plural "%{count} published entries"
+msgstr[0] "%{count} опублікований запис"
+msgstr[1] "%{count} опубліковані записи"
+msgstr[2] "%{count} опублікованих записів"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:136
+#, elixir-autogen, elixir-format
+msgid "Available groups:"
+msgstr "Доступні групи:"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:87
+#, elixir-autogen, elixir-format
+msgid "New entry"
+msgstr "Новий запис"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:128
+#, elixir-autogen, elixir-format
+msgid "No publishing group linked to this project yet."
+msgstr "До цього проєкту ще не прив'язано групу публікацій."
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:154
+#, elixir-autogen, elixir-format
+msgid "Nothing published"
+msgstr "Нічого не опубліковано"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:100
+#, elixir-autogen, elixir-format
+msgid "Nothing published in this group yet."
+msgstr "У цій групі ще нічого не опубліковано."
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:93
+#, elixir-autogen, elixir-format
+msgid "Open in Publishing"
+msgstr "Відкрити в «Публікаціях»"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:131
+#, elixir-autogen, elixir-format
+msgid "Paste a group slug into this tab's settings in the project's Modules & features panel."
+msgstr "Вставте slug групи в налаштування цієї вкладки на панелі проєкту «Модулі та функції»."
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:118
+#, elixir-autogen, elixir-format
+msgid "Showing %{shown} of %{total} — the full list lives in the Publishing admin."
+msgstr "Показано %{shown} із %{total} — повний список є в розділі адміністрування «Публікації»."
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1322
+#, elixir-autogen, elixir-format
+msgid "posts"
+msgstr "дописів"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3898
+#, elixir-autogen, elixir-format
+msgid "Collecting your edits…"
+msgstr "Збираємо ваші правки…"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4377
+#, elixir-autogen, elixir-format
+msgid "Exclude from the sitemap"
+msgstr "Виключити з карти сайту"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:572
+#, elixir-autogen, elixir-format
+msgid "Exclude this group from the sitemap"
+msgstr "Виключити цю групу з карти сайту"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4381
+#, elixir-autogen, elixir-format
+msgid "Leaves this post out of the site's sitemap. The post stays public at its URL."
+msgstr "Не включає цей допис до карти сайту. Допис залишається публічним за своєю URL-адресою."
+
+#: lib/phoenix_kit_publishing/web/edit.ex:574
+#, elixir-autogen, elixir-format
+msgid "Neither the listing nor any post in this group is listed in the sitemap."
+msgstr "Ні список, ні жоден допис цієї групи не потрапляють до карти сайту."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:1690
+#, elixir-autogen, elixir-format
+msgid "The editor did not answer, so nothing was switched. Your last edits may not be saved yet — please try again."
+msgstr "Редактор не відповів, тому нічого не перемкнено. Ваші останні правки могли ще не зберегтися — спробуйте ще раз."
+
+#: lib/phoenix_kit_publishing/web/settings.ex:770
+#: lib/phoenix_kit_publishing/web/settings.ex:780
+#, elixir-autogen, elixir-format
+msgid "Unique Views"
+msgstr "Унікальні перегляди"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:330
+#, elixir-autogen, elixir-format
+msgid "Unique views disabled — every page open counts"
+msgstr "Унікальні перегляди вимкнено — враховується кожне відкриття сторінки"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:329
+#, elixir-autogen, elixir-format
+msgid "Unique views enabled — one view per visitor per post per day"
+msgstr "Унікальні перегляди ввімкнено — один перегляд на відвідувача, допис і день"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:772
+#, elixir-autogen, elixir-format
+msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
+msgstr "Увімк.: кожен відвідувач враховується один раз на допис за день — за сеансом, а інакше за ключованим хешем адреси, тож читачі з однієї адреси враховуються як один, доки їхній браузер не збереже позначку. Вимк.: враховується кожне відкриття сторінки."
+
+#: lib/phoenix_kit_publishing/errors.ex:225
+#, elixir-autogen, elixir-format
+msgid "Saved as a draft, but it could not be published: %{reason}"
+msgstr "Збережено як чернетку, але опублікувати не вдалося: %{reason}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:48
+#: lib/phoenix_kit_publishing/web/settings.ex:136
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to change the Publishing settings"
+msgstr "У вас немає дозволу змінювати налаштування модуля «Публікації»"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:53
+#: lib/phoenix_kit_publishing/web/edit.ex:67
+#: lib/phoenix_kit_publishing/web/edit.ex:138
+#: lib/phoenix_kit_publishing/web/index.ex:195
+#: lib/phoenix_kit_publishing/web/new.ex:29
+#: lib/phoenix_kit_publishing/web/new.ex:144
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to manage publishing groups"
+msgstr "У вас немає дозволу керувати групами публікацій"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3880
+#, elixir-autogen, elixir-format
+msgid "%{count} other viewing"
+msgid_plural "%{count} others viewing"
+msgstr[0] "Ще %{count} переглядає"
+msgstr[1] "Ще %{count} переглядають"
+msgstr[2] "Ще %{count} переглядають"
+
+#: lib/phoenix_kit_publishing/errors.ex:255
+#, elixir-autogen, elixir-format
+msgid "%{field} %{message}"
+msgstr "%{field} %{message}"
+
+#: lib/phoenix_kit_publishing/web/project_docs_live.ex:165
+#, elixir-autogen, elixir-format
+msgid "(untitled)"
+msgstr "(без назви)"
+
+#: lib/phoenix_kit_publishing/publishing.ex:543
+#, elixir-autogen, elixir-format
+msgid "Activity on posts you wrote"
+msgstr "Активність у дописах, які ви написали"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1085
+#, elixir-autogen, elixir-format
+msgid "Cache rendered HTML for published posts (24-hour TTL)"
+msgstr "Кешувати згенерований HTML опублікованих дописів (TTL 24 години)"
+
+#: lib/phoenix_kit_publishing/publishing.ex:597
+#, elixir-autogen, elixir-format
+msgid "Change the module's settings"
+msgstr "Змінювати налаштування модуля"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:413
+#, elixir-autogen, elixir-format
+msgid "Cleared %{count} cached post for %{group}"
+msgid_plural "Cleared %{count} cached posts for %{group}"
+msgstr[0] "Очищено %{count} кешований допис для %{group}"
+msgstr[1] "Очищено %{count} кешовані дописи для %{group}"
+msgstr[2] "Очищено %{count} кешованих дописів для %{group}"
+
+#: lib/phoenix_kit_publishing/errors.ex:126
+#, elixir-autogen, elixir-format
+msgid "Comments are not available"
+msgstr "Коментарі недоступні"
+
+#: lib/phoenix_kit_publishing/publishing.ex:552
+#, elixir-autogen, elixir-format
+msgid "Comments on your posts"
+msgstr "Коментарі до ваших дописів"
+
+#: lib/phoenix_kit_publishing/errors.ex:132
+#, elixir-autogen, elixir-format
+msgid "Could not copy the content to the new version"
+msgstr "Не вдалося скопіювати вміст до нової версії"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:470
+#, elixir-autogen, elixir-format
+msgid "Couldn't save this setting. Please try again."
+msgstr "Не вдалося зберегти це налаштування. Спробуйте ще раз."
+
+#: lib/phoenix_kit_publishing/publishing.ex:591
+#, elixir-autogen, elixir-format
+msgid "Create, edit, trash, restore and permanently delete publishing groups with all their posts"
+msgstr "Створювати, редагувати, переміщувати в кошик, відновлювати й остаточно видаляти групи публікацій з усіма їхніми дописами"
+
+#: lib/phoenix_kit_publishing/publishing.ex:576
+#, elixir-autogen, elixir-format
+msgid "Database-backed CMS pages and multi-language content"
+msgstr "Сторінки CMS на основі бази даних і багатомовний вміст"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:1246
+#, elixir-autogen, elixir-format
+msgid "Edit categories"
+msgstr "Редагувати категорії"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:521
+#, elixir-autogen, elixir-format
+msgid "Edit group"
+msgstr "Редагувати групу"
+
+#: lib/phoenix_kit_publishing/web/controller.ex:708
+#: lib/phoenix_kit_publishing/web/controller.ex:754
+#: lib/phoenix_kit_publishing/web/controller.ex:789
+#, elixir-autogen, elixir-format
+msgid "Edit post"
+msgstr "Редагувати допис"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1398
+#, elixir-autogen, elixir-format
+msgid "Error rendering audio"
+msgstr "Помилка відображення аудіо"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1757
+#, elixir-autogen, elixir-format
+msgid "Error rendering component"
+msgstr "Помилка відображення компонента"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1419
+#, elixir-autogen, elixir-format
+msgid "Error rendering embed"
+msgstr "Помилка відображення вбудованого вмісту"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1442
+#, elixir-autogen, elixir-format
+msgid "Error rendering entity form"
+msgstr "Помилка відображення форми сутності"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1356
+#, elixir-autogen, elixir-format
+msgid "Error rendering image"
+msgstr "Помилка відображення зображення"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1824
+#, elixir-autogen, elixir-format
+msgid "Error rendering showcase"
+msgstr "Помилка відображення вітрини"
+
+#: lib/phoenix_kit_publishing/renderer.ex:1377
+#, elixir-autogen, elixir-format
+msgid "Error rendering video"
+msgstr "Помилка відображення відео"
+
+#: lib/phoenix_kit_publishing/errors.ex:135
+#, elixir-autogen, elixir-format
+msgid "Group is in the trash"
+msgstr "Група в кошику"
+
+#: lib/phoenix_kit_publishing/publishing.ex:589
+#, elixir-autogen, elixir-format
+msgid "Manage groups"
+msgstr "Керувати групами"
+
+#: lib/phoenix_kit_publishing/publishing.ex:599
+#, elixir-autogen, elixir-format
+msgid "Open the Publishing settings page and change settings and caches there"
+msgstr "Відкривати сторінку налаштувань модуля «Публікації» та змінювати там налаштування й кеші"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:189
+#, elixir-autogen, elixir-format
+msgid "Post restored and live again"
+msgstr "Допис відновлено, і він знову опублікований"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:4144
+#, elixir-autogen, elixir-format
+msgid "Preview: %{path}"
+msgstr "Попередній перегляд: %{path}"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:182
+#, elixir-autogen, elixir-format
+msgid "Regenerated %{count} cache"
+msgid_plural "Regenerated %{count} caches"
+msgstr[0] "Перебудовано %{count} кеш"
+msgstr[1] "Перебудовано %{count} кеші"
+msgstr[2] "Перебудовано %{count} кешів"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:185
+#, elixir-autogen, elixir-format
+msgid "Regenerated %{count} of %{total} caches; the others failed"
+msgid_plural "Regenerated %{count} of %{total} caches; the others failed"
+msgstr[0] "Перебудовано %{count} з %{total} кешів; решту перебудувати не вдалося"
+msgstr[1] "Перебудовано %{count} з %{total} кешів; решту перебудувати не вдалося"
+msgstr[2] "Перебудовано %{count} з %{total} кешів; решту перебудувати не вдалося"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1193
+#, elixir-autogen, elixir-format
+msgid "Render cache stores pre-rendered HTML for published posts. Cache keys include content hashes, so edits automatically use fresh renders. TTL: 24 hours."
+msgstr "Кеш рендерингу зберігає попередньо згенерований HTML опублікованих дописів. Ключі кешу містять хеші вмісту, тож після редагування автоматично використовується свіжий результат. TTL: 24 години."
+
+#: lib/phoenix_kit_publishing/publishing.ex:559
+#, elixir-autogen, elixir-format
+msgid "Replies to your comments"
+msgstr "Відповіді на ваші коментарі"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3388
+#, elixir-autogen, elixir-format
+msgid "Save the post before viewing the public page"
+msgstr "Збережіть допис, перш ніж переглядати публічну сторінку"
+
+#: lib/phoenix_kit_publishing/publishing.ex:553
+#, elixir-autogen, elixir-format
+msgid "Someone commented on a post you wrote"
+msgstr "Хтось прокоментував ваш допис"
+
+#: lib/phoenix_kit_publishing/publishing.ex:560
+#, elixir-autogen, elixir-format
+msgid "Someone replied to a comment you left"
+msgstr "Хтось відповів на ваш коментар"
+
+#: lib/phoenix_kit_publishing/errors.ex:179
+#, elixir-autogen, elixir-format
+msgid "Source version not found"
+msgstr "Вихідну версію не знайдено"
+
+#: lib/phoenix_kit_publishing/errors.ex:217
+#, elixir-autogen, elixir-format
+msgid "The group still holds %{count} post"
+msgid_plural "The group still holds %{count} posts"
+msgstr[0] "У групі ще є %{count} допис"
+msgstr[1] "У групі ще є %{count} дописи"
+msgstr[2] "У групі ще є %{count} дописів"
+
+#: lib/phoenix_kit_publishing/errors.ex:156
+#, elixir-autogen, elixir-format
+msgid "The post has no live version"
+msgstr "Допис не має активної версії"
+
+#: lib/phoenix_kit_publishing/errors.ex:160
+#, elixir-autogen, elixir-format
+msgid "The post has no version"
+msgstr "Допис не має версії"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:1281
+#, elixir-autogen, elixir-format
+msgid "This post has a live version: restoring it puts it back on the public site. Restore?"
+msgstr "Цей допис має активну версію: після відновлення він знову з'явиться на публічному сайті. Відновити?"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2469
+#, elixir-autogen, elixir-format
+msgid "Translation completed successfully for %{count} language"
+msgid_plural "Translation completed successfully for %{count} languages"
+msgstr[0] "Переклад успішно завершено для %{count} мови"
+msgstr[1] "Переклад успішно завершено для %{count} мов"
+msgstr[2] "Переклад успішно завершено для %{count} мов"
+
+#: lib/phoenix_kit_publishing/errors.ex:130
+#, elixir-autogen, elixir-format
+msgid "URL slug is a previous address of another post"
+msgstr "URL-slug — це попередня адреса іншого допису"
+
+#: lib/phoenix_kit_publishing/web/editor.ex:3389
+#, elixir-autogen, elixir-format
+msgid "View this post on the public site"
+msgstr "Переглянути цей допис на публічному сайті"
+
+#: lib/phoenix_kit_publishing/web/html.ex:3072
+#, elixir-autogen, elixir-format
+msgctxt "month abbreviation"
+msgid "May"
+msgstr "трав."
+
+#: lib/phoenix_kit_publishing/web/index.ex:249
+#, elixir-autogen, elixir-format
+msgid "Move the group to the trash before deleting it."
+msgstr "Перш ніж видалити групу, перемістіть її в кошик."
+
+#: lib/phoenix_kit_publishing/web/new.ex:682
+#, elixir-autogen, elixir-format
+msgid "Couldn't create this group."
+msgstr "Не вдалося створити цю групу."
+
+#: lib/phoenix_kit_publishing/web/html.ex:1008
+#, elixir-autogen, elixir-format
+msgid "Next page"
+msgstr "Наступна сторінка"
+
+#: lib/phoenix_kit_publishing/web/html.ex:978
+#, elixir-autogen, elixir-format
+msgid "Pagination"
+msgstr "Посторінкова навігація"
+
+#: lib/phoenix_kit_publishing/web/html.ex:984
+#, elixir-autogen, elixir-format
+msgid "Previous page"
+msgstr "Попередня сторінка"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:1161
+#, elixir-autogen, elixir-format
+msgid "Render cache for %{group}"
+msgstr "Кеш рендерингу для %{group}"
+
+#: lib/phoenix_kit_publishing/web/listing.ex:396
+#, elixir-autogen, elixir-format
+msgid "This group was renamed to %{slug}."
+msgstr "Групу перейменовано на %{slug}."
+
+#: lib/phoenix_kit_publishing/web/editor.ex:2252
+#, elixir-autogen, elixir-format
+msgid "This group was renamed to %{slug}. Your edits keep saving; reload the page to see collaborators' changes."
+msgstr "Групу перейменовано на %{slug}. Ваші зміни й далі зберігаються; перезавантажте сторінку, щоб побачити зміни інших."

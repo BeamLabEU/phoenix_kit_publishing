@@ -251,6 +251,65 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorSwitchContentTest do
     refute_push_event(view, @leaf, %{action: "set_content"})
   end
 
+  # Back is decided once Leaf has handed its buffer over: the blur flush comes
+  # AFTER the click, so deciding on the server's state alone left without a
+  # prompt while keystrokes were still on the client.
+  test "Back with keystrokes still on the client asks before leaving", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
+
+    render_click(view, "back_to_list", %{})
+    answer_flush(view, "English body. Typed just now.", [])
+
+    assert render(view) =~ "You have unsaved changes. Leave without saving?"
+  end
+
+  test "Back with nothing pending leaves once the buffer is in", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid)
+
+    render_click(view, "back_to_list", %{})
+    answer_flush(view, "English body.", dirty: false)
+
+    {path, _flash} = assert_redirect(view, 1000)
+    assert String.ends_with?(path, "/admin/publishing/#{ctx.slug}")
+  end
+
+  # A mention click is a navigation like any other switch: the last keystrokes
+  # are collected and saved first.
+  test "following a mention saves the last keystrokes first", ctx do
+    {:ok, other} =
+      Posts.create_post(ctx.slug, %{title: "Other", slug: "other", content: "Other body."})
+
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid, user_uuid: with_real_user())
+
+    send(view.pid, {:leaf_link_clicked, %{target: "post:" <> other.uuid}})
+    answer_flush(view, "English body. Before following.", [])
+
+    {path, _flash} = assert_redirect(view, 1000)
+    assert path =~ other.uuid
+
+    {:ok, english} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
+    assert english.content == "English body. Before following."
+  end
+
+  # Renamed while open: saves look the post up under the group slug, so the
+  # editor must take the new one or every autosave answers "Not found".
+  test "a rename of the group keeps the open editor saving", ctx do
+    {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid, user_uuid: with_real_user())
+
+    new_slug = ctx.slug <> "-renamed"
+    {:ok, _} = Groups.update_group(ctx.slug, %{"slug" => new_slug})
+
+    assert render(view) =~ "This group was renamed to #{new_slug}"
+    assert :sys.get_state(view.pid).socket.assigns.group_slug == new_slug
+
+    send(view.pid, {:leaf_changed, leaf_payload("English body. After the rename.")})
+    _ = render(view)
+    _ = render_click(view, "save", %{})
+
+    {:ok, english} = Publishing.read_post_by_uuid(ctx.uuid, "en-US", 1)
+    assert english.content == "English body. After the rename."
+  end
+
   test "the last keystrokes go with the switch instead of being dropped", ctx do
     user = with_real_user()
     {:ok, view, _html} = open_editor(ctx.slug, ctx.uuid, user_uuid: user)

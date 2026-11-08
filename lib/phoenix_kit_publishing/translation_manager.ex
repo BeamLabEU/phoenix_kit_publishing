@@ -338,7 +338,8 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
           "post_uuid" => db_post.uuid,
           "language" => language_code,
           "version_uuid" => db_version.uuid
-        }
+        },
+        opts
       )
 
       :ok
@@ -468,7 +469,8 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
           "post_uuid" => db_post.uuid,
           "language" => language_code,
           "version_uuid" => db_version.uuid
-        }
+        },
+        opts
       )
 
       :ok
@@ -509,7 +511,8 @@ defmodule PhoenixKit.Modules.Publishing.TranslationManager do
         "post_uuid" => post_uuid,
         "language" => lang,
         "reason" => ActivityLog.reason_string(reason)
-      }
+      },
+      opts
     )
 
     err

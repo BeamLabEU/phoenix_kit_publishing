@@ -72,6 +72,33 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc """
+  The times on `date` a READER can open: `list_times_on_date/2` without the
+  posts still scheduled ahead. A date-only URL resolves through this, so with
+  two embargoed posts on a date it no longer redirects to (and so reveals)
+  the first one's time.
+  """
+  @spec list_public_times_on_date(String.t(), Date.t() | String.t()) :: [String.t()]
+  def list_public_times_on_date(group_slug, date) do
+    date = if is_binary(date), do: Date.from_iso8601!(date), else: date
+
+    group_slug
+    |> DBStorage.list_posts_timestamp_mode(Constants.status_published(), date: date)
+    |> Enum.reject(
+      &Constants.scheduled_ahead?(%{mode: "timestamp", date: &1.post_date, time: &1.post_time})
+    )
+    |> Enum.map(&(Time.to_string(&1.post_time) |> String.slice(0, 5)))
+    |> Enum.uniq()
+    |> Enum.sort()
+  rescue
+    e ->
+      Logger.warning(
+        "[Publishing] list_public_times_on_date failed for #{group_slug}: #{inspect(e)}"
+      )
+
+      []
+  end
+
+  @doc """
   Finds a published post by URL slug — the public routing path. Drafts
   do NOT resolve through this lookup; use `find_by_url_slug_any_version/3`
   for admin/self-healing flows that need to see drafts.
@@ -162,13 +189,20 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   @doc """
   Lists posts for a given publishing group slug.
 
-  Queries the database directly via DBStorage.
-  The optional second argument is accepted for API compatibility but unused.
+  Queries the database directly via DBStorage. Without a language (the admin)
+  each map describes the newest revision, for editing. With one — core's
+  Sitemap passes the language it is building — a live post's URL fields
+  (`available_languages`, `language_slugs`, `url_slug`) are its LIVE version's:
+  a draft that renamed a slug or added a language used to put a URL in the
+  sitemap that 404s, and drop the live one.
   """
   @spec list_posts(String.t(), String.t() | nil) :: [map()]
-  def list_posts(group_slug, _preferred_language \\ nil) do
-    DBStorage.list_posts_with_metadata(group_slug)
-  end
+  def list_posts(group_slug, preferred_language \\ nil)
+
+  def list_posts(group_slug, language) when is_binary(language),
+    do: DBStorage.list_posts_with_metadata(group_slug, nil, public_urls: true)
+
+  def list_posts(group_slug, _language), do: DBStorage.list_posts_with_metadata(group_slug)
 
   @doc "Lists posts filtered by status (e.g. 'trashed', 'published')."
   @spec list_posts_by_status(String.t(), String.t()) :: [map()]

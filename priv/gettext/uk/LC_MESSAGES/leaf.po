@@ -1,0 +1,385 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: uk\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Add Column Right"
+msgstr "Додати стовпець праворуч"
+
+msgid "Add Row Below"
+msgstr "Додати рядок нижче"
+
+msgid "Align Center"
+msgstr "Вирівняти по центру"
+
+msgid "Align Left"
+msgstr "Вирівняти ліворуч"
+
+msgid "Align Right"
+msgstr "Вирівняти праворуч"
+
+msgid "Align center"
+msgstr "Вирівняти по центру"
+
+msgid "Align left"
+msgstr "Вирівняти ліворуч"
+
+msgid "Align right"
+msgstr "Вирівняти праворуч"
+
+msgid "Alt text (optional)"
+msgstr "Альтернативний текст (необов'язково)"
+
+msgid "Alt text..."
+msgstr "Альтернативний текст..."
+
+msgid "Audio"
+msgstr "Аудіо"
+
+msgid "Blockquote"
+msgstr "Блок цитати"
+
+msgid "Bold"
+msgstr "Жирний"
+
+msgid "Bullet List"
+msgstr "Маркований список"
+
+msgid "Button"
+msgstr "Кнопка"
+
+msgid "By URL"
+msgstr "За URL-адресою"
+
+msgid "Callout"
+msgstr "Виноска"
+
+msgid "Cancel"
+msgstr "Скасувати"
+
+msgid "Caption..."
+msgstr "Підпис..."
+
+msgid "Clean up"
+msgstr "Очищення"
+
+msgid "Code Block"
+msgstr "Блок коду"
+
+msgid "Code block"
+msgstr "Блок коду"
+
+msgid "Code language"
+msgstr "Мова коду"
+
+msgid "Column align"
+msgstr "Вирівнювання стовпця"
+
+msgid "Columns"
+msgstr "Стовпці"
+
+msgid "Components"
+msgstr "Компоненти"
+
+msgid "Copied"
+msgstr "Скопійовано"
+
+msgid "Copy"
+msgstr "Копіювати"
+
+msgid "Copy as HTML"
+msgstr "Копіювати як HTML"
+
+msgid "Copy as Markdown"
+msgstr "Копіювати як Markdown"
+
+msgid "Create"
+msgstr "Створити"
+
+msgid "Decrease Indent"
+msgstr "Зменшити відступ"
+
+msgid "Delete"
+msgstr "Видалити"
+
+msgid "Describe the image"
+msgstr "Опишіть зображення"
+
+msgid "Details / Accordion"
+msgstr "Деталі / Акордеон"
+
+msgid "Double-click to edit"
+msgstr "Двічі клацніть, щоб редагувати"
+
+msgid "Download .md"
+msgstr "Завантажити .md"
+
+msgid "Drag to resize · Double-click to fit content"
+msgstr "Перетягніть, щоб змінити розмір · Двічі клацніть, щоб припасувати до вмісту"
+
+msgid "Duplicate"
+msgstr "Дублювати"
+
+msgid "Edit <{tag}> source"
+msgstr "Редагувати вихідний код <{tag}>"
+
+msgid "Edit image URL"
+msgstr "Редагувати URL зображення"
+
+msgid "Edit link"
+msgstr "Редагувати посилання"
+
+msgid "Edit link URL"
+msgstr "Редагувати URL посилання"
+
+msgid "Embedded page"
+msgstr "Вбудована сторінка"
+
+msgid "Emoji"
+msgstr "Емодзі"
+
+msgid "Exit fullscreen"
+msgstr "Вийти з повноекранного режиму"
+
+msgid "Export"
+msgstr "Експорт"
+
+msgid "Format"
+msgstr "Формат"
+
+msgid "Fullscreen"
+msgstr "Повноекранний режим"
+
+msgid "HTML"
+msgstr "HTML"
+
+msgid "HTML mode"
+msgstr "Режим HTML"
+
+msgid "Heading"
+msgstr "Заголовок"
+
+msgid "Heading 1"
+msgstr "Заголовок 1"
+
+msgid "Heading 2"
+msgstr "Заголовок 2"
+
+msgid "Heading 3"
+msgstr "Заголовок 3"
+
+msgid "Headings"
+msgstr "Заголовки"
+
+msgid "Headline text"
+msgstr "Текст заголовка"
+
+msgid "Horizontal Rule"
+msgstr "Горизонтальна лінія"
+
+msgid "Hybrid"
+msgstr "Гібридний"
+
+msgid "Hybrid mode"
+msgstr "Гібридний режим"
+
+msgid "Image"
+msgstr "Зображення"
+
+msgid "Image URL"
+msgstr "URL зображення"
+
+msgid "Image alt text"
+msgstr "Альтернативний текст зображення"
+
+msgid "Image caption"
+msgstr "Підпис до зображення"
+
+msgid "Image options"
+msgstr "Параметри зображення"
+
+msgid "Increase Indent"
+msgstr "Збільшити відступ"
+
+msgid "Inline Code"
+msgstr "Код у рядку"
+
+msgid "Insert"
+msgstr "Вставити"
+
+msgid "Insert Emoji"
+msgstr "Вставити емодзі"
+
+msgid "Insert Image"
+msgstr "Вставити зображення"
+
+msgid "Insert Link"
+msgstr "Вставити посилання"
+
+msgid "Insert Table"
+msgstr "Вставити таблицю"
+
+msgid "Insert Video"
+msgstr "Вставити відео"
+
+msgid "Insert date"
+msgstr "Вставити дату"
+
+msgid "Insert time"
+msgstr "Вставити час"
+
+msgid "Italic"
+msgstr "Курсив"
+
+msgid "Link"
+msgstr "Посилання"
+
+msgid "Link URL"
+msgstr "URL посилання"
+
+msgid "Lists"
+msgstr "Списки"
+
+msgid "Markdown"
+msgstr "Markdown"
+
+msgid "Markdown mode"
+msgstr "Режим Markdown"
+
+msgid "Mode"
+msgstr "Режим"
+
+msgid "More editor options"
+msgstr "Інші параметри редактора"
+
+msgid "More formatting"
+msgstr "Інше форматування"
+
+msgid "More inserts"
+msgstr "Інші вставки"
+
+msgid "No address yet"
+msgstr "Адресу ще не вказано"
+
+msgid "No matches"
+msgstr "Збігів немає"
+
+msgid "Numbered List"
+msgstr "Нумерований список"
+
+msgid "Open image"
+msgstr "Відкрити зображення"
+
+msgid "Picture"
+msgstr "Зображення"
+
+msgid "Quote"
+msgstr "Цитата"
+
+msgid "Redo"
+msgstr "Повторити"
+
+msgid "Remove Column"
+msgstr "Видалити стовпець"
+
+msgid "Remove Formatting"
+msgstr "Очистити форматування"
+
+msgid "Remove Row"
+msgstr "Видалити рядок"
+
+msgid "Remove image"
+msgstr "Видалити зображення"
+
+msgid "Remove link"
+msgstr "Видалити посилання"
+
+msgid "Rows"
+msgstr "Рядки"
+
+msgid "Saved"
+msgstr "Збережено"
+
+msgid "Saving…"
+msgstr "Збереження…"
+
+msgid "Search emoji..."
+msgstr "Пошук емодзі..."
+
+msgid "Searching…"
+msgstr "Пошук…"
+
+msgid "Set language"
+msgstr "Вибрати мову"
+
+msgid "Spoiler"
+msgstr "Спойлер"
+
+msgid "Strikethrough"
+msgstr "Закреслений"
+
+msgid "Subscript"
+msgstr "Нижній індекс"
+
+msgid "Summary"
+msgstr "Короткий зміст"
+
+msgid "Superscript"
+msgstr "Верхній індекс"
+
+msgid "Symbols / Date"
+msgstr "Символи / Дата"
+
+msgid "Table"
+msgstr "Таблиця"
+
+msgid "Task List"
+msgstr "Список завдань"
+
+msgid "Text"
+msgstr "Текст"
+
+msgid "Toggle Header Row"
+msgstr "Увімкнути/вимкнути рядок заголовка"
+
+msgid "Toggle fullscreen"
+msgstr "Увімкнути/вимкнути повноекранний режим"
+
+msgid "Undo"
+msgstr "Скасувати"
+
+msgid "Unsaved changes"
+msgstr "Незбережені зміни"
+
+msgid "Upload"
+msgstr "Завантажити"
+
+msgid "Video"
+msgstr "Відео"
+
+msgid "View"
+msgstr "Вигляд"
+
+msgid "Visual"
+msgstr "Візуальний"
+
+msgid "Visual mode"
+msgstr "Візуальний режим"
+
+msgid "height"
+msgstr "висота"
+
+msgid "results"
+msgstr "результатів"
+
+msgid "stretch"
+msgstr "розтягування"

@@ -8,6 +8,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   import Ecto.Query
 
+  alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage.Mapper
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
@@ -98,28 +99,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   @spec restore_group(PublishingGroup.t()) :: changeset_or_struct(PublishingGroup.t())
   def restore_group(%PublishingGroup{} = group) do
     update_group(group, %{status: "active"})
-  end
-
-  @doc """
-  Upserts a group by slug atomically via PostgreSQL `ON CONFLICT`.
-
-  The previous check-then-act version (`get_group_by_slug` then create
-  or update) had a TOCTOU race: two concurrent callers with the same
-  slug could both observe `nil` and both attempt to insert, with one
-  crashing on the unique index. This version delegates conflict
-  resolution to PostgreSQL and replaces the mutable columns on hit.
-  """
-  @spec upsert_group(map()) :: changeset_or_struct(PublishingGroup.t())
-  def upsert_group(attrs) do
-    %PublishingGroup{}
-    |> PublishingGroup.changeset(attrs)
-    |> repo().insert(
-      on_conflict:
-        {:replace,
-         [:name, :mode, :status, :position, :data, :title_i18n, :description_i18n, :updated_at]},
-      conflict_target: :slug,
-      returning: true
-    )
   end
 
   @doc "Deletes a group and all its posts (cascade)."
@@ -446,7 +425,13 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       where: g.slug == ^group_slug and is_nil(p.trashed_at),
       where: v.status == @status_published,
       where: c.language in ^language_candidates,
-      where: ilike(c.title, ^pattern) or ilike(c.content, ^pattern),
+      # HTML comments are matched out: the page strips them (an author's
+      # `<!-- note -->` never reaches a reader), and a body search over the raw
+      # markdown answered `?q=` probes for their text. An unclosed comment
+      # runs to the end, as the sanitiser reads it.
+      where:
+        ilike(c.title, ^pattern) or
+          fragment("regexp_replace(?, '<!--.*\\?(-->|$)', '', 'g') ILIKE ?", c.content, ^pattern),
       distinct: true,
       select: p.uuid,
       limit: ^limit
@@ -469,6 +454,66 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       select: count(p.uuid)
     )
     |> repo().one() || 0
+  end
+
+  @doc """
+  The admin dashboard's figures for a group, from three aggregate queries
+  instead of every post, version and body of the group:
+
+    * `:posts` — non-trashed posts;
+    * `:published` — those whose active version is published;
+    * `:last_published_at` — the latest `published_at` among those live versions;
+    * `:languages` — the languages of each post's newest version, sorted.
+
+  The same numbers `list_posts_with_metadata/1` gave the dashboard, which
+  loaded every body of every group on each refresh only to count them.
+  """
+  @spec group_post_stats(String.t()) :: %{
+          posts: non_neg_integer(),
+          published: non_neg_integer(),
+          last_published_at: DateTime.t() | nil,
+          languages: [String.t()]
+        }
+  def group_post_stats(group_slug) do
+    live =
+      from(p in PublishingPost,
+        join: g in assoc(p, :group),
+        join: v in PublishingVersion,
+        on: v.uuid == p.active_version_uuid,
+        where: g.slug == ^group_slug and is_nil(p.trashed_at),
+        where: v.status == ^Constants.status_published(),
+        select: {count(p.uuid), max(v.published_at)}
+      )
+
+    newest =
+      from(v in PublishingVersion,
+        group_by: v.post_uuid,
+        select: %{post_uuid: v.post_uuid, number: max(v.version_number)}
+      )
+
+    languages =
+      from(c in PublishingContent,
+        join: v in PublishingVersion,
+        on: v.uuid == c.version_uuid,
+        join: n in subquery(newest),
+        on: n.post_uuid == v.post_uuid and n.number == v.version_number,
+        join: p in PublishingPost,
+        on: p.uuid == v.post_uuid,
+        join: g in assoc(p, :group),
+        where: g.slug == ^group_slug and is_nil(p.trashed_at),
+        distinct: true,
+        order_by: c.language,
+        select: c.language
+      )
+
+    {published, last_published_at} = repo().one(live) || {0, nil}
+
+    %{
+      posts: count_posts(group_slug),
+      published: published,
+      last_published_at: last_published_at,
+      languages: repo().all(languages)
+    }
   end
 
   @doc """
@@ -532,21 +577,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     repo().all(query)
   end
 
-  @doc "Lists posts in slug mode (ordered by slug asc)."
-  @spec list_posts_slug_mode(String.t(), String.t() | nil) :: [PublishingPost.t()]
-  def list_posts_slug_mode(group_slug, status \\ nil) do
-    query =
-      from(p in PublishingPost,
-        join: g in assoc(p, :group),
-        where: g.slug == ^group_slug and is_nil(p.trashed_at),
-        order_by: [asc: p.slug],
-        preload: [group: g]
-      )
-
-    by_publish_state(query, status)
-    |> repo().all()
-  end
-
   @doc "Finds a post by date and time (timestamp mode, matches hour:minute only)."
   @spec find_post_by_date_time(String.t(), Date.t(), Time.t() | nil) :: PublishingPost.t() | nil
   def find_post_by_date_time(group_slug, date, time) do
@@ -567,12 +597,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     post
     |> Ecto.Changeset.change(trashed_at: nil)
     |> repo().update()
-  end
-
-  @doc "Hard-deletes a post and all its versions/contents (cascade)."
-  @spec delete_post(PublishingPost.t()) :: changeset_or_struct(PublishingPost.t())
-  def delete_post(%PublishingPost{} = post) do
-    repo().delete(post)
   end
 
   # ===========================================================================
@@ -772,16 +796,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     |> repo().update_all(set: [status: new_status, updated_at: DateTime.utc_now()])
   end
 
-  @doc "Bulk-updates the status of all content rows for a version, excluding a specific language."
-  @spec update_content_status_except(String.t(), String.t(), String.t()) ::
-          {non_neg_integer(), nil}
-  def update_content_status_except(version_uuid, exclude_language, new_status) do
-    from(c in PublishingContent,
-      where: c.version_uuid == ^version_uuid and c.language != ^exclude_language
-    )
-    |> repo().update_all(set: [status: new_status, updated_at: DateTime.utc_now()])
-  end
-
   @doc "Gets content for a specific version and language."
   @spec get_content(String.t(), String.t()) :: PublishingContent.t() | nil
   def get_content(version_uuid, language) do
@@ -796,17 +810,6 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   def list_contents(version_uuid) do
     from(c in PublishingContent,
       where: c.version_uuid == ^version_uuid,
-      order_by: [asc: c.language]
-    )
-    |> repo().all()
-  end
-
-  @doc "Lists available languages for a version."
-  @spec list_languages(String.t()) :: [String.t()]
-  def list_languages(version_uuid) do
-    from(c in PublishingContent,
-      where: c.version_uuid == ^version_uuid,
-      select: c.language,
       order_by: [asc: c.language]
     )
     |> repo().all()
@@ -1060,6 +1063,21 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
             # never regenerate — the URL builders kept emitting the old slug
             # until the next mutation.
             ListingCache.invalidate(group_slug)
+
+            # A GET just moved a public URL: the audit trail has to say so.
+            ActivityLog.log(%{
+              action: "publishing.content.url_slug_resolved",
+              mode: "auto",
+              resource_type: "publishing_content",
+              resource_uuid: content.uuid,
+              metadata: %{
+                "group_slug" => group_slug,
+                "language" => content.language,
+                "from_url_slug" => base_slug,
+                "to_url_slug" => new_slug
+              }
+            })
+
             :ok
 
           {:error, changeset} ->
@@ -1448,9 +1466,17 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   Lists all posts in a group with their latest version metadata.
 
   Returns a list of post maps suitable for listing pages.
+
+  Options:
+
+    * `:public_urls` — a live post's URL fields (`available_languages`,
+      `language_slugs`, `language_previous_slugs`, `url_slug`) come from its
+      LIVE version instead of the newest revision, so a public consumer (core's
+      Sitemap) advertises the addresses readers can open, not a draft's.
   """
-  @spec list_posts_with_metadata(String.t(), String.t() | nil) :: [map()]
-  def list_posts_with_metadata(group_slug, status \\ nil) do
+  @spec list_posts_with_metadata(String.t(), String.t() | nil, keyword()) :: [map()]
+  def list_posts_with_metadata(group_slug, status \\ nil, opts \\ []) do
+    public_urls? = Keyword.get(opts, :public_urls, false)
     posts = if status, do: list_posts(group_slug, status), else: list_posts(group_slug)
     post_uuids = Enum.map(posts, & &1.uuid)
 
@@ -1488,7 +1514,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         latest = latest_by_post[post.uuid]
         published = published_by_post[post.uuid]
 
-        [latest, published]
+        [latest, published, live_by_post[post.uuid]]
         |> Enum.reject(&is_nil/1)
         |> Enum.uniq_by(& &1.uuid)
         |> Enum.map(& &1.uuid)
@@ -1516,7 +1542,17 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
         # stay latest-version for editing context.)
         live_effective_opts(live, all_contents_by_version)
       )
+      |> maybe_public_url_fields(public_urls? && live, post, all_contents_by_version)
     end)
+  end
+
+  defp maybe_public_url_fields(map, falsy, _post, _contents) when falsy in [nil, false], do: map
+
+  defp maybe_public_url_fields(map, live, post, all_contents_by_version) do
+    case Map.get(all_contents_by_version, live.uuid, []) do
+      [] -> map
+      live_contents -> Mapper.put_public_url_fields(map, post, live_contents)
+    end
   end
 
   # Effective-override opts for a post whose ACTIVE version is published:

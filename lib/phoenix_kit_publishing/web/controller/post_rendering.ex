@@ -332,7 +332,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   end
 
   defp handle_date_posts(conn, group_slug, date, language) do
-    case Publishing.list_times_on_date(group_slug, date) do
+    case Publishing.list_public_times_on_date(group_slug, date) do
       [] ->
         render_post(conn, group_slug, {:slug, date}, language)
 

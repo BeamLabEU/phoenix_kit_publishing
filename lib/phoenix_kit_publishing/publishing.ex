@@ -122,6 +122,9 @@ defmodule PhoenixKit.Modules.Publishing do
 
   defdelegate list_posts(group_slug, preferred_language \\ nil), to: Posts
   defdelegate list_posts_by_status(group_slug, status), to: Posts
+
+  @doc "The admin dashboard's post figures for a group (counts, last publish, languages)."
+  defdelegate group_post_stats(group_slug), to: DBStorage
   defdelegate list_raw_posts(group_slug, status \\ nil), to: Posts
   defdelegate create_post(group_slug, opts \\ %{}), to: Posts
   defdelegate read_post(group_slug, identifier, language \\ nil, version \\ nil), to: Posts
@@ -133,6 +136,7 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate restore_post(group_slug, post_uuid, opts), to: Posts
   defdelegate count_posts_on_date(group_slug, date), to: Posts
   defdelegate list_times_on_date(group_slug, date), to: Posts
+  defdelegate list_public_times_on_date(group_slug, date), to: Posts
   defdelegate read_post_by_datetime(group_slug, date, time), to: DBStorage
   defdelegate find_by_url_slug(group_slug, language, url_slug), to: Posts
   defdelegate find_by_previous_url_slug(group_slug, language, url_slug), to: Posts

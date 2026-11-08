@@ -24,7 +24,9 @@ controller (dead views); the admin side is LiveView.
   seam), plus `leaf`, `phoenix_live_view`, `mdex`, `saxy`, `oban`, `gettext`.
 - **Consumed by:** core's Sitemap module, which calls
   `PhoenixKit.Modules.Publishing.{enabled?/0, list_groups/0, list_posts/2}`
-  behind `Code.ensure_loaded?/1`; core's Languages admin page, which calls
+  behind `Code.ensure_loaded?/1` (with a language, `list_posts/2` answers a live
+  post's URL fields from its LIVE version; without one, the admin's newest
+  revision); core's Languages admin page, which calls
   `enabled?/0`, `list_groups/0` and `ListingCache.regenerate/1` (guarded and
   rescued on core's side) when a language is added or removed;
   `phoenix_kit_projects`, whose extension registry duck-types
@@ -252,7 +254,13 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   `phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}`, or the host
   header renders the page as logged-out even when the controller knows better.
 - **Gettext:** this module owns `PhoenixKitPublishing.Gettext` and
-  `priv/gettext` (de, en, et, fr, it, ru). Modules opt in with
+  `priv/gettext` (de, en, es, et, fr, it, pl, ru, uk, zh — core's locales).
+  Two domains: `default` and `leaf`, Leaf's own UI strings, which Leaf looks up
+  through this backend (`"leaf"` first); `leaf.pot` is a copy of
+  `deps/leaf/priv/gettext/leaf.pot`, refreshed by hand when Leaf adds strings,
+  and `gettext.extract --merge` merges it like the default one.
+  `gettext_catalogue_test.exs` fails on a fuzzy entry, an empty msgstr, a stray
+  backslash or a placeholder the msgid lacks. Modules opt in with
   `use Gettext, backend: PhoenixKitPublishing.Gettext`; tabs pass
   `gettext_backend: PhoenixKitPublishing.Gettext`. Extract with
   `mix gettext.extract --merge`. Only the macro form `gettext("…")` is visible to
@@ -398,7 +406,7 @@ User-driven actions (`mode: "manual"`):
 | `publishing.version.created` / `.published` / `.deleted` | `publishing_version` |
 | `publishing.translation.added` / `.cleared` / `.deleted` | `publishing_content` |
 | `publishing.category.created` / `.updated` / `.deleted` | `publishing_category` |
-| `publishing.category.reordered` | `publishing_group` (failure rows say `publishing_category` — known drift) |
+| `publishing.category.reordered` | `publishing_group` |
 | `publishing.comment.created` / `.replied` | `publishing_post` |
 | `publishing.module.enabled` / `.disabled` | `publishing_module` |
 | `publishing.translation.requested` | `publishing_post` — written only by the machine API's `translate_post` (mode `auto`, API metadata plus `group_slug`, `version`, `targets`, `enqueued`, `conflicts`), because the per-language Oban jobs log as the key owner without API attribution |
@@ -406,7 +414,10 @@ User-driven actions (`mode: "manual"`):
 Self-healing actions (`mode: "auto"`, no actor):
 `publishing.content.language_normalized`, `publishing.content.merged`,
 `publishing.content.promoted`, `publishing.content.metadata_promoted`,
-`publishing.post.auto_trashed`.
+`publishing.content.url_slug_resolved` (a read renamed a colliding url_slug),
+`publishing.post.auto_trashed`, `publishing.post.pointer_cleared` (a stale active
+version pointer cleared), `publishing.version.orphan_demoted`,
+`publishing.version.duplicate_archived`.
 
 ### Machine API
 
@@ -956,9 +967,6 @@ newest-created release as Latest and demotes the current one.
   `enabled_language_codes/0`) answer the same question with different tie-breaks;
   a `Languages.resolve_in/3` with a `:tie_break` opt would close it. Trigger: the
   next refactor touching either layer.
-- **Fix the `reorder_categories/3` resource_type drift** by passing the resource
-  type into `log_category_failure/5`, which hardcodes `publishing_category` while
-  success rows log `publishing_group`.
 - **Multi-tab sync flicker in the editor's collaborative module.** Same user with
   two tabs of one post plus a concurrent spectator: both owner tabs answer the
   spectator's initial sync, so the spectator's view flickers once and settles

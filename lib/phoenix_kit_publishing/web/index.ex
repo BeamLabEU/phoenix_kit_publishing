@@ -353,55 +353,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
     # ListingCache is built from active/published versions only, so a warm-cache
     # read would silently zero out the draft/scheduled counts this admin insight
     # exists to show — making the same widget report different numbers depending
-    # on cache warmth.
-    posts = Publishing.list_posts(group_slug)
-
-    status_counts = Enum.frequencies_by(posts, &Map.get(&1[:metadata] || %{}, :status, "draft"))
-
-    languages =
-      posts
-      |> Enum.flat_map(&(&1[:available_languages] || []))
-      |> Enum.uniq()
-      |> Enum.sort()
+    # on cache warmth. Aggregates, not the posts: this runs per group on every
+    # mount and after every post event anywhere.
+    stats = Publishing.group_post_stats(group_slug)
 
     %{
       name: db_group["name"],
       slug: group_slug,
       mode: db_group["mode"],
-      posts_count: length(posts),
-      published_count: Map.get(status_counts, Constants.status_published(), 0),
-      languages: languages,
+      posts_count: stats.posts,
+      published_count: stats.published,
+      languages: stats.languages,
       last_published_at_text:
-        format_datetime(find_latest_published_at(posts), current_user, date_time_settings)
+        format_datetime(stats.last_published_at, current_user, date_time_settings)
     }
-  end
-
-  defp find_latest_published_at(posts) do
-    posts
-    |> Enum.map(&get_in(&1, [:metadata, :published_at]))
-    |> Enum.reduce(nil, &update_latest_datetime/2)
-  end
-
-  defp update_latest_datetime(value, acc) do
-    case parse_datetime(value) do
-      {:ok, dt} -> compare_and_select_latest(dt, acc)
-      :error -> acc
-    end
-  end
-
-  defp compare_and_select_latest(datetime, nil), do: datetime
-
-  defp compare_and_select_latest(datetime, current) do
-    if DateTime.compare(datetime, current) == :gt, do: datetime, else: current
-  end
-
-  defp parse_datetime(nil), do: :error
-
-  defp parse_datetime(value) when is_binary(value) do
-    case DateTime.from_iso8601(value) do
-      {:ok, dt, _offset} -> {:ok, dt}
-      _ -> :error
-    end
   end
 
   defp format_datetime(nil, _user, _settings), do: nil

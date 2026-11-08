@@ -14,6 +14,8 @@ defmodule PhoenixKit.Modules.Publishing.GroupSlugTest do
   alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.PublishingGroup
+  alias PhoenixKit.Modules.Publishing.Renderer
+  alias PhoenixKit.Settings
 
   defp changeset(attrs, group \\ %PublishingGroup{}) do
     PublishingGroup.changeset(group, attrs)
@@ -37,6 +39,27 @@ defmodule PhoenixKit.Modules.Publishing.GroupSlugTest do
       assert {:ok, %{"mode" => "slug"}} =
                Groups.add_group("Mode #{System.unique_integer([:positive])}", mode: :slug)
     end
+  end
+
+  # The per-group render-cache switch is keyed by slug: a rename must take it
+  # along, or a group that had it off is silently back on.
+  test "a rename carries the group's render-cache setting to the new slug" do
+    {:ok, group} = Groups.add_group("Cache Move #{System.unique_integer([:positive])}")
+    old_key = Renderer.per_group_cache_key(group["slug"])
+    {:ok, _} = Settings.update_setting(old_key, "false")
+
+    new_slug = group["slug"] <> "-renamed"
+    {:ok, _} = Groups.update_group(group["slug"], %{"slug" => new_slug})
+
+    new_key = Renderer.per_group_cache_key(new_slug)
+    assert Settings.get_setting(new_key, nil) == "false"
+    assert Settings.get_setting(old_key, nil) == nil
+  end
+
+  # A refused field used to come back as :already_exists, sending the admin to
+  # look for a group that doesn't exist.
+  test "a name over the column width is :invalid_name, not :already_exists" do
+    assert {:error, :invalid_name} = Groups.add_group(String.duplicate("n", 300))
   end
 
   # `/admin/publishing/new-group`, `/edit-group/:g` and `/categories/:g` are

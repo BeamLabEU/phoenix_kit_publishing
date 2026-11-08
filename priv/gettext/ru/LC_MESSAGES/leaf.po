@@ -1,0 +1,385 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: ru\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100 != 11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10||n%100>=20) ? 1 : 2);\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Add Column Right"
+msgstr "Добавить столбец справа"
+
+msgid "Add Row Below"
+msgstr "Добавить строку ниже"
+
+msgid "Align Center"
+msgstr "Выровнять по центру"
+
+msgid "Align Left"
+msgstr "Выровнять по левому краю"
+
+msgid "Align Right"
+msgstr "Выровнять по правому краю"
+
+msgid "Align center"
+msgstr "Выровнять по центру"
+
+msgid "Align left"
+msgstr "Выровнять по левому краю"
+
+msgid "Align right"
+msgstr "Выровнять по правому краю"
+
+msgid "Alt text (optional)"
+msgstr "Альтернативный текст (необязательно)"
+
+msgid "Alt text..."
+msgstr "Альтернативный текст..."
+
+msgid "Audio"
+msgstr "Аудио"
+
+msgid "Blockquote"
+msgstr "Блок цитаты"
+
+msgid "Bold"
+msgstr "Жирный"
+
+msgid "Bullet List"
+msgstr "Маркированный список"
+
+msgid "Button"
+msgstr "Кнопка"
+
+msgid "By URL"
+msgstr "По URL"
+
+msgid "Callout"
+msgstr "Выноска"
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Caption..."
+msgstr "Подпись..."
+
+msgid "Clean up"
+msgstr "Очистка"
+
+msgid "Code Block"
+msgstr "Блок кода"
+
+msgid "Code block"
+msgstr "Блок кода"
+
+msgid "Code language"
+msgstr "Язык кода"
+
+msgid "Column align"
+msgstr "Выравнивание столбца"
+
+msgid "Columns"
+msgstr "Столбцы"
+
+msgid "Components"
+msgstr "Компоненты"
+
+msgid "Copied"
+msgstr "Скопировано"
+
+msgid "Copy"
+msgstr "Копировать"
+
+msgid "Copy as HTML"
+msgstr "Копировать как HTML"
+
+msgid "Copy as Markdown"
+msgstr "Копировать как Markdown"
+
+msgid "Create"
+msgstr "Создать"
+
+msgid "Decrease Indent"
+msgstr "Уменьшить отступ"
+
+msgid "Delete"
+msgstr "Удалить"
+
+msgid "Describe the image"
+msgstr "Опишите изображение"
+
+msgid "Details / Accordion"
+msgstr "Детали / Аккордеон"
+
+msgid "Double-click to edit"
+msgstr "Дважды щёлкните, чтобы изменить"
+
+msgid "Download .md"
+msgstr "Скачать .md"
+
+msgid "Drag to resize · Double-click to fit content"
+msgstr "Перетащите, чтобы изменить размер · Дважды щёлкните, чтобы подогнать под содержимое"
+
+msgid "Duplicate"
+msgstr "Дублировать"
+
+msgid "Edit <{tag}> source"
+msgstr "Изменить исходный код <{tag}>"
+
+msgid "Edit image URL"
+msgstr "Изменить URL изображения"
+
+msgid "Edit link"
+msgstr "Изменить ссылку"
+
+msgid "Edit link URL"
+msgstr "Изменить URL ссылки"
+
+msgid "Embedded page"
+msgstr "Встроенная страница"
+
+msgid "Emoji"
+msgstr "Эмодзи"
+
+msgid "Exit fullscreen"
+msgstr "Выйти из полноэкранного режима"
+
+msgid "Export"
+msgstr "Экспорт"
+
+msgid "Format"
+msgstr "Формат"
+
+msgid "Fullscreen"
+msgstr "Полноэкранный режим"
+
+msgid "HTML"
+msgstr "HTML"
+
+msgid "HTML mode"
+msgstr "Режим HTML"
+
+msgid "Heading"
+msgstr "Заголовок"
+
+msgid "Heading 1"
+msgstr "Заголовок 1"
+
+msgid "Heading 2"
+msgstr "Заголовок 2"
+
+msgid "Heading 3"
+msgstr "Заголовок 3"
+
+msgid "Headings"
+msgstr "Заголовки"
+
+msgid "Headline text"
+msgstr "Текст заголовка"
+
+msgid "Horizontal Rule"
+msgstr "Горизонтальная линия"
+
+msgid "Hybrid"
+msgstr "Гибридный"
+
+msgid "Hybrid mode"
+msgstr "Гибридный режим"
+
+msgid "Image"
+msgstr "Изображение"
+
+msgid "Image URL"
+msgstr "URL изображения"
+
+msgid "Image alt text"
+msgstr "Альтернативный текст изображения"
+
+msgid "Image caption"
+msgstr "Подпись к изображению"
+
+msgid "Image options"
+msgstr "Параметры изображения"
+
+msgid "Increase Indent"
+msgstr "Увеличить отступ"
+
+msgid "Inline Code"
+msgstr "Встроенный код"
+
+msgid "Insert"
+msgstr "Вставить"
+
+msgid "Insert Emoji"
+msgstr "Вставить эмодзи"
+
+msgid "Insert Image"
+msgstr "Вставить изображение"
+
+msgid "Insert Link"
+msgstr "Вставить ссылку"
+
+msgid "Insert Table"
+msgstr "Вставить таблицу"
+
+msgid "Insert Video"
+msgstr "Вставить видео"
+
+msgid "Insert date"
+msgstr "Вставить дату"
+
+msgid "Insert time"
+msgstr "Вставить время"
+
+msgid "Italic"
+msgstr "Курсив"
+
+msgid "Link"
+msgstr "Ссылка"
+
+msgid "Link URL"
+msgstr "URL ссылки"
+
+msgid "Lists"
+msgstr "Списки"
+
+msgid "Markdown"
+msgstr "Markdown"
+
+msgid "Markdown mode"
+msgstr "Режим Markdown"
+
+msgid "Mode"
+msgstr "Режим"
+
+msgid "More editor options"
+msgstr "Другие параметры редактора"
+
+msgid "More formatting"
+msgstr "Другое форматирование"
+
+msgid "More inserts"
+msgstr "Другие вставки"
+
+msgid "No address yet"
+msgstr "Адрес не указан"
+
+msgid "No matches"
+msgstr "Совпадений нет"
+
+msgid "Numbered List"
+msgstr "Нумерованный список"
+
+msgid "Open image"
+msgstr "Открыть изображение"
+
+msgid "Picture"
+msgstr "Изображение"
+
+msgid "Quote"
+msgstr "Цитата"
+
+msgid "Redo"
+msgstr "Повторить"
+
+msgid "Remove Column"
+msgstr "Удалить столбец"
+
+msgid "Remove Formatting"
+msgstr "Очистить форматирование"
+
+msgid "Remove Row"
+msgstr "Удалить строку"
+
+msgid "Remove image"
+msgstr "Удалить изображение"
+
+msgid "Remove link"
+msgstr "Удалить ссылку"
+
+msgid "Rows"
+msgstr "Строки"
+
+msgid "Saved"
+msgstr "Сохранено"
+
+msgid "Saving…"
+msgstr "Сохранение…"
+
+msgid "Search emoji..."
+msgstr "Поиск эмодзи..."
+
+msgid "Searching…"
+msgstr "Поиск…"
+
+msgid "Set language"
+msgstr "Выбрать язык"
+
+msgid "Spoiler"
+msgstr "Спойлер"
+
+msgid "Strikethrough"
+msgstr "Зачёркнутый"
+
+msgid "Subscript"
+msgstr "Подстрочный"
+
+msgid "Summary"
+msgstr "Краткое содержание"
+
+msgid "Superscript"
+msgstr "Надстрочный"
+
+msgid "Symbols / Date"
+msgstr "Символы / Дата"
+
+msgid "Table"
+msgstr "Таблица"
+
+msgid "Task List"
+msgstr "Список задач"
+
+msgid "Text"
+msgstr "Текст"
+
+msgid "Toggle Header Row"
+msgstr "Включить/выключить строку заголовка"
+
+msgid "Toggle fullscreen"
+msgstr "Включить/выключить полноэкранный режим"
+
+msgid "Undo"
+msgstr "Отменить"
+
+msgid "Unsaved changes"
+msgstr "Несохранённые изменения"
+
+msgid "Upload"
+msgstr "Загрузить"
+
+msgid "Video"
+msgstr "Видео"
+
+msgid "View"
+msgstr "Вид"
+
+msgid "Visual"
+msgstr "Визуальный"
+
+msgid "Visual mode"
+msgstr "Визуальный режим"
+
+msgid "height"
+msgstr "высота"
+
+msgid "results"
+msgstr "результатов"
+
+msgid "stretch"
+msgstr "растяжение"

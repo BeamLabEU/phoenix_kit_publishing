@@ -44,8 +44,8 @@ defmodule PhoenixKitPublishing.GettextCatalogueTest do
     # the option were dropped, lookups would still pass, so pin the layout:
     # one split module per shipped catalogue.
     test "has one compiled module per shipped locale catalogue" do
-      for locale <- ~w(de en et fr it ru) do
-        module = Module.concat(PhoenixKitPublishing.Gettext, "T_#{locale}_default")
+      for locale <- ~w(de en es et fr it pl ru uk zh), domain <- ~w(default leaf) do
+        module = Module.concat(PhoenixKitPublishing.Gettext, "T_#{locale}_#{domain}")
 
         assert Code.ensure_loaded?(module),
                "#{inspect(module)} is missing — is split_module_by still set?"
@@ -60,7 +60,11 @@ defmodule PhoenixKitPublishing.GettextCatalogueTest do
         "et" => "Avaldamine",
         "fr" => "Publication",
         "it" => "Pubblicazione",
-        "ru" => "Публикация"
+        "ru" => "Публикация",
+        "es" => "Publicación",
+        "pl" => "Publikowanie",
+        "uk" => "Публікації",
+        "zh" => "发布"
       }
 
       for {locale, translated} <- expected do
@@ -93,11 +97,12 @@ defmodule PhoenixKitPublishing.GettextCatalogueTest do
   # `\\"` in et/it/ru showed a backslash before every quote, and gettext
   # serves `fuzzy` entries (a merge's guess) as if they were reviewed.
   describe "shipped catalogues" do
-    for locale <- ~w(de et fr it ru) do
+    for locale <- ~w(de es et fr it pl ru uk zh), domain <- ~w(default leaf) do
       @locale locale
+      @domain domain
 
-      test "#{locale}: no fuzzy entry, no empty msgstr, no stray backslash" do
-        {:ok, po} = Expo.PO.parse_file("priv/gettext/#{@locale}/LC_MESSAGES/default.po")
+      test "#{locale}/#{domain}: no fuzzy entry, no empty msgstr, no stray backslash" do
+        {:ok, po} = Expo.PO.parse_file("priv/gettext/#{@locale}/LC_MESSAGES/#{@domain}.po")
 
         for message <- po.messages do
           id = Expo.Message.key(message) |> inspect()
@@ -110,8 +115,8 @@ defmodule PhoenixKitPublishing.GettextCatalogueTest do
         end
       end
 
-      test "#{locale}: every placeholder in a msgstr exists in its msgid" do
-        {:ok, po} = Expo.PO.parse_file("priv/gettext/#{@locale}/LC_MESSAGES/default.po")
+      test "#{locale}/#{domain}: every placeholder in a msgstr exists in its msgid" do
+        {:ok, po} = Expo.PO.parse_file("priv/gettext/#{@locale}/LC_MESSAGES/#{@domain}.po")
 
         for message <- po.messages do
           allowed = placeholders(msgids(message))
@@ -124,6 +129,31 @@ defmodule PhoenixKitPublishing.GettextCatalogueTest do
           end
         end
       end
+    end
+  end
+
+  # Leaf translates its own UI through this backend, "leaf" domain first. A
+  # catalogue that lags `leaf.pot` leaves those strings in English.
+  describe "the leaf domain" do
+    test "every locale's leaf.po holds every msgid of leaf.pot" do
+      {:ok, pot} = Expo.PO.parse_file("priv/gettext/leaf.pot")
+      ids = MapSet.new(pot.messages, &Expo.Message.key/1)
+      assert MapSet.size(ids) > 100
+
+      for locale <- ~w(de en es et fr it pl ru uk zh) do
+        {:ok, po} = Expo.PO.parse_file("priv/gettext/#{locale}/LC_MESSAGES/leaf.po")
+        missing = MapSet.difference(ids, MapSet.new(po.messages, &Expo.Message.key/1))
+        assert MapSet.size(missing) == 0, "#{locale}: #{inspect(MapSet.to_list(missing))}"
+      end
+    end
+
+    test "Leaf's strings resolve through the backend" do
+      translated =
+        Gettext.with_locale(PhoenixKitPublishing.Gettext, "de", fn ->
+          Gettext.dgettext(PhoenixKitPublishing.Gettext, "leaf", "Bold")
+        end)
+
+      refute translated == "Bold"
     end
   end
 

@@ -609,18 +609,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           </div>
           <.input field={@form[:position]} type="number" label={gettext("Position")} />
           <.textarea field={@form[:description]} label={gettext("Description")} rows="2" />
-          <div class="flex items-center justify-end gap-2 pt-2">
-            <.button type="button" variant="ghost" size="sm" phx-click="cancel_form">
-              {gettext("Cancel")}
-            </.button>
-            <.button type="submit" size="sm" phx-disable-with={gettext("Saving…")}>
-              <%= if @editing do %>
-                {gettext("Save")}
-              <% else %>
-                {gettext("Create")}
-              <% end %>
-            </.button>
-          </div>
+          <.form_actions
+            cancel_click="cancel_form"
+            submit_label={if @editing, do: gettext("Save"), else: gettext("Create")}
+            class="pt-2"
+          />
         </.form>
       </.modal>
 
@@ -642,14 +635,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
               name="move[parent_uuid]"
             />
           </div>
-          <div class="flex items-center justify-end gap-2 pt-4">
-            <.button type="button" variant="ghost" size="sm" phx-click="cancel_move">
-              {gettext("Cancel")}
-            </.button>
-            <.button type="submit" size="sm" phx-disable-with={gettext("Moving…")}>
-              {gettext("Move")}
-            </.button>
-          </div>
+          <.form_actions
+            cancel_click="cancel_move"
+            submit_label={gettext("Move")}
+            submitting_label={gettext("Moving…")}
+            class="pt-4"
+          />
         </.form>
       </.modal>
     </div>

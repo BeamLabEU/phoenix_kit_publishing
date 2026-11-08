@@ -13,6 +13,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Date, as: UtilsDate
   alias PhoenixKit.Utils.Routes
@@ -44,6 +45,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
       |> assign(:group_slug, group_slug)
       |> assign(:post_uuid, post_uuid)
       |> assign(:post, nil)
+      |> assign(:view_total, nil)
       |> assign(:group_name, group_name)
       |> assign(:date_time_settings, date_time_settings)
       |> assign(:enabled_languages, Publishing.enabled_language_codes())
@@ -71,6 +73,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
           |> assign(:post, post)
           |> assign(:post_uuid, post_uuid)
           |> assign(:page_title, post.metadata.title || gettext("Untitled"))
+          |> assign(:view_total, view_total(group_slug, post_uuid))
 
         {:noreply, socket}
 
@@ -84,6 +87,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
 
   def handle_params(_params, _uri, socket) do
     {:noreply, socket}
+  end
+
+  # The post's all-time views when its group counts them, nil when it doesn't.
+  defp view_total(group_slug, post_uuid) do
+    case Publishing.fetch_group(group_slug) do
+      {:ok, %{"views_enabled" => true}} -> Views.total(post_uuid)
+      _ -> nil
+    end
   end
 
   @impl true
@@ -132,12 +143,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
 
   def format_version_date(_), do: ""
 
-  @spec version_status_badge_class(term()) :: String.t()
-  def version_status_badge_class(@status_published), do: "badge-success"
-  def version_status_badge_class("draft"), do: "badge-warning"
-  def version_status_badge_class("archived"), do: "badge-ghost"
-  def version_status_badge_class(_), do: "badge-ghost"
-
   # `<.status_dot>` variants — the neutral dot stands in for the old
   # `bg-base-content/20` for archived and unknown alike.
   @spec language_status_variant(term()) :: :success | :warning | :neutral
@@ -162,25 +167,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
     ~H"""
     <%= if @post do %>
     <div class="max-w-4xl mx-auto p-4 md:p-6">
-      <%!-- Breadcrumb --%>
-      <div class="text-sm breadcrumbs mb-4">
-        <ul>
-          <li>
-            <.pk_link navigate="/admin/publishing">{gettext("Publishing")}</.pk_link>
-          </li>
-          <li>
-            <.pk_link navigate={"/admin/publishing/#{@group_slug}"}>{@group_name}</.pk_link>
-          </li>
-          <li>{@post.metadata.title || gettext("Untitled")}</li>
-        </ul>
-      </div>
-
+      <%!-- The trail (Publishing › group › title) is the admin layout's, from
+        page_section and page_crumbs; no second one in the page. --%>
       <%!-- Header with title and actions --%>
       <.admin_page_header>
         <div class="flex items-center gap-2">
-          <span class={"badge #{version_status_badge_class(@post.metadata[:status] || "draft")}"}>
-            {status_label(@post.metadata[:status] || "draft")}
-          </span>
+          <.status_badge
+            status={@post.metadata[:status] || "draft"}
+            label={status_label(@post.metadata[:status] || "draft")}
+            size={:md}
+          />
           <span class="text-sm text-base-content/60">
             {gettext("Slug")}: <code class="font-mono">{@post.slug}</code>
           </span>
@@ -191,14 +187,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
             navigate={"/admin/publishing/#{@group_slug}/#{@post_uuid}/edit"}
             class="btn-sm"
           >
-            <span class="hero-pencil-square w-4 h-4" />{gettext("Edit")}
+            <.icon name="hero-pencil-square" class="w-4 h-4" />{gettext("Edit")}
           </.pk_link_button>
           <.pk_link_button
             variant="ghost"
             navigate={"/admin/publishing/#{@group_slug}/#{@post_uuid}/preview"}
             class="btn-sm"
           >
-            <span class="hero-eye w-4 h-4" />{gettext("Preview")}
+            <.icon name="hero-eye" class="w-4 h-4" />{gettext("Preview")}
           </.pk_link_button>
         </:actions>
       </.admin_page_header>
@@ -218,9 +214,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
                 >
                   <div class="flex items-center gap-2">
                     <span class="font-mono text-sm">v{version}</span>
-                    <span class={"badge badge-xs #{version_status_badge_class(status)}"}>
-                      {status_label(status)}
-                    </span>
+                    <.status_badge status={status} label={status_label(status)} size={:xs} />
                   </div>
                   <%= if date do %>
                     <span class="text-xs text-base-content/50">{format_version_date(date)}</span>
@@ -279,12 +273,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.PostShow do
           </div>
         </div>
 
-        <%!-- Future stats placeholder --%>
-        <div class="card bg-base-100 border border-base-200 shadow-sm">
+        <%!-- Views, when the group counts them (a "coming soon" card stood here). --%>
+        <div :if={@view_total} class="card bg-base-100 border border-base-200 shadow-sm">
           <div class="card-body p-4">
             <h2 class="card-title text-base">{gettext("Stats")}</h2>
-            <p class="text-sm text-base-content/50 mt-2">
-              {gettext("Post analytics will appear here.")}
+            <p class="text-sm mt-2 flex items-center gap-2">
+              <.icon name="hero-eye" class="w-4 h-4 text-base-content/60" />
+              {ngettext("%{count} view", "%{count} views", @view_total)}
             </p>
           </div>
         </div>

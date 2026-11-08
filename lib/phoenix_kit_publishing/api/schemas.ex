@@ -345,6 +345,10 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
 
   # --- category writes ------------------------------------------------------------------------
 
+  # The text caps here are the outer bound, above the column widths on purpose:
+  # the handlers check the real width per row, so one over-long value is that
+  # row's error and the rest of the batch still runs, where a schema refusal
+  # would reject the whole call.
   def upsert_categories do
     row =
       object(%{

@@ -237,9 +237,19 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
     is_binary(title) and String.trim(title) != "" and title != Constants.default_title()
   end
 
-  @doc "The content row of the primary language, if the version has one."
-  def primary_row(contents),
-    do: Enum.find(contents, &(&1.language == LanguageHelpers.get_primary_language()))
+  @doc """
+  The content row of the primary language, if the version has one: the full
+  code, else a legacy base-code row (`en` for `en-US`), as `title_ok?/1` and
+  `get_post` read it. An exact-only match left an unhealed legacy row out, so
+  an `if_revision` taken from `get_post` never matched (`revision_mismatch` on
+  every try).
+  """
+  def primary_row(contents) do
+    primary = LanguageHelpers.get_primary_language()
+
+    Enum.find(contents, &(&1.language == primary)) ||
+      Enum.find(contents, &(&1.language == LanguageHelpers.url_language_code(primary)))
+  end
 
   # The module's own check rolls the transaction back with a bare atom; checking up front gives
   # the caller a reason and keeps a refused publish out of the failed-mutation log.
@@ -317,13 +327,16 @@ defmodule PhoenixKit.Modules.Publishing.API.Refs do
 
     case keys do
       ["id"] ->
-        find(categories, &(&1.uuid == ref["id"]))
+        id = Common.canonical_uuid(ref["id"])
+        find(categories, &(&1.uuid == id))
 
       ["slug"] ->
         find(categories, &(&1.slug == ref["slug"]))
 
       ["id", "slug"] ->
-        with {:ok, by_id} <- find(categories, &(&1.uuid == ref["id"])),
+        id = Common.canonical_uuid(ref["id"])
+
+        with {:ok, by_id} <- find(categories, &(&1.uuid == id)),
              true <- by_id.slug == ref["slug"] do
           {:ok, by_id}
         else

@@ -43,12 +43,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Translation do
   # publishing-specific setting keys + the publishing-specific prompt slug.
 
   @doc """
-  Checks if AI translation is available (AI module installed + enabled + endpoints configured).
-  """
-  @spec ai_translation_available?() :: boolean()
-  def ai_translation_available?, do: Translations.available?()
-
-  @doc """
   Lists available AI endpoints for translation as `[{uuid, name}]`.
   """
   @spec list_ai_endpoints() :: [{String.t(), String.t()}]

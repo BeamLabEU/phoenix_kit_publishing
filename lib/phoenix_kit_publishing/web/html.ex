@@ -971,40 +971,51 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               </div>
           <% end %>
           <%!-- Pagination --%>
+          <%!-- Windowed (first, last, the current page ±2), with previous and
+            next: one button per page put 250 of them under a 5,000-post group.
+            Plain links — this is a dead view. --%>
           <%= if @total_pages > 1 do %>
-            <div class="join mt-8 flex justify-center">
-              <%= for page_num <- 1..@total_pages do %>
-                <%= if page_num == @page do %>
-                  <button class="join-item btn btn-active">{page_num}</button>
-                <% else %>
-                  <.link
-                    navigate={group_listing_path(@current_language, @group["slug"], page: page_num)}
-                    class="join-item btn"
-                  >
-                    {page_num}
-                  </.link>
+            <nav class="join mt-8 flex justify-center" aria-label={gettext("Pagination")}>
+              <a
+                :if={@page > 1}
+                href={group_listing_path(@current_language, @group["slug"], page: @page - 1)}
+                class="join-item btn"
+                rel="prev"
+                aria-label={gettext("Previous page")}
+              >
+                «
+              </a>
+              <%= for item <- pagination_window(@page, @total_pages) do %>
+                <%= cond do %>
+                  <% item == :gap -> %>
+                    <span class="join-item btn btn-disabled" aria-hidden="true">…</span>
+                  <% item == @page -> %>
+                    <span class="join-item btn btn-active" aria-current="page">{item}</span>
+                  <% true -> %>
+                    <a
+                      href={group_listing_path(@current_language, @group["slug"], page: item)}
+                      class="join-item btn"
+                    >
+                      {item}
+                    </a>
                 <% end %>
               <% end %>
-            </div>
+              <a
+                :if={@page < @total_pages}
+                href={group_listing_path(@current_language, @group["slug"], page: @page + 1)}
+                class="join-item btn"
+                rel="next"
+                aria-label={gettext("Next page")}
+              >
+                »
+              </a>
+            </nav>
           <% end %>
         <% end %>
 
         <%= if @total_count == 0 do %>
           <div class="alert alert-info">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              class="stroke-current shrink-0 w-6 h-6"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              >
-              </path>
-            </svg>
+            <.icon name="hero-information-circle" class="shrink-0 w-6 h-6" />
             <span>
               <%= if assigns[:search_query] do %>
                 {gettext("No posts match your search.")}
@@ -1027,14 +1038,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   def post_date(assigns) do
     ~H"""
     <div class={["flex items-center gap-2 text-sm text-base-content/70", @class]}>
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-        />
-      </svg>
+      <.icon name="hero-calendar" class="w-4 h-4" />
       <time datetime={@post.metadata.published_at || ""}>
         {format_post_date(@post, @group_slug)}
       </time>
@@ -1849,6 +1853,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         required
         maxlength="10000"
         placeholder={@placeholder}
+        aria-label={@placeholder}
         class="textarea w-full"
       ></textarea>
       <button type="submit" class={["btn btn-primary", if(@compact, do: "btn-xs", else: "btn-sm")]}>
@@ -2120,23 +2125,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <%= if @version_dropdown do %>
               <div class="dropdown dropdown-end">
                 <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                  <.icon name="hero-clock" class="w-4 h-4" />
                   v{@version_dropdown.current_version}
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+                  <.icon name="hero-chevron-down" class="w-3 h-3" />
                 </div>
                 <ul
                   tabindex="0"
@@ -2258,6 +2249,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <%!-- The enhancement script lives OUTSIDE #comments: that section
           gets swapped by the script itself, and a document-level listener
           shouldn't ride a subtree it replaces. --%>
+        <%!-- Built once: a timestamp post's URL costs a count query, and every
+          top-level comment carries the form action. --%>
+        <% comments_url = build_post_url(@group_slug, @post, @current_language) %>
         <div :if={assigns[:comments_enabled]} class="hidden" aria-hidden="true">
           {Phoenix.HTML.raw(comment_fetch_assets())}
         </div>
@@ -2273,7 +2267,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <.comment_node
               :for={comment <- @post_comments}
               comment={comment}
-              form_action={build_post_url(@group_slug, @post, @current_language) <> "#comments"}
+              form_action={comments_url <> "#comments"}
               post_uuid={@post.uuid}
               form_token={assigns[:comment_form_token]}
               can_comment={can_comment?(assigns)}
@@ -2281,7 +2275,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           </ol>
           <%= if can_comment?(assigns) do %>
             <.comment_form
-              action={build_post_url(@group_slug, @post, @current_language) <> "#comments"}
+              action={comments_url <> "#comments"}
               post_uuid={@post.uuid}
               token={assigns[:comment_form_token]}
             />
@@ -2303,7 +2297,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           post_notes={@post_notes}
           note_comments={assigns[:note_comments] || %{}}
           comments_enabled={assigns[:comments_enabled]}
-          form_action={build_post_url(@group_slug, @post, @current_language)}
+          form_action={comments_url}
           post_uuid={@post.uuid}
           form_token={assigns[:comment_form_token]}
           can_comment={can_comment?(assigns)}
@@ -2928,6 +2922,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       "/" -> []
       prefix -> prefix |> String.trim("/") |> String.split("/", trim: true)
     end
+  end
+
+  @doc """
+  The page numbers a pager shows: the first and last page, the current one
+  and two either side, with `:gap` where pages are left out.
+  """
+  @spec pagination_window(pos_integer(), pos_integer()) :: [pos_integer() | :gap]
+  def pagination_window(page, total_pages) do
+    shown =
+      [1, total_pages | Enum.to_list(max(page - 2, 1)..min(page + 2, total_pages))]
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    shown
+    |> Enum.zip([nil | shown])
+    |> Enum.flat_map(fn
+      {n, prev} when is_integer(prev) and n - prev > 1 -> [:gap, n]
+      {n, _prev} -> [n]
+    end)
   end
 
   @doc """

@@ -272,6 +272,21 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
   end
 
   @doc """
+  A UUID in its stored, lower-case form; anything that is not one comes back as
+  it is (and then matches nothing). Rows store lower-case uuids, so an
+  upper-case id from a client compared unequal and read as unknown.
+  """
+  @spec canonical_uuid(term()) :: term()
+  def canonical_uuid(value) when is_binary(value) do
+    case Ecto.UUID.cast(value) do
+      {:ok, uuid} -> uuid
+      :error -> value
+    end
+  end
+
+  def canonical_uuid(value), do: value
+
+  @doc """
   An image id field (a media file UUID; `null` or "" clears), stored in canonical (lowercase)
   form. An absent field passes. A file that is not in the media library, is trashed or is a
   system file (tile chunks, hidden originals) is `unknown_file`: a dangling id would be accepted

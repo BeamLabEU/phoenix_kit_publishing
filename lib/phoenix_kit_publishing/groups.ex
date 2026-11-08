@@ -14,8 +14,10 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
+  alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.StaleFixer
+  alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Slug
 
   alias PhoenixKit.Modules.Publishing.Constants
@@ -210,7 +212,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           nil,
-          %{"slug" => slug, "reason" => "not_found"}
+          %{"slug" => slug, "reason" => "not_found"},
+          opts
         )
 
         {:error, :not_found}
@@ -224,7 +227,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
             ActivityLog.actor_uuid(opts),
             "publishing_group",
             db_group.uuid,
-            %{"slug" => slug, "reason" => "has_posts", "post_count" => post_count}
+            %{"slug" => slug, "reason" => "has_posts", "post_count" => post_count},
+            opts
           )
 
           {:error, {:has_posts, post_count}}
@@ -259,7 +263,10 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
              {:ok, updated} <- write_group_update_locked(db_group, name, sanitized_slug, params) do
           # A slug rename orphans the old slug's listing cache entry — it leaks in
           # :persistent_term and keeps serving stale data under the old key (L6).
-          if db_group.slug != updated.slug, do: ListingCache.invalidate(db_group.slug)
+          if db_group.slug != updated.slug do
+            ListingCache.invalidate(db_group.slug)
+            move_render_cache_setting(db_group.slug, updated.slug)
+          end
 
           group = db_group_to_map(updated)
           PublishingPubSub.broadcast_group_updated(group)
@@ -288,6 +295,24 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
             err
         end
     end
+  end
+
+  # The per-group render-cache switch is keyed by slug. Left under the old
+  # slug, a group that had it off silently got it back on, and a group created
+  # later with the old slug inherited the setting.
+  defp move_render_cache_setting(old_slug, new_slug) do
+    old_key = Renderer.per_group_cache_key(old_slug)
+
+    case Settings.get_setting(old_key, nil) do
+      nil ->
+        :ok
+
+      value ->
+        Settings.update_setting(Renderer.per_group_cache_key(new_slug), value)
+        Settings.delete_setting(old_key)
+    end
+  rescue
+    _ -> :ok
   end
 
   # Converts an error reason from `update_group`'s with-chain into a
@@ -615,9 +640,29 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
 
         {:ok, group}
 
-      {:error, _changeset} ->
-        log_failed_group_create(opts, db_attrs[:name] || "", "already_exists")
-        {:error, :already_exists}
+      {:error, changeset} ->
+        reason = create_error_reason(changeset)
+        log_failed_group_create(opts, db_attrs[:name] || "", to_string(reason))
+        {:error, reason}
+    end
+  end
+
+  # Only the slug's unique index is "already exists"; a name over the column
+  # width, or any other refused field, said the same and sent the admin
+  # looking for a group that isn't there.
+  defp create_error_reason(%Ecto.Changeset{errors: errors}) do
+    cond do
+      Enum.any?(errors, fn {_field, {_msg, meta}} -> meta[:constraint] == :unique end) ->
+        :already_exists
+
+      Keyword.has_key?(errors, :name) ->
+        :invalid_name
+
+      Keyword.has_key?(errors, :slug) ->
+        :invalid_slug
+
+      true ->
+        :db_update_failed
     end
   end
 
@@ -632,7 +677,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           db_group.uuid,
-          %{"slug" => slug}
+          %{"slug" => slug},
+          opts
         )
 
         {:ok, slug}
@@ -643,7 +689,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           ActivityLog.actor_uuid(opts),
           "publishing_group",
           db_group.uuid,
-          %{"slug" => slug}
+          %{"slug" => slug},
+          opts
         )
 
         error
@@ -684,14 +731,16 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # `add_group` validates inputs synchronously before reaching the DB —
   # all four early-return branches log a `db_pending: true` audit row so
   # the audit trail captures the user-initiated action even when the
-  # input never made it to a row.
+  # input never made it to a row. The submitted name itself stays out:
+  # activity metadata is PII-safe keys only, and a refused name is
+  # free text of any length.
   defp log_failed_group_create(opts, name_attempt, reason) do
     ActivityLog.log_failed_mutation(
       "publishing.group.created",
       ActivityLog.actor_uuid(opts),
       "publishing_group",
       nil,
-      %{"name_attempted" => name_attempt, "reason" => reason},
+      %{"name_length" => String.length(name_attempt), "reason" => reason},
       opts
     )
   end

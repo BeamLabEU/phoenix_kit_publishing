@@ -161,6 +161,18 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
         mark_listing_dirty()
 
+        # The post just went offline on a read: say so in the audit trail.
+        ActivityLog.log(%{
+          action: "publishing.post.pointer_cleared",
+          mode: "auto",
+          resource_type: "publishing_post",
+          resource_uuid: post.uuid,
+          metadata: %{
+            "version_uuid" => active_uuid,
+            "reason" => if(version, do: "version_#{version.status}", else: "version_missing")
+          }
+        })
+
       _ ->
         Logger.debug(
           "[Publishing] Skipped stale-pointer clear for #{post.uuid} — " <>
@@ -420,8 +432,11 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
     end
   end
 
+  # On the site's wall clock, as creation stamps a timestamp post
+  # (`Constants.to_site_wall/2`): on UTC the post's URL date and release time
+  # were off by the site's offset.
   defp fill_missing_timestamp(attrs, post) do
-    now = DateTime.utc_now()
+    now = Constants.to_site_wall(DateTime.utc_now())
     attrs = maybe_set_date(attrs, post.post_date, now)
     maybe_set_time(attrs, post.post_time, now)
   end
@@ -951,8 +966,9 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
   @doc """
   Ensures only one version is published per post.
 
-  If multiple versions have status "published", keeps the highest version
-  number as published and archives the rest.
+  If multiple versions have status "published", keeps the one the post points
+  at (`active_version_uuid`, the one readers are served), else the highest
+  version number, and archives the rest.
   """
   @spec fix_multiple_published_versions(PublishingPost.t()) ::
           {:ok, term()} | {:error, term()} | nil
@@ -983,6 +999,14 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
           DBStorage.update_content_status(v.uuid, "draft")
           mark_listing_dirty()
 
+          ActivityLog.log(%{
+            action: "publishing.version.orphan_demoted",
+            mode: "auto",
+            resource_type: "publishing_version",
+            resource_uuid: v.uuid,
+            metadata: %{"post_uuid" => post.uuid, "version_number" => v.version_number}
+          })
+
         _ ->
           :ok
       end
@@ -991,12 +1015,18 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
 
   defp demote_orphaned_published_versions(_post, _ctx), do: :ok
 
-  # Runs under the post row lock on versions read inside it. Keeps the
-  # highest version number published and archives the rest.
-  defp archive_extra_published(post, versions) do
+  # Runs under the post row lock on versions read inside it, with the locked
+  # row's pointer. Keeps the version the post points at — the one the public
+  # serves — and archives the rest; the highest number only when the pointer
+  # names none of them. Keeping the highest regardless archived the live v2
+  # beside a stray published v3, and the next read cleared the now-stale
+  # pointer and demoted v3: two reads took the post down.
+  defp archive_extra_published(post, versions, active_uuid) do
     case Enum.filter(versions, &Constants.published?(&1.status)) do
       [_, _ | _] = fresh ->
-        [keep | demote] = Enum.sort_by(fresh, & &1.version_number, :desc)
+        by_number = Enum.sort_by(fresh, & &1.version_number, :desc)
+        keep = Enum.find(by_number, &(&1.uuid == active_uuid)) || hd(by_number)
+        demote = Enum.reject(by_number, &(&1.uuid == keep.uuid))
 
         Logger.info(
           "[Publishing] Post #{post.uuid} has #{length(fresh)} published versions, " <>
@@ -1007,6 +1037,18 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
           DBStorage.update_version(v, %{status: "archived"})
           DBStorage.update_content_status(v.uuid, "archived")
           mark_listing_dirty()
+
+          ActivityLog.log(%{
+            action: "publishing.version.duplicate_archived",
+            mode: "auto",
+            resource_type: "publishing_version",
+            resource_uuid: v.uuid,
+            metadata: %{
+              "post_uuid" => post.uuid,
+              "version_number" => v.version_number,
+              "kept_version_number" => keep.version_number
+            }
+          })
         end
 
       _ ->
@@ -1024,8 +1066,13 @@ defmodule PhoenixKit.Modules.Publishing.StaleFixer do
       repo = RepoHelper.repo()
 
       repo.transaction(fn ->
-        DBStorage.lock_post_row!(repo, post.uuid)
-        archive_extra_published(post, DBStorage.list_versions(post.uuid))
+        locked = DBStorage.lock_post_row!(repo, post.uuid) || post
+
+        archive_extra_published(
+          post,
+          DBStorage.list_versions(post.uuid),
+          locked.active_version_uuid
+        )
       end)
     end
   end

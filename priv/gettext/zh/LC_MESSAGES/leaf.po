@@ -1,0 +1,385 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: zh\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Add Column Right"
+msgstr "在右侧添加列"
+
+msgid "Add Row Below"
+msgstr "在下方添加行"
+
+msgid "Align Center"
+msgstr "居中对齐"
+
+msgid "Align Left"
+msgstr "左对齐"
+
+msgid "Align Right"
+msgstr "右对齐"
+
+msgid "Align center"
+msgstr "居中对齐"
+
+msgid "Align left"
+msgstr "左对齐"
+
+msgid "Align right"
+msgstr "右对齐"
+
+msgid "Alt text (optional)"
+msgstr "替代文本（可选）"
+
+msgid "Alt text..."
+msgstr "替代文本..."
+
+msgid "Audio"
+msgstr "音频"
+
+msgid "Blockquote"
+msgstr "块引用"
+
+msgid "Bold"
+msgstr "粗体"
+
+msgid "Bullet List"
+msgstr "项目符号列表"
+
+msgid "Button"
+msgstr "按钮"
+
+msgid "By URL"
+msgstr "通过 URL"
+
+msgid "Callout"
+msgstr "标注框"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Caption..."
+msgstr "说明文字..."
+
+msgid "Clean up"
+msgstr "清理"
+
+msgid "Code Block"
+msgstr "代码块"
+
+msgid "Code block"
+msgstr "代码块"
+
+msgid "Code language"
+msgstr "代码语言"
+
+msgid "Column align"
+msgstr "列对齐"
+
+msgid "Columns"
+msgstr "列"
+
+msgid "Components"
+msgstr "组件"
+
+msgid "Copied"
+msgstr "已复制"
+
+msgid "Copy"
+msgstr "复制"
+
+msgid "Copy as HTML"
+msgstr "复制为 HTML"
+
+msgid "Copy as Markdown"
+msgstr "复制为 Markdown"
+
+msgid "Create"
+msgstr "创建"
+
+msgid "Decrease Indent"
+msgstr "减少缩进"
+
+msgid "Delete"
+msgstr "删除"
+
+msgid "Describe the image"
+msgstr "描述图片"
+
+msgid "Details / Accordion"
+msgstr "详情 / 折叠面板"
+
+msgid "Double-click to edit"
+msgstr "双击编辑"
+
+msgid "Download .md"
+msgstr "下载 .md"
+
+msgid "Drag to resize · Double-click to fit content"
+msgstr "拖动以调整大小 · 双击以适应内容"
+
+msgid "Duplicate"
+msgstr "创建副本"
+
+msgid "Edit <{tag}> source"
+msgstr "编辑 <{tag}> 源代码"
+
+msgid "Edit image URL"
+msgstr "编辑图片 URL"
+
+msgid "Edit link"
+msgstr "编辑链接"
+
+msgid "Edit link URL"
+msgstr "编辑链接 URL"
+
+msgid "Embedded page"
+msgstr "嵌入页面"
+
+msgid "Emoji"
+msgstr "表情符号"
+
+msgid "Exit fullscreen"
+msgstr "退出全屏"
+
+msgid "Export"
+msgstr "导出"
+
+msgid "Format"
+msgstr "格式"
+
+msgid "Fullscreen"
+msgstr "全屏"
+
+msgid "HTML"
+msgstr "HTML"
+
+msgid "HTML mode"
+msgstr "HTML 模式"
+
+msgid "Heading"
+msgstr "标题"
+
+msgid "Heading 1"
+msgstr "标题 1"
+
+msgid "Heading 2"
+msgstr "标题 2"
+
+msgid "Heading 3"
+msgstr "标题 3"
+
+msgid "Headings"
+msgstr "标题"
+
+msgid "Headline text"
+msgstr "大标题文本"
+
+msgid "Horizontal Rule"
+msgstr "水平线"
+
+msgid "Hybrid"
+msgstr "混合"
+
+msgid "Hybrid mode"
+msgstr "混合模式"
+
+msgid "Image"
+msgstr "图片"
+
+msgid "Image URL"
+msgstr "图片 URL"
+
+msgid "Image alt text"
+msgstr "图片替代文本"
+
+msgid "Image caption"
+msgstr "图片说明"
+
+msgid "Image options"
+msgstr "图片选项"
+
+msgid "Increase Indent"
+msgstr "增加缩进"
+
+msgid "Inline Code"
+msgstr "行内代码"
+
+msgid "Insert"
+msgstr "插入"
+
+msgid "Insert Emoji"
+msgstr "插入表情符号"
+
+msgid "Insert Image"
+msgstr "插入图片"
+
+msgid "Insert Link"
+msgstr "插入链接"
+
+msgid "Insert Table"
+msgstr "插入表格"
+
+msgid "Insert Video"
+msgstr "插入视频"
+
+msgid "Insert date"
+msgstr "插入日期"
+
+msgid "Insert time"
+msgstr "插入时间"
+
+msgid "Italic"
+msgstr "斜体"
+
+msgid "Link"
+msgstr "链接"
+
+msgid "Link URL"
+msgstr "链接 URL"
+
+msgid "Lists"
+msgstr "列表"
+
+msgid "Markdown"
+msgstr "Markdown"
+
+msgid "Markdown mode"
+msgstr "Markdown 模式"
+
+msgid "Mode"
+msgstr "模式"
+
+msgid "More editor options"
+msgstr "更多编辑器选项"
+
+msgid "More formatting"
+msgstr "更多格式"
+
+msgid "More inserts"
+msgstr "更多插入项"
+
+msgid "No address yet"
+msgstr "尚无地址"
+
+msgid "No matches"
+msgstr "无匹配项"
+
+msgid "Numbered List"
+msgstr "编号列表"
+
+msgid "Open image"
+msgstr "打开图片"
+
+msgid "Picture"
+msgstr "图片"
+
+msgid "Quote"
+msgstr "引用"
+
+msgid "Redo"
+msgstr "重做"
+
+msgid "Remove Column"
+msgstr "删除列"
+
+msgid "Remove Formatting"
+msgstr "清除格式"
+
+msgid "Remove Row"
+msgstr "删除行"
+
+msgid "Remove image"
+msgstr "移除图片"
+
+msgid "Remove link"
+msgstr "移除链接"
+
+msgid "Rows"
+msgstr "行"
+
+msgid "Saved"
+msgstr "已保存"
+
+msgid "Saving…"
+msgstr "正在保存…"
+
+msgid "Search emoji..."
+msgstr "搜索表情符号..."
+
+msgid "Searching…"
+msgstr "正在搜索…"
+
+msgid "Set language"
+msgstr "设置语言"
+
+msgid "Spoiler"
+msgstr "剧透"
+
+msgid "Strikethrough"
+msgstr "删除线"
+
+msgid "Subscript"
+msgstr "下标"
+
+msgid "Summary"
+msgstr "摘要"
+
+msgid "Superscript"
+msgstr "上标"
+
+msgid "Symbols / Date"
+msgstr "符号 / 日期"
+
+msgid "Table"
+msgstr "表格"
+
+msgid "Task List"
+msgstr "任务列表"
+
+msgid "Text"
+msgstr "文本"
+
+msgid "Toggle Header Row"
+msgstr "切换标题行"
+
+msgid "Toggle fullscreen"
+msgstr "切换全屏"
+
+msgid "Undo"
+msgstr "撤销"
+
+msgid "Unsaved changes"
+msgstr "未保存的更改"
+
+msgid "Upload"
+msgstr "上传"
+
+msgid "Video"
+msgstr "视频"
+
+msgid "View"
+msgstr "视图"
+
+msgid "Visual"
+msgstr "可视化"
+
+msgid "Visual mode"
+msgstr "可视化模式"
+
+msgid "height"
+msgstr "高度"
+
+msgid "results"
+msgstr "条结果"
+
+msgid "stretch"
+msgstr "拉伸"

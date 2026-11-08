@@ -161,49 +161,84 @@ admin routes, smart-fallback wording, settings keys (`default_language_no_prefix
 core's), API permissions, dependency table, `mix test.reset`. AGENTS.md: sanitiser
 `data-*` rule, PubSub cache topics, `CacheSync`, test harness, `Errors` tuples.
 
-## Open
+## Open items, second pass
 
-Not fixed in this pass; listed with where to start.
+Fixed after the 0.17.0 release, each with a test that fails without it unless noted.
 
 **Data layer**
-- `Publishing.list_posts/2` (core's Sitemap) builds `language_slugs`,
-  `available_languages` and `url_slug` from the newest version, so a draft's renamed
-  slug is advertised for a live post (`db_storage.ex` `live_effective_opts`). MEDIUM.
-- `StaleFixer.archive_extra_published` keeps the highest published version instead of
-  the one the pointer names; two reads can unpublish the post. MEDIUM.
-- `Views.VisitorTable` sweeps every 24 h from boot and caps across days. MEDIUM.
-- Categories write the audit row and broadcast inside their transaction. MEDIUM.
-- Self-healing renames (`auto_resolve_url_slug_collision`, StaleFixer pointer clears)
-  write no activity row.
-- `list_posts_with_metadata` loads every body to count statuses (Index dashboard,
-  sitemap); a group rename orphans `publishing_render_cache_enabled_<old-slug>`.
-- Several log calls use the 5-argument forms and drop `opts`; `name_attempted` puts raw
-  submitted text into activity metadata.
-- Dead code: `DBStorage.delete_post/1`, `list_languages/1`, `list_posts_slug_mode/2`,
-  `upsert_group/1`, `Groups.list_trashed_groups/0`, the `Metadata` module,
-  `PubSub.broadcast_post_status_changed/2` (no sender; receivers exist),
-  `Web.Editor.Preview`, `Persistence.create_new_version_from_edit/3`.
+- `Publishing.list_posts/2` with a language (core's Sitemap) answers a live post's
+  `available_languages`, `language_slugs`, `language_previous_slugs` and `url_slug`
+  from its LIVE version; without one (the admin) nothing changes.
+- The duplicate-published heal keeps the version the post points at, under the locked
+  row's pointer.
+- `Views.VisitorTable` caps per day (a `{:count, day}` counter) and sweeps just after
+  UTC midnight.
+- Categories write their audit row and invalidate the listing after COMMIT;
+  `replace_post_categories` writes under the post lock on a re-read version; the
+  reorder failure row's resource type is `publishing_group` (the AGENTS.md TODO).
+- Self-healing writes log `auto` rows: `publishing.content.url_slug_resolved`,
+  `publishing.post.pointer_cleared`, `publishing.version.orphan_demoted`,
+  `publishing.version.duplicate_archived`.
+- The groups dashboard reads aggregates (`group_post_stats/1`) instead of every post
+  body of every group.
+- A group rename carries `publishing_render_cache_enabled_<slug>` to the new slug.
+- Every mutation threads its options into its log calls (none is exempt in
+  `activity_attribution_test.exs` now); a refused group name is logged by length, not
+  text; a refused group create says why (`:invalid_name`, …) instead of always
+  `:already_exists`.
+- A title-derived post slug goes through `validate_slug/1` like a preferred one.
+- A date-only URL resolves over the times a reader can open (no embargoed post's time
+  leaks); the missing-timestamp heal stamps the site clock.
+- Dead internal code removed: `DBStorage.delete_post/1`, `list_languages/1`,
+  `list_posts_slug_mode/2`, `update_content_status_except/3`, `upsert_group/1`,
+  `Categories.categories_for_posts/1`, `categories_of_post/1`,
+  `MediaFolders.post_folder_prefix/0`, `Web.Editor.Preview` (and its `preview_token`
+  guards), the never-taken save-time version branch, a few unused helpers. Functions on
+  the public `Publishing` facade were kept.
 
 **Public**
-- One request to an unpublished post costs up to ~5 × (versions + 1) queries in the
-  language fallback; per-card image URL lookups and per-call `count_posts_on_date`.
-- A replayed session cookie with the dedup marker counts every hit.
-- Search runs ILIKE over raw markdown, so stripped HTML comments can be probed.
+- An unpublished post's language fallback costs the same however many versions the post
+  has (72 → 48 queries for 13 versions in the test, more with languages on).
+- The comment form URL is built once per page.
+- A marked session dedups by an id in the marker, so a replayed cookie counts once.
+- Body search ignores HTML comments.
 
 **Admin**
-- A mention link or Back leaves the editor without flushing Leaf's buffer.
-- Renaming a group strands open editors and Listings on the old slug.
-- The Index dashboard loads every post of every group on each refresh.
+- Back and a mention click flush Leaf's buffer first (`after_flush/2`).
+- An open editor follows a rename of its group (saves keep working, a flash says so); an
+  open Listing moves to the new slug.
 
-**UI** (consistency, no breakage): status badges hand-rolled three ways (core
-`status_badge` fits), public pagination unwindowed (core `pagination_controls`),
-duplicate headings beside the layout trail, five date formats, hand-rolled form
-sections and footers (`form_section` / `form_actions`), labels not tied to controls,
-daisyUI 4 `input-disabled` leftovers.
+**UI**
+- Status badges are core's `status_badge` (and the listing's version badge uses the
+  same colours); public pagination is windowed with previous/next; duplicate headings
+  and breadcrumbs removed (Listing, New, PostShow); the version switcher shows the site
+  date format and clock; New, Edit and the category dialogs use core's `form_actions`;
+  the remaining unnamed controls have names; daisyUI 4 `*-disabled` classes removed;
+  radio groups are `fieldset`/`legend`; hand-drawn SVGs are `<.icon>`; PostShow shows
+  the real view count instead of a placeholder card.
 
-**Machine API** (nits): reasonless validation errors in `set_translation`,
-`create_version`, `schedule_post`; upper-case category uuids miss; schema caps differ
-from handler caps; `if_revision` on unhealed legacy rows.
+**Machine API**
+- Reasons `primary_language`, `exclusive_fields`, `invalid_datetime` on the three
+  reasonless errors; upper-case category ids match; `if_revision` matches a legacy
+  base-code primary row.
 
-**Translations**: core ships es, pl, uk, zh, this module doesn't; Leaf's strings
-(tracked in PR 63's follow-up).
+**Translations**
+- es, pl, uk and zh catalogues (core's locales), and a `leaf` domain in all ten
+  languages for Leaf's editor strings.
+
+## Still open
+
+- **Per-card image URLs** cost 3–5 queries each on listings: core has no batch URL
+  lookup, and the URLs are signed, so it starts in core.
+- **Edit's form sections** stay hand-rolled: they are sub-sections inside one form card,
+  and core's `form_section` is a top-level shadowed card.
+- `ProjectDocsLive` renders without core's components (it is a plain `Phoenix.LiveView`
+  for the projects hub); Preview repeats the public post-date and version-dropdown
+  markup.
+- The editor's published-at field is a UTC instant, previewed on the site clock
+  ("Displays as"); that is correct, but an editor reads two clocks.
+- Leaf adds "results" after a bare number with no plural handling, so the translation
+  reads right only for the many-form (a Leaf change).
+- `PubSub.broadcast_post_status_changed/2` has receivers and no sender.
+- The view-dedup session marker (up to 50 uuids and an id) has not been measured
+  against a host's other session data and the 4 KB cookie limit.

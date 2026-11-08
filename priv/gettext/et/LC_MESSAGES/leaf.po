@@ -1,0 +1,385 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: et\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Add Column Right"
+msgstr "Lisa veerg paremale"
+
+msgid "Add Row Below"
+msgstr "Lisa rida alla"
+
+msgid "Align Center"
+msgstr "Joonda keskele"
+
+msgid "Align Left"
+msgstr "Joonda vasakule"
+
+msgid "Align Right"
+msgstr "Joonda paremale"
+
+msgid "Align center"
+msgstr "Joonda keskele"
+
+msgid "Align left"
+msgstr "Joonda vasakule"
+
+msgid "Align right"
+msgstr "Joonda paremale"
+
+msgid "Alt text (optional)"
+msgstr "Alternatiivtekst (valikuline)"
+
+msgid "Alt text..."
+msgstr "Alternatiivtekst..."
+
+msgid "Audio"
+msgstr "Heli"
+
+msgid "Blockquote"
+msgstr "Tsitaadiplokk"
+
+msgid "Bold"
+msgstr "Paks"
+
+msgid "Bullet List"
+msgstr "Punktloend"
+
+msgid "Button"
+msgstr "Nupp"
+
+msgid "By URL"
+msgstr "URL-i kaudu"
+
+msgid "Callout"
+msgstr "Esiletõstetud plokk"
+
+msgid "Cancel"
+msgstr "Tühista"
+
+msgid "Caption..."
+msgstr "Pealdis..."
+
+msgid "Clean up"
+msgstr "Puhastamine"
+
+msgid "Code Block"
+msgstr "Koodiplokk"
+
+msgid "Code block"
+msgstr "Koodiplokk"
+
+msgid "Code language"
+msgstr "Koodi keel"
+
+msgid "Column align"
+msgstr "Veeru joondus"
+
+msgid "Columns"
+msgstr "Veerud"
+
+msgid "Components"
+msgstr "Komponendid"
+
+msgid "Copied"
+msgstr "Kopeeritud"
+
+msgid "Copy"
+msgstr "Kopeeri"
+
+msgid "Copy as HTML"
+msgstr "Kopeeri HTML-ina"
+
+msgid "Copy as Markdown"
+msgstr "Kopeeri Markdownina"
+
+msgid "Create"
+msgstr "Loo"
+
+msgid "Decrease Indent"
+msgstr "Vähenda taanet"
+
+msgid "Delete"
+msgstr "Kustuta"
+
+msgid "Describe the image"
+msgstr "Kirjeldage pilti"
+
+msgid "Details / Accordion"
+msgstr "Üksikasjad / Akordion"
+
+msgid "Double-click to edit"
+msgstr "Muutmiseks topeltklõpsake"
+
+msgid "Download .md"
+msgstr "Laadi alla .md"
+
+msgid "Drag to resize · Double-click to fit content"
+msgstr "Lohistage suuruse muutmiseks · Topeltklõpsake sisu järgi sobitamiseks"
+
+msgid "Duplicate"
+msgstr "Dubleeri"
+
+msgid "Edit <{tag}> source"
+msgstr "Muuda <{tag}> lähtekoodi"
+
+msgid "Edit image URL"
+msgstr "Muuda pildi URL-i"
+
+msgid "Edit link"
+msgstr "Muuda linki"
+
+msgid "Edit link URL"
+msgstr "Muuda lingi URL-i"
+
+msgid "Embedded page"
+msgstr "Manustatud leht"
+
+msgid "Emoji"
+msgstr "Emoji"
+
+msgid "Exit fullscreen"
+msgstr "Välju täisekraanist"
+
+msgid "Export"
+msgstr "Eksport"
+
+msgid "Format"
+msgstr "Vorming"
+
+msgid "Fullscreen"
+msgstr "Täisekraan"
+
+msgid "HTML"
+msgstr "HTML"
+
+msgid "HTML mode"
+msgstr "HTML-režiim"
+
+msgid "Heading"
+msgstr "Pealkiri"
+
+msgid "Heading 1"
+msgstr "Pealkiri 1"
+
+msgid "Heading 2"
+msgstr "Pealkiri 2"
+
+msgid "Heading 3"
+msgstr "Pealkiri 3"
+
+msgid "Headings"
+msgstr "Pealkirjad"
+
+msgid "Headline text"
+msgstr "Pealkirja tekst"
+
+msgid "Horizontal Rule"
+msgstr "Horisontaalne joon"
+
+msgid "Hybrid"
+msgstr "Hübriid"
+
+msgid "Hybrid mode"
+msgstr "Hübriidrežiim"
+
+msgid "Image"
+msgstr "Pilt"
+
+msgid "Image URL"
+msgstr "Pildi URL"
+
+msgid "Image alt text"
+msgstr "Pildi alternatiivtekst"
+
+msgid "Image caption"
+msgstr "Pildi pealdis"
+
+msgid "Image options"
+msgstr "Pildi valikud"
+
+msgid "Increase Indent"
+msgstr "Suurenda taanet"
+
+msgid "Inline Code"
+msgstr "Reasisene kood"
+
+msgid "Insert"
+msgstr "Lisa"
+
+msgid "Insert Emoji"
+msgstr "Lisa emoji"
+
+msgid "Insert Image"
+msgstr "Lisa pilt"
+
+msgid "Insert Link"
+msgstr "Lisa link"
+
+msgid "Insert Table"
+msgstr "Lisa tabel"
+
+msgid "Insert Video"
+msgstr "Lisa video"
+
+msgid "Insert date"
+msgstr "Lisa kuupäev"
+
+msgid "Insert time"
+msgstr "Lisa kellaaeg"
+
+msgid "Italic"
+msgstr "Kaldkiri"
+
+msgid "Link"
+msgstr "Link"
+
+msgid "Link URL"
+msgstr "Lingi URL"
+
+msgid "Lists"
+msgstr "Loendid"
+
+msgid "Markdown"
+msgstr "Markdown"
+
+msgid "Markdown mode"
+msgstr "Markdown-režiim"
+
+msgid "Mode"
+msgstr "Režiim"
+
+msgid "More editor options"
+msgstr "Rohkem redaktori valikuid"
+
+msgid "More formatting"
+msgstr "Rohkem vormindust"
+
+msgid "More inserts"
+msgstr "Rohkem lisamisvalikuid"
+
+msgid "No address yet"
+msgstr "Aadress puudub"
+
+msgid "No matches"
+msgstr "Vasteid pole"
+
+msgid "Numbered List"
+msgstr "Nummerdatud loend"
+
+msgid "Open image"
+msgstr "Ava pilt"
+
+msgid "Picture"
+msgstr "Pilt"
+
+msgid "Quote"
+msgstr "Tsitaat"
+
+msgid "Redo"
+msgstr "Tee uuesti"
+
+msgid "Remove Column"
+msgstr "Eemalda veerg"
+
+msgid "Remove Formatting"
+msgstr "Eemalda vorming"
+
+msgid "Remove Row"
+msgstr "Eemalda rida"
+
+msgid "Remove image"
+msgstr "Eemalda pilt"
+
+msgid "Remove link"
+msgstr "Eemalda link"
+
+msgid "Rows"
+msgstr "Read"
+
+msgid "Saved"
+msgstr "Salvestatud"
+
+msgid "Saving…"
+msgstr "Salvestamine…"
+
+msgid "Search emoji..."
+msgstr "Otsi emojit..."
+
+msgid "Searching…"
+msgstr "Otsin…"
+
+msgid "Set language"
+msgstr "Määra keel"
+
+msgid "Spoiler"
+msgstr "Spoiler"
+
+msgid "Strikethrough"
+msgstr "Läbikriipsutus"
+
+msgid "Subscript"
+msgstr "Alaindeks"
+
+msgid "Summary"
+msgstr "Kokkuvõte"
+
+msgid "Superscript"
+msgstr "Ülaindeks"
+
+msgid "Symbols / Date"
+msgstr "Sümbolid / Kuupäev"
+
+msgid "Table"
+msgstr "Tabel"
+
+msgid "Task List"
+msgstr "Ülesannete loend"
+
+msgid "Text"
+msgstr "Tekst"
+
+msgid "Toggle Header Row"
+msgstr "Lülita päiserida sisse/välja"
+
+msgid "Toggle fullscreen"
+msgstr "Lülita täisekraan sisse/välja"
+
+msgid "Undo"
+msgstr "Võta tagasi"
+
+msgid "Unsaved changes"
+msgstr "Salvestamata muudatused"
+
+msgid "Upload"
+msgstr "Laadi üles"
+
+msgid "Video"
+msgstr "Video"
+
+msgid "View"
+msgstr "Vaade"
+
+msgid "Visual"
+msgstr "Visuaalne"
+
+msgid "Visual mode"
+msgstr "Visuaalne režiim"
+
+msgid "height"
+msgstr "kõrgus"
+
+msgid "results"
+msgstr "tulemust"
+
+msgid "stretch"
+msgstr "venitus"

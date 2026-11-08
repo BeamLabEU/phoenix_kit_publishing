@@ -385,18 +385,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   end
 
   # The payload is `%{uuid, slug}` only; the group itself is reloaded.
-  def handle_info({:group_updated, _payload}, socket) do
-    groups = load_db_groups()
-    current_group = Enum.find(groups, fn b -> b["slug"] == socket.assigns.group_slug end)
-
-    socket =
-      socket
-      |> assign(:groups, groups)
-      |> assign(:current_group, current_group || socket.assigns.current_group)
-      |> assign_page_title()
-
-    {:noreply, socket}
+  # This group was renamed: its posts, subscriptions and URL all live under
+  # the new slug now. Kept on the old one, the list emptied and every action
+  # answered "Not found".
+  def handle_info({:group_updated, %{uuid: uuid, slug: new_slug} = payload}, socket)
+      when is_binary(new_slug) and is_binary(uuid) and new_slug != socket.assigns.group_slug do
+    if uuid == get_in(socket.assigns, [:current_group, "uuid"]) do
+      {:noreply,
+       socket
+       |> put_flash(:info, gettext("This group was renamed to %{slug}.", slug: new_slug))
+       |> push_navigate(to: Routes.path("/admin/publishing/#{new_slug}"))}
+    else
+      refresh_groups_after_update(socket, payload)
+    end
   end
+
+  def handle_info({:group_updated, payload}, socket),
+    do: refresh_groups_after_update(socket, payload)
 
   def handle_info({:group_deleted, deleted_slug}, socket) do
     if socket.assigns.group_slug == deleted_slug do
@@ -511,6 +516,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   defp update_post_in_list(socket, _updated_post), do: refresh_posts(socket)
 
   defp refresh_post_by_slug(socket, _post_slug), do: refresh_posts(socket)
+
+  defp refresh_groups_after_update(socket, _payload) do
+    groups = load_db_groups()
+    current_group = Enum.find(groups, fn b -> b["slug"] == socket.assigns.group_slug end)
+
+    socket =
+      socket
+      |> assign(:groups, groups)
+      |> assign(:current_group, current_group || socket.assigns.current_group)
+      |> assign_page_title()
+
+    {:noreply, socket}
+  end
 
   defp maybe_sweep_stale_posts(socket, group_slug) do
     if connected?(socket) and not is_nil(group_slug) and
@@ -786,22 +804,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
   def format_datetime(_post, _user, _settings), do: gettext("Unsaved draft")
 
   @doc """
-  Gets the published version number from a post's version_statuses map.
-  Returns nil if no version is published.
-  """
-  @spec get_published_version(map()) :: integer() | nil
-  def get_published_version(post) do
-    version_statuses = Map.get(post, :version_statuses, %{})
-
-    version_statuses
-    |> Enum.find(fn {_version, status} -> Constants.published?(status) end)
-    |> case do
-      {version, _status} -> version
-      nil -> nil
-    end
-  end
-
-  @doc """
   Gets the display version info for a post based on priority:
   1. Published version (if exists) - what visitors see
   2. Newest draft version (if no published) - work in progress
@@ -974,10 +976,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     <% group_slug = (@current_group && @current_group["slug"]) || @group_slug || "your-group" %>
     <% public_url =
       @endpoint_url <> PublishingHTML.group_listing_path(@default_url_language, group_slug) %>
-    <.admin_page_header back={Routes.path("/admin/publishing")}>
-      <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content">
-        {(@current_group && @current_group["name"]) || @group_slug || gettext("Group")}
-      </h1>
+    <%!-- The group's name is the page title, which the admin layout's trail
+      already shows (with the way back to Publishing); no second heading. --%>
+    <.admin_page_header>
       <% has_published = Map.get(@post_status_counts, Constants.status_published(), 0) > 0 %>
       <%= if has_published do %>
         <div class="text-sm text-base-content/60 mt-0.5">
@@ -1155,10 +1156,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                         <%= if is_versioned do %>
                           <% {display_version, display_status, _label} =
                             get_display_version(post) %>
+                          <%!-- The colours of core's status_badge (draft warning,
+                            archived ghost), as on PostShow and in the editor. --%>
                           <span class={[
                             "badge badge-xs gap-1",
                             Constants.published?(display_status) && "badge-success",
-                            !Constants.published?(display_status) && "badge-ghost"
+                            display_status == "draft" && "badge-warning",
+                            display_status not in ["draft", "published"] && "badge-ghost"
                           ]}>
                             <%= if version_count > 1 do %>
                               {ngettext("%{count} version", "%{count} versions", version_count,
@@ -1239,7 +1243,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                                 post_status == "draft" && "text-warning",
                                 post_status == "archived" && "text-base-content/60"
                               ]}>
-                                <select name="status">
+                                <select name="status" aria-label={gettext("Status")}>
                                   <option value="draft" selected={post_status == "draft"}>
                                     {gettext("Draft")}
                                   </option>

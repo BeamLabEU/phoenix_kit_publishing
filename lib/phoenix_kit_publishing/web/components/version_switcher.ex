@@ -25,6 +25,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
   """
 
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Utils.Date, as: UtilsDate
 
   use Phoenix.Component
   use Gettext, backend: PhoenixKitPublishing.Gettext
@@ -233,19 +234,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.VersionSwitcher do
   defp format_version_date(nil), do: nil
   defp format_version_date(""), do: nil
 
+  # The site's date and time formats on the site's clock, as the rest of the
+  # admin shows dates; this read a UTC `%Y-%m-%d %H:%M` before.
   defp format_version_date(date_string) when is_binary(date_string) do
-    case DateTime.from_iso8601(date_string) do
-      {:ok, datetime, _offset} ->
-        Calendar.strftime(datetime, "%Y-%m-%d %H:%M")
-
-      _ ->
-        # Try parsing as NaiveDateTime
-        case NaiveDateTime.from_iso8601(date_string) do
-          {:ok, naive_dt} -> Calendar.strftime(naive_dt, "%Y-%m-%d %H:%M")
-          _ -> nil
-        end
+    with {:error, _} <- DateTime.from_iso8601(date_string),
+         {:ok, naive} <- NaiveDateTime.from_iso8601(date_string) do
+      site_date_time(DateTime.from_naive!(naive, "Etc/UTC"))
+    else
+      {:ok, datetime, _offset} -> site_date_time(datetime)
+      _ -> nil
     end
   end
 
   defp format_version_date(_), do: nil
+
+  defp site_date_time(datetime) do
+    UtilsDate.format_datetime_with_user_format(datetime) <>
+      " " <> UtilsDate.format_time_with_user_format(datetime)
+  end
 end

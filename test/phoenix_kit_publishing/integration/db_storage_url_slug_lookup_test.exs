@@ -331,6 +331,12 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageUrlSlugLookupTest do
       reloaded_newer = DBStorage.list_contents(newer_v.uuid) |> List.first()
       assert reloaded_newer.url_slug == "duplicate-slug-2"
 
+      # A read moved a public URL; the audit trail records it.
+      assert_activity_logged("publishing.content.url_slug_resolved",
+        resource_uuid: reloaded_newer.uuid,
+        metadata_has: %{"from_url_slug" => "duplicate-slug", "to_url_slug" => "duplicate-slug-2"}
+      )
+
       # Subsequent lookup is clean — only one row matches "duplicate-slug".
       assert winner_again =
                DBStorage.find_by_url_slug(group["slug"], "en-US", "duplicate-slug")

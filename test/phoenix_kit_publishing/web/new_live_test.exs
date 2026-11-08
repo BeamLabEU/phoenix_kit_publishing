@@ -21,7 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.NewLiveTest do
       |> put_test_scope(fake_scope())
       |> live("/admin/publishing/new-group")
 
-    assert html =~ "Create a New Publishing Group"
+    assert html =~ "group-create-form"
     assert html =~ ~s|phx-disable-with="Creating…"|
   end
 

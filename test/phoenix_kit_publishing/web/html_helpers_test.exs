@@ -270,4 +270,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTMLHelpersTest do
       assert HTML.public_origin(conn) == "https://max-dev.example"
     end
   end
+
+  describe "pagination_window/2" do
+    alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
+
+    test "few pages: every page" do
+      assert PublishingHTML.pagination_window(2, 4) == [1, 2, 3, 4]
+    end
+
+    test "many pages: first, last, the current ±2 and the gaps" do
+      assert PublishingHTML.pagination_window(1, 250) == [1, 2, 3, :gap, 250]
+
+      assert PublishingHTML.pagination_window(100, 250) == [
+               1,
+               :gap,
+               98,
+               99,
+               100,
+               101,
+               102,
+               :gap,
+               250
+             ]
+
+      assert PublishingHTML.pagination_window(250, 250) == [1, :gap, 248, 249, 250]
+      assert PublishingHTML.pagination_window(4, 9) == [1, 2, 3, 4, 5, 6, :gap, 9]
+    end
+  end
 end

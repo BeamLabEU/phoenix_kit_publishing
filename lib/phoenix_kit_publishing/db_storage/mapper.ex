@@ -170,6 +170,25 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
     |> maybe_override_title(opts)
   end
 
+  @doc """
+  Replaces a post map's URL fields with those of `contents` (the post's live
+  version's rows): the languages it is published in, their slugs, their 301
+  history and the primary language's `url_slug`.
+  """
+  @spec put_public_url_fields(map(), PublishingPost.t(), [PublishingContent.t()]) :: map()
+  def put_public_url_fields(map, %PublishingPost{} = post, contents) do
+    primary =
+      Enum.find(contents, &(&1.language == LanguageHelpers.get_primary_language())) ||
+        List.first(contents)
+
+    Map.merge(map, %{
+      available_languages: contents |> Enum.map(& &1.language) |> Enum.sort(),
+      language_slugs: build_language_slugs(contents, post.slug),
+      language_previous_slugs: build_language_previous_slugs(contents),
+      url_slug: Values.blank_to_nil(primary && primary.url_slug) || post.slug
+    })
+  end
+
   # ===========================================================================
   # Private Helpers
   # ===========================================================================

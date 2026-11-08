@@ -5,7 +5,8 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
   `Views.maybe_record_view/2` asks `first_view_today?/3` once per cookieless
   request; the key is `{day, post_uuid, visitor_hash}` and the caller passes a
   HASH — no address ever reaches this table. Keys from earlier days are swept
-  once a day (and at start), so the table holds at most one day of visitors.
+  just after each UTC midnight (and at start), so the table holds one day of
+  visitors; a per-day counter (`{:count, day}`) is what the cap reads.
 
   A supervised process owns the table for the same reason
   `ListingCache.LockTableOwner` owns the lock table: an ETS table dies with
@@ -17,7 +18,9 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
   use GenServer
 
   @table :phoenix_kit_publishing_view_visitors
-  @sweep_every :timer.hours(24)
+  # Past midnight, so the day being swept is over on every clock that agrees
+  # with this one to within a second.
+  @sweep_delay_ms 1_000
 
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts) do
@@ -31,32 +34,50 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
   `%Date{}` struct compares field by field in key order (day before month)
   and would sweep the wrong keys.
   """
-  # Past this many rows in a day the table stops remembering and every view
+  # Past this many visitors in a day the table stops remembering and every view
   # counts: a flood of distinct addresses must not turn a 16-byte row each
-  # into unbounded memory, and over-counting under attack beats a crash.
+  # into unbounded memory, and over-counting under attack beats a crash. Read
+  # from the day's own counter: the table's size also held the previous day
+  # until a sweep timed from boot came round, so a busy day switched dedup off
+  # for most of the next one.
   @max_rows 500_000
 
   @spec first_view_today?(String.t(), binary(), String.t()) :: boolean()
   def first_view_today?(post_uuid, visitor_hash, day \\ today()) do
-    :ets.info(@table, :size) >= @max_rows or
-      :ets.insert_new(@table, {{day, post_uuid, visitor_hash}, true})
+    if day_count(day) >= @max_rows do
+      true
+    else
+      inserted? = :ets.insert_new(@table, {{day, post_uuid, visitor_hash}, true})
+      if inserted?, do: :ets.update_counter(@table, {:count, day}, 1, {{:count, day}, 0})
+      inserted?
+    end
   rescue
     ArgumentError -> true
   end
 
-  @doc "Deletes every key from a day before `today`. Returns the number removed."
+  defp day_count(day) do
+    case :ets.lookup(@table, {:count, day}) do
+      [{_key, count}] -> count
+      [] -> 0
+    end
+  end
+
+  @doc "Deletes every key (and counter) from a day before `today`. Returns the number removed."
   @spec sweep(String.t()) :: non_neg_integer()
   def sweep(today \\ today()) do
-    :ets.select_delete(@table, [{{{:"$1", :_, :_}, :_}, [{:<, :"$1", today}], [true]}])
+    :ets.select_delete(@table, [
+      {{{:"$1", :_, :_}, :_}, [{:<, :"$1", today}], [true]},
+      {{{:count, :"$1"}, :_}, [{:<, :"$1", today}], [true]}
+    ])
   rescue
     ArgumentError -> 0
   end
 
   @doc false
-  # Test-only: the raw rows, so a test can prove no address is stored.
+  # Test-only: the visitor rows, so a test can prove no address is stored.
   @spec entries() :: [{{String.t(), String.t(), binary()}, true}]
   def entries do
-    :ets.tab2list(@table)
+    :ets.match_object(@table, {{:_, :_, :_}, :_})
   rescue
     ArgumentError -> []
   end
@@ -101,8 +122,15 @@ defmodule PhoenixKit.Modules.Publishing.Views.VisitorTable do
   def handle_info(_message, state), do: {:noreply, state}
 
   defp schedule_sweep(state) do
-    Process.send_after(self(), :sweep, @sweep_every)
+    Process.send_after(self(), :sweep, ms_until_next_utc_midnight() + @sweep_delay_ms)
     state
+  end
+
+  @doc false
+  @spec ms_until_next_utc_midnight(DateTime.t()) :: non_neg_integer()
+  def ms_until_next_utc_midnight(now \\ DateTime.utc_now()) do
+    tomorrow = now |> DateTime.to_date() |> Date.add(1)
+    DateTime.diff(DateTime.new!(tomorrow, ~T[00:00:00], "Etc/UTC"), now, :millisecond)
   end
 
   defp today, do: Date.to_iso8601(Date.utc_today())

@@ -17,7 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.API.CreateVersion do
   end
 
   defp exclusive(%{"blank" => true, "from_version" => _}),
-    do: Common.invalid("blank", "give blank or from_version, not both")
+    do: Common.invalid("blank", "give blank or from_version, not both", "exclusive_fields")
 
   defp exclusive(_input), do: :ok
 

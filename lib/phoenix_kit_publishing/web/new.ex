@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Access
+  alias PhoenixKit.Modules.Publishing.Errors
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
@@ -332,11 +333,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
     ~H"""
     <div class="container flex flex-col mx-auto px-4 py-6">
     <%!-- Header Section --%>
-    <.admin_page_header
-      back={Routes.path("/admin/publishing")}
-      title={gettext("Create a New Publishing Group")}
-    />
-
+    <%!-- The title and the way back are the layout's trail (page_title,
+      page_section), as on the Edit page; no second heading. --%>
     <div class="max-w-2xl mx-auto space-y-6">
       <div class="card bg-base-100 shadow-xl border border-base-200">
         <div class="card-body space-y-6">
@@ -399,12 +397,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
             </div>
 
             <%!-- Content Type Section --%>
-            <div class="fieldset">
-              <label class="label">
-                <span class="fieldset-legend text-sm font-semibold text-base-content">
-                  {gettext("Content Type")}
-                </span>
-              </label>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-sm font-semibold text-base-content">
+                {gettext("Content Type")}
+              </legend>
               <div class="space-y-3">
                 <%= for preset <- @preset_types do %>
                   <label class="cursor-pointer flex items-start gap-3 rounded-lg border border-base-300/70 bg-base-200/40 px-4 py-3 hover:border-primary/60 transition">
@@ -466,6 +462,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
                           type="text"
                           name="group[custom_type]"
                           class="input input-sm w-full max-w-xs"
+                          aria-label={gettext("Content Type")}
                           placeholder={gettext("e.g. tutorials, recipes")}
                           value={
                             if @form[:type].value not in PhoenixKit.Modules.Publishing.Constants.valid_types(),
@@ -487,15 +484,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
                   )}
                 </span>
               </label>
-            </div>
+            </fieldset>
 
             <%!-- Item Naming Section --%>
-            <div class="fieldset">
-              <label class="label">
-                <span class="fieldset-legend text-sm font-semibold text-base-content">
-                  {gettext("Item Naming")}
-                </span>
-              </label>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-sm font-semibold text-base-content">
+                {gettext("Item Naming")}
+              </legend>
               <p class="text-xs text-base-content/60 mb-3">
                 {gettext(
                   "What do you call items in this publishing group? These names appear in the UI."
@@ -529,15 +524,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
                   )}
                 </span>
               </label>
-            </div>
+            </fieldset>
 
             <%!-- URL Mode Section --%>
-            <div class="fieldset">
-              <label class="label">
-                <span class="fieldset-legend text-sm font-semibold text-base-content">
-                  {gettext("URL Mode")}
-                </span>
-              </label>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend text-sm font-semibold text-base-content">
+                {gettext("URL Mode")}
+              </legend>
               <div class="space-y-3">
                 <label class="cursor-pointer flex items-start gap-3 rounded-lg border border-base-300/70 bg-base-200/40 px-4 py-3 hover:border-primary/60 transition">
                   <input
@@ -597,18 +590,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
                   )}
                 </span>
               </label>
-            </div>
+            </fieldset>
 
-            <div class="flex flex-wrap gap-3 justify-end">
-              <.button type="submit" size="sm" phx-disable-with={gettext("Creating…")}>
-                <.icon name="hero-plus" class="w-4 h-4 mr-1" /> {gettext(
-                  "Create Publishing Group"
-                )}
-              </.button>
-              <.button type="button" variant="ghost" size="sm" phx-click="cancel">
-                <.icon name="hero-arrow-uturn-left" class="w-4 h-4 mr-1" /> {gettext("Cancel")}
-              </.button>
-            </div>
+            <.form_actions
+              cancel_to={Routes.path("/admin/publishing")}
+              submit_label={gettext("Create Publishing Group")}
+              submitting_label={gettext("Creating…")}
+              submit_icon="hero-plus"
+              class="flex-wrap"
+            />
           </.form>
         </div>
       </div>
@@ -664,7 +654,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
          |> put_flash(:info, gettext("Publishing group \"%{name}\" created", name: group["name"]))
          |> push_navigate(to: Routes.path("/admin/publishing/#{group["slug"]}"))}
 
-      {:error, :already_exists} ->
+      {:error, reason} ->
         {:noreply,
          socket
          |> assign_form_state(
@@ -673,56 +663,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
            last_generated_slug,
            auto_item_names?
          )
-         |> put_flash(:error, gettext("That publishing group already exists"))}
-
-      {:error, :invalid_name} ->
-        {:noreply,
-         socket
-         |> assign_form_state(
-           normalized_params,
-           auto_slug?,
-           last_generated_slug,
-           auto_item_names?
-         )
-         |> put_flash(:error, gettext("Please enter a valid name"))}
-
-      {:error, :invalid_mode} ->
-        {:noreply,
-         socket
-         |> assign_form_state(
-           normalized_params,
-           auto_slug?,
-           last_generated_slug,
-           auto_item_names?
-         )
-         |> put_flash(:error, gettext("Invalid URL mode"))}
-
-      {:error, :invalid_type} ->
-        {:noreply,
-         socket
-         |> assign_form_state(
-           normalized_params,
-           auto_slug?,
-           last_generated_slug,
-           auto_item_names?
-         )
-         |> put_flash(:error, gettext("Invalid content type"))}
-
-      {:error, :invalid_slug} ->
-        {:noreply,
-         socket
-         |> assign_form_state(
-           normalized_params,
-           auto_slug?,
-           last_generated_slug,
-           auto_item_names?
-         )
-         |> put_flash(
-           :error,
-           gettext(
-             "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
-           )
-         )}
+         |> put_flash(:error, create_error_message(reason))}
     end
   end
+
+  defp create_error_message(:already_exists), do: gettext("That publishing group already exists")
+  defp create_error_message(:invalid_name), do: gettext("Please enter a valid name")
+  defp create_error_message(:invalid_mode), do: gettext("Invalid URL mode")
+  defp create_error_message(:invalid_type), do: gettext("Invalid content type")
+
+  defp create_error_message(:invalid_slug),
+    do:
+      gettext(
+        "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
+      )
+
+  defp create_error_message(reason),
+    do: gettext("Couldn't create this group.") <> " " <> Errors.message(reason)
 end
