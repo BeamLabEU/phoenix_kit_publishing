@@ -267,7 +267,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     attrs = Map.new(attrs, fn {key, value} -> {to_string(key), value} end)
     opts = Map.new(opts)
 
-    with {:ok, published_at} <- import_published_at(attrs["published_at"]),
+    with :ok <- check_import_shapes(attrs),
+         {:ok, published_at} <- import_published_at(attrs["published_at"]),
          {:ok, category_uuids} <- import_category_uuids(group_slug, attrs),
          {:ok, post} <-
            create_post(
@@ -287,6 +288,27 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       read_post_by_uuid(post[:uuid])
     end
   end
+
+  # Every attr's shape is checked before anything is written, so a bad one
+  # never leaves a half-made post behind.
+  @import_text_keys ~w(title content slug description seo_title excerpt featured_image_uuid
+                       og_title og_description og_image_uuid)
+
+  defp check_import_shapes(attrs) do
+    checks = [
+      Enum.all?(@import_text_keys, &(is_nil(attrs[&1]) or is_binary(attrs[&1]))),
+      is_nil(attrs["og"]) or is_map(attrs["og"]),
+      Enum.all?(~w(category_slugs category_uuids), &string_list?(attrs[&1])),
+      is_nil(attrs["custom_fields"]) or is_map(attrs["custom_fields"]) or
+        is_list(attrs["custom_fields"])
+    ]
+
+    if Enum.all?(checks), do: :ok, else: {:error, :invalid_format}
+  end
+
+  defp string_list?(nil), do: true
+  defp string_list?(list) when is_list(list), do: Enum.all?(list, &is_binary/1)
+  defp string_list?(_other), do: false
 
   defp atomize_create(attrs),
     do: Map.new(attrs, fn {key, value} -> {String.to_existing_atom(key), value} end)
