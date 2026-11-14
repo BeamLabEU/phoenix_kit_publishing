@@ -277,6 +277,18 @@ yourself, pass `Web.HTML.url_context(language)` in place of the language to
 `build_post_url/4`, with `build_date_counts/1` for a timestamp group: the
 settings are then read once, and no URL costs a query.
 
+## Importing posts from code
+
+`PhoenixKit.Modules.Publishing.import_post/3` creates a post with everything it
+carries and publishes it, in one call: title and body, description, SEO title,
+OpenGraph fields, categories (by slug or uuid), custom fields, and a
+`published_at` in the past or the future. In a timestamp group that instant is
+the post's URL minute on the site's clock; posts imported into the same minute
+take the nearest earlier free minutes, so none of them ends up in the future
+(where a timestamp post is not live yet). An unknown category or an unreadable
+date refuses the import before anything is written; `publish: false` leaves a
+draft.
+
 ## Admin Routes
 
 | Route | LiveView | Purpose |

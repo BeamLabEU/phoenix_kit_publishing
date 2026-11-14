@@ -97,27 +97,27 @@ msgstr "Tõlgi AI-ga"
 msgid "AI Translation"
 msgstr "AI tõlge"
 
-#: lib/phoenix_kit_publishing/errors.ex:195
+#: lib/phoenix_kit_publishing/errors.ex:199
 #, elixir-autogen, elixir-format
 msgid "AI endpoint is disabled"
 msgstr "AI otspunkt on keelatud"
 
-#: lib/phoenix_kit_publishing/errors.ex:194
+#: lib/phoenix_kit_publishing/errors.ex:198
 #, elixir-autogen, elixir-format
 msgid "AI endpoint not found"
 msgstr "AI otspunkti ei leitud"
 
-#: lib/phoenix_kit_publishing/errors.ex:192
+#: lib/phoenix_kit_publishing/errors.ex:196
 #, elixir-autogen, elixir-format
 msgid "AI module is not enabled"
 msgstr "AI moodul ei ole lubatud"
 
-#: lib/phoenix_kit_publishing/errors.ex:206
+#: lib/phoenix_kit_publishing/errors.ex:210
 #, elixir-autogen, elixir-format
 msgid "AI request failed: %{reason}"
 msgstr "AI päring ebaõnnestus: %{reason}"
 
-#: lib/phoenix_kit_publishing/errors.ex:198
+#: lib/phoenix_kit_publishing/errors.ex:202
 #, elixir-autogen, elixir-format
 msgid "AI translation failed: %{reason}"
 msgstr "AI tõlge ebaõnnestus: %{reason}"
@@ -158,7 +158,7 @@ msgstr "Kõigil keeltel on juba tõlked olemas"
 msgid "All versions of this post have been deleted. Please navigate away."
 msgstr "Kõik selle postituse versioonid on kustutatud. Palun liikuge sellelt lehelt eemale."
 
-#: lib/phoenix_kit_publishing/errors.ex:119
+#: lib/phoenix_kit_publishing/errors.ex:121
 #, elixir-autogen, elixir-format
 msgid "Already exists"
 msgstr "On juba olemas"
@@ -248,7 +248,7 @@ msgstr "Vahemälu möödalasud"
 msgid "Cache cleared for %{group}"
 msgstr "%{group} vahemälu tühjendatud"
 
-#: lib/phoenix_kit_publishing/errors.ex:120
+#: lib/phoenix_kit_publishing/errors.ex:122
 #, elixir-autogen, elixir-format
 msgid "Cache miss"
 msgstr "Vahemälu möödalask"
@@ -274,17 +274,17 @@ msgstr "Avaldatud postituste renderdatud HTML on vahemälus. Kasutab sisu räsil
 msgid "Cancel"
 msgstr "Tühista"
 
-#: lib/phoenix_kit_publishing/errors.ex:154
+#: lib/phoenix_kit_publishing/errors.ex:158
 #, elixir-autogen, elixir-format
 msgid "Cannot delete the last language"
 msgstr "Viimast keelt ei saa kustutada"
 
-#: lib/phoenix_kit_publishing/errors.ex:155
+#: lib/phoenix_kit_publishing/errors.ex:159
 #, elixir-autogen, elixir-format
 msgid "Cannot delete the last version"
 msgstr "Viimast versiooni ei saa kustutada"
 
-#: lib/phoenix_kit_publishing/errors.ex:121
+#: lib/phoenix_kit_publishing/errors.ex:123
 #, elixir-autogen, elixir-format
 msgid "Cannot delete the live version"
 msgstr "Aktiivset versiooni ei saa kustutada"
@@ -576,7 +576,7 @@ msgstr "Kohandatud URL-i slug '%{slug}' keele %{language} jaoks tühjendati, kun
 msgid "Custom URL slug '%{slug}' was cleared from %{count} translations because it conflicts with another post's post slug"
 msgstr "Kohandatud URL-i slug '%{slug}' tühjendati %{count} tõlkest, kuna see on vastuolus teise postituse sluggiga"
 
-#: lib/phoenix_kit_publishing/errors.ex:133
+#: lib/phoenix_kit_publishing/errors.ex:135
 #, elixir-autogen, elixir-format
 msgid "Database update failed"
 msgstr "Andmebaasi uuendamine ebaõnnestus"
@@ -649,7 +649,7 @@ msgstr "Kustutamine…"
 msgid "Description"
 msgstr "Kirjeldus"
 
-#: lib/phoenix_kit_publishing/errors.ex:134
+#: lib/phoenix_kit_publishing/errors.ex:136
 #, elixir-autogen, elixir-format
 msgid "Destination already exists"
 msgstr "Sihtkoht on juba olemas"
@@ -722,7 +722,7 @@ msgstr "Vahemällu salvestatud kirjed"
 msgid "Error rendering markdown"
 msgstr "Viga markdown'i renderdamisel"
 
-#: lib/phoenix_kit_publishing/errors.ex:183
+#: lib/phoenix_kit_publishing/errors.ex:187
 #, elixir-autogen, elixir-format
 msgid "Every time slot on this post's date is taken. Change the date or time, then try again."
 msgstr "Kõik selle postituse kuupäeva ajapilud on hõivatud. Muutke kuupäeva või kellaaega ja proovige uuesti."
@@ -732,12 +732,12 @@ msgstr "Kõik selle postituse kuupäeva ajapilud on hõivatud. Muutke kuupäeva 
 msgid "Examples: \"Create new %{singular}\", \"View all %{plural}\""
 msgstr "Näited: „Loo uus %{singular}“, „Vaata kõiki %{plural}“"
 
-#: lib/phoenix_kit_publishing/errors.ex:202
+#: lib/phoenix_kit_publishing/errors.ex:206
 #, elixir-autogen, elixir-format
 msgid "Failed to extract AI response: %{reason}"
 msgstr "AI vastuse eraldamine ebaõnnestus: %{reason}"
 
-#: lib/phoenix_kit_publishing/errors.ex:210
+#: lib/phoenix_kit_publishing/errors.ex:214
 #, elixir-autogen, elixir-format
 msgid "Failed to read source post: %{reason}"
 msgstr "Lähtepostituse lugemine ebaõnnestus: %{reason}"
@@ -832,7 +832,7 @@ msgstr "Rühma slug"
 msgid "Group moved to trash"
 msgstr "Rühm liigutati prügikasti"
 
-#: lib/phoenix_kit_publishing/errors.ex:136
+#: lib/phoenix_kit_publishing/errors.ex:138
 #: lib/phoenix_kit_publishing/web/edit.ex:891
 #, elixir-autogen, elixir-format
 msgid "Group not found"
@@ -905,7 +905,7 @@ msgstr "Lehesisene keelevalija on lubatud — avaldamise leheküljed renderdavad
 msgid "Invalid URL mode"
 msgstr "Vigane URL-i režiim"
 
-#: lib/phoenix_kit_publishing/errors.ex:137
+#: lib/phoenix_kit_publishing/errors.ex:139
 #, elixir-autogen, elixir-format
 msgid "Invalid content"
 msgstr "Vigane sisu"
@@ -921,27 +921,27 @@ msgstr "Vigane sisutüüp"
 msgid "Invalid examples"
 msgstr "Vigased näited"
 
-#: lib/phoenix_kit_publishing/errors.ex:138
+#: lib/phoenix_kit_publishing/errors.ex:140
 #, elixir-autogen, elixir-format
 msgid "Invalid format"
 msgstr "Vigane vorming"
 
-#: lib/phoenix_kit_publishing/errors.ex:139
+#: lib/phoenix_kit_publishing/errors.ex:141
 #, elixir-autogen, elixir-format
 msgid "Invalid mode"
 msgstr "Vigane režiim"
 
-#: lib/phoenix_kit_publishing/errors.ex:140
+#: lib/phoenix_kit_publishing/errors.ex:142
 #, elixir-autogen, elixir-format
 msgid "Invalid name"
 msgstr "Vigane nimi"
 
-#: lib/phoenix_kit_publishing/errors.ex:142
+#: lib/phoenix_kit_publishing/errors.ex:144
 #, elixir-autogen, elixir-format
 msgid "Invalid path"
 msgstr "Vigane rada"
 
-#: lib/phoenix_kit_publishing/errors.ex:143
+#: lib/phoenix_kit_publishing/errors.ex:145
 #, elixir-autogen, elixir-format
 msgid "Invalid slug"
 msgstr "Vigane slug"
@@ -959,17 +959,17 @@ msgstr "Vigane slugi vorming. Kasutage ainult väiketähti, numbreid ja sidekrii
 msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
 msgstr "Vigane slugi vorming. Kasutage ainult väiketähti, numbreid ja sidekriipse (nt my-post-title)"
 
-#: lib/phoenix_kit_publishing/errors.ex:144
+#: lib/phoenix_kit_publishing/errors.ex:148
 #, elixir-autogen, elixir-format
 msgid "Invalid status"
 msgstr "Vigane olek"
 
-#: lib/phoenix_kit_publishing/errors.ex:145
+#: lib/phoenix_kit_publishing/errors.ex:149
 #, elixir-autogen, elixir-format
 msgid "Invalid type"
 msgstr "Vigane tüüp"
 
-#: lib/phoenix_kit_publishing/errors.ex:146
+#: lib/phoenix_kit_publishing/errors.ex:150
 #, elixir-autogen, elixir-format
 msgid "Invalid version"
 msgstr "Vigane versioon"
@@ -1148,7 +1148,7 @@ msgstr "Uus"
 msgid "New Version"
 msgstr "Uus versioon"
 
-#: lib/phoenix_kit_publishing/errors.ex:193
+#: lib/phoenix_kit_publishing/errors.ex:197
 #, elixir-autogen, elixir-format
 msgid "No AI prompt selected"
 msgstr "AI juhist pole valitud"
@@ -1158,7 +1158,7 @@ msgstr "AI juhist pole valitud"
 msgid "No OG image set."
 msgstr "OG-pilti pole määratud."
 
-#: lib/phoenix_kit_publishing/errors.ex:159
+#: lib/phoenix_kit_publishing/errors.ex:163
 #, elixir-autogen, elixir-format
 msgid "No UUID"
 msgstr "UUID puudub"
@@ -1168,7 +1168,7 @@ msgstr "UUID puudub"
 msgid "No other languages enabled to translate to"
 msgstr "Ühtegi teist keelt pole tõlkimiseks lubatud"
 
-#: lib/phoenix_kit_publishing/errors.ex:157
+#: lib/phoenix_kit_publishing/errors.ex:161
 #, elixir-autogen, elixir-format
 msgid "No post"
 msgstr "Postitust pole"
@@ -1193,7 +1193,7 @@ msgstr "Avaldatud postitusi pole veel"
 msgid "No published posts yet."
 msgstr "Avaldatud postitusi pole veel."
 
-#: lib/phoenix_kit_publishing/errors.ex:158
+#: lib/phoenix_kit_publishing/errors.ex:162
 #, elixir-autogen, elixir-format
 msgid "No published version"
 msgstr "Avaldatud versiooni pole"
@@ -1208,12 +1208,12 @@ msgstr "Avaldamisrühmi pole veel"
 msgid "None"
 msgstr "Puudub"
 
-#: lib/phoenix_kit_publishing/errors.ex:161
+#: lib/phoenix_kit_publishing/errors.ex:165
 #, elixir-autogen, elixir-format
 msgid "Not found"
 msgstr "Ei leitud"
 
-#: lib/phoenix_kit_publishing/errors.ex:162
+#: lib/phoenix_kit_publishing/errors.ex:166
 #, elixir-autogen, elixir-format
 msgid "Not published"
 msgstr "Avaldamata"
@@ -1364,7 +1364,7 @@ msgstr "Mitmus"
 msgid "Post created and saved"
 msgstr "Postitus loodud ja salvestatud"
 
-#: lib/phoenix_kit_publishing/errors.ex:170
+#: lib/phoenix_kit_publishing/errors.ex:174
 #, elixir-autogen, elixir-format
 msgid "Post is trashed"
 msgstr "Postitus on prügikastis"
@@ -1374,7 +1374,7 @@ msgstr "Postitus on prügikastis"
 msgid "Post moved to trash"
 msgstr "Postitus liigutati prügikasti"
 
-#: lib/phoenix_kit_publishing/errors.ex:169
+#: lib/phoenix_kit_publishing/errors.ex:173
 #: lib/phoenix_kit_publishing/web/editor.ex:356
 #: lib/phoenix_kit_publishing/web/editor.ex:523
 #: lib/phoenix_kit_publishing/web/editor.ex:632
@@ -1477,8 +1477,8 @@ msgstr "Avaldatud"
 msgid "Published (Live)"
 msgstr "Avaldatud (aktiivne)"
 
-#: lib/phoenix_kit_publishing/publishing.ex:579
-#: lib/phoenix_kit_publishing/publishing.ex:611
+#: lib/phoenix_kit_publishing/publishing.ex:614
+#: lib/phoenix_kit_publishing/publishing.ex:646
 #: lib/phoenix_kit_publishing/web/categories_live.ex:41
 #: lib/phoenix_kit_publishing/web/edit.ex:83
 #: lib/phoenix_kit_publishing/web/editor.ex:183
@@ -1610,7 +1610,7 @@ msgstr "Renderduse vahemälu on keelatud. Postitused renderdatakse iga päringu 
 msgid "Render the language switcher on listing + post pages. Disable when your host layout already provides one."
 msgstr "Renderda keelevalija loendi- ja postituse lehtedel. Keela, kui teie majutav paigutus juba pakub oma valijat."
 
-#: lib/phoenix_kit_publishing/errors.ex:171
+#: lib/phoenix_kit_publishing/errors.ex:175
 #, elixir-autogen, elixir-format
 msgid "Resource not found"
 msgstr "Ressurssi ei leitud"
@@ -1722,17 +1722,17 @@ msgstr "Slug"
 msgid "Slug Style"
 msgstr "Slugi stiil"
 
-#: lib/phoenix_kit_publishing/errors.ex:177
+#: lib/phoenix_kit_publishing/errors.ex:181
 #, elixir-autogen, elixir-format
 msgid "Slug already exists"
 msgstr "Slug on juba olemas"
 
-#: lib/phoenix_kit_publishing/errors.ex:174
+#: lib/phoenix_kit_publishing/errors.ex:178
 #, elixir-autogen, elixir-format
 msgid "Slug conflicts with a reserved language code"
 msgstr "Slug on vastuolus reserveeritud keelekoodiga"
 
-#: lib/phoenix_kit_publishing/errors.ex:176
+#: lib/phoenix_kit_publishing/errors.ex:180
 #, elixir-autogen, elixir-format
 msgid "Slug conflicts with a reserved route word"
 msgstr "Slug on vastuolus reserveeritud marsruudisõnaga"
@@ -1747,7 +1747,7 @@ msgstr "Slug on kohustuslik. Sisestage pealkiri selle automaatseks loomiseks võ
 msgid "Slug style updated to %{style}"
 msgstr "Slugi stiiliks määrati %{style}"
 
-#: lib/phoenix_kit_publishing/errors.ex:178
+#: lib/phoenix_kit_publishing/errors.ex:182
 #, elixir-autogen, elixir-format
 msgid "Slug taken"
 msgstr "Slug on juba kasutusel"
@@ -1764,7 +1764,7 @@ msgstr "Slugi-põhine"
 msgid "Social / OpenGraph"
 msgstr "Sotsiaalmeedia / OpenGraph"
 
-#: lib/phoenix_kit_publishing/errors.ex:237
+#: lib/phoenix_kit_publishing/errors.ex:241
 #, elixir-autogen, elixir-format
 msgid "Some fields are invalid. Please review and try again."
 msgstr "Mõned väljad on vigased. Palun vaadake need üle ja proovige uuesti."
@@ -1944,7 +1944,7 @@ msgstr "See tõlgib sisu keelest %{source} keelde %{target}, kirjutades üle kog
 msgid "Timestamp-based"
 msgstr "Ajatempli-põhine"
 
-#: lib/phoenix_kit_publishing/errors.ex:187
+#: lib/phoenix_kit_publishing/errors.ex:191
 #, elixir-autogen, elixir-format
 msgid "Title is required to publish"
 msgstr "Avaldamiseks on pealkiri kohustuslik"
@@ -2090,7 +2090,7 @@ msgstr "URL-i slug ei tohi olla keelekood"
 msgid "URL slug cannot be a reserved word (admin, api, assets, etc.)"
 msgstr "URL-i slug ei tohi olla reserveeritud sõna (admin, api, assets jne)"
 
-#: lib/phoenix_kit_publishing/errors.ex:127
+#: lib/phoenix_kit_publishing/errors.ex:129
 #, elixir-autogen, elixir-format
 msgid "URL slug conflicts with another post"
 msgstr "URL-i slug on vastuolus teise postitusega"
@@ -2105,7 +2105,7 @@ msgstr "URL-i slug on teise postituse varasem aadress — selle kasutamine kaape
 msgid "URL slug must be lowercase letters, numbers, and hyphens only"
 msgstr "URL-i slug tohib sisaldada ainult väiketähti, numbreid ja sidekriipse"
 
-#: lib/phoenix_kit_publishing/errors.ex:247
+#: lib/phoenix_kit_publishing/errors.ex:251
 #, elixir-autogen, elixir-format
 msgid "Unexpected error: %{reason}"
 msgstr "Ootamatu viga: %{reason}"
@@ -2131,7 +2131,7 @@ msgstr "Teadmata"
 msgid "Unknown language:"
 msgstr "Teadmata keel:"
 
-#: lib/phoenix_kit_publishing/errors.ex:188
+#: lib/phoenix_kit_publishing/errors.ex:192
 #, elixir-autogen, elixir-format
 msgid "Unpublished"
 msgstr "Avaldamata"
@@ -2213,12 +2213,12 @@ msgstr "Versiooni %{version} avaldas teine toimetaja"
 msgid "Version Settings"
 msgstr "Versiooni seaded"
 
-#: lib/phoenix_kit_publishing/errors.ex:189
+#: lib/phoenix_kit_publishing/errors.ex:193
 #, elixir-autogen, elixir-format
 msgid "Version access is disabled"
 msgstr "Versioonidele juurdepääs on keelatud"
 
-#: lib/phoenix_kit_publishing/errors.ex:190
+#: lib/phoenix_kit_publishing/errors.ex:194
 #: lib/phoenix_kit_publishing/web/editor.ex:1248
 #: lib/phoenix_kit_publishing/web/editor.ex:1254
 #: lib/phoenix_kit_publishing/web/editor.ex:2736
@@ -2742,6 +2742,7 @@ msgstr "Kategooria loodud"
 msgid "Category deleted — its children moved to the top level"
 msgstr "Kategooria kustutatud — selle alamkategooriad liikusid ülemisele tasemele"
 
+#: lib/phoenix_kit_publishing/errors.ex:146
 #: lib/phoenix_kit_publishing/web/categories_live.ex:99
 #: lib/phoenix_kit_publishing/web/categories_live.ex:180
 #, elixir-autogen, elixir-format
@@ -3507,7 +3508,7 @@ msgstr "Märkused"
 msgid "live"
 msgstr "aktiivne"
 
-#: lib/phoenix_kit_publishing/errors.ex:124
+#: lib/phoenix_kit_publishing/errors.ex:126
 #, elixir-autogen, elixir-format
 msgid "A category can't be moved inside itself or one of its own children"
 msgstr "Kategooriat ei saa liigutada iseenda ega oma alamkategooria sisse"
@@ -3517,7 +3518,7 @@ msgstr "Kategooriat ei saa liigutada iseenda ega oma alamkategooria sisse"
 msgid "Couldn't save the group — please check the values and try again."
 msgstr "Gruppi ei õnnestunud salvestada — kontrolli väärtusi ja proovi uuesti."
 
-#: lib/phoenix_kit_publishing/errors.ex:141
+#: lib/phoenix_kit_publishing/errors.ex:143
 #, elixir-autogen, elixir-format
 msgid "Invalid order"
 msgstr "Vigane järjestus"
@@ -3527,12 +3528,12 @@ msgstr "Vigane järjestus"
 msgid "Moving…"
 msgstr "Liigutamine…"
 
-#: lib/phoenix_kit_publishing/errors.ex:168
+#: lib/phoenix_kit_publishing/errors.ex:172
 #, elixir-autogen, elixir-format
 msgid "Parent category belongs to another group"
 msgstr "Ülemkategooria kuulub teise gruppi"
 
-#: lib/phoenix_kit_publishing/errors.ex:167
+#: lib/phoenix_kit_publishing/errors.ex:171
 #, elixir-autogen, elixir-format
 msgid "Parent category not found"
 msgstr "Ülemkategooriat ei leitud"
@@ -3547,7 +3548,7 @@ msgstr "Postitus salvestati mustandina, kuid seda ei saa avaldada: põhikeelel p
 msgid "Post saved, but publishing failed."
 msgstr "Postitus salvestati, kuid avaldamine ebaõnnestus."
 
-#: lib/phoenix_kit_publishing/errors.ex:165
+#: lib/phoenix_kit_publishing/errors.ex:169
 #, elixir-autogen, elixir-format
 msgid "Save the changes against the new version — creating one doesn't apply them"
 msgstr "Salvesta muudatused uude versiooni — versiooni loomine neid ei rakenda"
@@ -3562,7 +3563,7 @@ msgstr "See slug on juba teises grupis kasutusel."
 msgid "The live version stays published — to take it offline, use Unpublish on the group page."
 msgstr "Avaldatud versioon jääb avaldatuks — mahavõtmiseks kasuta grupi lehel nuppu „Eemalda avaldamisest”."
 
-#: lib/phoenix_kit_publishing/errors.ex:150
+#: lib/phoenix_kit_publishing/errors.ex:154
 #, elixir-autogen, elixir-format
 msgid "The primary language's content anchors the post and can't be deleted — edit it instead"
 msgstr "Põhikeele sisu on postituse alus ja seda ei saa kustutada — muuda seda selle asemel"
@@ -3720,7 +3721,7 @@ msgstr "Unikaalsed vaatamised sees — üks vaatamine külastaja, postituse ja p
 msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
 msgstr "Sees: iga külastaja loetakse postituse kohta päevas üks kord — seansi, selle puudumisel aadressi võtmega räsi järgi; ühte aadressi jagavad lugejad loetakse üks kord, kuni brauser markeri alles hoiab. Väljas: loetakse iga lehe avamine."
 
-#: lib/phoenix_kit_publishing/errors.ex:225
+#: lib/phoenix_kit_publishing/errors.ex:229
 #, elixir-autogen, elixir-format
 msgid "Saved as a draft, but it could not be published: %{reason}"
 msgstr "Salvestatud mustandina, kuid avaldamine ebaõnnestus: %{reason}"
@@ -3748,7 +3749,7 @@ msgid_plural "%{count} others viewing"
 msgstr[0] "%{count} kasutaja vaatab"
 msgstr[1] "%{count} kasutajat vaatab"
 
-#: lib/phoenix_kit_publishing/errors.ex:255
+#: lib/phoenix_kit_publishing/errors.ex:259
 #, elixir-autogen, elixir-format
 msgid "%{field} %{message}"
 msgstr "%{field} %{message}"
@@ -3758,7 +3759,7 @@ msgstr "%{field} %{message}"
 msgid "(untitled)"
 msgstr "(pealkirjata)"
 
-#: lib/phoenix_kit_publishing/publishing.ex:580
+#: lib/phoenix_kit_publishing/publishing.ex:615
 #, elixir-autogen, elixir-format
 msgid "Activity on posts you wrote"
 msgstr "Tegevus teie kirjutatud postitustes"
@@ -3768,7 +3769,7 @@ msgstr "Tegevus teie kirjutatud postitustes"
 msgid "Cache rendered HTML for published posts (24-hour TTL)"
 msgstr "Vahemälusta avaldatud postituste renderdatud HTML (TTL 24 tundi)"
 
-#: lib/phoenix_kit_publishing/publishing.ex:634
+#: lib/phoenix_kit_publishing/publishing.ex:669
 #, elixir-autogen, elixir-format
 msgid "Change the module's settings"
 msgstr "Mooduli seadete muutmine"
@@ -3780,17 +3781,17 @@ msgid_plural "Cleared %{count} cached posts for %{group}"
 msgstr[0] "Tühjendati %{count} vahemällu salvestatud postitus rühma %{group} jaoks"
 msgstr[1] "Tühjendati %{count} vahemällu salvestatud postitust rühma %{group} jaoks"
 
-#: lib/phoenix_kit_publishing/errors.ex:126
+#: lib/phoenix_kit_publishing/errors.ex:128
 #, elixir-autogen, elixir-format
 msgid "Comments are not available"
 msgstr "Kommentaarid pole saadaval"
 
-#: lib/phoenix_kit_publishing/publishing.ex:589
+#: lib/phoenix_kit_publishing/publishing.ex:624
 #, elixir-autogen, elixir-format
 msgid "Comments on your posts"
 msgstr "Kommentaarid teie postitustele"
 
-#: lib/phoenix_kit_publishing/errors.ex:132
+#: lib/phoenix_kit_publishing/errors.ex:134
 #, elixir-autogen, elixir-format
 msgid "Could not copy the content to the new version"
 msgstr "Sisu ei õnnestunud uude versiooni kopeerida"
@@ -3800,12 +3801,12 @@ msgstr "Sisu ei õnnestunud uude versiooni kopeerida"
 msgid "Couldn't save this setting. Please try again."
 msgstr "Seda seadet ei õnnestunud salvestada. Palun proovige uuesti."
 
-#: lib/phoenix_kit_publishing/publishing.ex:628
+#: lib/phoenix_kit_publishing/publishing.ex:663
 #, elixir-autogen, elixir-format
 msgid "Create, edit, trash, restore and permanently delete publishing groups with all their posts"
 msgstr "Avaldamisrühmade loomine, muutmine, prügikasti viimine, taastamine ja koos kõigi postitustega jäädavalt kustutamine"
 
-#: lib/phoenix_kit_publishing/publishing.ex:613
+#: lib/phoenix_kit_publishing/publishing.ex:648
 #, elixir-autogen, elixir-format
 msgid "Database-backed CMS pages and multi-language content"
 msgstr "Andmebaasipõhised CMS-lehed ja mitmekeelne sisu"
@@ -3862,17 +3863,17 @@ msgstr "Viga esitluse renderdamisel"
 msgid "Error rendering video"
 msgstr "Viga video renderdamisel"
 
-#: lib/phoenix_kit_publishing/errors.ex:135
+#: lib/phoenix_kit_publishing/errors.ex:137
 #, elixir-autogen, elixir-format
 msgid "Group is in the trash"
 msgstr "Rühm on prügikastis"
 
-#: lib/phoenix_kit_publishing/publishing.ex:626
+#: lib/phoenix_kit_publishing/publishing.ex:661
 #, elixir-autogen, elixir-format
 msgid "Manage groups"
 msgstr "Rühmade haldamine"
 
-#: lib/phoenix_kit_publishing/publishing.ex:636
+#: lib/phoenix_kit_publishing/publishing.ex:671
 #, elixir-autogen, elixir-format
 msgid "Open the Publishing settings page and change settings and caches there"
 msgstr "Publishingi seadete lehe avamine ning seal seadete ja vahemälude muutmine"
@@ -3906,7 +3907,7 @@ msgstr[1] "Genereeriti uuesti %{count} vahemälu %{total}-st; ülejäänud ebaõ
 msgid "Render cache stores pre-rendered HTML for published posts. Cache keys include content hashes, so edits automatically use fresh renders. TTL: 24 hours."
 msgstr "Renderduse vahemälu salvestab avaldatud postituste eelnevalt renderdatud HTML-i. Vahemälu võtmed sisaldavad sisu räsi, mistõttu muudatused kasutavad automaatselt värsket renderdust. TTL: 24 tundi."
 
-#: lib/phoenix_kit_publishing/publishing.ex:596
+#: lib/phoenix_kit_publishing/publishing.ex:631
 #, elixir-autogen, elixir-format
 msgid "Replies to your comments"
 msgstr "Vastused teie kommentaaridele"
@@ -3916,34 +3917,34 @@ msgstr "Vastused teie kommentaaridele"
 msgid "Save the post before viewing the public page"
 msgstr "Salvestage postitus enne avaliku lehe vaatamist"
 
-#: lib/phoenix_kit_publishing/publishing.ex:590
+#: lib/phoenix_kit_publishing/publishing.ex:625
 #, elixir-autogen, elixir-format
 msgid "Someone commented on a post you wrote"
 msgstr "Keegi kommenteeris teie kirjutatud postitust"
 
-#: lib/phoenix_kit_publishing/publishing.ex:597
+#: lib/phoenix_kit_publishing/publishing.ex:632
 #, elixir-autogen, elixir-format
 msgid "Someone replied to a comment you left"
 msgstr "Keegi vastas teie kommentaarile"
 
-#: lib/phoenix_kit_publishing/errors.ex:179
+#: lib/phoenix_kit_publishing/errors.ex:183
 #, elixir-autogen, elixir-format
 msgid "Source version not found"
 msgstr "Lähteversiooni ei leitud"
 
-#: lib/phoenix_kit_publishing/errors.ex:217
+#: lib/phoenix_kit_publishing/errors.ex:221
 #, elixir-autogen, elixir-format
 msgid "The group still holds %{count} post"
 msgid_plural "The group still holds %{count} posts"
 msgstr[0] "Rühmas on veel %{count} postitus"
 msgstr[1] "Rühmas on veel %{count} postitust"
 
-#: lib/phoenix_kit_publishing/errors.ex:156
+#: lib/phoenix_kit_publishing/errors.ex:160
 #, elixir-autogen, elixir-format
 msgid "The post has no live version"
 msgstr "Postitusel pole avaldatud versiooni"
 
-#: lib/phoenix_kit_publishing/errors.ex:160
+#: lib/phoenix_kit_publishing/errors.ex:164
 #, elixir-autogen, elixir-format
 msgid "The post has no version"
 msgstr "Postitusel pole versiooni"
@@ -3960,7 +3961,7 @@ msgid_plural "Translation completed successfully for %{count} languages"
 msgstr[0] "Tõlge õnnestus %{count} keele jaoks"
 msgstr[1] "Tõlge õnnestus %{count} keele jaoks"
 
-#: lib/phoenix_kit_publishing/errors.ex:130
+#: lib/phoenix_kit_publishing/errors.ex:132
 #, elixir-autogen, elixir-format
 msgid "URL slug is a previous address of another post"
 msgstr "URL-i slug on teise postituse varasem aadress"
@@ -4248,3 +4249,8 @@ msgstr "Sait kuvab selle (postitused jäävad siia)"
 #, elixir-autogen, elixir-format
 msgid "The site renders it and the category and tag pages"
 msgstr "Sait kuvab selle ning kategooria- ja sildilehed"
+
+#: lib/phoenix_kit_publishing/errors.ex:147
+#, elixir-autogen, elixir-format
+msgid "Invalid publish date"
+msgstr "Vigane avaldamiskuupäev"

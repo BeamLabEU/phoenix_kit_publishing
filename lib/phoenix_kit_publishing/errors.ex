@@ -51,6 +51,8 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   @type error_atom ::
           :already_exists
           | :cache_miss
+          | :category_not_found
+          | :invalid_published_at
           | :cannot_delete_live
           | :category_cycle
           | :comments_unavailable
@@ -141,6 +143,8 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:invalid_order), do: gettext("Invalid order")
   def message(:invalid_path), do: gettext("Invalid path")
   def message(:invalid_slug), do: gettext("Invalid slug")
+  def message(:category_not_found), do: gettext("Category not found")
+  def message(:invalid_published_at), do: gettext("Invalid publish date")
   def message(:invalid_status), do: gettext("Invalid status")
   def message(:invalid_type), do: gettext("Invalid type")
   def message(:invalid_version), do: gettext("Invalid version")

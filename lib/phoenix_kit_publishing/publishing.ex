@@ -164,6 +164,41 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate group_post_stats(group_slug), to: DBStorage
   defdelegate list_raw_posts(group_slug, status \\ nil), to: Posts
   defdelegate create_post(group_slug, opts \\ %{}), to: Posts
+
+  @doc """
+  Creates a post with everything it carries in one call, published unless
+  `publish: false`: what an importer, a migration from another CMS or a site
+  writing posts from code needs instead of create + read + update + publish
+  and a direct update to backdate.
+
+      {:ok, post} =
+        Publishing.import_post("news", %{
+          title: "PhoenixKit Projects 0.33.0",
+          content: "...",
+          description: "What changed in Projects 0.33.0.",
+          og: %{title: "Projects 0.33.0", description: "..."},
+          category_slugs: ["projects"],
+          custom_fields: %{"package" => "phoenix_kit_projects", "version" => "0.33.0"},
+          published_at: ~U[2026-11-06 01:13:00Z]
+        })
+
+  Attrs (string or atom keys): `title`, `content` (primary language), `slug`
+  (slug mode), `description`, `seo_title`, `excerpt`, `featured`,
+  `featured_image_uuid`, `sitemap_exclude`, `og` (`%{title, description,
+  image_uuid}`, or `og_title` / `og_description` / `og_image_uuid`),
+  `category_slugs` and/or `category_uuids`, `custom_fields`, and
+  `published_at` (a `DateTime` or ISO 8601 string, past or future). With
+  `published_at` the version is published at that instant and a timestamp
+  post's URL minute is that instant on the site's clock, or the nearest free
+  minute (earlier first), so posts imported together never collide.
+
+  Options: `publish:` (default `true`), `actor_uuid:` and the other options
+  the context functions take. Errors: `:invalid_published_at`,
+  `:category_not_found` (checked before anything is written), and those of
+  `create_post/2`, `update_post/4` and `Versions.publish_version/4`.
+  """
+  @spec import_post(String.t(), map(), map() | keyword()) :: {:ok, map()} | {:error, term()}
+  defdelegate import_post(group_slug, attrs, opts \\ %{}), to: Posts
   defdelegate read_post(group_slug, identifier, language \\ nil, version \\ nil), to: Posts
   defdelegate read_post_by_uuid(post_uuid, language \\ nil, version \\ nil), to: Posts
   defdelegate update_post(group_slug, post, params, opts \\ %{}), to: Posts
