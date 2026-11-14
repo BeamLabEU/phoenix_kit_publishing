@@ -511,6 +511,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
         |> assign(:pagination_style, pagination_style())
+        |> assign(:category_index, Map.get(assigns, :category_index))
+        |> assign(:category_filter, Map.get(assigns, :category_filter, []))
+        |> assign(:filter_categories, Map.get(assigns, :filter_categories, []))
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:search_query, Map.get(assigns, :search_query))
         |> assign(:og, %{
@@ -641,15 +644,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
         |> assign(:pagination_style, pagination_style())
+        |> assign(:category_index, Map.get(assigns, :category_index))
+        |> assign(:category_filter, Map.get(assigns, :category_filter, []))
+        |> assign(:filter_categories, Map.get(assigns, :filter_categories, []))
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:search_query, nil)
         |> assign(:term_filter, assigns.term_filter)
-        |> assign(:og, %{
-          title: assigns.page_title,
-          url: base_url <> listing_url,
-          locale: og_locale(assigns.current_language),
-          type: "website"
-        })
+        |> assign(
+          :og,
+          %{
+            title: assigns.page_title,
+            url: base_url <> listing_url,
+            locale: og_locale(assigns.current_language),
+            type: "website"
+          }
+          |> maybe_put_description(Map.get(assigns, :meta_description))
+        )
         |> maybe_assign_term_admin_edit(term, group_slug)
         |> render(:index)
 
@@ -660,6 +670,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         handle_not_found(conn, reason)
     end
   end
+
+  defp maybe_put_description(og, description) when is_binary(description) and description != "",
+    do: Map.put(og, :description, description)
+
+  defp maybe_put_description(og, _description), do: og
 
   # Feeds serve the reader's backlog: one page of the listing is too little
   # (a catch-up reader misses posts), unbounded is abuse-prone. 50 mirrors
@@ -721,6 +736,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           assigns.post
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_related_posts(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
@@ -802,6 +818,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           assigns.post
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_related_posts(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
@@ -1112,6 +1129,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       show_top_back_link: true,
       show_prev_next: false,
       show_categories: false,
+      category_chips_position: Constants.default_category_chips_position(),
+      related_posts: Constants.default_related_posts(),
       show_view_counts: false
     }
   end
@@ -1197,6 +1216,68 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # Chronological prev/next links for the post page, gated on the group's
   # show_prev_next setting so the (cache-backed) whole-group pass only runs
   # for groups that display the nav. Neighbors are same-group + same-language.
+  # "More from this category" (the group's related_posts setting): the newest
+  # other posts of this language sharing one of this post's categories. Off,
+  # or a post without categories, costs nothing.
+  defp assign_related_posts(conn, group, post) do
+    limit = related_limit(group)
+    uuids = MapSet.new(Map.get(post.metadata || %{}, :category_uuids) || [])
+    language = conn.assigns[:current_language]
+
+    if limit > 0 and MapSet.size(uuids) > 0 and is_binary(language) do
+      related = related_posts(post, uuids, language, limit)
+      date_counts = Listing.group_date_counts(post.group)
+
+      conn
+      |> assign(
+        :related_post_links,
+        Enum.map(related, &related_link(&1, post.group, language, date_counts))
+      )
+      |> assign(:related_category, related_category(post.group, MapSet.to_list(uuids)))
+    else
+      conn
+      |> assign(:related_post_links, [])
+      |> assign(:related_category, nil)
+    end
+  end
+
+  defp related_limit(group) do
+    case Map.get(group, "related_posts") do
+      "3" -> 3
+      "6" -> 6
+      _ -> 0
+    end
+  end
+
+  defp related_posts(post, uuids, language, limit) do
+    post.group
+    |> Listing.chronological_posts(language)
+    |> Enum.reject(&(&1.uuid == post.uuid))
+    |> Enum.filter(&shares_category?(&1, uuids))
+    |> Enum.take(limit)
+  end
+
+  defp shares_category?(post, uuids),
+    do: Enum.any?(post[:category_uuids] || [], &MapSet.member?(uuids, &1))
+
+  defp related_link(post, group_slug, language, date_counts) do
+    %{
+      title: get_in(post, [:metadata, :title]) || Constants.default_title(),
+      url: PublishingHTML.build_post_url(group_slug, post, language, date_counts),
+      published_at: get_in(post, [:metadata, :published_at])
+    }
+  end
+
+  # The heading names the category when the post has exactly one.
+  defp related_category(group_slug, [uuid]) do
+    case Categories.categories_by_uuids(group_slug, [uuid]) do
+      [category] -> category
+      _ -> nil
+    end
+  end
+
+  defp related_category(_group_slug, _uuids), do: nil
+
   defp assign_post_neighbors(conn, group, group_slug, language, post) do
     if Map.get(group, "show_prev_next", false) do
       %{newer: newer, older: older, date_counts: date_counts} =

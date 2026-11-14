@@ -841,6 +841,52 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             {gettext("Clear search")}
           </.link>
         </div>
+        <%!-- Category filter (the group's listing_category_filter): links that
+          add or remove a category from `?category=`; several at once show
+          posts in any of them, subcategories included. A dead view, so plain
+          links; the selected ones carry aria-current. --%>
+        <nav
+          :if={(assigns[:filter_categories] || []) != [] and !assigns[:search_query]}
+          class="mb-6 flex flex-wrap items-center gap-2"
+          aria-label={gettext("Filter by category")}
+          data-category-filter
+        >
+          <a
+            href={group_listing_path(@current_language, @group["slug"])}
+            class={[
+              "btn btn-xs rounded-full",
+              if((assigns[:category_filter] || []) == [], do: "btn-primary", else: "btn-ghost")
+            ]}
+            aria-current={(assigns[:category_filter] || []) == [] && "true"}
+          >
+            {gettext("All")}
+          </a>
+          <a
+            :for={choice <- @filter_categories}
+            href={category_filter_href(assigns, choice.category.slug)}
+            class={[
+              "btn btn-xs rounded-full gap-1",
+              if(choice.selected?, do: "btn-primary", else: "btn-ghost"),
+              choice.depth > 0 && "font-normal"
+            ]}
+            aria-current={choice.selected? && "true"}
+            data-category={choice.category.slug}
+          >
+            <.icon
+              :if={PublishingCategory.icon(choice.category)}
+              name={PublishingCategory.icon(choice.category)}
+              class="size-3"
+            />
+            <span
+              :if={PublishingCategory.color_css(choice.category) && !choice.selected?}
+              class="size-2 rounded-full bg-[var(--pk-cat)]"
+              style={"--pk-cat: #{PublishingCategory.color_css(choice.category)}"}
+              aria-hidden="true"
+            />
+            {PublishingCategory.translated_name(choice.category, @current_language)}
+            <span class="opacity-60">{choice.count}</span>
+          </a>
+        </nav>
         <%!-- Category/tag archive heading — same shape as the search heading. --%>
         <div :if={assigns[:term_filter]} class="mb-6 flex flex-wrap items-center gap-3">
           <h2 class="text-lg font-semibold">
@@ -886,6 +932,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               <.listing_band_card
                 :for={post <- featured_posts}
                 post={post}
+                categories={post_card_categories(post, assigns[:category_index])}
                 group_slug={@group["slug"]}
                 current_language={@current_language}
                 date_counts={date_counts}
@@ -914,6 +961,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               <.listing_band_card
                 :for={post <- newest_posts}
                 post={post}
+                categories={post_card_categories(post, assigns[:category_index])}
                 group_slug={@group["slug"]}
                 current_language={@current_language}
                 date_counts={date_counts}
@@ -938,6 +986,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 <.listing_post_line
                   :for={post <- @posts}
                   post={post}
+                  categories={post_card_categories(post, assigns[:category_index])}
                   group_slug={@group["slug"]}
                   current_language={@current_language}
                   date_counts={date_counts}
@@ -949,6 +998,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 <.listing_post_row
                   :for={post <- @posts}
                   post={post}
+                  categories={post_card_categories(post, assigns[:category_index])}
                   group_slug={@group["slug"]}
                   current_language={@current_language}
                   date_counts={date_counts}
@@ -961,6 +1011,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 <.listing_post_card
                   :for={post <- @posts}
                   post={post}
+                  categories={post_card_categories(post, assigns[:category_index])}
                   group_slug={@group["slug"]}
                   current_language={@current_language}
                   date_counts={date_counts}
@@ -977,8 +1028,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             page={@page}
             total_pages={@total_pages}
             style={assigns[:pagination_style] || "numbered"}
-            path={&group_listing_path(@current_language, @group["slug"], page: &1)}
+            path={&group_listing_path(@current_language, @group["slug"], listing_params(assigns, &1))}
             form_action={group_listing_path(@current_language, @group["slug"])}
+            extra_params={listing_params(assigns, nil)}
           />
         <% end %>
 
@@ -1031,6 +1083,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
   attr :image_links, :boolean, default: true
   attr :animations, :boolean, default: true
+
+  attr :categories, :list, default: [], doc: "PublishingCategory structs to show as chips"
 
   defp listing_post_card(assigns) do
     highlight? = assigns.variant != :grid
@@ -1103,6 +1157,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <span :if={@newest?} class="badge badge-secondary badge-sm w-fit gap-1">
           ✦ {gettext("Latest")}
         </span>
+        <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} />
         <h3 :if={@highlight?} class="card-title text-2xl">
           <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
         </h3>
@@ -1164,6 +1219,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   attr :date_counts, :map, required: true
   attr :animations, :boolean, default: true
 
+  attr :categories, :list, default: [], doc: "PublishingCategory structs to show as chips"
+
   defp listing_post_line(assigns) do
     assigns =
       assign(
@@ -1198,6 +1255,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <h2 class="min-w-0 text-base font-medium group-hover:text-primary">
           {@post.metadata.title}
         </h2>
+        <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} link={false} />
       </.link>
     </li>
     """
@@ -1214,6 +1272,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   attr :date_counts, :map, required: true
   attr :image_links, :boolean, default: true
   attr :animations, :boolean, default: true
+
+  attr :categories, :list, default: [], doc: "PublishingCategory structs to show as chips"
 
   defp listing_post_row(assigns) do
     assigns =
@@ -1263,6 +1323,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         </figure>
       <% end %>
       <div class="card-body p-5">
+        <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} />
         <h2 class="card-title text-lg">
           <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
         </h2>
@@ -1303,6 +1364,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   attr :style, :string, required: true
   attr :image_links, :boolean, default: true
   attr :animations, :boolean, default: true
+  attr :categories, :list, default: [], doc: "PublishingCategory structs to show as chips"
 
   defp listing_band_card(%{style: style} = assigns)
        when style in ["cover", "cover_panel", "minimal", "top"] do
@@ -1347,6 +1409,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       group_slug={@group_slug}
       current_language={@current_language}
       date_counts={@date_counts}
+      categories={@categories}
       variant={@variant}
       image_links={@image_links}
       animations={@animations}
@@ -1406,6 +1469,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   # option). No image degrades to a branded gradient banner, scrim on top, so
   # the fixed light text keeps contrast either way. A real <img> (not a CSS
   # background) so the browser can lazy-load it.
+  attr :categories, :list, default: [], doc: "PublishingCategory structs to show as chips"
+
   defp band_cover(assigns) do
     ~H"""
     <article
@@ -1437,6 +1502,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         @image_links && "pointer-events-none"
       ]}>
         <.band_badge band={@band} />
+        <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} class="relative z-20 mb-2" />
         <h3 class={["font-bold", (@layout == "card" && "text-2xl") || "text-2xl lg:text-3xl"]}>
           <.link
             navigate={@post_url}
@@ -1468,6 +1534,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   # Cover panel — full-bleed image with an opaque theme panel for the text:
   # the a11y-safe cover (contrast comes from the panel, not a scrim, so any
   # uploaded photo works). No image reads as a normal panel on bg-base-200.
+  attr :categories, :list, default: [], doc: "PublishingCategory structs to show as chips"
+
   defp band_cover_panel(assigns) do
     ~H"""
     <article
@@ -1486,6 +1554,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       <div class={["relative z-10 w-full p-5 lg:p-8", @image_links && "pointer-events-none"]}>
         <div class="pointer-events-auto flex max-w-xl flex-col gap-2 rounded-2xl bg-base-100/95 p-6 shadow-xl">
           <.band_badge band={@band} />
+          <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} class="relative z-20 mb-2" />
           <h3 class="text-2xl font-bold">
             <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
           </h3>
@@ -1501,6 +1570,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
 
   # Minimal — typography-first editorial band; the image is deliberately
   # ignored, so it doubles as the canonical no-image look.
+  attr :categories, :list, default: [], doc: "PublishingCategory structs to show as chips"
+
   defp band_minimal(assigns) do
     ~H"""
     <article
@@ -1516,6 +1587,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         card is grid-stretched next to a taller sibling. --%>
       <div class="flex h-full flex-col gap-2">
         <.band_badge band={@band} />
+        <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} class="relative z-20 mb-2" />
         <h3 class="text-2xl font-bold tracking-tight lg:text-3xl">
           <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
         </h3>
@@ -1531,6 +1603,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   # Top — a wide 16:9 image banner stacked above the text, even at hero
   # width. The one style that gets native lazy-loading for free; no image
   # simply drops the banner.
+  attr :categories, :list, default: [], doc: "PublishingCategory structs to show as chips"
+
   defp band_top(assigns) do
     ~H"""
     <article
@@ -1565,6 +1639,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       </figure>
       <div class="card-body">
         <.band_badge band={@band} />
+        <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} class="relative z-20 mb-2" />
         <h3 class="card-title text-2xl">
           <.link navigate={@post_url} class="hover:text-primary">{@post.metadata.title}</.link>
         </h3>
@@ -2039,23 +2114,37 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <% end %>
 
         <%!-- Post Header --%>
+        <%!-- Category chips go where the group's category_chips_position
+          says: above the title, in one row with the date (or right under the
+          title when the date is hidden), or after the content. --%>
+        <% post_categories = assigns[:post_categories] || [] %>
+        <% chips_position = assigns[:category_chips_position] || "bottom" %>
+        <% date_position =
+          if has_publication_date?(@post), do: assigns[:post_date_position] || "below", else: "hidden" %>
+        <% date_chips = if chips_position == "date", do: post_categories, else: [] %>
         <header class="mb-8 border-b pb-6">
-          <.post_date
-            :if={
-              has_publication_date?(@post) and (assigns[:post_date_position] || "below") == "above"
-            }
-            post={@post}
+          <.category_chips
+            :if={chips_position == "top"}
+            categories={post_categories}
+            language={@current_language}
             group_slug={@group_slug}
             class="mb-3"
           />
+          <div :if={date_position == "above"} class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <.post_date post={@post} group_slug={@group_slug} />
+            <.category_chips categories={date_chips} language={@current_language} group_slug={@group_slug} />
+          </div>
           <h1 class="text-3xl font-bold">
             {@post.metadata.title || PhoenixKit.Modules.Publishing.Constants.default_title()}
           </h1>
-          <.post_date
-            :if={
-              has_publication_date?(@post) and (assigns[:post_date_position] || "below") == "below"
-            }
-            post={@post}
+          <div :if={date_position == "below"} class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <.post_date post={@post} group_slug={@group_slug} />
+            <.category_chips categories={date_chips} language={@current_language} group_slug={@group_slug} />
+          </div>
+          <.category_chips
+            :if={date_position == "hidden"}
+            categories={date_chips}
+            language={@current_language}
             group_slug={@group_slug}
             class="mt-3"
           />
@@ -2145,7 +2234,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           listed at all any more — they live inline in the prose as #hashtags,
           already rendered as links to the same archives, so a chip row just
           repeated them. --%>
-        <% post_categories = assigns[:post_categories] || [] %>
+        <% bottom_chips = if chips_position == "bottom", do: post_categories, else: [] %>
         <%!-- Everything else on this page announces a change of register with
               a rule: the header closes with one, comments and the footer open
               with one. These two sat between the prose and the comments on
@@ -2163,18 +2252,36 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               at oklch(0.96 …) — all but invisible, and visibly weaker than
               the rules a few lines above and below it. --%>
         <% trailing_rule = "mt-6 border-t pt-4" %>
-        <div
-          :if={post_categories != []}
-          class={["flex flex-wrap gap-2", trailing_rule]}
+        <.category_chips
+          categories={bottom_chips}
+          language={@current_language}
+          group_slug={@group_slug}
+          class={trailing_rule}
+        />
+        <%!-- More from this category (the group's related_posts setting). --%>
+        <section
+          :if={(assigns[:related_post_links] || []) != []}
+          class={["mb-2", bottom_chips == [] && trailing_rule, bottom_chips != [] && "mt-6"]}
+          aria-labelledby="pk-related-posts"
+          data-related-posts
         >
-          <.link
-            :for={category <- post_categories}
-            navigate={term_archive_path(@current_language, @group_slug, {:category, category.slug})}
-            class="badge badge-primary badge-outline badge-sm hover:badge-primary"
-          >
-            {PublishingCategory.translated_name(category, @current_language)}
-          </.link>
-        </div>
+          <h2 id="pk-related-posts" class="mb-3 text-sm font-semibold uppercase tracking-wider text-base-content/60">
+            <%= if assigns[:related_category] do %>
+              {gettext("More from %{category}",
+                category: PublishingCategory.translated_name(@related_category, @current_language)
+              )}
+            <% else %>
+              {gettext("Related posts")}
+            <% end %>
+          </h2>
+          <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <li :for={related <- @related_post_links}>
+              <.link navigate={related.url} class="block rounded-box border border-base-300 p-3 hover:border-primary">
+                <span class="block font-medium">{related.title}</span>
+              </.link>
+            </li>
+          </ul>
+        </section>
         <%!-- Chronological neighbors (gated on the group's show_prev_next
           setting; either side absent at the chronology's edge). Newer on the
           left mirrors the newest-first listing order. --%>
@@ -2186,7 +2293,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             # trailing block rather than a new section, so it sits close. The
             # old `mt-8` was sized for a boundary it used to mark itself and
             # left a gap nearly as tall as the chips row above it.
-            if(post_categories == [], do: trailing_rule, else: "mt-4")
+            if(bottom_chips == [], do: trailing_rule, else: "mt-4")
           ]}
           aria-label={gettext("More posts")}
         >
@@ -2893,6 +3000,115 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     end
   end
 
+  attr :categories, :list, required: true, doc: "`PublishingCategory` structs, in display order"
+  attr :language, :string, required: true
+  attr :group_slug, :string, required: true
+  attr :class, :any, default: nil
+  attr :link, :boolean, default: true, doc: "false renders labels, for use inside a link"
+
+  @doc """
+  A row of category chips, each a link to the category's archive page, in the
+  category's own colour (`PublishingCategory.color_css/1`, tinted with
+  `color-mix`) and icon when it has them; a plain outlined chip otherwise.
+  Renders nothing for an empty list.
+  """
+  def category_chips(assigns) do
+    ~H"""
+    <div :if={@categories != []} class={["flex flex-wrap items-center gap-1.5", @class]}>
+      <%= for category <- @categories do %>
+        <a
+          :if={@link}
+          href={term_archive_path(@language, @group_slug, {:category, category.slug})}
+          class={chip_class(category)}
+          style={chip_style(category)}
+          data-category={category.slug}
+        >
+          <.chip_body category={category} language={@language} />
+        </a>
+        <span :if={!@link} class={chip_class(category)} style={chip_style(category)} data-category={category.slug}>
+          <.chip_body category={category} language={@language} />
+        </span>
+      <% end %>
+    </div>
+    """
+  end
+
+  attr :category, :any, required: true
+  attr :language, :string, required: true
+
+  defp chip_body(assigns) do
+    ~H"""
+    <.icon
+      :if={PublishingCategory.icon(@category)}
+      name={PublishingCategory.icon(@category)}
+      class="size-3"
+    />
+    {PublishingCategory.translated_name(@category, @language)}
+    """
+  end
+
+  # The chip's colour comes in as the `--pk-cat` custom property, so the
+  # tinted classes below are literal (Tailwind sees them) whatever the colour.
+  defp chip_class(category) do
+    [
+      "badge badge-sm gap-1 whitespace-nowrap",
+      if(PublishingCategory.color_css(category),
+        do:
+          "border-[color-mix(in_oklab,var(--pk-cat)_35%,transparent)] " <>
+            "bg-[color-mix(in_oklab,var(--pk-cat)_14%,transparent)] " <>
+            "text-[color-mix(in_oklab,var(--pk-cat)_75%,var(--color-base-content))] " <>
+            "hover:bg-[color-mix(in_oklab,var(--pk-cat)_24%,transparent)]",
+        else: "badge-outline hover:badge-primary"
+      )
+    ]
+  end
+
+  defp chip_style(category) do
+    case PublishingCategory.color_css(category) do
+      nil -> nil
+      css -> "--pk-cat: #{css}"
+    end
+  end
+
+  @doc """
+  The categories of a listing post, in the order of `index` (a map of
+  category uuid to `PublishingCategory`, built once per page by the
+  controller); uuids that name no category are skipped.
+  """
+  @spec post_card_categories(map(), map() | nil) :: [PublishingCategory.t()]
+  def post_card_categories(_post, nil), do: []
+
+  def post_card_categories(post, index) when is_map(index) do
+    uuids = post[:category_uuids] || get_in(post, [:metadata, :category_uuids]) || []
+
+    uuids
+    |> Enum.flat_map(&List.wrap(Map.get(index, &1)))
+    |> Enum.sort_by(&{&1.position, &1.name})
+  end
+
+  @doc false
+  # The listing's query params for a page (nil: none), carrying the active
+  # category filter, in the order the canonical URL has them.
+  def listing_params(assigns, page) do
+    filter =
+      case assigns[:category_filter] || [] do
+        [] -> []
+        slugs -> [{"category", Enum.join(slugs, ",")}]
+      end
+
+    if page, do: [{"page", page} | filter], else: filter
+  end
+
+  @doc false
+  # The filter link for one category: it toggles that slug in `?category=`,
+  # and always lands on page 1.
+  def category_filter_href(assigns, slug) do
+    current = assigns[:category_filter] || []
+    next = if slug in current, do: List.delete(current, slug), else: current ++ [slug]
+    params = if next == [], do: [], else: [{"category", Enum.join(next, ",")}]
+    group_listing_path(assigns.current_language, assigns.group["slug"], params)
+  end
+
   @pagination_styles ~w(numbered compact simple)
 
   @doc "The pager styles `publishing_pagination_style` may name."
@@ -2933,6 +3149,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   attr :style, :string, default: "numbered", doc: "`numbered`, `compact` or `simple`"
   attr :path, :any, required: true, doc: "a function from a page number to its URL"
   attr :form_action, :string, required: true, doc: "the listing URL without a page"
+
+  attr :extra_params, :list,
+    default: [],
+    doc: "query params the page box keeps (`[{\"category\", \"a,b\"}]`)"
 
   @doc """
   The pager under a listing, in one of `pagination_styles/0`:
@@ -3004,6 +3224,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             class="input input-sm w-20"
           />
         </label>
+        <input :for={{name, value} <- @extra_params} type="hidden" name={name} value={value} />
         <button type="submit" class="btn btn-sm">{gettext("Go")}</button>
       </form>
     </nav>

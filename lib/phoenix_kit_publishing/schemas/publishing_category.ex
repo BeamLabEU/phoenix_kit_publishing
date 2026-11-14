@@ -114,6 +114,31 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
   @display_keys ~w(color icon seo_title seo_description)
   @display_limits %{"seo_title" => 120, "seo_description" => 320}
 
+  # Icons a category can use that always render: each name is written out
+  # here, in this module's source, which the host's Tailwind scans through
+  # `css_sources/0`, so its `hero-*` class is generated. Any other heroicon
+  # name is accepted too, but renders only once the host's Tailwind sees the
+  # class (e.g. `@source inline("hero-…")` in its app.css).
+  @suggested_icons ~w(
+    hero-tag hero-folder hero-newspaper hero-megaphone hero-light-bulb hero-sparkles
+    hero-star hero-heart hero-bolt hero-fire hero-rocket-launch hero-wrench-screwdriver
+    hero-cog-6-tooth hero-cube hero-puzzle-piece hero-code-bracket hero-command-line
+    hero-cpu-chip hero-server-stack hero-cloud hero-globe-alt hero-map hero-calendar
+    hero-clock hero-chart-bar hero-banknotes hero-shopping-cart hero-credit-card
+    hero-users hero-user-group hero-chat-bubble-left-right hero-envelope hero-book-open
+    hero-academic-cap hero-document-text hero-photo hero-film hero-musical-note
+    hero-shield-check hero-lock-closed hero-beaker hero-building-office hero-home
+    hero-truck hero-gift hero-trophy hero-flag hero-information-circle
+    hero-question-mark-circle hero-exclamation-triangle
+  )
+
+  @doc """
+  Icons that render on every host without setup (see the module source for
+  why); any other heroicon name works once the host's Tailwind sees it.
+  """
+  @spec suggested_icons() :: [String.t()]
+  def suggested_icons, do: @suggested_icons
+
   @doc "The daisyUI theme colours a category's `color` may name instead of a hex value."
   @spec colors() :: [String.t()]
   def colors, do: @colors

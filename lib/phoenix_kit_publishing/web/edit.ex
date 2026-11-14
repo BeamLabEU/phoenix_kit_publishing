@@ -189,6 +189,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "search_enabled" => group["search_enabled"],
       "sitemap_exclude" => group["sitemap_exclude"],
       "show_categories" => group["show_categories"],
+      "category_chips_position" => group["category_chips_position"],
+      "related_posts" => group["related_posts"],
+      "listing_show_categories" => group["listing_show_categories"],
+      "listing_category_filter" => group["listing_category_filter"],
       "views_enabled" => group["views_enabled"],
       "comments_enabled" => group["comments_enabled"],
       "show_view_counts" => group["show_view_counts"],
@@ -271,6 +275,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       {gettext("Cover panel — background image with a solid text panel"), "cover_panel"},
       {gettext("Minimal — text only, no image"), "minimal"},
       {gettext("Top image — a wide image banner above the text"), "top"}
+    ]
+  end
+
+  # Values must match Publishing.Constants.category_chips_positions/0.
+  defp category_chips_position_options do
+    [
+      {gettext("Above the title"), "top"},
+      {gettext("Beside the date"), "date"},
+      {gettext("After the content"), "bottom"}
+    ]
+  end
+
+  # Values must match Publishing.Constants.related_posts_options/0.
+  defp related_posts_options do
+    [
+      {gettext("Off"), "off"},
+      {gettext("3 posts"), "3"},
+      {gettext("6 posts"), "6"}
     ]
   end
 
@@ -481,6 +503,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   options={listing_layout_options()}
                 />
 
+                <.checkbox field={@form[:listing_show_categories]}>
+                  {gettext("Show categories on the cards")}
+                  <:description>
+                    {gettext("Each post's categories on its card, in the category's colour and icon.")}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:listing_category_filter]}>
+                  {gettext("Show a category filter")}
+                  <:description>
+                    {gettext(
+                      "The group's categories above the listing; readers can pick one or several."
+                    )}
+                  </:description>
+                </.checkbox>
+
                 <.checkbox field={@form[:search_enabled]}>
                   {gettext("Show a search box")}
                   <:description>
@@ -632,9 +670,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                 <.checkbox field={@form[:show_categories]}>
                   {gettext("Show category chips")}
                   <:description>
-                    {gettext("Linked category badges above the post content.")}
+                    {gettext("Linked category badges, each leading to its archive page.")}
                   </:description>
                 </.checkbox>
+
+                <.select
+                  field={@form[:category_chips_position]}
+                  label={gettext("Category chip position")}
+                  options={category_chips_position_options()}
+                />
+
+                <.select
+                  field={@form[:related_posts]}
+                  label={gettext("More from this category")}
+                  options={related_posts_options()}
+                />
 
                 <.checkbox field={@form[:comments_enabled]}>
                   {gettext("Enable comments")}

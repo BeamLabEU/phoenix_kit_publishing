@@ -630,11 +630,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
                 <option :for={token <- PublishingCategory.colors()} value={token} />
               </datalist>
             </div>
-            <.input
-              field={@form[:icon]}
-              label={gettext("Icon")}
-              placeholder="hero-cube"
-            />
+            <div>
+              <.input
+                field={@form[:icon]}
+                label={gettext("Icon")}
+                placeholder="hero-cube"
+                list="category-icon-suggestions"
+              />
+              <datalist id="category-icon-suggestions">
+                <option :for={icon <- PublishingCategory.suggested_icons()} value={icon} />
+              </datalist>
+              <div
+                :if={@form[:icon].value not in [nil, ""]}
+                class="mt-1 flex items-center gap-2 text-xs text-base-content/60"
+                data-icon-preview
+              >
+                <.icon name={@form[:icon].value} class="size-4" />
+                <span :if={@form[:icon].value not in PublishingCategory.suggested_icons()}>
+                  {gettext("Not in the suggested set: shows only if the site's CSS includes it.")}
+                </span>
+              </div>
+            </div>
           </div>
           <p class="text-xs text-base-content/60 -mt-1">
             {gettext(

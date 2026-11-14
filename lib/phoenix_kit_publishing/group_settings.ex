@@ -58,6 +58,28 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
     [
       # --- Listing page -----------------------------------------------------
       %{
+        key: "listing_show_categories",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :listing,
+        label: "Categories on cards",
+        description:
+          "Show each post's categories on its listing card, with the category's colour and icon.",
+        depends_on: nil
+      },
+      %{
+        key: "listing_category_filter",
+        type: :boolean,
+        allowed: @boolean_allowed,
+        default: false,
+        scope: :listing,
+        label: "Category filter",
+        description:
+          "Show the group's categories above the listing as a filter; several can be picked at once (?category=a,b), subcategories included.",
+        depends_on: nil
+      },
+      %{
         key: "listing_sort",
         type: :enum,
         allowed: Constants.listing_sorts(),
@@ -308,7 +330,29 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
         scope: :post,
         label: "Category chips",
         description:
-          "Show the post's categories as linked chips above the content, each leading to its archive page.",
+          "Show the post's categories as linked chips, each leading to its archive page (where: category_chips_position).",
+        depends_on: nil
+      },
+      %{
+        key: "category_chips_position",
+        type: :enum,
+        allowed: Constants.category_chips_positions(),
+        default: Constants.default_category_chips_position(),
+        scope: :post,
+        label: "Category chip position",
+        description:
+          "Where the post page shows its category chips: \"top\" (above the title), \"date\" (beside the date) or \"bottom\" (after the content).",
+        depends_on: "show_categories"
+      },
+      %{
+        key: "related_posts",
+        type: :enum,
+        allowed: Constants.related_posts_options(),
+        default: Constants.default_related_posts(),
+        scope: :post,
+        label: "More from this category",
+        description:
+          "At the end of a post, list \"3\" or \"6\" other posts that share one of its categories, newest first; \"off\" lists none.",
         depends_on: nil
       },
       %{
