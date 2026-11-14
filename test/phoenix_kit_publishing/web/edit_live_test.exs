@@ -27,6 +27,32 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     %{group: group}
   end
 
+  test "a timestamp group offers readable URLs; converting changes its mode", %{
+    conn: conn,
+    group: slug_group
+  } do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{slug_group["slug"]}")
+
+    refute has_element?(view, "[data-convert-to-slugs]")
+
+    {:ok, group} =
+      Groups.add_group("Timed #{System.unique_integer([:positive])}", mode: "timestamp")
+
+    {:ok, view, _html} =
+      build_conn()
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    assert has_element?(view, "[data-convert-to-slugs] button[data-confirm]")
+    html = render_click(view, "convert_to_slug_mode", %{})
+    assert html =~ "Converted to readable URLs"
+    assert Groups.get_group_mode(group["slug"]) == "slug"
+    refute has_element?(view, "[data-convert-to-slugs]")
+  end
+
   test "form renders with the current name and slug, save button shows phx-disable-with",
        %{conn: conn, group: group} do
     {:ok, _view, html} =

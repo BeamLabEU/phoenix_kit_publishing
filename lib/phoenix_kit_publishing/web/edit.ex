@@ -130,6 +130,37 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, handle_switch_language(socket, lang_code)}
   end
 
+  # One way and site-wide (every post URL of the group changes), so it sits
+  # outside the form behind a confirmation; the old URLs keep working (301).
+  def handle_event("convert_to_slug_mode", _params, socket) do
+    if Access.can_manage_groups?(Access.scope(socket)) do
+      slug = socket.assigns.group["slug"]
+
+      case Publishing.convert_to_slug_mode(slug,
+             actor_uuid: Shared.actor_uuid_from_socket(socket)
+           ) do
+        {:ok, %{converted: count}} ->
+          {:noreply,
+           socket
+           |> assign(:group, find_group(slug) || socket.assigns.group)
+           |> put_flash(
+             :info,
+             ngettext(
+               "Converted to readable URLs: %{count} post has a new address; its old one redirects.",
+               "Converted to readable URLs: %{count} posts have new addresses; the old ones redirect.",
+               count
+             )
+           )}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, Errors.message(reason))}
+      end
+    else
+      {:noreply,
+       put_flash(socket, :error, gettext("You don't have permission to manage publishing groups"))}
+    end
+  end
+
   def handle_event("save", %{"group" => params} = all_params, socket) do
     if Access.can_manage_groups?(Access.scope(socket)) do
       save_group(params, all_params, socket)
@@ -809,6 +840,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                 </.button>
               </.form_actions>
             </.form>
+            <%!-- Readable URLs for a timestamp group (ModeConversion): outside
+              the form, one way, behind a confirmation. --%>
+            <div
+              :if={@group["mode"] == "timestamp"}
+              class="mt-8 rounded-box border border-warning/40 p-4"
+              data-convert-to-slugs
+            >
+              <h3 class="font-semibold">{gettext("Readable URLs")}</h3>
+              <p class="mt-1 text-sm text-base-content/70">
+                {gettext(
+                  "Give every post an address from its title (/news/release-notes instead of /news/2026-11-06/01:13). The old addresses keep working: they redirect. This cannot be undone."
+                )}
+              </p>
+              <.button
+                type="button"
+                phx-click="convert_to_slug_mode"
+                data-confirm={
+                  gettext("Change every post's address in this group to one made from its title?")
+                }
+                class="btn-warning btn-sm mt-3"
+              >
+                {gettext("Convert to readable URLs")}
+              </.button>
+            </div>
             <%!-- Outside the group form — the modal carries its own selector
               <form>s and HTML forbids nesting them. --%>
             <.ai_translate_modal ai_translate={FormGlue.ai_translate_config(assigns)} />

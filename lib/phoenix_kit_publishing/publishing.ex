@@ -199,6 +199,18 @@ defmodule PhoenixKit.Modules.Publishing do
   """
   @spec import_post(String.t(), map(), map() | keyword()) :: {:ok, map()} | {:error, term()}
   defdelegate import_post(group_slug, attrs, opts \\ %{}), to: Posts
+
+  @doc """
+  Converts a timestamp-mode group to slug URLs (`/news/2026-11-06/01:13`
+  becomes `/news/projects-0-33-0`): every post gets a unique slug from its
+  title, and the old date URLs answer with a 301 to the new ones. One way
+  only. See `PhoenixKit.Modules.Publishing.ModeConversion`.
+  """
+  @spec convert_to_slug_mode(String.t(), keyword() | map()) :: {:ok, map()} | {:error, atom()}
+  defdelegate convert_to_slug_mode(group_slug, opts \\ []),
+    to: PhoenixKit.Modules.Publishing.ModeConversion,
+    as: :to_slug_mode
+
   defdelegate read_post(group_slug, identifier, language \\ nil, version \\ nil), to: Posts
   defdelegate read_post_by_uuid(post_uuid, language \\ nil, version \\ nil), to: Posts
   defdelegate update_post(group_slug, post, params, opts \\ %{}), to: Posts

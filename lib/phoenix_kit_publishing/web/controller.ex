@@ -31,6 +31,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Views
@@ -445,11 +447,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp dispatch_parsed_path(conn, {:slug_post, group_slug, post_slug}, language),
     do: handle_post(conn, group_slug, {:slug, post_slug}, language)
 
-  defp dispatch_parsed_path(conn, {:timestamp_post, group_slug, date, time}, language),
-    do: handle_post(conn, group_slug, {:timestamp, date, time}, language)
+  defp dispatch_parsed_path(conn, {:timestamp_post, group_slug, date, time}, language) do
+    case converted_group_url(group_slug, date, time, language) do
+      nil -> handle_post(conn, group_slug, {:timestamp, date, time}, language)
+      url -> redirect_301(conn, url)
+    end
+  end
 
-  defp dispatch_parsed_path(conn, {:date_only_post, group_slug, date}, language),
-    do: handle_date_only_url(conn, group_slug, date, language)
+  defp dispatch_parsed_path(conn, {:date_only_post, group_slug, date}, language) do
+    case converted_group_url(group_slug, date, nil, language) do
+      nil -> handle_date_only_url(conn, group_slug, date, language)
+      url -> redirect_301(conn, url)
+    end
+  end
 
   defp dispatch_parsed_path(conn, {:versioned_post, group_slug, post_slug, version}, language),
     do: handle_versioned_post(conn, group_slug, post_slug, version, language)
@@ -892,6 +902,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # Issue the canonical 301 while preserving the request's query string — a
   # `?utm_source=…` link that hits a canonical/locale redirect must not have its
   # campaign params stripped.
+  # A date URL in a group converted to slug mode (ModeConversion): the post
+  # still carries the date and time it was published under, so the old URL
+  # finds it and answers with a 301 to its slug URL. nil (the usual path)
+  # for a timestamp group, or no post at that date.
+  defp converted_group_url(group_slug, date, time, language) do
+    with "slug" <- Groups.get_group_mode(group_slug),
+         {:ok, date} <- Date.from_iso8601(date),
+         {:ok, time} <- parse_url_time(time),
+         %{slug: slug} when is_binary(slug) <-
+           DBStorage.get_post_by_datetime(group_slug, date, time) do
+      PublishingHTML.build_post_url(group_slug, %{mode: "slug", slug: slug}, language)
+    else
+      _ -> nil
+    end
+  end
+
+  defp parse_url_time(nil), do: {:ok, nil}
+  defp parse_url_time(time), do: Time.from_iso8601(time <> ":00")
+
   defp redirect_301(conn, url) do
     conn
     |> put_status(301)

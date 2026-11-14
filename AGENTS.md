@@ -299,8 +299,12 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
 - **Soft delete:** posts use `trashed_at` (nil = active), groups use
   `status` (`"active"` / `"trashed"`). There is no post status column — status is
   version-level.
-- **Dual URL modes** (`"timestamp"` / `"slug"`) are locked at group creation and
-  never change.
+- **Dual URL modes** (`"timestamp"` / `"slug"`) are set at group creation. The
+  one change is `Publishing.convert_to_slug_mode/2` (`ModeConversion`, the
+  "Readable URLs" button on the group's edit page): timestamp to slug, one way,
+  every post given a unique slug from its title in one transaction; posts keep
+  `post_date`/`post_time`, and a date URL in a slug group answers with a 301 to
+  the post's slug URL (`converted_group_url/4` in `Web.Controller`).
 - **Content format** is Markdown plus inline PHK XML components (`<Image>`,
   `<Hero>`, `<CTA>`, `<Video>`, `<Headline>`, `<Subheadline>`, `<EntityForm>`,
   `<Audio>`), parsed by Saxy.
