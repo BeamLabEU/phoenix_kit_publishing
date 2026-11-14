@@ -386,17 +386,36 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  defp backdate_slot(group_slug, %{mode: "timestamp"} = db_post, published_at) do
+  # Another post can take the chosen minute between the search and the
+  # update (two imports at once): the unique index refuses it, and the search
+  # runs again, a few times.
+  defp backdate_slot(group_slug, db_post, published_at, attempt \\ 1)
+
+  defp backdate_slot(group_slug, %{mode: "timestamp"} = db_post, published_at, attempt) do
     wall = shift_to_site_timezone(published_at)
     time = %Time{hour: wall.hour, minute: wall.minute, second: 0, microsecond: {0, 0}}
 
     {date, time} =
       find_available_timestamp(group_slug, DateTime.to_date(wall), time, db_post.uuid)
 
-    DBStorage.update_post(db_post, %{post_date: date, post_time: time})
+    case DBStorage.update_post(db_post, %{post_date: date, post_time: time}) do
+      {:error, %Ecto.Changeset{} = changeset} when attempt < 5 ->
+        if slot_taken_error?(changeset),
+          do: backdate_slot(group_slug, db_post, published_at, attempt + 1),
+          else: {:error, changeset}
+
+      result ->
+        result
+    end
   end
 
-  defp backdate_slot(_group_slug, db_post, _published_at), do: {:ok, db_post}
+  defp backdate_slot(_group_slug, db_post, _published_at, _attempt), do: {:ok, db_post}
+
+  defp slot_taken_error?(changeset),
+    do:
+      Enum.any?(changeset.errors, fn {_field, {_message, meta}} ->
+        meta[:constraint] == :unique
+      end)
 
   defp maybe_publish_import(_group_slug, _post, false, _opts), do: :ok
 

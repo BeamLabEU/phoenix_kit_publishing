@@ -138,8 +138,12 @@ defmodule PhoenixKitPublishing.RouterDispatch do
     prefix_segments = split_prefix(url_prefix)
     public_segments = split_prefix(PublishingHTML.public_url_prefix())
 
+    # The longer prefix first: with the kit at /phoenix_kit and the public
+    # pages at /, `/phoenix_kit/news/x` is the kit-prefixed URL of a news
+    # post, never a post "news" of a group named after the kit's segment.
     [public_segments, prefix_segments]
     |> Enum.uniq()
+    |> Enum.sort_by(&length/1, :desc)
     |> Enum.find_value(:pass, fn segments ->
       with {:ok, rest} <- strip_prefix(path_info, segments),
            {:rewrite, _conn} = rewritten <-

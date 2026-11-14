@@ -84,12 +84,12 @@ defmodule PhoenixKit.Modules.Publishing.API.Common do
     {:error, code, message, context}
   end
 
-  @not_found ~w(not_found post_not_found group_not_found resource_not_found no_post)a
+  @not_found ~w(not_found post_not_found group_not_found resource_not_found no_post category_not_found)a
   @version ~w(source_not_found invalid_version version_not_found)a
   @slug_taken ~w(slug_already_exists slug_taken already_exists conflicts_with_post_slug conflicts_with_previous_slug)a
   @invalid_slug ~w(invalid_slug invalid_format)a
   @same_name ~w(reserved_language_code reserved_route_word invalid_name invalid_mode invalid_type post_trashed
-                category_cycle parent_not_found parent_wrong_group title_required)a
+                category_cycle parent_not_found parent_wrong_group title_required invalid_published_at)a
   @not_published ~w(not_published no_published_version)a
   @ai ~w(ai_disabled ai_no_prompt ai_endpoint_not_found ai_endpoint_disabled)a
 

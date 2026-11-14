@@ -8,6 +8,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ModeConversionTest do
   # async: false — mutates the global publishing settings rows.
   use PhoenixKitPublishing.ConnCase, async: false
 
+  import Ecto.Query, only: [from: 2]
+
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts}
   alias PhoenixKit.Settings
@@ -85,5 +87,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ModeConversionTest do
     assert {:error, :invalid_mode} = Publishing.convert_to_slug_mode(slug)
     assert {:error, :group_not_found} = Publishing.convert_to_slug_mode("no-such-group")
     assert {:ok, _} = Posts.read_post(slug, "projects-0-33-0")
+  end
+
+  test "a draft's old URL does not reveal its new one; a date-shaped slug is remade", %{
+    slug: slug
+  } do
+    {:ok, draft} =
+      Publishing.import_post(slug, %{title: "Secret plans", published_at: "2026-11-10T08:00:00Z"},
+        publish: false
+      )
+
+    {:ok, dated} =
+      Publishing.import_post(slug, %{title: "Dated", published_at: "2026-11-11T08:00:00Z"})
+
+    # a timestamp post's slug was never in its URL; one shaped like a date
+    # would be read as a date after the conversion
+    {1, _} =
+      PhoenixKitPublishing.Test.Repo.update_all(
+        from(p in PhoenixKit.Modules.Publishing.PublishingPost,
+          where: p.uuid == ^dated[:uuid]
+        ),
+        set: [slug: "2026-11-11"]
+      )
+
+    {:ok, %{slugs: slugs}} = Publishing.convert_to_slug_mode(slug)
+    assert slugs[dated[:uuid]] == "dated"
+
+    conn = get(build_conn(), "/#{slug}/2026-11-10/08:00")
+    assert conn.status != 301
+    refute (get_resp_header(conn, "location") |> List.first() || "") =~ "secret-plans"
+    assert slugs[draft[:uuid]] == "secret-plans"
   end
 end

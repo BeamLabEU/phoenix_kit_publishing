@@ -910,7 +910,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     with "slug" <- Groups.get_group_mode(group_slug),
          {:ok, date} <- Date.from_iso8601(date),
          {:ok, time} <- parse_url_time(time),
-         %{slug: slug} when is_binary(slug) <-
+         # only a live post: a draft's old URL must not reveal its new one
+         %{slug: slug, active_version_uuid: live} when is_binary(slug) and not is_nil(live) <-
            DBStorage.get_post_by_datetime(group_slug, date, time) do
       PublishingHTML.build_post_url(group_slug, %{mode: "slug", slug: slug}, language)
     else

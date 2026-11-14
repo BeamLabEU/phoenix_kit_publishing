@@ -558,4 +558,35 @@ defmodule PhoenixKitPublishing.RouterDispatchIntegrationTest do
       assert owner([slug, "2026-11-14"]) == :publishing
     end
   end
+
+  describe "maybe_rewrite/2 — public pages under their own prefix" do
+    test "the longer prefix wins: the kit-prefixed URL of a post, not a group named like the kit" do
+      {:ok, kit_named} = Groups.add_group(unique_name(), mode: "slug", slug: "cms")
+      {:ok, news} = Groups.add_group(unique_name(), mode: "slug", slug: unique_slug())
+
+      Application.put_env(:phoenix_kit_publishing, :public_url_prefix, "/")
+      on_exit(fn -> Application.delete_env(:phoenix_kit_publishing, :public_url_prefix) end)
+
+      conn = %Plug.Conn{
+        path_info: ["cms", news["slug"], "a-post"],
+        request_path: "/cms/#{news["slug"]}/a-post",
+        private: %{}
+      }
+
+      assert {:rewrite, rewritten} = RouterDispatch.maybe_rewrite(conn, "/cms")
+
+      assert rewritten.path_info == [
+               "cms",
+               "__phoenix_kit_publishing_dispatch",
+               "root",
+               news["slug"],
+               "a-post"
+             ]
+
+      # the group named "cms" is still reached at the public root
+      conn = %Plug.Conn{path_info: ["cms"], request_path: "/cms", private: %{}}
+      assert {:rewrite, _} = RouterDispatch.maybe_rewrite(conn, "/cms")
+      _ = kit_named
+    end
+  end
 end

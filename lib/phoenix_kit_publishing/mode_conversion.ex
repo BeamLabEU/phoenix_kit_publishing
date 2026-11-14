@@ -85,7 +85,11 @@ defmodule PhoenixKit.Modules.Publishing.ModeConversion do
 
     {slugs, _taken} =
       Enum.map_reduce(posts, taken, fn post, taken ->
-        slug = if post.slug in [nil, ""], do: free_slug(post, titles, taken), else: post.slug
+        slug =
+          if routable_slug?(post.slug),
+            do: post.slug,
+            else: free_slug(post, titles, MapSet.delete(taken, post.slug))
+
         {{post.uuid, slug}, MapSet.put(taken, slug)}
       end)
 
@@ -141,6 +145,11 @@ defmodule PhoenixKit.Modules.Publishing.ModeConversion do
     do: "post-#{Date.to_iso8601(date)}-#{Calendar.strftime(time, "%H%M")}"
 
   defp fallback_slug(_post), do: "post"
+
+  # A timestamp post's slug was never part of its URL; one the router could
+  # not reach as a slug (blank, date-shaped, reserved) is made anew.
+  defp routable_slug?(slug) when is_binary(slug) and slug != "", do: routable(slug) == slug
+  defp routable_slug?(_slug), do: false
 
   # A slug the router reads as a date, or one of the reserved route words,
   # would never reach the post.
