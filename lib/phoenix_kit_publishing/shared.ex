@@ -9,6 +9,7 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   require Logger
 
   alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Users.Auth.Scope
 
   # ============================================================================
@@ -24,15 +25,23 @@ defmodule PhoenixKit.Modules.Publishing.Shared do
   self-closing, or an unterminated opening tag left by upstream truncation —
   is dropped. Only capitalised tags are touched: lowercase admin-authored
   HTML passes through for the renderer to handle.
+
+  A tag inside an inline code span or a fenced block is text, not a
+  component, and is kept: the regexes run over the text as the renderer's
+  component scanner sees it, with the `<` in code masked (the renderer's
+  `mask_scanned_code`), and the mask is lifted afterwards.
   """
   @spec strip_components(String.t() | term()) :: String.t() | term()
   def strip_components(markdown) when is_binary(markdown) do
     # `\<Tag` is text, not a component: it is how Leaf writes a typed `<`.
+    # The mask covers it as well as code; the lookbehinds stay as a backstop.
     markdown
+    |> Renderer.mask_scanned_code()
     |> String.replace(~r/(?<!\\)<Note\b[^>]*>(.*?)<\/Note>/s, "\\1")
     |> String.replace(~r/(?<!\\)<([A-Z][A-Za-z]*)\b[^>]*>.*?<\/\1>/s, " ")
     |> String.replace(~r/(?<!\\)<[A-Z][A-Za-z]*\b[^>]*\/?>/, " ")
     |> String.replace(~r/(?<!\\)<[A-Z][A-Za-z]*\b[^>]*\z/s, " ")
+    |> Renderer.unmask_scanned_code()
   end
 
   def strip_components(other), do: other

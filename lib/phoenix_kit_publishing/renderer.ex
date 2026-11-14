@@ -1238,7 +1238,13 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # `\\<`, and the scanners are plain regexes that would otherwise take the tag
   # after it for a live component, leaving the backslash on the page. Code goes
   # first, so a `\\<` shown inside code is already out of reach here.
-  defp mask_scanned_code(content) do
+  #
+  # Public (but undocumented) so `Shared.strip_components/1` can run its own
+  # component regexes over the same masked text: an excerpt must keep a
+  # `<Image>` shown in code exactly as the page renders it.
+  @doc false
+  @spec mask_scanned_code(String.t()) :: String.t()
+  def mask_scanned_code(content) do
     mask = fn match -> String.replace(match, "<", @code_lt_sentinel) end
 
     @code_region_regex
@@ -1249,7 +1255,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # Restore sentinels back to raw `<`. A no-op on the plain path (which never
   # masks); on the mixed path the restored `<` re-enters MDEx inside a code span,
   # where comrak HTML-escapes it to `&lt;`.
-  defp unmask_scanned_code(content) do
+  @doc false
+  @spec unmask_scanned_code(String.t()) :: String.t()
+  def unmask_scanned_code(content) do
     String.replace(content, @code_lt_sentinel, "<")
   end
 
