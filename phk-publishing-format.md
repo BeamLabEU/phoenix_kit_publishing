@@ -79,11 +79,33 @@ You can mix **bold text** and inline components:
 
 | Component | Notes |
 |-----------|-------|
-| `<Image … />` | Works with either `src="/path/to/file.jpg"` or `file_uuid="…"`. Optional `file_variant="thumbnail" | "small" | "medium" | "large"` picks a specific variant from PhoenixKit Storage. The renderer now always returns the natural dimensions; add your own `class` if you want to constrain width. |
+| `<Image … />` | Works with either `src="/path/to/file.jpg"` or `file_uuid="…"`. Optional `file_variant="thumbnail" | "small" | "medium" | "large"` picks a specific variant from PhoenixKit Storage. The renderer now always returns the natural dimensions; add your own `class` if you want to constrain width. Optional `dark_file_uuid="…"` or `dark_src="…"` adds a dark-theme counterpart (see below). |
 | `<Headline>…</Headline>` | Renders a hero-style heading. |
 | `<Subheadline>…</Subheadline>` | Medium-sized supporting text. |
 | `<CTA primary="true|false" action="/path-or-anchor">Label</CTA>` | Button styled by the admin theme. |
 | `<Video …>Caption</Video>` | Responsive YouTube embeds. Provide either `video_id="dQw4w9WgXcQ"` or a `url="https://youtu.be/dQw4w9WgXcQ"`. Optional attributes: `autoplay`, `muted`, `controls`, `loop`, `start` (seconds), and `ratio` (`16:9`, `4:3`, `1:1`, `21:9`). Use the component body (or `caption="..."` when self-closing) to show a caption. |
+
+### Light/dark image pairs
+
+A screenshot that has a light and a dark version takes both on one tag:
+
+```markdown
+<Image file_uuid="019a…" dark_file_uuid="019b…" alt="The dashboard" />
+<Image src="/shots/light.png" dark_src="/shots/dark.png" alt="The dashboard" />
+```
+
+The reader sees the image that matches the **site theme**: a `data-theme` on
+`<html>` whose base is dark (core's `PhoenixKit.ThemeConfig.base_map/0`, the
+dark daisyUI themes plus the host's `:theme_definitions`) shows the dark one,
+any other theme the light one; with no `data-theme` the OS preference
+(`prefers-color-scheme`) decides. It is plain CSS, no JavaScript: both images
+are rendered (lazy, with the same `alt`, `class` and `file_variant`) and a
+small stylesheet the renderer appends hides one. The hidden one is
+`display: none`, so a screen reader reads only the visible one. `stretch` and
+`align` apply to the pair. `dark_src` wins over `dark_file_uuid`; when the dark
+image does not resolve, the light one renders alone, and without either
+attribute the output is the plain `<Image>`. A theme a host defines only in
+CSS, outside `:theme_definitions`, counts as light.
 
 Additional components can be introduced by adding Phoenix components under `lib/modules/publishing/components/` and registering them in the PageBuilder renderer.
 

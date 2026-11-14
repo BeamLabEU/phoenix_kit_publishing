@@ -40,6 +40,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.PreviewLiveTest do
     assert html =~ "Preview Subject" || html =~ post[:slug]
   end
 
+  test "the preview renders a light/dark image pair with its theme stylesheet", %{
+    conn: conn,
+    group: group
+  } do
+    {:ok, post} =
+      Posts.create_post(group["slug"], %{
+        title: "Dark Shot",
+        content: ~s(<Image src="/l.png" dark_src="/d.png" alt="Shot" />)
+      })
+
+    {:ok, _view, html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/preview")
+
+    assert html =~ "pk-img-light"
+    assert html =~ "pk-img-dark"
+    assert html =~ ~s(src="/d.png")
+    assert html =~ "prefers-color-scheme:dark"
+  end
+
   test "back_to_editor event navigates to the editor URL", %{
     conn: conn,
     group: group,

@@ -83,9 +83,12 @@ Deliberate non-features, so nobody adds them assuming they were missed.
   stylesheets are static text appended after it. The cleaner runs before the render
   cache fills and again after `resolve_post_links/2` when it rewrote something; that
   pass sets the appended stylesheet tail aside and puts it back, recognising only the
-  sheets listed in `@constant_style_blocks` and keyframes-only sheets of the generated
-  shape, so a NEW generated stylesheet must be added to `@constant_style_blocks`
-  (or fit the keyframes shape), or it silently disappears on pages with post links.
+  sheets listed in `@constant_style_blocks`, keyframes-only sheets of the generated
+  shape and the light/dark `<Image>` sheet (`Components.Image.dark_image_css?/1`, which
+  recognises it for any theme list, since the dark theme names come from core's
+  `ThemeConfig.base_map/0` at render time), so a NEW generated stylesheet must be added
+  to `@constant_style_blocks` (or fit one of the generated shapes), or it silently
+  disappears on pages with post links.
   A new tag or attribute a component emits must be added to the allow-list in
   `renderer/sanitizer.ex`. The machine API's text rule is the
   confirmation gate on top: a write whose body text holds HTML, components, post

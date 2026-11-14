@@ -372,6 +372,9 @@ Regular **Markdown** content with all GitHub-flavored features.
 
 <Image file_id="019a6f96-..." alt="Description" />
 
+<!-- A light/dark pair: the reader sees the one matching the site theme -->
+<Image file_uuid="019a6f96-..." dark_file_uuid="019a6f97-..." alt="Description" />
+
 <Hero variant="centered">
   <Headline>Welcome</Headline>
   <CTA primary="true" action="/signup">Get Started</CTA>
