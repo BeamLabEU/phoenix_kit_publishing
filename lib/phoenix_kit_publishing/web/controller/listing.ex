@@ -463,7 +463,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
 
   # The slugs that name a category of the group, in request order, and every
   # uuid they cover (each with its subcategories).
-  defp resolve_category_filter(_categories, []), do: %{slugs: [], uuids: MapSet.new()}
+  # `uuids` is a plain map (uuid => true): carried inside a map, a MapSet
+  # loses its opaque type for dialyzer.
+  defp resolve_category_filter(_categories, []), do: %{slugs: [], uuids: %{}}
 
   defp resolve_category_filter(categories, slugs) do
     by_slug = Map.new(categories, &{&1.slug, &1})
@@ -473,7 +475,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     uuids =
       known
       |> Enum.flat_map(&subtree(Map.fetch!(by_slug, &1), children))
-      |> MapSet.new()
+      |> Map.new(&{&1, true})
 
     %{slugs: known, uuids: uuids}
   end
@@ -482,15 +484,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     [category.uuid | Enum.flat_map(Map.get(children, category.uuid, []), &subtree(&1, children))]
   end
 
-  defp filter_by_categories(posts, uuids) do
-    if MapSet.size(uuids) == 0,
-      do: posts,
-      else:
-        Enum.filter(
-          posts,
-          &(post_category_uuids(&1) |> Enum.any?(fn uuid -> MapSet.member?(uuids, uuid) end))
-        )
-  end
+  defp filter_by_categories(posts, uuids) when map_size(uuids) == 0, do: posts
+
+  defp filter_by_categories(posts, uuids),
+    do:
+      Enum.filter(
+        posts,
+        &(post_category_uuids(&1) |> Enum.any?(fn uuid -> Map.has_key?(uuids, uuid) end))
+      )
 
   defp post_category_uuids(post),
     do: post[:category_uuids] || get_in(post, [:metadata, :category_uuids]) || []
