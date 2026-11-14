@@ -104,7 +104,11 @@ defmodule PhoenixKitPublishing.MigrationsDataSafetyTest do
     {:ok, v2_post} = Versions.create_new_version(group["slug"], post, %{}, %{})
 
     {:ok, category} =
-      Categories.create_category(group["slug"], %{"name" => "Data Safety Category"})
+      Categories.create_category(group["slug"], %{
+        "name" => "Data Safety Category",
+        "color" => "primary",
+        "seo_title" => "Kept through a rollback"
+      })
 
     {:ok, _uuids} = Categories.replace_post_categories(post[:uuid], [category.uuid])
 
@@ -155,6 +159,9 @@ defmodule PhoenixKitPublishing.MigrationsDataSafetyTest do
 
     reloaded_category = Repo.get!(PublishingCategory, category.uuid)
     assert reloaded_category.name == category.name
+    # V3's column is left in place by a rollback, with what it holds
+    assert PublishingCategory.color(reloaded_category) == "primary"
+    assert PublishingCategory.seo_title(reloaded_category) == "Kept through a rollback"
 
     assert post_category_row_exists?(post[:uuid], category.uuid)
     assert post_view_total(post[:uuid]) == 1
@@ -221,8 +228,11 @@ defmodule PhoenixKitPublishing.MigrationsDataSafetyTest do
   test "a real down(version: 1) removes only V2's two indexes; a real up(version: 2) restores them",
        %{group: group, post: post} do
     counts_before = all_counts()
-    assert Migrations.migrated_version_runtime(prefix: "public") == 2
-    assert Enum.all?(@v2_indexes, &index_exists?/1), "test_helper installs the chain at V2"
+
+    assert Migrations.migrated_version_runtime(prefix: "public") ==
+             Migrations.current_version()
+
+    assert Enum.all?(@v2_indexes, &index_exists?/1), "test_helper installs the chain at current"
 
     inventory_at_2 = index_inventory()
 
@@ -238,7 +248,9 @@ defmodule PhoenixKitPublishing.MigrationsDataSafetyTest do
 
     run_migration(RunUpToCurrent)
 
-    assert Migrations.migrated_version_runtime(prefix: "public") == 2
+    assert Migrations.migrated_version_runtime(prefix: "public") ==
+             Migrations.current_version()
+
     assert index_inventory() == inventory_at_2
     assert all_counts() == counts_before
     assert Repo.get!(PublishingGroup, group["uuid"]).name == group["name"]
@@ -249,7 +261,9 @@ defmodule PhoenixKitPublishing.MigrationsDataSafetyTest do
     Repo.query!("COMMENT ON TABLE phoenix_kit_publishing_groups IS NULL")
     run_migration(RunUpToCurrent)
 
-    assert Migrations.migrated_version_runtime(prefix: "public") == 2
+    assert Migrations.migrated_version_runtime(prefix: "public") ==
+             Migrations.current_version()
+
     assert index_inventory() == inventory_at_2
     assert all_counts() == counts_before
   end

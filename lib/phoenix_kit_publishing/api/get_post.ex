@@ -151,6 +151,7 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPost do
       },
       "tags" => PublishingVersion.get_tags(version),
       "category_ids" => PublishingVersion.get_category_uuids(version),
+      "custom_fields" => PublishingVersion.get_custom_fields(version),
       "url_slug" => content && content.url_slug
     }
   end

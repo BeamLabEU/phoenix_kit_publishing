@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.PublishingVersion
 
   # ============================================================================
   # Form Building
@@ -74,7 +75,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "audio_uuid" => Map.get(post.metadata, :audio_uuid) || "",
       "og_title" => og_field(post, "title"),
       "og_description" => og_field(post, "description"),
-      "og_image_uuid" => og_field(post, "image_uuid")
+      "og_image_uuid" => og_field(post, "image_uuid"),
+      # Rows, not a map: the form keeps them as typed (a new row starts
+      # blank), and `custom_fields_map/1` is what the save writes.
+      "custom_fields" =>
+        post.metadata
+        |> Map.get(:custom_fields, %{})
+        |> Enum.sort()
+        |> Enum.map(fn {key, value} -> %{"key" => key, "value" => value} end)
     }
   end
 
@@ -157,7 +165,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
         "audio_uuid" => normalize_string(form, "audio_uuid"),
         "og_title" => normalize_string(form, "og_title"),
         "og_description" => normalize_string(form, "og_description"),
-        "og_image_uuid" => normalize_string(form, "og_image_uuid")
+        "og_image_uuid" => normalize_string(form, "og_image_uuid"),
+        "custom_fields" => custom_field_rows(Map.get(form, "custom_fields"))
       }
 
     case Map.fetch(form, "slug") do
@@ -184,7 +193,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       "audio_uuid" => "",
       "og_title" => "",
       "og_description" => "",
-      "og_image_uuid" => ""
+      "og_image_uuid" => "",
+      "custom_fields" => []
     }
 
   # Normalizes the editor's featured checkbox (hidden "false" + checkbox "true"
@@ -456,9 +466,45 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
   """
   @spec dirty?(map(), map(), String.t() | nil) :: boolean()
   def dirty?(post, form, content) do
-    normalized_form = normalize_form(form)
-    normalized_form != post_form(post) || content != post.content
+    comparable(normalize_form(form)) != comparable(post_form(post)) || content != post.content
   end
+
+  # Custom fields compare by what a save would write: rows in another order,
+  # or a blank row just added, are no change.
+  defp comparable(form), do: Map.update(form, "custom_fields", %{}, &custom_fields_map/1)
+
+  @doc """
+  The editor's custom-field rows as a list of `%{"key", "value"}` maps, in the
+  order typed: from that list, or from the `%{"0" => %{"key", "value"}}` map a
+  form submit sends (ordered by its index). Values are kept as typed.
+  """
+  @spec custom_field_rows(term()) :: [map()]
+  def custom_field_rows(rows) when is_list(rows), do: Enum.flat_map(rows, &row/1)
+
+  def custom_field_rows(rows) when is_map(rows) do
+    rows
+    |> Enum.sort_by(fn {index, _row} -> row_index(index) end)
+    |> Enum.flat_map(fn {_index, row} -> row(row) end)
+  end
+
+  def custom_field_rows(_rows), do: []
+
+  defp row(%{} = row),
+    do: [%{"key" => to_string(row["key"] || ""), "value" => to_string(row["value"] || "")}]
+
+  defp row(_row), do: []
+
+  defp row_index(index) do
+    case Integer.parse(to_string(index)) do
+      {n, _} -> n
+      :error -> 0
+    end
+  end
+
+  @doc "What a save writes for the editor's custom-field rows (blank ones dropped)."
+  @spec custom_fields_map(term()) :: map()
+  def custom_fields_map(rows),
+    do: rows |> custom_field_rows() |> PublishingVersion.normalize_custom_fields()
 
   # ============================================================================
   # Helpers

@@ -34,6 +34,18 @@ admin opts in — with these nuances:
   `controller/listing.ex`).
 - `listing_animations` (default on) owns every card hover effect (the 4px
   motion-safe lift + shadow/image transitions) — off renders fully static cards.
+- Categories on the public pages, all default-off: `listing_show_categories`
+  (chips on every card layout and band style, in the category's colour and
+  icon; in the `minimal` layout as labels, since its whole row is a link),
+  `listing_category_filter` (a filter row above the listing driving
+  `?category=a,b`: any of the picked categories, subcategories included; the
+  bands are off while it filters, the canonical URL and the pager keep the
+  parameter), `category_chips_position` (`top` / `date` / `bottom`, where the
+  post page's `show_categories` chips go; `bottom` is where they always were)
+  and `related_posts` (`off` / `3` / `6`: other posts of the language sharing
+  a category, newest first, under the post). A category's colour, icon and
+  archive SEO texts live on the category itself (`PublishingCategory`, module
+  chain V3).
 
 Both bands also carry a **style** key (`featured_style` / `newest_style`:
 `classic | cover | cover_panel | minimal | top`, default `classic`) orthogonal to

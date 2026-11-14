@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
     not_found: {:not_found, nil},
     post_not_found: {:not_found, nil},
     group_not_found: {:not_found, nil},
+    category_not_found: {:not_found, nil},
     resource_not_found: {:not_found, nil},
     no_post: {:not_found, nil},
     source_not_found: {:validation_failed, "version_not_found"},
@@ -27,6 +28,7 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
     reserved_route_word: {:validation_failed, "reserved_route_word"},
     invalid_name: {:validation_failed, "invalid_name"},
     invalid_mode: {:validation_failed, "invalid_mode"},
+    invalid_published_at: {:validation_failed, "invalid_published_at"},
     invalid_type: {:validation_failed, "invalid_type"},
     post_trashed: {:validation_failed, "post_trashed"},
     not_published: {:validation_failed, "not_published"},
@@ -55,7 +57,7 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
     no_published_version no_uuid not_found not_published params_not_applied parent_not_found parent_wrong_group post_not_found
     post_trashed resource_not_found reserved_language_code reserved_route_word slug_already_exists slug_taken
     timestamp_collision_unresolvable title_required unpublished version_access_disabled ai_disabled ai_no_prompt
-    ai_endpoint_not_found ai_endpoint_disabled)a ++
+    ai_endpoint_not_found ai_endpoint_disabled category_not_found invalid_published_at)a ++
                  ~w(source_not_found no_active_version no_version conflicts_with_previous_slug version_not_found
                      content_copy_failed went_live locked_check_failed)a
 

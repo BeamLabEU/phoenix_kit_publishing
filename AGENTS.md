@@ -83,9 +83,12 @@ Deliberate non-features, so nobody adds them assuming they were missed.
   stylesheets are static text appended after it. The cleaner runs before the render
   cache fills and again after `resolve_post_links/2` when it rewrote something; that
   pass sets the appended stylesheet tail aside and puts it back, recognising only the
-  sheets listed in `@constant_style_blocks` and keyframes-only sheets of the generated
-  shape, so a NEW generated stylesheet must be added to `@constant_style_blocks`
-  (or fit the keyframes shape), or it silently disappears on pages with post links.
+  sheets listed in `@constant_style_blocks`, keyframes-only sheets of the generated
+  shape and the light/dark `<Image>` sheet (`Components.Image.dark_image_css?/1`, which
+  recognises it for any theme list, since the dark theme names come from core's
+  `ThemeConfig.base_map/0` at render time), so a NEW generated stylesheet must be added
+  to `@constant_style_blocks` (or fit one of the generated shapes), or it silently
+  disappears on pages with post links.
   A new tag or attribute a component emits must be added to the allow-list in
   `renderer/sanitizer.ex`. The machine API's text rule is the
   confirmation gate on top: a write whose body text holds HTML, components, post
@@ -125,9 +128,10 @@ Deliberate non-features, so nobody adds them assuming they were missed.
   still *creates* all 7 on every install (V135 baseline for
   groups/posts/versions/contents, V159 for categories/post_categories/
   post_views, V164 rebuilds one index). V1 of this chain is a pure adoption
-  of that current shape and V2 only adds two expression indexes (see
-  "Database & migrations" below and the chain's own moduledoc) — no column,
-  constraint or table has ever changed through it.
+  of that current shape, V2 only adds two expression indexes and V3 one
+  column, `data` on categories (see "Database & migrations" below and the
+  chain's own moduledoc); no table or constraint has changed through it, and
+  a rollback never drops a column's contents.
 - **No all-groups public overview.** If one returns it returns as an opt-in
   reserved route, not as a catch-all sibling.
 - **No guest commenting.** The comments seam requires a logged-in user because
@@ -295,8 +299,12 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
 - **Soft delete:** posts use `trashed_at` (nil = active), groups use
   `status` (`"active"` / `"trashed"`). There is no post status column — status is
   version-level.
-- **Dual URL modes** (`"timestamp"` / `"slug"`) are locked at group creation and
-  never change.
+- **Dual URL modes** (`"timestamp"` / `"slug"`) are set at group creation. The
+  one change is `Publishing.convert_to_slug_mode/2` (`ModeConversion`, the
+  "Readable URLs" button on the group's edit page): timestamp to slug, one way,
+  every post given a unique slug from its title in one transaction; posts keep
+  `post_date`/`post_time`, and a date URL in a slug group answers with a 301 to
+  the post's slug URL (`converted_group_url/4` in `Web.Controller`).
 - **Content format** is Markdown plus inline PHK XML components (`<Image>`,
   `<Hero>`, `<CTA>`, `<Video>`, `<Headline>`, `<Subheadline>`, `<EntityForm>`,
   `<Audio>`), parsed by Saxy.
@@ -638,14 +646,19 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **`..._versions`** — source of truth for published state: `post_uuid`,
   `version_number` (unique per post), `status` (draft/published/archived),
   `published_at`, `data` JSONB (`featured_image_uuid`, tags, seo, description,
-  `allow_version_access`, `sitemap_exclude`, notes, `created_from`). Status is
+  `allow_version_access`, `sitemap_exclude`, `custom_fields` (a host's own
+  string fields, normalised by `PublishingVersion.normalize_custom_fields/1`,
+  read as `metadata.custom_fields`), notes, `created_from`). Status is
   version-level: every language in a version shares it.
 - **`..._contents`** — per-language title and body: `version_uuid`, `language`
   (unique per version), `title`, `content` (markdown), `url_slug` (per-language
   routing), plus reserved `status` / `data`. Read fallback: requested language →
   site default → first available.
 - **`..._categories`** — hierarchical per-group taxonomy; nullable `parent_uuid`
-  self-FK, `slug` unique per group, `name_i18n` display names. Deleting a group
+  self-FK, `slug` unique per group, `name_i18n` display names, `data` JSONB
+  (module chain V3) with `color` (hex or a daisyUI theme colour), `icon` (a
+  heroicon name), `seo_title`, `seo_description` — validated strictly, since
+  colour and icon reach a `style` attribute and a class. Deleting a group
   cascades; deleting a parent lifts children to the root. A parent is picked in
   core's `TreePicker` (the category form and the Move dialog), never an
   indented flat select; the tree leaves out the category's own subtree and the
@@ -681,6 +694,7 @@ Site-wide keys, all read through `PhoenixKit.Settings`.
 | `publishing_enabled` | `false` | Master on/off switch (via `enable_system/0`) |
 | `publishing_public_enabled` | `true` | Serve public routes |
 | `publishing_posts_per_page` | `20` | Listing pagination size (clamped 1–200) |
+| `publishing_pagination_style` | `"numbered"` | The listing pager (`Web.HTML.pager/1`): `numbered` (first, last, the current page ±2, ±1 on a phone, Previous/Next), `compact` (Previous, "Page 7 of 62", Next and a GET go-to-page box) or `simple` (Previous/Next only); anything else is `numbered`. Read per request, not part of any cache. Every style wraps rather than widening the page |
 | `publishing_reading_wpm` | `200` | Words per minute for the reading-time estimate (clamped 50–1000) |
 | `publishing_editor_lock_minutes` | `30` | Editor owner-lock timeout (clamped 1–480) |
 | `publishing_slug_style` | `"transliterate"` | `transliterate` / `unicode` / `ascii`; anything else, or any error, falls back to `:transliterate` |
@@ -688,7 +702,7 @@ Site-wide keys, all read through `PhoenixKit.Settings`.
 | `publishing_render_cache_enabled` | `true` | Toggle the Markdown render cache (global) |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group override for the render cache |
 | `publishing_show_language_switcher` | `true` | Render the in-page language switcher on listing + post pages. Turn off when the host layout provides one |
-| `publishing_render_og_tags` | `true` | Render og/twitter meta tags **in-page** (inside the public body), so previews work even when the host root layout ignores the forwarded `:og`. Turn off when the host renders `:og` in `<head>`, to avoid duplicates |
+| `publishing_render_og_tags` | `true` | Render og/twitter/`name="description"` meta tags **in-page** (inside the public body), so previews work even when the host root layout ignores the forwarded `:og`. **Some scrapers read only `<head>`**: the recommended host setup is `<PhoenixKit.Modules.Publishing.Web.HTML.og_meta_tags og={assigns[:og]} />` in the root layout's `<head>` with this setting off (README, "OpenGraph tags belong in `<head>`"); core's own root layout already prints `@og` in `<head>`. Off avoids duplicates. The default stays on |
 | `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD in-page on post pages, from the same refined `:og` map. `escape: :html_safe` on the encode so no value can close the script tag early |
 | `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → 404, never the smart fallback (a feed URL must not redirect to HTML). Canonical-prefix 301s ARE emitted feed-to-feed, matching `rel="self"` |
 | `publishing_unique_views` | `true` | One view per visitor per post per day: a session carrying the dedup marker is the visitor, a cookieless request is a keyed hash of its address (the LAST `x-forwarded-for` hop, the one the site's proxy appended — the first is the client's to forge — else `remote_ip`) held for the day in `Views.VisitorTable`, capped at 500k rows a day, never the raw address; readers behind one address count once until their browser keeps the marker. Off → every page open counts |
@@ -797,7 +811,12 @@ already taken by ANOTHER expression gets the shape under `<name>_v2`,
 stamps V2 over a missing index. `down/1` never drops any of the 7 tables,
 for any target — below V2 it removes exactly those two indexes by the same
 shape match, whatever name they landed under, leaving a same-named index on
-a different expression alone, then re-stamps or clears the marker. See
+a different expression alone, then re-stamps or clears the marker. V3
+adds `data jsonb NOT NULL DEFAULT '{}'` to `phoenix_kit_publishing_categories`
+(`ADD COLUMN IF NOT EXISTS`; core's `ModuleOwnedTables` lists the table as
+this module's, which sanctions altering it); a rollback below V3 only moves
+the marker and leaves the column and its contents. `mix phoenix_kit.repair`
+reports it as an info-level extra column. See
 `PhoenixKitPublishing.Migrations`' moduledoc for the full ownership
 writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL` safety-net
 section here.
@@ -806,7 +825,9 @@ V2 needs nothing from core's `ExpectedSchema` manifest: `mix
 phoenix_kit.repair` reports drift and never drops an object, and no
 module's own chain registers its objects there. The one core-side step a
 shape change here can need is excluding, from core's baseline generator,
-an object that core created and this chain alters — V2 alters none. Phase
+an object that core created and this chain alters — V3's column, which
+core's next baseline squash must not drop; under core's plan that squash
+leaves module-owned tables out altogether. Phase
 2 (a future core baseline
 squash that drops these tables from core) is already covered: the chain
 alone builds the complete shape of all 7 tables from nothing, so a fresh
@@ -907,6 +928,7 @@ repeat loop in Commands is the stability check.
 | Public dispatch (`RouterDispatch`) | The host router's `call/2` override and `restore_path/2` are a pair: without the restore, the canonical-URL redirect emits the internal prefix and loops forever. Never add a second `call/2` override. | [dev_docs/guides/router-dispatch.md](dev_docs/guides/router-dispatch.md) |
 | Smart fallback / 404 policy | A missing GROUP renders 404; only a missing child of an existing group redirects. Under `url_prefix: "/"` the alternative hijacks host paths. | [dev_docs/guides/router-dispatch.md](dev_docs/guides/router-dispatch.md) |
 | Sitemap exclusion | The sitemap knobs live where core's Sitemap source reads them: `sitemap_exclude` is a top-level key on the `list_groups/0` group map and `metadata.sitemap_exclude` on the `list_posts/2` post map (version `data`, mapped from the latest version like `allow_version_access`). Publishing never filters for the sitemap itself; `integration/sitemap_source_test.exs` runs core's real source against both. | — |
+| Sitemap refresh | Publishing, unpublishing, and trashing or restoring a post with a live version call `SitemapRefresh.request/0`, which inserts core's `Sitemap.SchedulerWorker` job (the `regenerate_module_now/1` args, `source: "publishing"`) 30 s out and unique over the waiting jobs, because core's job is not unique: a bulk import queues one regeneration, not one per post. Guarded like every optional seam (`Code.ensure_loaded?` + `function_exported?` + rescue/catch, skipped while `sitemap_enabled` is off or Oban is not running); it never fails a publish. `integration/sitemap_refresh_test.exs`. | `@moduledoc` on `Publishing.SitemapRefresh` |
 | Per-group display settings | A new setting must be added in all five places (`Constants` → schema accessor → `merge_group_config`/`db_group_to_map` → edit form → `GroupSettings` spec) or the spec test fails; `update_group/3` stays lenient, `validate_group_settings/1` stays strict. | [dev_docs/guides/group-display-settings.md](dev_docs/guides/group-display-settings.md) |
 | Translatable group name | Overrides live in an isolated `data["name_i18n"]` map, never in the multilang helper's `data`-owning convention, which would clobber the display settings. The slug is never translated. | [dev_docs/guides/group-display-settings.md](dev_docs/guides/group-display-settings.md) |
 | Activity logging | An audit failure never crashes its mutation, and a changeset never reaches metadata. | [dev_docs/guides/activity-logging.md](dev_docs/guides/activity-logging.md) |
@@ -960,7 +982,7 @@ newest-created release as Latest and demotes the current one.
   `phoenix_kit_publishing_contents (version_uuid/group, language, url_slug)` for
   non-trashed rows, so a duplicate becomes impossible at the source instead of
   something the read path's auto-renamer cleans up. This is a shape change, so it
-  is V3 of `PhoenixKitPublishing.Migrations`; core needs nothing for a new
+  is V4 of `PhoenixKitPublishing.Migrations`; core needs nothing for a new
   index (see Database & migrations).
 - **Unify the two base→dialect resolvers.** `new_translation_request?/2` (against
   `post.available_languages`) and `Posts.resolve_language_to_dialect/1` (against

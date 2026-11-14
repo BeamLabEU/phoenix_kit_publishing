@@ -36,6 +36,12 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @scrollbar_styles Constants.scrollbar_styles()
   @default_listing_sort Constants.default_listing_sort()
   @listing_sorts Constants.listing_sorts()
+  @default_category_chips_position Constants.default_category_chips_position()
+  @category_chips_positions Constants.category_chips_positions()
+  @default_related_posts Constants.default_related_posts()
+  @related_posts Constants.related_posts_options()
+  @default_public_listing Constants.default_public_listing()
+  @public_listings Constants.public_listings()
   @default_listing_layout Constants.default_listing_layout()
   @listing_layouts Constants.listing_layouts()
   @default_timeline_granularity Constants.default_timeline_granularity()
@@ -334,7 +340,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
                         show_top_back_link listing_image_links listing_animations
                         show_prev_next search_enabled show_categories
                         views_enabled show_view_counts comments_enabled
-                        sitemap_exclude)
+                        sitemap_exclude listing_show_categories
+                        listing_category_filter)
   @enum_settings [
     {"featured_layout", @featured_layouts},
     {"featured_style", @band_styles},
@@ -344,6 +351,9 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     {"scroll_timeline_granularity", @timeline_granularities},
     {"listing_sort", @listing_sorts},
     {"listing_layout", @listing_layouts},
+    {"category_chips_position", @category_chips_positions},
+    {"related_posts", @related_posts},
+    {"public_listing", @public_listings},
     {"post_date_position", @post_date_positions},
     {"post_width", @post_widths},
     {"notes_style", @notes_styles}
@@ -842,6 +852,12 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "show_prev_next" => Map.get(data, "show_prev_next", false),
       "search_enabled" => Map.get(data, "search_enabled", false),
       "show_categories" => Map.get(data, "show_categories", false),
+      "category_chips_position" =>
+        Map.get(data, "category_chips_position", @default_category_chips_position),
+      "related_posts" => Map.get(data, "related_posts", @default_related_posts),
+      "listing_show_categories" => Map.get(data, "listing_show_categories", false),
+      "listing_category_filter" => Map.get(data, "listing_category_filter", false),
+      "public_listing" => Map.get(data, "public_listing", @default_public_listing),
       "views_enabled" => Map.get(data, "views_enabled", false),
       "show_view_counts" => Map.get(data, "show_view_counts", false),
       "comments_enabled" => Map.get(data, "comments_enabled", false),

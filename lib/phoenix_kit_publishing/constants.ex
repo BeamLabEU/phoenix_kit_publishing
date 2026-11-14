@@ -303,6 +303,39 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @spec default_listing_sort() :: String.t()
   def default_listing_sort, do: @default_listing_sort
 
+  @category_chips_positions ["top", "date", "bottom"]
+  @default_category_chips_position "bottom"
+
+  @doc ~S|Where the post page shows its category chips: "top" (above the title), "date" (beside the date line) or "bottom" (after the content).|
+  @spec category_chips_positions() :: [String.t()]
+  def category_chips_positions, do: @category_chips_positions
+
+  @doc ~S|Default category-chip position ("bottom", where they always were).|
+  @spec default_category_chips_position() :: String.t()
+  def default_category_chips_position, do: @default_category_chips_position
+
+  @related_posts ["off", "3", "6"]
+  @default_related_posts "off"
+
+  @doc ~S|How many "more from this category" posts the post page lists: "off", "3" or "6".|
+  @spec related_posts_options() :: [String.t()]
+  def related_posts_options, do: @related_posts
+
+  @doc ~S|Default for related posts ("off").|
+  @spec default_related_posts() :: String.t()
+  def default_related_posts, do: @default_related_posts
+
+  @public_listings ["publishing", "host", "host_with_archives"]
+  @default_public_listing "publishing"
+
+  @doc ~S|Who serves a group's public listing pages: "publishing" (this module), "host" (the bare listing path goes to the host's router) or "host_with_archives" (the category and tag archives too). Posts and feeds are always this module's.|
+  @spec public_listings() :: [String.t()]
+  def public_listings, do: @public_listings
+
+  @doc ~S|Default public-listing owner ("publishing").|
+  @spec default_public_listing() :: String.t()
+  def default_public_listing, do: @default_public_listing
+
   @listing_layouts ["grid", "list", "minimal"]
   @default_listing_layout "grid"
 

@@ -46,7 +46,11 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Renderer do
     do: {:ok, PhoenixKit.Modules.Shared.Components.Subheadline}
 
   defp resolve_component(:cta), do: {:ok, PhoenixKit.Modules.Shared.Components.CTA}
-  defp resolve_component(:image), do: {:ok, PhoenixKit.Modules.Shared.Components.Image}
+  # Publishing's wrapper: core's Image unchanged, plus the dark_src /
+  # dark_file_uuid light/dark pair.
+  defp resolve_component(:image),
+    do: {:ok, PhoenixKit.Modules.Publishing.PageBuilder.Components.Image}
+
   defp resolve_component(:video), do: {:ok, PhoenixKit.Modules.Shared.Components.Video}
 
   defp resolve_component(:audio),

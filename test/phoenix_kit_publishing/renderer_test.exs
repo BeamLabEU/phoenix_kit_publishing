@@ -823,4 +823,33 @@ defmodule PhoenixKit.Modules.Publishing.RendererTest do
       assert HTML.extract_excerpt(~S(see \<Image/> here)) == "see <Image/> here"
     end
   end
+
+  describe "the excerpt of a body showing a component in code" do
+    alias PhoenixKit.Modules.Publishing.Shared
+    alias PhoenixKit.Modules.Publishing.Web.HTML
+
+    test "an inline code span keeps its tag-shaped text" do
+      # Tag stripping leaves a space where `</code>` stood, as for any code span.
+      assert HTML.extract_excerpt("show their picture (also inside a `<Image>`)") =~
+               "show their picture (also inside a <Image>"
+
+      assert HTML.extract_excerpt("use ``<CTA>Go</CTA>`` for a button") ==
+               "use <CTA>Go</CTA> for a button"
+    end
+
+    test "a fenced block keeps its tag-shaped text" do
+      assert Shared.strip_components("```\n<Hero title=\"x\">Hi</Hero>\n```") ==
+               "```\n<Hero title=\"x\">Hi</Hero>\n```"
+
+      assert HTML.extract_excerpt("<!-- more -->" |> then(&("```\n<Image/>\n```\n" <> &1))) ==
+               "<Image/>"
+    end
+
+    test "a real component outside code is still stripped" do
+      assert Shared.strip_components(~s(`<Image>` and <Image src="/a.png"/> and <CTA>Go</CTA>)) ==
+               "`<Image>` and   and  "
+
+      refute Shared.strip_components("a `x` b <Image/>") =~ <<0>>
+    end
+  end
 end

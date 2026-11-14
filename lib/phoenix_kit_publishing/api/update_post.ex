@@ -10,11 +10,12 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
     DBStorage,
     LanguageHelpers,
     Posts,
-    PublishingContent
+    PublishingContent,
+    PublishingVersion
   }
 
   @tool "publishing.update_post"
-  @fields ~w(title content description seo_title excerpt featured_image_id featured sitemap_exclude og_title og_description og_image_id category_ids slug)
+  @fields ~w(title content description seo_title excerpt featured_image_id featured sitemap_exclude og_title og_description og_image_id category_ids custom_fields slug)
   @text_fields ~w(title content description seo_title excerpt og_title og_description)
   @image_fields ~w(featured_image_id og_image_id)
   @scope %{
@@ -30,10 +31,11 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
     "featured" => "version",
     "sitemap_exclude" => "version",
     "category_ids" => "version",
+    "custom_fields" => "version",
     "slug" => "post"
   }
   @param %{"featured_image_id" => "featured_image_uuid", "category_ids" => "category_uuids"}
-  @direct ~w(title content description seo_title excerpt featured_image_id featured sitemap_exclude)
+  @direct ~w(title content description seo_title excerpt featured_image_id featured sitemap_exclude custom_fields)
 
   @spec call(map(), map()) ::
           {:ok, map()} | {:preview, map(), String.t()} | {:error, atom(), String.t(), map()}
@@ -219,6 +221,9 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
   defp current("slug", t), do: t.hit.db_post.slug
   defp current("category_ids", t), do: version_data(t)["category_uuids"] || []
 
+  defp current("custom_fields", t),
+    do: PublishingVersion.normalize_custom_fields(version_data(t)["custom_fields"])
+
   defp current(field, t) when field in ~w(featured sitemap_exclude),
     do: version_data(t)[field] || false
 
@@ -232,6 +237,11 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
 
   defp desired("category_ids", _t, categories, _slug), do: categories
   defp desired("slug", _t, _categories, slug), do: slug
+
+  # The whole map is replaced; null clears it. Compared as stored.
+  defp desired("custom_fields", t, _categories, _slug),
+    do: PublishingVersion.normalize_custom_fields(t.input["custom_fields"])
+
   defp desired(field, t, _categories, _slug), do: t.input[field]
 
   # nil and "" are equal for the "unchanged" test; lists compare as sets.

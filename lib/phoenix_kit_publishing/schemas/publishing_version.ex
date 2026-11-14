@@ -19,6 +19,11 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   - `tags` - List of tag strings
   - `description` - SEO meta description
   - `allow_version_access` - Whether older versions are publicly accessible
+  - `custom_fields` - A host's own per-post fields, a map of string keys
+    (`[a-z0-9_]`, at most #{40} characters) to string values (at most 2 000
+    characters), at most 30 of them: "package" and "version" on a release
+    post, say. Written through `normalize_custom_fields/1`; read with
+    `get_custom_fields/1` and on the post map as `metadata.custom_fields`.
   - `sitemap_exclude` - Leave this post out of the site's sitemap (core's
     Sitemap source reads it as `metadata.sitemap_exclude` on the post map)
   - `featured` - Whether this post is featured (pinned to the top of the group
@@ -168,6 +173,88 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   @spec get_allow_version_access(t()) :: boolean()
   def get_allow_version_access(%__MODULE__{data: data}),
     do: Map.get(data, "allow_version_access", false)
+
+  @max_custom_fields 30
+  @max_custom_key 40
+  @max_custom_value 2_000
+
+  @doc "The post's custom fields (a map, `%{}` when it has none)."
+  @spec get_custom_fields(t()) :: %{optional(String.t()) => String.t()}
+  def get_custom_fields(%__MODULE__{data: data}),
+    do: normalize_custom_fields(Map.get(data, "custom_fields"))
+
+  @doc """
+  Custom fields as stored: from a map, or from a list of `%{"key", "value"}`
+  rows (the editor's shape) where a later row wins. Keys are trimmed,
+  lowercased and reduced to `[a-z0-9_]` (other characters become `_`); a
+  blank key or value is dropped; a value is cut at #{@max_custom_value}
+  characters; at most #{@max_custom_fields} fields are kept, by key order.
+  Anything else is `%{}`.
+  """
+  @spec normalize_custom_fields(term()) :: %{optional(String.t()) => String.t()}
+  def normalize_custom_fields(fields) when is_map(fields) and not is_struct(fields),
+    do: fields |> Enum.to_list() |> pairs_to_fields()
+
+  def normalize_custom_fields(rows) when is_list(rows) do
+    rows
+    |> Enum.flat_map(fn
+      %{"key" => key, "value" => value} -> [{key, value}]
+      %{key: key, value: value} -> [{key, value}]
+      {key, value} -> [{key, value}]
+      _ -> []
+    end)
+    |> pairs_to_fields()
+  end
+
+  def normalize_custom_fields(_fields), do: %{}
+
+  @doc "A custom field key as stored, or nil when nothing of it is left."
+  @spec custom_field_key(term()) :: String.t() | nil
+  def custom_field_key(key) when is_binary(key) or is_atom(key) do
+    key =
+      key
+      |> to_string()
+      |> String.trim()
+      |> String.downcase()
+      |> String.replace(~r/[^a-z0-9_]+/, "_")
+      |> String.trim("_")
+      |> String.slice(0, @max_custom_key)
+
+    if key == "", do: nil, else: key
+  end
+
+  def custom_field_key(_key), do: nil
+
+  defp pairs_to_fields(pairs) do
+    pairs
+    |> Enum.flat_map(fn {key, value} ->
+      with key when is_binary(key) <- custom_field_key(key),
+           value when is_binary(value) <- custom_field_value(value) do
+        [{key, value}]
+      else
+        _ -> []
+      end
+    end)
+    |> Map.new()
+    |> Enum.sort()
+    |> Enum.take(@max_custom_fields)
+    |> Map.new()
+  end
+
+  # A NUL byte or invalid UTF-8 would make Postgres refuse the JSONB.
+  defp custom_field_value(value) when is_binary(value) do
+    value = if String.valid?(value), do: String.replace(value, <<0>>, ""), else: ""
+
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> String.slice(trimmed, 0, @max_custom_value)
+    end
+  end
+
+  defp custom_field_value(value) when is_number(value) or is_boolean(value),
+    do: custom_field_value(to_string(value))
+
+  defp custom_field_value(_value), do: nil
 
   @doc "Returns whether this post is left out of the sitemap."
   @spec get_sitemap_exclude(t()) :: boolean()

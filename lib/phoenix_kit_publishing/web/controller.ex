@@ -31,6 +31,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.Categories
   alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.DBStorage
+  alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Views
@@ -445,11 +447,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp dispatch_parsed_path(conn, {:slug_post, group_slug, post_slug}, language),
     do: handle_post(conn, group_slug, {:slug, post_slug}, language)
 
-  defp dispatch_parsed_path(conn, {:timestamp_post, group_slug, date, time}, language),
-    do: handle_post(conn, group_slug, {:timestamp, date, time}, language)
+  defp dispatch_parsed_path(conn, {:timestamp_post, group_slug, date, time}, language) do
+    case converted_group_url(group_slug, date, time, language) do
+      nil -> handle_post(conn, group_slug, {:timestamp, date, time}, language)
+      url -> redirect_301(conn, url)
+    end
+  end
 
-  defp dispatch_parsed_path(conn, {:date_only_post, group_slug, date}, language),
-    do: handle_date_only_url(conn, group_slug, date, language)
+  defp dispatch_parsed_path(conn, {:date_only_post, group_slug, date}, language) do
+    case converted_group_url(group_slug, date, nil, language) do
+      nil -> handle_date_only_url(conn, group_slug, date, language)
+      url -> redirect_301(conn, url)
+    end
+  end
 
   defp dispatch_parsed_path(conn, {:versioned_post, group_slug, post_slug, version}, language),
     do: handle_versioned_post(conn, group_slug, post_slug, version, language)
@@ -479,6 +489,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # ============================================================================
 
   defp handle_group_listing(conn, group_slug, language) do
+    # `?page=` is a query param, like `?q=` (see `search_param/1`): fetched
+    # here, so a host endpoint without Plug.Parsers still pages.
+    conn = Plug.Conn.fetch_query_params(conn)
+
     result =
       case search_param(conn) do
         nil -> Listing.render_group_listing(conn, group_slug, language, conn.params)
@@ -506,6 +520,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:per_page, assigns.per_page)
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
+        |> assign(:pagination_style, pagination_style())
+        |> assign(:category_index, Map.get(assigns, :category_index))
+        |> assign(:category_filter, Map.get(assigns, :category_filter, []))
+        |> assign(:filter_categories, Map.get(assigns, :filter_categories, []))
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:search_query, Map.get(assigns, :search_query))
         |> assign(:og, %{
@@ -635,15 +653,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:per_page, assigns.per_page)
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
+        |> assign(:pagination_style, pagination_style())
+        |> assign(:category_index, Map.get(assigns, :category_index))
+        |> assign(:category_filter, Map.get(assigns, :category_filter, []))
+        |> assign(:filter_categories, Map.get(assigns, :filter_categories, []))
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:search_query, nil)
         |> assign(:term_filter, assigns.term_filter)
-        |> assign(:og, %{
-          title: assigns.page_title,
-          url: base_url <> listing_url,
-          locale: og_locale(assigns.current_language),
-          type: "website"
-        })
+        |> assign(
+          :og,
+          %{
+            title: assigns.page_title,
+            url: base_url <> listing_url,
+            locale: og_locale(assigns.current_language),
+            type: "website"
+          }
+          |> maybe_put_description(Map.get(assigns, :meta_description))
+        )
         |> maybe_assign_term_admin_edit(term, group_slug)
         |> render(:index)
 
@@ -654,6 +680,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         handle_not_found(conn, reason)
     end
   end
+
+  defp maybe_put_description(og, description) when is_binary(description) and description != "",
+    do: Map.put(og, :description, description)
+
+  defp maybe_put_description(og, _description), do: og
 
   # Feeds serve the reader's backlog: one page of the listing is too little
   # (a catch-up reader misses posts), unbounded is abuse-prone. 50 mirrors
@@ -715,6 +746,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           assigns.post
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_related_posts(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
@@ -796,6 +828,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           assigns.post
         )
         |> assign_post_categories(Map.get(assigns, :group, %{}), assigns.post)
+        |> assign_related_posts(Map.get(assigns, :group, %{}), assigns.post)
         |> track_post_view(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_notes(Map.get(assigns, :group, %{}), assigns.post)
         |> assign_post_comments(Map.get(assigns, :group, %{}), assigns.post)
@@ -843,6 +876,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     Settings.get_boolean_setting("publishing_public_enabled", true)
   end
 
+  # The site's pager style (`publishing_pagination_style`), read per request
+  # through the settings cache: it is not part of any cached listing.
+  defp pagination_style do
+    PublishingHTML.pagination_style(Settings.get_setting_cached("publishing_pagination_style"))
+  end
+
   defp set_gettext_locale(language) do
     # Sets both: core's backend for host-rendered chrome (error pages, root
     # layout) and this module's own backend for publishing's own strings
@@ -863,6 +902,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # Issue the canonical 301 while preserving the request's query string — a
   # `?utm_source=…` link that hits a canonical/locale redirect must not have its
   # campaign params stripped.
+  # A date URL in a group converted to slug mode (ModeConversion): the post
+  # still carries the date and time it was published under, so the old URL
+  # finds it and answers with a 301 to its slug URL. nil (the usual path)
+  # for a timestamp group, or no post at that date.
+  defp converted_group_url(group_slug, date, time, language) do
+    with "slug" <- Groups.get_group_mode(group_slug),
+         {:ok, date} <- Date.from_iso8601(date),
+         {:ok, time} <- parse_url_time(time),
+         # only a live post: a draft's old URL must not reveal its new one
+         %{slug: slug, active_version_uuid: live} when is_binary(slug) and not is_nil(live) <-
+           DBStorage.get_post_by_datetime(group_slug, date, time) do
+      PublishingHTML.build_post_url(group_slug, %{mode: "slug", slug: slug}, language)
+    else
+      _ -> nil
+    end
+  end
+
+  defp parse_url_time(nil), do: {:ok, nil}
+  defp parse_url_time(time), do: Time.from_iso8601(time <> ":00")
+
   defp redirect_301(conn, url) do
     conn
     |> put_status(301)
@@ -934,11 +993,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   end
 
   # The per-language og:description default: a plain-text excerpt of the
-  # language's own body. nil (not "") when there is nothing to derive, so the
-  # caller's `||` chain can fall through to the version-level description.
+  # language's own body, shortened to a search-result length (~160
+  # graphemes, at a sentence end when one fits). nil (not "") when there is
+  # nothing to derive, so the caller's `||` chain can fall through to the
+  # version-level description. An explicit description is never trimmed.
   defp derived_og_description(post) do
     case PublishingHTML.extract_excerpt(post.content) do
-      text when is_binary(text) and text != "" -> String.slice(text, 0, 300)
+      text when is_binary(text) and text != "" -> PublishingHTML.trim_description(text)
       _ -> nil
     end
   end
@@ -1100,6 +1161,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       show_top_back_link: true,
       show_prev_next: false,
       show_categories: false,
+      category_chips_position: Constants.default_category_chips_position(),
+      related_posts: Constants.default_related_posts(),
       show_view_counts: false
     }
   end
@@ -1185,6 +1248,68 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # Chronological prev/next links for the post page, gated on the group's
   # show_prev_next setting so the (cache-backed) whole-group pass only runs
   # for groups that display the nav. Neighbors are same-group + same-language.
+  # "More from this category" (the group's related_posts setting): the newest
+  # other posts of this language sharing one of this post's categories. Off,
+  # or a post without categories, costs nothing.
+  defp assign_related_posts(conn, group, post) do
+    limit = related_limit(group)
+    uuids = MapSet.new(Map.get(post.metadata || %{}, :category_uuids) || [])
+    language = conn.assigns[:current_language]
+
+    if limit > 0 and MapSet.size(uuids) > 0 and is_binary(language) do
+      related = related_posts(post, uuids, language, limit)
+      date_counts = Listing.group_date_counts(post.group)
+
+      conn
+      |> assign(
+        :related_post_links,
+        Enum.map(related, &related_link(&1, post.group, language, date_counts))
+      )
+      |> assign(:related_category, related_category(post.group, MapSet.to_list(uuids)))
+    else
+      conn
+      |> assign(:related_post_links, [])
+      |> assign(:related_category, nil)
+    end
+  end
+
+  defp related_limit(group) do
+    case Map.get(group, "related_posts") do
+      "3" -> 3
+      "6" -> 6
+      _ -> 0
+    end
+  end
+
+  defp related_posts(post, uuids, language, limit) do
+    post.group
+    |> Listing.chronological_posts(language)
+    |> Enum.reject(&(&1.uuid == post.uuid))
+    |> Enum.filter(&shares_category?(&1, uuids))
+    |> Enum.take(limit)
+  end
+
+  defp shares_category?(post, uuids),
+    do: Enum.any?(post[:category_uuids] || [], &MapSet.member?(uuids, &1))
+
+  defp related_link(post, group_slug, language, date_counts) do
+    %{
+      title: get_in(post, [:metadata, :title]) || Constants.default_title(),
+      url: PublishingHTML.build_post_url(group_slug, post, language, date_counts),
+      published_at: get_in(post, [:metadata, :published_at])
+    }
+  end
+
+  # The heading names the category when the post has exactly one.
+  defp related_category(group_slug, [uuid]) do
+    case Categories.categories_by_uuids(group_slug, [uuid]) do
+      [category] -> category
+      _ -> nil
+    end
+  end
+
+  defp related_category(_group_slug, _uuids), do: nil
+
   defp assign_post_neighbors(conn, group, group_slug, language, post) do
     if Map.get(group, "show_prev_next", false) do
       %{newer: newer, older: older, date_counts: date_counts} =

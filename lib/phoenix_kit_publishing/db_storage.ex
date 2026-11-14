@@ -229,6 +229,23 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc """
+  The uuid of the post holding a timestamp slot in the group, trashed or not
+  (the unique index covers both), or nil when the slot is free.
+  """
+  @spec timestamp_slot_holder(String.t(), Date.t(), Time.t()) :: String.t() | nil
+  def timestamp_slot_holder(group_slug, date, time) do
+    normalized_time = %Time{hour: time.hour, minute: time.minute, second: 0, microsecond: {0, 0}}
+
+    from(p in PublishingPost,
+      join: g in assoc(p, :group),
+      where: g.slug == ^group_slug and p.post_date == ^date and p.post_time == ^normalized_time,
+      select: p.uuid,
+      limit: 1
+    )
+    |> repo().one()
+  end
+
+  @doc """
   Whether a post in the group, trashed or not, holds `slug`. The unique index
   `idx_publishing_posts_group_slug` covers trashed posts too (a trashed post
   can be restored under its slug), so a probe that skips them hands out a slug

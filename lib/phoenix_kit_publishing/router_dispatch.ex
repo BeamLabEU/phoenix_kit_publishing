@@ -51,6 +51,7 @@ defmodule PhoenixKitPublishing.RouterDispatch do
   alias PhoenixKit.ModuleRegistry
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
 
   @internal_prefix "__phoenix_kit_publishing_dispatch"
   @localized_segment "localized"
@@ -128,27 +129,30 @@ defmodule PhoenixKitPublishing.RouterDispatch do
 
   def maybe_rewrite(%Plug.Conn{path_info: path_info} = conn, url_prefix)
       when is_binary(url_prefix) do
+    # The internal scope lives under PhoenixKit's url_prefix; the public
+    # pages under the public prefix (`PublishingHTML.public_url_prefix/0`),
+    # the same unless the host set `:public_url_prefix`. A request under
+    # either is served: under the kit prefix it is an old or core-built URL
+    # (the sitemap's), which the controllers' canonical check then 301s to
+    # the public one.
     prefix_segments = split_prefix(url_prefix)
+    public_segments = split_prefix(PublishingHTML.public_url_prefix())
 
-    case strip_prefix(path_info, prefix_segments) do
-      {:ok, rest} ->
-        cond do
-          # Localized shape `/:language/:group` — segment 0 MUST be a language the
-          # site actually serves, else any host URL `/<seg>/<group-named-seg>` (e.g.
-          # `/company/news`, `/api/news`) would be hijacked into publishing.
-          localized_locale?(candidate_at(rest, 0)) and known_group?(candidate_at(rest, 1)) ->
-            {:rewrite, rewrite(conn, @localized_segment, prefix_segments, rest)}
-
-          known_group?(candidate_at(rest, 0)) ->
-            {:rewrite, rewrite(conn, @root_segment, prefix_segments, rest)}
-
-          true ->
-            :pass
-        end
-
-      :mismatch ->
-        :pass
-    end
+    # The longer prefix first: with the kit at /phoenix_kit and the public
+    # pages at /, `/phoenix_kit/news/x` is the kit-prefixed URL of a news
+    # post, never a post "news" of a group named after the kit's segment.
+    [public_segments, prefix_segments]
+    |> Enum.uniq()
+    |> Enum.sort_by(&length/1, :desc)
+    |> Enum.find_value(:pass, fn segments ->
+      with {:ok, rest} <- strip_prefix(path_info, segments),
+           {:rewrite, _conn} = rewritten <-
+             rest |> dispatch_target() |> dispatch(conn, prefix_segments, rest) do
+        rewritten
+      else
+        _ -> nil
+      end
+    end)
   end
 
   # A URL locale segment is valid only if it's an enabled language, or a base code
@@ -216,25 +220,77 @@ defmodule PhoenixKitPublishing.RouterDispatch do
     end
   end
 
-  @spec known_group?(String.t() | nil) :: boolean()
-  defp known_group?(nil), do: false
+  defp dispatch(nil, _conn, _prefix_segments, _rest), do: :pass
 
-  defp known_group?(slug) when is_binary(slug) do
-    not reserved_by_other_module?(slug) and
+  defp dispatch({segment, group, group_path}, conn, prefix_segments, rest) do
+    if host_owned?(group, group_path),
+      do: :pass,
+      else: {:rewrite, rewrite(conn, segment, prefix_segments, rest)}
+  end
+
+  # Localized shape `/:language/:group` — segment 0 MUST be a language the
+  # site actually serves, else any host URL `/<seg>/<group-named-seg>` (e.g.
+  # `/company/news`, `/api/news`) would be hijacked into publishing. Returns
+  # the internal scope, the group, and the path from the group segment on.
+  defp dispatch_target(rest) do
+    with false <- localized_locale?(candidate_at(rest, 0)),
+         %{} = group <- known_group(candidate_at(rest, 0)) do
+      {@root_segment, group, rest}
+    else
+      true ->
+        case known_group(candidate_at(rest, 1)) do
+          %{} = group -> {@localized_segment, group, tl(rest)}
+          nil -> root_target(rest)
+        end
+
+      nil ->
+        nil
+    end
+  end
+
+  # A locale-looking first segment that is ALSO a group slug (and no group
+  # follows it) is that group.
+  defp root_target(rest) do
+    case known_group(candidate_at(rest, 0)) do
+      %{} = group -> {@root_segment, group, rest}
+      nil -> nil
+    end
+  end
+
+  # A group whose `public_listing` hands its listing pages to the host: the
+  # bare listing path, and with "host_with_archives" its category and tag
+  # archives (`/group/category/x`), are left to the host's router. Post
+  # pages and every feed (`…/feed.xml`) stay this module's.
+  defp host_owned?(group, [_group_slug]),
+    do: Map.get(group, "public_listing") in ["host", "host_with_archives"]
+
+  defp host_owned?(group, [_group_slug, type, _value]) when type in ["category", "tag"],
+    do: Map.get(group, "public_listing") == "host_with_archives"
+
+  defp host_owned?(_group, _path), do: false
+
+  @spec known_group(String.t() | nil) :: map() | nil
+  defp known_group(nil), do: nil
+
+  defp known_group(slug) when is_binary(slug) do
+    if reserved_by_other_module?(slug) do
+      nil
+    else
       case Groups.fetch_group(slug) do
-        {:ok, _group} -> true
-        _ -> false
+        {:ok, group} -> group
+        _ -> nil
       end
+    end
   rescue
     # DB unavailable, table missing during install, etc. — better to
     # pass through so host routes still work than to crash the request.
-    _ -> false
+    _ -> nil
   catch
     # Sandbox shutdown mid-test fires an :exit signal that `rescue` doesn't
     # catch. The dispatch override runs on every request, including during
     # tests that share the sandbox; matches the canonical `enabled?/0`
     # pattern (see phoenix_kit_hello_world commit c1c2674).
-    :exit, _reason -> false
+    :exit, _reason -> nil
   end
 
   # A group slug that collides with another module's reserved top-level route

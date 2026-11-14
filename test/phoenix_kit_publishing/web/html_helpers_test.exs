@@ -271,6 +271,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTMLHelpersTest do
     end
   end
 
+  test "an excerpt keeps a component shown in a fence that holds a blank line" do
+    body = "```\n<Image src=\"/x.png\"/>\n\n```\n\nReal text"
+
+    assert HTML.extract_excerpt(body) =~
+             ~s(<Image src="/x.png"/>)
+
+    for fence <- ["~~~", "````"] do
+      body = "#{fence}\n<Image src=\"/y.png\"/>\n\n#{fence}\n\nReal text"
+      assert HTML.extract_excerpt(body) =~ ~s(<Image src="/y.png"/>), fence
+    end
+  end
+
   describe "pagination_window/2" do
     alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
 
@@ -295,6 +307,53 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTMLHelpersTest do
 
       assert PublishingHTML.pagination_window(250, 250) == [1, :gap, 248, 249, 250]
       assert PublishingHTML.pagination_window(4, 9) == [1, 2, 3, 4, 5, 6, :gap, 9]
+    end
+  end
+
+  describe "trim_description/2" do
+    test "text within the limit is returned whole" do
+      text = String.duplicate("a", 160)
+      assert HTML.trim_description(text) == text
+      assert HTML.trim_description("  Short.  ") == "Short."
+    end
+
+    test "a long text is cut at the last sentence end inside 160 graphemes" do
+      first = "This first sentence runs for a while so that it is long enough to count."
+      second = " And the second one also fits inside the limit, just about, here."
+      text = first <> second <> " A third sentence would push it far past the limit."
+
+      result = HTML.trim_description(text)
+      assert result == first <> second
+      assert String.length(result) <= 160
+    end
+
+    test "without a usable sentence end it cuts at a word boundary with an ellipsis" do
+      text = "Hi. " <> String.duplicate("word ", 60)
+      result = HTML.trim_description(text)
+
+      assert String.ends_with?(result, "word…")
+      assert String.length(result) <= 160
+      refute result =~ "wor…"
+    end
+
+    test "a full stop inside a number is not a sentence end" do
+      text = String.duplicate("x", 100) <> " pi is 3.14159 " <> String.duplicate("long ", 20)
+      refute HTML.trim_description(text) =~ ~r/3\.$/
+    end
+
+    test "lengths are graphemes, so multibyte text is never split" do
+      text = String.duplicate("é", 100) <> " " <> String.duplicate("日本語 ", 40)
+      result = HTML.trim_description(text)
+
+      assert String.valid?(result)
+      assert String.length(result) <= 160
+      assert byte_size(result) > 160
+      assert String.ends_with?(result, "日本語…")
+    end
+
+    test "a single word longer than the limit is cut hard" do
+      result = HTML.trim_description(String.duplicate("z", 400))
+      assert result == String.duplicate("z", 159) <> "…"
     end
   end
 end

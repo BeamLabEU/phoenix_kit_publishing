@@ -27,16 +27,16 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.PublishingVersion
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.SitemapRefresh
   alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.StaleFixer
   alias PhoenixKit.Utils.Date, as: UtilsDate
 
   # Suppress dialyzer false positives for pattern matches
   @dialyzer {:nowarn_function, create_post: 2}
-
-  @max_timestamp_attempts 60
 
   @doc """
   Returns true when the given post is a DB-backed post (has a UUID).
@@ -252,6 +252,180 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
         other
     end
+  end
+
+  @import_version_keys ~w(description seo_title excerpt featured featured_image_uuid
+                           og_title og_description og_image_uuid sitemap_exclude)
+
+  @doc """
+  Creates a post with everything it carries, in one call: for an importer, a
+  migration from another CMS, or a site that writes posts from code. See
+  `PhoenixKit.Modules.Publishing.import_post/3` for the attrs and options.
+  """
+  @spec import_post(String.t(), map(), map() | keyword()) :: {:ok, map()} | {:error, term()}
+  def import_post(group_slug, attrs, opts \\ %{}) when is_map(attrs) do
+    attrs = Map.new(attrs, fn {key, value} -> {to_string(key), value} end)
+    opts = Map.new(opts)
+
+    with :ok <- check_import_shapes(attrs),
+         {:ok, published_at} <- import_published_at(attrs["published_at"]),
+         {:ok, category_uuids} <- import_category_uuids(group_slug, attrs),
+         {:ok, post} <-
+           create_post(
+             group_slug,
+             Map.merge(opts, Map.take(attrs, ~w(title content slug)) |> atomize_create())
+           ),
+         :ok <- backdate(group_slug, post, published_at),
+         {:ok, post} <- read_post_by_uuid(post[:uuid]),
+         {:ok, _} <-
+           update_post(
+             group_slug,
+             post,
+             import_version_params(attrs, category_uuids),
+             Map.put(opts, :publish, false)
+           ),
+         :ok <- maybe_publish_import(group_slug, post, Map.get(opts, :publish, true), opts) do
+      read_post_by_uuid(post[:uuid])
+    end
+  end
+
+  # Every attr's shape is checked before anything is written, so a bad one
+  # never leaves a half-made post behind.
+  @import_text_keys ~w(title content slug description seo_title excerpt featured_image_uuid
+                       og_title og_description og_image_uuid)
+
+  defp check_import_shapes(attrs) do
+    checks = [
+      Enum.all?(@import_text_keys, &(is_nil(attrs[&1]) or is_binary(attrs[&1]))),
+      is_nil(attrs["og"]) or
+        (is_map(attrs["og"]) and
+           Enum.all?(Map.values(attrs["og"]), &(is_nil(&1) or is_binary(&1)))),
+      Enum.all?(~w(category_slugs category_uuids), &string_list?(attrs[&1])),
+      is_nil(attrs["custom_fields"]) or is_map(attrs["custom_fields"]) or
+        is_list(attrs["custom_fields"])
+    ]
+
+    if Enum.all?(checks), do: :ok, else: {:error, :invalid_format}
+  end
+
+  defp string_list?(nil), do: true
+  defp string_list?(list) when is_list(list), do: Enum.all?(list, &is_binary/1)
+  defp string_list?(_other), do: false
+
+  defp atomize_create(attrs),
+    do: Map.new(attrs, fn {key, value} -> {String.to_existing_atom(key), value} end)
+
+  defp import_published_at(nil), do: {:ok, nil}
+  defp import_published_at(%DateTime{} = at), do: {:ok, DateTime.truncate(at, :second)}
+
+  defp import_published_at(at) when is_binary(at) do
+    case DateTime.from_iso8601(at) do
+      {:ok, dt, _offset} -> {:ok, DateTime.truncate(dt, :second)}
+      _ -> {:error, :invalid_published_at}
+    end
+  end
+
+  defp import_published_at(_at), do: {:error, :invalid_published_at}
+
+  # Categories by uuid ("category_uuids") or by slug ("category_slugs"); a slug
+  # the group does not have refuses the import before anything is written.
+  defp import_category_uuids(group_slug, attrs) do
+    slugs = List.wrap(attrs["category_slugs"])
+    uuids = List.wrap(attrs["category_uuids"])
+
+    if slugs == [] do
+      {:ok, uuids}
+    else
+      by_slug = Map.new(Categories.list_categories(group_slug), &{&1.slug, &1.uuid})
+
+      case Enum.reject(slugs, &Map.has_key?(by_slug, &1)) do
+        [] -> {:ok, Enum.uniq(uuids ++ Enum.map(slugs, &Map.fetch!(by_slug, &1)))}
+        _missing -> {:error, :category_not_found}
+      end
+    end
+  end
+
+  defp import_version_params(attrs, category_uuids) do
+    attrs
+    |> Map.take(@import_version_keys)
+    |> Map.merge(import_og(attrs))
+    |> Map.reject(fn {_key, value} -> is_nil(value) end)
+    |> put_unless_empty("category_uuids", category_uuids)
+    |> put_present(attrs, "custom_fields")
+  end
+
+  # `og: %{title, description, image_uuid}`, or the flat og_* keys (which win).
+  defp import_og(attrs) do
+    og = Map.new(attrs["og"] || %{}, fn {key, value} -> {to_string(key), value} end)
+
+    %{
+      "og_title" => attrs["og_title"] || og["title"],
+      "og_description" => attrs["og_description"] || og["description"],
+      "og_image_uuid" => attrs["og_image_uuid"] || og["image_uuid"]
+    }
+  end
+
+  defp put_unless_empty(params, _key, []), do: params
+  defp put_unless_empty(params, key, value), do: Map.put(params, key, value)
+
+  defp put_present(params, attrs, key) do
+    if Map.has_key?(attrs, key), do: Map.put(params, key, attrs[key]), else: params
+  end
+
+  # A past (or future) publish time: the version's published_at is the
+  # instant given; a timestamp post's URL minute is that instant on the
+  # site's wall clock, or the nearest free minute around it (earlier first,
+  # see find_available_timestamp/4).
+  defp backdate(_group_slug, _post, nil), do: :ok
+
+  defp backdate(group_slug, post, %DateTime{} = published_at) do
+    db_post = DBStorage.get_post_by_uuid(post[:uuid])
+    version = DBStorage.get_version(post[:uuid], 1)
+
+    with {:ok, _} <- DBStorage.update_version(version, %{published_at: published_at}),
+         {:ok, _} <- backdate_slot(group_slug, db_post, published_at) do
+      :ok
+    end
+  end
+
+  # Another post can take the chosen minute between the search and the
+  # update (two imports at once): the unique index refuses it, and the search
+  # runs again, a few times.
+  defp backdate_slot(group_slug, db_post, published_at, attempt \\ 1)
+
+  defp backdate_slot(group_slug, %{mode: "timestamp"} = db_post, published_at, attempt) do
+    wall = shift_to_site_timezone(published_at)
+    time = %Time{hour: wall.hour, minute: wall.minute, second: 0, microsecond: {0, 0}}
+
+    {date, time} =
+      find_available_timestamp(group_slug, DateTime.to_date(wall), time, db_post.uuid)
+
+    case DBStorage.update_post(db_post, %{post_date: date, post_time: time}) do
+      {:error, %Ecto.Changeset{} = changeset} when attempt < 5 ->
+        if slot_taken_error?(changeset),
+          do: backdate_slot(group_slug, db_post, published_at, attempt + 1),
+          else: {:error, changeset}
+
+      result ->
+        result
+    end
+  end
+
+  defp backdate_slot(_group_slug, db_post, _published_at, _attempt), do: {:ok, db_post}
+
+  # Only the slot's own index: a backdate writes nothing else that is unique.
+  defp slot_taken_error?(changeset) do
+    Enum.any?(changeset.errors, fn {_field, {_message, meta}} ->
+      meta[:constraint] == :unique and
+        meta[:constraint_name] == "idx_publishing_posts_group_date_time_unique"
+    end)
+  end
+
+  defp maybe_publish_import(_group_slug, _post, false, _opts), do: :ok
+
+  defp maybe_publish_import(group_slug, post, _publish, opts) do
+    publish_opts = Enum.reject([actor_uuid: ActivityLog.actor_uuid(opts)], &is_nil(elem(&1, 1)))
+    Publishing.Versions.publish_version(group_slug, post[:uuid], 1, publish_opts)
   end
 
   @doc """
@@ -541,6 +715,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         case DBStorage.update_post(db_post, %{trashed_at: nil}) do
           {:ok, _} ->
             ListingCache.regenerate(group_slug)
+            # A restored post with a live version is back on the public site.
+            if db_post.active_version_uuid, do: SitemapRefresh.request()
             PublishingPubSub.broadcast_post_updated(group_slug, %{uuid: db_post.uuid})
 
             ActivityLog.log_manual(
@@ -595,6 +771,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
           {:ok, _} ->
             broadcast_id = db_post.uuid
             ListingCache.regenerate(group_slug)
+            # Only a post that was live leaves the public site.
+            if db_post.active_version_uuid, do: SitemapRefresh.request()
             PublishingPubSub.broadcast_post_deleted(group_slug, broadcast_id)
 
             ActivityLog.log_manual(
@@ -1110,40 +1288,39 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     end
   end
 
-  # Finds the next available minute for a timestamp-mode post.
-  # If the given date/time is already taken, bumps forward by one minute at a time.
-  # Limited to 60 attempts to prevent unbounded recursion.
-  defp find_available_timestamp(group_slug, date, time, attempts \\ 0)
+  # The free minute nearest the wanted one for a timestamp-mode post: the
+  # wanted minute, else the earlier ones (up to an hour back), else the later
+  # ones. Earlier first, so a post created in a taken minute stays visible: a
+  # later minute is in the future, where a timestamp post is not published yet
+  # (two posts made in the same minute used to push each other a minute ahead,
+  # hidden until then). Gives back the wanted minute when the whole window is
+  # taken; the insert then hits the unique index and the retry reports it.
+  @timestamp_search_minutes 60
 
-  defp find_available_timestamp(_group_slug, date, time, @max_timestamp_attempts) do
-    {date, time}
+  defp find_available_timestamp(group_slug, date, %Time{} = time, except_post_uuid \\ nil) do
+    wanted = NaiveDateTime.new!(date, %{time | second: 0, microsecond: {0, 0}})
+
+    offsets =
+      [0] ++
+        Enum.map(1..@timestamp_search_minutes, &(-&1)) ++
+        Enum.to_list(1..@timestamp_search_minutes)
+
+    Enum.find_value(offsets, {date, time}, fn offset ->
+      candidate = NaiveDateTime.add(wanted, offset * 60)
+      {c_date, c_time} = {NaiveDateTime.to_date(candidate), NaiveDateTime.to_time(candidate)}
+
+      # Trashed-INCLUSIVE check: the unique index includes trashed rows, so a
+      # version that only looked at live posts would keep handing back a slot
+      # the DB rejects, and the collision retry could never converge (M2/M1).
+      if slot_free?(group_slug, c_date, c_time, except_post_uuid), do: {c_date, c_time}
+    end)
   end
 
-  defp find_available_timestamp(group_slug, date, time, attempts) do
-    # Trashed-INCLUSIVE check: the unique index includes trashed rows, so a
-    # version that only looked at live posts would keep handing back a slot the
-    # DB rejects, and the collision retry could never converge (see M2/M1).
-    if DBStorage.timestamp_slot_taken?(group_slug, date, time) do
-      bump_timestamp(group_slug, date, time, attempts)
-    else
-      {date, time}
-    end
-  end
+  defp slot_free?(group_slug, date, time, nil),
+    do: not DBStorage.timestamp_slot_taken?(group_slug, date, time)
 
-  # Advance the candidate timestamp by one minute, rolling over to the next day
-  # at midnight, and retry the availability check.
-  defp bump_timestamp(group_slug, date, time, attempts) do
-    total_seconds = time.hour * 3600 + time.minute * 60 + 60
-
-    if total_seconds >= 86_400 do
-      next_date = Date.add(date, 1)
-      find_available_timestamp(group_slug, next_date, ~T[00:00:00], attempts + 1)
-    else
-      next_hour = div(total_seconds, 3600)
-      next_minute = div(rem(total_seconds, 3600), 60)
-      next_time = %Time{hour: next_hour, minute: next_minute, second: 0, microsecond: {0, 0}}
-      find_available_timestamp(group_slug, date, next_time, attempts + 1)
-    end
+  defp slot_free?(group_slug, date, time, post_uuid) do
+    DBStorage.timestamp_slot_holder(group_slug, date, time) in [nil, post_uuid]
   end
 
   # Updates a post in the database.
@@ -1621,6 +1798,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         normalize_featured(Map.get(params, "sitemap_exclude"))
       )
       |> put_audio_uuid(Map.get(params, "audio_uuid"))
+      |> put_custom_fields(params)
 
     # Also update version-level status and published_at if provided.
     # "published" is NEVER written here — it is set atomically with
@@ -1636,6 +1814,21 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     case DBStorage.update_version(version, version_attrs) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Absent: left alone. Present: the whole map is replaced (a field left out
+  # is removed), and an empty map drops the key.
+  defp put_custom_fields(data, params) do
+    case Map.fetch(params, "custom_fields") do
+      :error ->
+        data
+
+      {:ok, fields} ->
+        case PublishingVersion.normalize_custom_fields(fields) do
+          empty when map_size(empty) == 0 -> Map.delete(data, "custom_fields")
+          normalized -> Map.put(data, "custom_fields", normalized)
+        end
     end
   end
 

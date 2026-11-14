@@ -301,6 +301,56 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert DBStorage.get_version(post[:uuid], 1).data["sitemap_exclude"] == true
     end
 
+    test "custom fields: rows are added, typed, removed and saved as a map", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      saver_uuid = "019cce93-0000-7000-8000-00000000ee03"
+
+      TestRepo.query!(
+        """
+        INSERT INTO phoenix_kit_users (uuid, email, hashed_password, inserted_at, updated_at)
+        VALUES ($1::uuid, 'fields-saver@example.com', 'x', now(), now())
+        ON CONFLICT (email) DO NOTHING
+        """,
+        [Ecto.UUID.dump!(saver_uuid)]
+      )
+
+      {:ok, view, _html} =
+        conn
+        |> put_test_scope(fake_scope(user_uuid: saver_uuid))
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      render_click(view, "add_custom_field", %{})
+      render_click(view, "add_custom_field", %{})
+      assert has_element?(view, "[data-custom-fields] input[name='custom_fields[1][key]']")
+      # two blank rows are no change
+      refute assigns_of(view)[:has_pending_changes]
+
+      render_change(view, "update_meta", %{
+        "custom_fields" => %{
+          "0" => %{"key" => "Package", "value" => "phoenix_kit_projects"},
+          "1" => %{"key" => "version", "value" => "0.33.0"}
+        },
+        "_target" => ["custom_fields", "1", "value"]
+      })
+
+      assert assigns_of(view)[:has_pending_changes]
+
+      render_click(view, "add_custom_field", %{})
+      render_click(view, "remove_custom_field", %{"index" => "2"})
+      render_click(view, "remove_custom_field", %{"index" => "9"})
+
+      _ = render_click(view, "save", %{})
+
+      assert DBStorage.get_version(post[:uuid], 1).data["custom_fields"] ==
+               %{"package" => "phoenix_kit_projects", "version" => "0.33.0"}
+
+      assert [%{metadata: %{custom_fields: %{"version" => "0.33.0"}}}] =
+               Publishing.list_posts(group["slug"])
+    end
+
     test "warns before a save takes the live version down", %{
       conn: conn,
       group: group,

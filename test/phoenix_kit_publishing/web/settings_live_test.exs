@@ -184,6 +184,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.SettingsLiveTest do
     assert final != initial
   end
 
+  test "change_pagination_style stores a known style and ignores anything else", %{conn: conn} do
+    {:ok, _} = Settings.update_setting("publishing_pagination_style", "numbered")
+
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/settings/publishing")
+
+    assert has_element?(view, "#setting-pagination-style option[value=numbered][selected]")
+
+    view
+    |> element("#setting-pagination-style")
+    |> render_change(%{"pagination_style" => "compact"})
+
+    assert Settings.get_setting("publishing_pagination_style") == "compact"
+    assert has_element?(view, "#setting-pagination-style option[value=compact][selected]")
+
+    render_change(view, "change_pagination_style", %{"pagination_style" => "fancy"})
+    assert Settings.get_setting("publishing_pagination_style") == "compact"
+  end
+
   test "toggle_unique_views flips the unique-views setting", %{conn: conn} do
     {:ok, view, html} =
       conn

@@ -872,6 +872,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # ============================================================================
 
   @impl true
+  # Custom fields: a row is added or removed here; typing in one goes through
+  # update_meta like every other field of the form.
+  def handle_event("add_custom_field", _params, socket) do
+    rows = Forms.custom_field_rows(socket.assigns.form["custom_fields"])
+
+    {:noreply,
+     change_form_field(socket, "custom_fields", rows ++ [%{"key" => "", "value" => ""}])}
+  end
+
+  def handle_event("remove_custom_field", %{"index" => index}, socket) do
+    rows = Forms.custom_field_rows(socket.assigns.form["custom_fields"])
+
+    case Integer.parse(to_string(index)) do
+      {i, ""} when i >= 0 and i < length(rows) ->
+        {:noreply, change_form_field(socket, "custom_fields", List.delete_at(rows, i))}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("update_meta", params, socket) do
     socket = maybe_reclaim_lock(socket)
 
@@ -4384,6 +4405,65 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </p>
                 </div>
 
+                <%!-- Custom fields — a host's own per-post values (version
+                     data `custom_fields`, read as `metadata.custom_fields`).
+                     Rows ride the form; keys are normalised on save. --%>
+                <div data-custom-fields>
+                  <div class="flex items-center justify-between">
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
+                      {gettext("Custom fields")}
+                    </span>
+                    <button
+                      type="button"
+                      phx-click="add_custom_field"
+                      class="btn btn-ghost btn-xs"
+                      disabled={edit_disabled? or @viewing_older_version}
+                    >
+                      <.icon name="hero-plus" class="w-3 h-3" /> {gettext("Add")}
+                    </button>
+                  </div>
+                  <div
+                    :for={{row, index} <- Enum.with_index(Forms.custom_field_rows(@form["custom_fields"]))}
+                    class="mt-1 flex items-center gap-1"
+                  >
+                    <input
+                      type="text"
+                      name={"custom_fields[#{index}][key]"}
+                      value={row["key"]}
+                      placeholder={gettext("name")}
+                      maxlength="40"
+                      aria-label={gettext("Field name")}
+                      disabled={edit_disabled? or @viewing_older_version}
+                      class="input input-sm w-2/5"
+                    />
+                    <input
+                      type="text"
+                      name={"custom_fields[#{index}][value]"}
+                      value={row["value"]}
+                      placeholder={gettext("value")}
+                      maxlength="2000"
+                      aria-label={gettext("Field value")}
+                      disabled={edit_disabled? or @viewing_older_version}
+                      class="input input-sm flex-1"
+                    />
+                    <button
+                      type="button"
+                      phx-click="remove_custom_field"
+                      phx-value-index={index}
+                      class="btn btn-ghost btn-xs btn-square"
+                      aria-label={gettext("Remove field")}
+                      disabled={edit_disabled? or @viewing_older_version}
+                    >
+                      <.icon name="hero-x-mark" class="w-3 h-3" />
+                    </button>
+                  </div>
+                  <p class="text-xs text-base-content/60 mt-1 ml-1">
+                    {gettext(
+                      "Your site's own values for this post (e.g. package, version), for templates and the API."
+                    )}
+                  </p>
+                </div>
+
                 <%!-- Categories — version-level, edited through the form and
                      written by the ordinary save (see the component doc). --%>
                 <.live_component
@@ -4867,5 +4947,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     phoenix_kit_current_user={assigns[:phoenix_kit_current_user]}
     />
     """
+  end
+
+  # One form field changed by an event rather than an input: the same path
+  # as a categories change (dirty tracking, autosave, collaborative sync).
+  defp change_form_field(socket, field, value) do
+    socket = maybe_reclaim_lock(socket)
+
+    if socket.assigns.readonly? or socket.assigns.translation_locked? do
+      socket
+    else
+      new_form =
+        socket.assigns.form
+        |> Map.put(field, value)
+        |> Forms.normalize_form()
+
+      has_changes = Forms.dirty?(socket.assigns.post, new_form, socket.assigns.content)
+
+      socket =
+        socket
+        |> Forms.assign_form_with_tracking(new_form)
+        |> assign(:has_pending_changes, has_changes)
+        |> assign(:autosave_blocked, blocked_reason(socket, new_form))
+
+      socket = if has_changes, do: schedule_autosave(socket), else: socket
+
+      Collaborative.broadcast_form_change(socket, :meta, new_form)
+      Collaborative.touch_activity(socket)
+    end
   end
 end

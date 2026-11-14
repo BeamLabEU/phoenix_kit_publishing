@@ -33,11 +33,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
   import Plug.Conn, only: [get_resp_header: 2]
 
   alias Ecto.Adapters.SQL.Sandbox
+  alias PhoenixKit.Config
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
+  alias PhoenixKitPublishing.RouterDispatch
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   @endpoint PhoenixKitPublishing.Test.DispatchEndpoint
@@ -188,5 +191,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
     assert_no_internal_leak(en_conn)
 
     _ = slug
+  end
+
+  describe "public pages under their own prefix (public_url_prefix)" do
+    # The router here is mounted at /phoenix_kit (the macro's compile-time
+    # prefix) while URLs are built from the runtime prefix, "/" in the test
+    # build: exactly a host that keeps the admin under /phoenix_kit and the
+    # blog at the root.
+    test "the public path is served; the kit-prefixed one 301s to it", %{slug: slug} do
+      conn = build_conn() |> get("/#{slug}/routed")
+      assert conn.status == 200
+      assert conn.resp_body =~ "Routed"
+
+      conn = build_conn() |> get("#{@prefix}/#{slug}/routed")
+      assert conn.status == 301
+      assert get_resp_header(conn, "location") == ["/#{slug}/routed"]
+
+      # a path that names no group, under either prefix, is the host's
+      for path_info <- [["not-a-group-#{slug}"], ["phoenix_kit", "not-a-group-#{slug}"]] do
+        conn = %Plug.Conn{path_info: path_info, request_path: "/" <> Enum.join(path_info, "/")}
+        assert RouterDispatch.maybe_rewrite(conn, @prefix) == :pass
+      end
+    end
+
+    test "an explicit public_url_prefix moves every public URL", %{slug: slug} do
+      Application.put_env(:phoenix_kit_publishing, :public_url_prefix, "/blog/")
+      on_exit(fn -> Application.delete_env(:phoenix_kit_publishing, :public_url_prefix) end)
+
+      assert PublishingHTML.public_url_prefix() == "/blog"
+
+      conn = build_conn() |> get("/blog/#{slug}")
+      assert conn.status == 200
+      assert conn.resp_body =~ ~s(href="/blog/#{slug}/routed")
+
+      conn = build_conn() |> get("#{@prefix}/#{slug}/routed")
+      assert get_resp_header(conn, "location") == ["/blog/#{slug}/routed"]
+    end
+
+    test "a value that is not a plain path is ignored" do
+      Application.put_env(:phoenix_kit_publishing, :public_url_prefix, "/blog?x=1")
+      on_exit(fn -> Application.delete_env(:phoenix_kit_publishing, :public_url_prefix) end)
+
+      assert PublishingHTML.public_url_prefix() ==
+               Config.get_url_prefix()
+    end
   end
 end

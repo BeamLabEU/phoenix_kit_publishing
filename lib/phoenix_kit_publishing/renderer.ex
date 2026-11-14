@@ -16,12 +16,12 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   alias PhoenixKit.Modules.Publishing.PageBuilder
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Audio, as: AudioComponent
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Embed, as: EmbedComponent
+  alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Image
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Renderer.Sanitizer
   alias PhoenixKit.Modules.Publishing.RenderSignal
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
-  alias PhoenixKit.Modules.Shared.Components.Image
   alias PhoenixKit.Modules.Shared.Components.Video
   alias PhoenixKit.Modules.Storage.URLSigner
   alias PhoenixKit.Settings
@@ -54,7 +54,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # v11: author `data-*` attributes are dropped (only the notes' `data-note` stays),
   #      and a component attribute value keeps an apostrophe or a quote of the other
   #      kind instead of ending at it.
-  @cache_version "v11"
+  # v12: `<Image dark_src|dark_file_uuid>` renders a light/dark pair plus its
+  #      stylesheet; a cached v11 entry would keep showing the light image only.
+  @cache_version "v12"
 
   @generated_styles_key :pk_publishing_generated_styles
 
@@ -758,7 +760,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
     cleaned <>
       notes_css <>
-      take_generated_styles() <> showcase_styles(cleaned) <> helix_styles(cleaned)
+      take_generated_styles() <>
+      showcase_styles(cleaned) <> helix_styles(cleaned) <> dark_image_styles(cleaned)
   end
 
   # Stylesheets generated while rendering (a scrolling gallery's keyframes),
@@ -800,6 +803,15 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
 
   defp helix_styles(html) do
     if String.contains?(html, ~s(class="pk-helix)), do: @helix_css, else: ""
+  end
+
+  # A light/dark `<Image>` pair needs the sheet that hides one of the two. It
+  # is generated (the dark theme names come from core's ThemeConfig, host
+  # themes included), so the post-link pass recognises it by shape, see
+  # Image.dark_image_css?/1.
+  defp dark_image_styles(html) do
+    {_light, dark} = Image.marker_classes()
+    if String.contains?(html, dark), do: Image.dark_image_css(), else: ""
   end
 
   defp normalize_notes_style("panel"), do: "panel"
@@ -980,7 +992,8 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
     do: {binary_part(html, 0, stop), binary_part(html, stop, byte_size(html) - stop)}
 
   defp generated_style_block?(block) do
-    block in @constant_style_blocks or generated_keyframes_block?(block)
+    block in @constant_style_blocks or generated_keyframes_block?(block) or
+      Image.dark_image_css?(block)
   end
 
   defp generated_keyframes_block?(block) do
@@ -1238,7 +1251,13 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # `\\<`, and the scanners are plain regexes that would otherwise take the tag
   # after it for a live component, leaving the backslash on the page. Code goes
   # first, so a `\\<` shown inside code is already out of reach here.
-  defp mask_scanned_code(content) do
+  #
+  # Public (but undocumented) so `Shared.strip_components/1` can run its own
+  # component regexes over the same masked text: an excerpt must keep a
+  # `<Image>` shown in code exactly as the page renders it.
+  @doc false
+  @spec mask_scanned_code(String.t()) :: String.t()
+  def mask_scanned_code(content) do
     mask = fn match -> String.replace(match, "<", @code_lt_sentinel) end
 
     @code_region_regex
@@ -1249,7 +1268,9 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # Restore sentinels back to raw `<`. A no-op on the plain path (which never
   # masks); on the mixed path the restored `<` re-enters MDEx inside a code span,
   # where comrak HTML-escapes it to `&lt;`.
-  defp unmask_scanned_code(content) do
+  @doc false
+  @spec unmask_scanned_code(String.t()) :: String.t()
+  def unmask_scanned_code(content) do
     String.replace(content, @code_lt_sentinel, "<")
   end
 

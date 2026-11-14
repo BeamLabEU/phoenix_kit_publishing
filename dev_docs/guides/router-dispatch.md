@@ -63,6 +63,44 @@ The override is emitted unconditionally inside `phoenix_kit_routes/0`
 (compile-time gated on `Code.ensure_loaded?(PhoenixKitPublishing.RouterDispatch)`),
 so installs that don't have publishing in the dep tree get a no-op.
 
+## Public pages under their own prefix (`:public_url_prefix`)
+
+By default the public pages live under PhoenixKit's `url_prefix`, so a host
+that mounts the kit at `/phoenix_kit` gets `/phoenix_kit/blog/<post>`. A host
+that wants the admin tucked away and the blog at the root sets
+
+```elixir
+config :phoenix_kit_publishing, public_url_prefix: "/"
+```
+
+`Web.HTML.public_url_prefix/0` is what every public URL builder starts with
+(the configured value, else the kit prefix; a value that is not a plain path
+is ignored with a warning). `maybe_rewrite/2` accepts a group path under the
+public prefix and under the kit prefix, and always rewrites into the internal
+scope under the kit prefix, where the routes are. A request under the kit
+prefix is an old link or a URL core built itself (core's sitemap source
+still uses the kit prefix): the controllers' canonical check 301s it to the
+public URL, so it keeps working.
+
+## A group whose listing the host serves (`public_listing`)
+
+A host that draws its own page at a group's address (a news page with its own
+filters, built on `Publishing.list_published/2`) sets the group's
+`public_listing`:
+
+| Value | `maybe_rewrite/2` leaves to the host's router |
+|---|---|
+| `"publishing"` (default) | nothing |
+| `"host"` | the bare listing path, `/<group>` and `/<locale>/<group>` (any query string) |
+| `"host_with_archives"` | that, and `/<group>/category/<slug>` and `/<group>/tag/<tag>` |
+
+Post pages and every feed (`…/feed.xml`, category feeds included) are always
+rewritten to Publishing. The host declares the path in its own router (`live
+"/news", NewsLive` inside its live_session); nothing else is needed, no
+endpoint plug in front of the router. The group map is the one
+`maybe_rewrite/2` already reads to recognise the group, so the setting costs
+no extra query.
+
 ## `mix phx.routes` blind spot
 
 The publishing routes appear under the `__phoenix_kit_publishing_dispatch`

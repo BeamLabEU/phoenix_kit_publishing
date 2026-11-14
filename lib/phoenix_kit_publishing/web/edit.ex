@@ -130,6 +130,37 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
     {:noreply, handle_switch_language(socket, lang_code)}
   end
 
+  # One way and site-wide (every post URL of the group changes), so it sits
+  # outside the form behind a confirmation; the old URLs keep working (301).
+  def handle_event("convert_to_slug_mode", _params, socket) do
+    if Access.can_manage_groups?(Access.scope(socket)) do
+      slug = socket.assigns.group["slug"]
+
+      case Publishing.convert_to_slug_mode(slug,
+             actor_uuid: Shared.actor_uuid_from_socket(socket)
+           ) do
+        {:ok, %{converted: count}} ->
+          {:noreply,
+           socket
+           |> assign(:group, find_group(slug) || socket.assigns.group)
+           |> put_flash(
+             :info,
+             ngettext(
+               "Converted to readable URLs: %{count} post has a new address; its old one redirects.",
+               "Converted to readable URLs: %{count} posts have new addresses; the old ones redirect.",
+               count
+             )
+           )}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, Errors.message(reason))}
+      end
+    else
+      {:noreply,
+       put_flash(socket, :error, gettext("You don't have permission to manage publishing groups"))}
+    end
+  end
+
   def handle_event("save", %{"group" => params} = all_params, socket) do
     if Access.can_manage_groups?(Access.scope(socket)) do
       save_group(params, all_params, socket)
@@ -189,6 +220,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "search_enabled" => group["search_enabled"],
       "sitemap_exclude" => group["sitemap_exclude"],
       "show_categories" => group["show_categories"],
+      "category_chips_position" => group["category_chips_position"],
+      "related_posts" => group["related_posts"],
+      "listing_show_categories" => group["listing_show_categories"],
+      "listing_category_filter" => group["listing_category_filter"],
+      "public_listing" => group["public_listing"],
       "views_enabled" => group["views_enabled"],
       "comments_enabled" => group["comments_enabled"],
       "show_view_counts" => group["show_view_counts"],
@@ -271,6 +307,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       {gettext("Cover panel — background image with a solid text panel"), "cover_panel"},
       {gettext("Minimal — text only, no image"), "minimal"},
       {gettext("Top image — a wide image banner above the text"), "top"}
+    ]
+  end
+
+  # Values must match Publishing.Constants.public_listings/0.
+  defp public_listing_options do
+    [
+      {gettext("Publishing renders it"), "publishing"},
+      {gettext("The site renders it (posts stay here)"), "host"},
+      {gettext("The site renders it and the category and tag pages"), "host_with_archives"}
+    ]
+  end
+
+  # Values must match Publishing.Constants.category_chips_positions/0.
+  defp category_chips_position_options do
+    [
+      {gettext("Above the title"), "top"},
+      {gettext("Beside the date"), "date"},
+      {gettext("After the content"), "bottom"}
+    ]
+  end
+
+  # Values must match Publishing.Constants.related_posts_options/0.
+  defp related_posts_options do
+    [
+      {gettext("Off"), "off"},
+      {gettext("3 posts"), "3"},
+      {gettext("6 posts"), "6"}
     ]
   end
 
@@ -481,6 +544,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   options={listing_layout_options()}
                 />
 
+                <.select
+                  field={@form[:public_listing]}
+                  label={gettext("Listing page")}
+                  options={public_listing_options()}
+                />
+                <p class="-mt-2 text-xs text-base-content/60">
+                  {gettext(
+                    "For a site that draws its own listing at this group's address: its router answers there, and post pages and feeds stay with Publishing."
+                  )}
+                </p>
+
+                <.checkbox field={@form[:listing_show_categories]}>
+                  {gettext("Show categories on the cards")}
+                  <:description>
+                    {gettext("Each post's categories on its card, in the category's colour and icon.")}
+                  </:description>
+                </.checkbox>
+
+                <.checkbox field={@form[:listing_category_filter]}>
+                  {gettext("Show a category filter")}
+                  <:description>
+                    {gettext(
+                      "The group's categories above the listing; readers can pick one or several."
+                    )}
+                  </:description>
+                </.checkbox>
+
                 <.checkbox field={@form[:search_enabled]}>
                   {gettext("Show a search box")}
                   <:description>
@@ -632,9 +722,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                 <.checkbox field={@form[:show_categories]}>
                   {gettext("Show category chips")}
                   <:description>
-                    {gettext("Linked category badges above the post content.")}
+                    {gettext("Linked category badges, each leading to its archive page.")}
                   </:description>
                 </.checkbox>
+
+                <.select
+                  field={@form[:category_chips_position]}
+                  label={gettext("Category chip position")}
+                  options={category_chips_position_options()}
+                />
+
+                <.select
+                  field={@form[:related_posts]}
+                  label={gettext("More from this category")}
+                  options={related_posts_options()}
+                />
 
                 <.checkbox field={@form[:comments_enabled]}>
                   {gettext("Enable comments")}
@@ -738,6 +840,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                 </.button>
               </.form_actions>
             </.form>
+            <%!-- Readable URLs for a timestamp group (ModeConversion): outside
+              the form, one way, behind a confirmation. --%>
+            <div
+              :if={@group["mode"] == "timestamp"}
+              class="mt-8 rounded-box border border-warning/40 p-4"
+              data-convert-to-slugs
+            >
+              <h3 class="font-semibold">{gettext("Readable URLs")}</h3>
+              <p class="mt-1 text-sm text-base-content/70">
+                {gettext(
+                  "Give every post an address from its title (/news/release-notes instead of /news/2026-11-06/01:13). The old addresses keep working: they redirect. This cannot be undone."
+                )}
+              </p>
+              <.button
+                type="button"
+                phx-click="convert_to_slug_mode"
+                data-confirm={
+                  gettext("Change every post's address in this group to one made from its title?")
+                }
+                class="btn-warning btn-sm mt-3"
+              >
+                {gettext("Convert to readable URLs")}
+              </.button>
+            </div>
             <%!-- Outside the group form — the modal carries its own selector
               <form>s and HTML forbids nesting them. --%>
             <.ai_translate_modal ai_translate={FormGlue.ai_translate_config(assigns)} />

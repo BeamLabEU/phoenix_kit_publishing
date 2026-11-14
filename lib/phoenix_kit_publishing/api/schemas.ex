@@ -173,6 +173,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
           "maxItems" => 50,
           "items" => %{"type" => "string", "maxLength" => 200}
         },
+        "custom_fields" => custom_fields_schema(),
         "slug" => row_text(200)
       },
       ["post"]
@@ -349,6 +350,13 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
   # the handlers check the real width per row, so one over-long value is that
   # row's error and the rest of the batch still runs, where a schema refusal
   # would reject the whole call.
+  # A post's own fields: a free-key map like name_i18n (core's validator has
+  # no keyword for its values), so PublishingVersion.normalize_custom_fields/1
+  # is the check: names normalised to [a-z0-9_], values strings (numbers and
+  # booleans as text) of at most 2 000 characters, blanks dropped, at most 30;
+  # null clears them all.
+  defp custom_fields_schema, do: %{"type" => ["object", "null"]}
+
   def upsert_categories do
     row =
       object(%{
@@ -358,7 +366,12 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
         "description" => %{"type" => ["string", "null"], "maxLength" => 5000},
         "name_i18n" => %{"type" => "object"},
         "parent" => %{"type" => ["object", "null"]},
-        "position" => %{"type" => "integer"}
+        "position" => %{"type" => "integer"},
+        # PublishingCategory.data — null or "" removes the value
+        "color" => %{"type" => ["string", "null"], "maxLength" => 20},
+        "icon" => %{"type" => ["string", "null"], "maxLength" => 100},
+        "seo_title" => %{"type" => ["string", "null"], "maxLength" => 120},
+        "seo_description" => %{"type" => ["string", "null"], "maxLength" => 320}
       })
 
     object(

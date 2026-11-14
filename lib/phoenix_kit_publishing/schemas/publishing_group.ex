@@ -70,6 +70,17 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   - `show_prev_next` - Chronological "newer / older" post navigation at the
     bottom of the post page, within the same group + language (default `false`).
   - `show_categories` - Linked category chips on the post page (default `false`).
+  - `category_chips_position` - Where those chips go: `"top"`, `"date"` or
+    `"bottom"` (default `"bottom"`).
+  - `related_posts` - "More from this category" at the end of a post: `"off"`,
+    `"3"` or `"6"` posts sharing a category, newest first (default `"off"`).
+  - `listing_show_categories` - Category chips on the listing cards (default `false`).
+  - `public_listing` - Who serves the listing pages: `"publishing"` (default),
+    `"host"` (the bare listing path is left to the host's router) or
+    `"host_with_archives"` (its category and tag archives too). Posts and
+    feeds stay this module's.
+  - `listing_category_filter` - A category filter above the listing, one or
+    several at once, by `?category=` (default `false`).
   - `views_enabled` - Count post views (per-day rollups; session-deduped,
     bot-filtered, no reader PII — see `Publishing.Views`). Default `false`.
   - `show_view_counts` - Show the "N views" line on the post page (needs
@@ -322,6 +333,36 @@ defmodule PhoenixKit.Modules.Publishing.PublishingGroup do
   @doc "Returns whether the post page shows linked category chips (default false)."
   @spec show_categories?(t()) :: boolean()
   def show_categories?(%__MODULE__{data: data}), do: Map.get(data, "show_categories", false)
+
+  @doc "Where the post page shows its category chips."
+  @spec category_chips_position(t()) :: String.t()
+  def category_chips_position(%__MODULE__{data: data}),
+    do:
+      Map.get(
+        data,
+        "category_chips_position",
+        Publishing.Constants.default_category_chips_position()
+      )
+
+  @doc ~s(How many related posts the post page lists: "off", "3" or "6".)
+  @spec related_posts(t()) :: String.t()
+  def related_posts(%__MODULE__{data: data}),
+    do: Map.get(data, "related_posts", Publishing.Constants.default_related_posts())
+
+  @doc "Who serves the group's public listing pages."
+  @spec public_listing(t()) :: String.t()
+  def public_listing(%__MODULE__{data: data}),
+    do: Map.get(data, "public_listing", Publishing.Constants.default_public_listing())
+
+  @doc "Whether the listing cards show their categories."
+  @spec listing_show_categories?(t()) :: boolean()
+  def listing_show_categories?(%__MODULE__{data: data}),
+    do: Map.get(data, "listing_show_categories", false)
+
+  @doc "Whether the listing offers a category filter."
+  @spec listing_category_filter?(t()) :: boolean()
+  def listing_category_filter?(%__MODULE__{data: data}),
+    do: Map.get(data, "listing_category_filter", false)
 
   @doc ~S|Returns whether the post page shows the "N views" line (default false).|
   @spec show_view_counts?(t()) :: boolean()

@@ -559,5 +559,21 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.MapperTest do
 
       assert result.content == "Actual paragraph here."
     end
+
+    test "the derived excerpt keeps a component shown in a code span" do
+      group = build_group()
+      post = build_post(group)
+      version = build_version(post)
+
+      content =
+        build_content(version, %{
+          content: "Show a picture with `<Image src=\"/a.png\"/>`.<Image src=\"/b.png\"/>",
+          data: %{}
+        })
+
+      result = Mapper.to_listing_map(post, version, [content], [version])
+
+      assert result.content == "Show a picture with `<Image src=\"/a.png\"/>`."
+    end
   end
 end

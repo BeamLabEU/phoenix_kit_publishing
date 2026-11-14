@@ -36,6 +36,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.OgTagsTest do
     assert html =~ ~s(<meta name="twitter:title" content="Hello World">)
     assert html =~ ~s(<meta property="og:description" content="A nice post">)
     assert html =~ ~s(<meta name="twitter:description" content="A nice post">)
+    assert html =~ ~s(<meta name="description" content="A nice post">)
     assert html =~ ~s(<meta property="og:image" content="https://cdn.example.com/x.png">)
     assert html =~ ~s(<meta name="twitter:image" content="https://cdn.example.com/x.png">)
     assert html =~ ~s(<meta property="og:url" content="https://example.com/blog/hello">)
@@ -48,6 +49,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.OgTagsTest do
     html = render_og(%{type: "website", title: "Blog", url: "https://example.com/blog"})
 
     refute html =~ "og:image"
+    refute html =~ ~s(name="description")
     refute html =~ "twitter:image"
     assert html =~ ~s(<meta name="twitter:card" content="summary">)
   end

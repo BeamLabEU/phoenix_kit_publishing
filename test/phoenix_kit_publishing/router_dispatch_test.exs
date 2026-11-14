@@ -515,4 +515,78 @@ defmodule PhoenixKitPublishing.RouterDispatchIntegrationTest do
       _ -> :ok
     end
   end
+
+  describe "maybe_rewrite/1 — a group whose listing the host serves (public_listing)" do
+    defp request(path_info),
+      do: %Plug.Conn{
+        path_info: path_info,
+        request_path: "/" <> Enum.join(path_info, "/"),
+        private: %{}
+      }
+
+    defp owner(path_info) do
+      case RouterDispatch.maybe_rewrite(request(path_info)) do
+        :pass -> :host
+        {:rewrite, _conn} -> :publishing
+      end
+    end
+
+    test "host: the bare listing path is the host's; posts, feeds and archives stay" do
+      {:ok, group} = Groups.add_group(unique_name())
+      slug = group["slug"]
+
+      assert owner([slug]) == :publishing
+      {:ok, _} = Groups.update_group(slug, %{"public_listing" => "host"})
+
+      assert owner([slug]) == :host
+      assert owner(["en", slug]) == :host
+      assert owner([slug, "a-post"]) == :publishing
+      assert owner(["en", slug, "a-post"]) == :publishing
+      assert owner([slug, "feed.xml"]) == :publishing
+      assert owner([slug, "category", "billing"]) == :publishing
+    end
+
+    test "host_with_archives: the category and tag archives too, but not their feeds" do
+      {:ok, group} = Groups.add_group(unique_name())
+      slug = group["slug"]
+      {:ok, _} = Groups.update_group(slug, %{"public_listing" => "host_with_archives"})
+
+      assert owner([slug]) == :host
+      assert owner([slug, "category", "billing"]) == :host
+      assert owner(["en", slug, "tag", "elixir"]) == :host
+      assert owner([slug, "category", "billing", "feed.xml"]) == :publishing
+      assert owner([slug, "2026-11-14"]) == :publishing
+    end
+  end
+
+  describe "maybe_rewrite/2 — public pages under their own prefix" do
+    test "the longer prefix wins: the kit-prefixed URL of a post, not a group named like the kit" do
+      {:ok, kit_named} = Groups.add_group(unique_name(), mode: "slug", slug: "cms")
+      {:ok, news} = Groups.add_group(unique_name(), mode: "slug", slug: unique_slug())
+
+      Application.put_env(:phoenix_kit_publishing, :public_url_prefix, "/")
+      on_exit(fn -> Application.delete_env(:phoenix_kit_publishing, :public_url_prefix) end)
+
+      conn = %Plug.Conn{
+        path_info: ["cms", news["slug"], "a-post"],
+        request_path: "/cms/#{news["slug"]}/a-post",
+        private: %{}
+      }
+
+      assert {:rewrite, rewritten} = RouterDispatch.maybe_rewrite(conn, "/cms")
+
+      assert rewritten.path_info == [
+               "cms",
+               "__phoenix_kit_publishing_dispatch",
+               "root",
+               news["slug"],
+               "a-post"
+             ]
+
+      # the group named "cms" is still reached at the public root
+      conn = %Plug.Conn{path_info: ["cms"], request_path: "/cms", private: %{}}
+      assert {:rewrite, _} = RouterDispatch.maybe_rewrite(conn, "/cms")
+      _ = kit_named
+    end
+  end
 end

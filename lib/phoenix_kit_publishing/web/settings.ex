@@ -13,6 +13,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
 
@@ -28,6 +29,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @unique_views_key "publishing_unique_views"
   @slug_style_key "publishing_slug_style"
   @valid_slug_styles ~w(transliterate unicode ascii)
+  @pagination_style_key "publishing_pagination_style"
 
   # The settings strip. Tabs are `patch` links carrying `?tab=`, so a reload,
   # the back button and a deep link from the docs all land on the same
@@ -97,6 +99,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       |> assign(:render_jsonld, Settings.get_boolean_setting(@render_jsonld_key, true))
       |> assign(:unique_views, Settings.get_boolean_setting(@unique_views_key, true))
       |> assign(:slug_style, Settings.get_setting(@slug_style_key, "transliterate"))
+      |> assign(
+        :pagination_style,
+        PublishingHTML.pagination_style(Settings.get_setting(@pagination_style_key, "numbered"))
+      )
       |> assign_numbers()
       |> assign(
         :memory_cache_enabled,
@@ -354,6 +360,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   end
 
   defp settings_event("change_slug_style", _params, socket), do: {:noreply, socket}
+
+  defp settings_event("change_pagination_style", %{"pagination_style" => style}, socket) do
+    if style in PublishingHTML.pagination_styles() do
+      case Settings.update_setting(@pagination_style_key, style) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> assign(:pagination_style, style)
+           |> put_flash(:info, gettext("Pagination style updated"))}
+
+        {:error, _} ->
+          write_failed(socket)
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp settings_event("change_pagination_style", _params, socket), do: {:noreply, socket}
 
   # Three numbers that were previously not settable at all. `posts_per_page`
   # is the sharpest case: the reader was already there in the code, so the
@@ -808,6 +833,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                   {gettext("Transliterate — privet"), "transliterate"},
                   {gettext("Unicode — привет"), "unicode"},
                   {gettext("ASCII only — strip"), "ascii"}
+                ]}
+              />
+            </form>
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-ellipsis-horizontal" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("Pagination Style")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext("How a listing with more posts than fit on a page moves between pages.")}
+                </p>
+              </div>
+            </div>
+            <form
+              id="setting-pagination-style"
+              phx-change="change_pagination_style"
+              class="w-full max-w-80"
+            >
+              <.select
+                name="pagination_style"
+                value={@pagination_style}
+                class="select-sm"
+                aria-label={gettext("Pagination Style")}
+                options={[
+                  {gettext("Page numbers — « 1 … 6 7 8 … 62 »"), "numbered"},
+                  {gettext("Compact — Page 7 of 62, with a page box"), "compact"},
+                  {gettext("Previous and next only"), "simple"}
                 ]}
               />
             </form>

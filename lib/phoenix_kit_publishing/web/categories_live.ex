@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Categories
+  alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Settings
@@ -85,7 +86,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           "slug" => category.slug,
           "parent_uuid" => category.parent_uuid || "",
           "description" => category.description || "",
-          "position" => to_string(category.position)
+          "position" => to_string(category.position),
+          "color" => PublishingCategory.color(category) || "",
+          "icon" => PublishingCategory.icon(category) || "",
+          "seo_title" => PublishingCategory.seo_title(category) || "",
+          "seo_description" => PublishingCategory.seo_description(category) || ""
         }
 
         {:noreply, open_form(socket, to_form(params, as: :category), category.uuid)}
@@ -107,7 +112,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   def handle_event("save", %{"category" => params}, socket) do
     attrs =
       params
-      |> Map.take(["name", "slug", "description", "position"])
+      |> Map.take(["name", "slug", "description", "position" | PublishingCategory.display_keys()])
       |> put_parent(socket)
       # A cleared position input arrives as "" — Ecto would cast it to nil and
       # the DB rejects NULL; treat blank as the 0 default instead.
@@ -344,7 +349,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
         "slug" => "",
         "parent_uuid" => parent_uuid,
         "description" => "",
-        "position" => "0"
+        "position" => "0",
+        "color" => "",
+        "icon" => "",
+        "seo_title" => "",
+        "seo_description" => ""
       },
       as: :category
     )
@@ -609,6 +618,51 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
           </div>
           <.input field={@form[:position]} type="number" label={gettext("Position")} />
           <.textarea field={@form[:description]} label={gettext("Description")} rows="2" />
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <.input
+                field={@form[:color]}
+                label={gettext("Colour")}
+                placeholder={gettext("#4f46e5 or primary")}
+                list="category-color-tokens"
+              />
+              <datalist id="category-color-tokens">
+                <option :for={token <- PublishingCategory.colors()} value={token} />
+              </datalist>
+            </div>
+            <div>
+              <.input
+                field={@form[:icon]}
+                label={gettext("Icon")}
+                placeholder="hero-cube"
+                list="category-icon-suggestions"
+              />
+              <datalist id="category-icon-suggestions">
+                <option :for={icon <- PublishingCategory.suggested_icons()} value={icon} />
+              </datalist>
+              <div
+                :if={@form[:icon].value not in [nil, ""]}
+                class="mt-1 flex items-center gap-2 text-xs text-base-content/60"
+                data-icon-preview
+              >
+                <.icon name={@form[:icon].value} class="size-4" />
+                <span :if={@form[:icon].value not in PublishingCategory.suggested_icons()}>
+                  {gettext("Not in the suggested set: shows only if the site's CSS includes it.")}
+                </span>
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-base-content/60 -mt-1">
+            {gettext(
+              "Shown on the category's chips. Colour: a hex value or a theme colour; icon: a Heroicons name."
+            )}
+          </p>
+          <.input field={@form[:seo_title]} label={gettext("SEO title")} />
+          <.textarea
+            field={@form[:seo_description]}
+            label={gettext("SEO description")}
+            rows="2"
+          />
           <.form_actions
             cancel_click="cancel_form"
             submit_label={if @editing, do: gettext("Save"), else: gettext("Create")}

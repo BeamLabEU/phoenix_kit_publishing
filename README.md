@@ -250,6 +250,58 @@ Publishing.regenerate_cache("docs")
 Publishing.invalidate_cache("docs")
 ```
 
+## Listing posts from a host
+
+A host that draws its own listing (a news page with its own filters, a "latest
+posts" block) reads the published posts as data instead of rendering
+Publishing's page:
+
+```elixir
+{:ok, %{entries: entries, total: total, total_pages: pages}} =
+  PhoenixKit.Modules.Publishing.list_published("news",
+    language: "en",
+    categories: ["billing", "crm"],   # any of them, subcategories included
+    page: 3,
+    per_page: 20
+  )
+
+{:ok, counts} = PhoenixKit.Modules.Publishing.category_counts("news", language: "en")
+# %{"billing" => 44, "crm" => 12, ...}
+```
+
+Each entry has `uuid`, `title`, `description`, `excerpt`, `url`, `published_at`,
+`featured_image_uuid` (`featured_image_url` with `images: true`), `categories`
+(`slug`, `name`, `color`, `color_css`, `icon`, `url`) and `custom` (the post's
+custom fields, edited in the post editor's sidebar). Building many post URLs
+yourself, pass `Web.HTML.url_context(language)` in place of the language to
+`build_post_url/4`, with `build_date_counts/1` for a timestamp group: the
+settings are then read once, and no URL costs a query.
+
+## Public pages at the site root
+
+With PhoenixKit mounted under a prefix (`/phoenix_kit`), the public pages
+follow it by default. To serve them at the root while the admin stays under the
+prefix:
+
+```elixir
+config :phoenix_kit_publishing, public_url_prefix: "/"
+```
+
+Old URLs under the kit prefix 301 to the new ones. Core's sitemap still lists
+the kit-prefixed URLs until its Publishing source reads this setting.
+
+## Importing posts from code
+
+`PhoenixKit.Modules.Publishing.import_post/3` creates a post with everything it
+carries and publishes it, in one call: title and body, description, SEO title,
+OpenGraph fields, categories (by slug or uuid), custom fields, and a
+`published_at` in the past or the future. In a timestamp group that instant is
+the post's URL minute on the site's clock; posts imported into the same minute
+take the nearest earlier free minutes, so none of them ends up in the future
+(where a timestamp post is not live yet). An unknown category or an unreadable
+date refuses the import before anything is written; `publish: false` leaves a
+draft.
+
 ## Admin Routes
 
 | Route | LiveView | Purpose |
@@ -372,6 +424,9 @@ Regular **Markdown** content with all GitHub-flavored features.
 
 <Image file_id="019a6f96-..." alt="Description" />
 
+<!-- A light/dark pair: the reader sees the one matching the site theme -->
+<Image file_uuid="019a6f96-..." dark_file_uuid="019a6f97-..." alt="Description" />
+
 <Hero variant="centered">
   <Headline>Welcome</Headline>
   <CTA primary="true" action="/signup">Get Started</CTA>
@@ -389,11 +444,12 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_enabled` | `false` | Enable/disable module |
 | `publishing_public_enabled` | `true` | Show public routes |
 | `publishing_posts_per_page` | `20` | Listing pagination (1–200) |
+| `publishing_pagination_style` | `"numbered"` | The listing pager: `numbered` (windowed page numbers), `compact` ("Page 7 of 62" with a go-to-page box) or `simple` (Previous / Next) |
 | `publishing_reading_wpm` | `200` | Words per minute for the reading time (50–1000) |
 | `publishing_editor_lock_minutes` | `30` | Editor owner-lock timeout (1–480) |
 | `publishing_slug_style` | `transliterate` | `transliterate`, `unicode` or `ascii` |
 | `publishing_show_language_switcher` | `true` | In-page language switcher on public pages |
-| `publishing_render_og_tags` | `true` | In-page OpenGraph/Twitter meta tags |
+| `publishing_render_og_tags` | `true` | In-page OpenGraph/Twitter meta tags; turn off once your root layout renders them in `<head>` (see below) |
 | `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD on post pages |
 | `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` |
 | `publishing_unique_views` | `true` | One view per visitor per post per day |
@@ -401,6 +457,38 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_render_cache_enabled` | `true` | Render cache global toggle |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group render cache |
 | `publishing_media_folder_uuid` | — | The module's media folder, written by the ready-made media hook (see below) |
+
+### OpenGraph tags belong in `<head>`
+
+Out of the box the post and listing pages print their `og:*`, `twitter:*` and
+`<meta name="description">` tags **in the page body**
+(`publishing_render_og_tags`, on by default), so link previews work with any
+root layout. Some scrapers only read `<head>`, so a host that owns its root
+layout should render the tags there and turn the in-page copy off.
+
+The controller puts the page's OpenGraph map on `conn.assigns.og` (`nil` on
+pages without one). Render it in the `<head>` of your root layout with the
+module's own component, which prints nothing when there is no map:
+
+```heex
+<%!-- lib/my_app_web/components/layouts/root.html.heex --%>
+<head>
+  <meta charset="utf-8" />
+  <%!-- … --%>
+  <PhoenixKit.Modules.Publishing.Web.HTML.og_meta_tags og={assigns[:og]} />
+</head>
+```
+
+Then turn **In-Page OpenGraph Tags** off at `/admin/settings/publishing`
+(or set `publishing_render_og_tags` to `false`), otherwise every tag appears
+twice. Core's own root layout (`PhoenixKitWeb.Layouts.root`) already prints
+`@og` in `<head>`, so a host on it only needs the setting turned off. Read the
+assign in `root.html.heex`, not in a function-component layout such as
+`Layouts.app/1`, which sees only the attrs it declares.
+
+A description derived from the post body is cut to about 160 characters at a
+sentence end; one the author wrote (the post's OG override or its
+description) is used whole.
 
 ## Media folders
 

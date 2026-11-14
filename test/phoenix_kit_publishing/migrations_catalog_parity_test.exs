@@ -55,13 +55,19 @@ defmodule PhoenixKitPublishing.MigrationsCatalogParityTest do
 
   # V1 on its own is still core's baseline, exactly — V2's two indexes are
   # the whole difference between the two.
-  test "V1 alone matches core's baseline; V2 adds exactly the two media-folder indexes" do
+  test "V1 alone matches core's baseline; V2 adds exactly the two media-folder indexes, V3 one column" do
     Migrations.up_statements(@prefix, 1) |> Enum.each(&Repo.query!/1)
 
-    core_baseline = Enum.reject(catalog_shape("public"), &v2_index?/1)
+    core_baseline = Enum.reject(catalog_shape("public"), &(v2_index?(&1) or v3_column?(&1)))
     v1 = catalog_shape(@prefix)
 
     assert Enum.count(catalog_shape("public"), &v2_index?/1) == 2
+
+    assert Enum.filter(catalog_shape("public"), &v3_column?/1) == [
+             {:column, "phoenix_kit_publishing_categories",
+              {"data", "jsonb", nil, "NO", "'{}'::jsonb"}}
+           ]
+
     assert v1 -- core_baseline == []
     assert core_baseline -- v1 == []
   end
@@ -78,6 +84,9 @@ defmodule PhoenixKitPublishing.MigrationsCatalogParityTest do
     do: Enum.any?(@v2_indexes, &String.contains?(definition, "INDEX #{&1} ON"))
 
   defp v2_index?(_row), do: false
+
+  defp v3_column?({:column, "phoenix_kit_publishing_categories", {"data", _, _, _, _}}), do: true
+  defp v3_column?(_row), do: false
 
   defp catalog_shape(schema) do
     strip = &String.replace(&1 || "", "#{schema}.", "")
