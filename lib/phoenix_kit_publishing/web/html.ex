@@ -33,6 +33,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   that does render it in `<head>` gets the strictly-correct placement; such a
   host disables the in-page copy via `publishing_render_og_tags` to avoid
   duplicate tags. Renders nothing when `:og` is absent (e.g. the groups index).
+
+  Some scrapers read only `<head>`, so a host that owns its root layout
+  should call this component there and turn the setting off:
+
+      <head>
+        <PhoenixKit.Modules.Publishing.Web.HTML.og_meta_tags og={assigns[:og]} />
+      </head>
   """
   attr :og, :map, default: nil
 

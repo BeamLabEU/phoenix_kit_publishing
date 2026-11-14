@@ -394,7 +394,7 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_editor_lock_minutes` | `30` | Editor owner-lock timeout (1–480) |
 | `publishing_slug_style` | `transliterate` | `transliterate`, `unicode` or `ascii` |
 | `publishing_show_language_switcher` | `true` | In-page language switcher on public pages |
-| `publishing_render_og_tags` | `true` | In-page OpenGraph/Twitter meta tags |
+| `publishing_render_og_tags` | `true` | In-page OpenGraph/Twitter meta tags; turn off once your root layout renders them in `<head>` (see below) |
 | `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD on post pages |
 | `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` |
 | `publishing_unique_views` | `true` | One view per visitor per post per day |
@@ -402,6 +402,38 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_render_cache_enabled` | `true` | Render cache global toggle |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group render cache |
 | `publishing_media_folder_uuid` | — | The module's media folder, written by the ready-made media hook (see below) |
+
+### OpenGraph tags belong in `<head>`
+
+Out of the box the post and listing pages print their `og:*`, `twitter:*` and
+`<meta name="description">` tags **in the page body**
+(`publishing_render_og_tags`, on by default), so link previews work with any
+root layout. Some scrapers only read `<head>`, so a host that owns its root
+layout should render the tags there and turn the in-page copy off.
+
+The controller puts the page's OpenGraph map on `conn.assigns.og` (`nil` on
+pages without one). Render it in the `<head>` of your root layout with the
+module's own component, which prints nothing when there is no map:
+
+```heex
+<%!-- lib/my_app_web/components/layouts/root.html.heex --%>
+<head>
+  <meta charset="utf-8" />
+  <%!-- … --%>
+  <PhoenixKit.Modules.Publishing.Web.HTML.og_meta_tags og={assigns[:og]} />
+</head>
+```
+
+Then turn **In-Page OpenGraph Tags** off at `/admin/settings/publishing`
+(or set `publishing_render_og_tags` to `false`), otherwise every tag appears
+twice. Core's own root layout (`PhoenixKitWeb.Layouts.root`) already prints
+`@og` in `<head>`, so a host on it only needs the setting turned off. Read the
+assign in `root.html.heex`, not in a function-component layout such as
+`Layouts.app/1`, which sees only the attrs it declares.
+
+A description derived from the post body is cut to about 160 characters at a
+sentence end; one the author wrote (the post's OG override or its
+description) is used whole.
 
 ## Media folders
 
