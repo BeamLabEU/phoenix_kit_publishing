@@ -970,47 +970,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
                 />
               </div>
           <% end %>
-          <%!-- Pagination --%>
-          <%!-- Windowed (first, last, the current page ±2), with previous and
-            next: one button per page put 250 of them under a 5,000-post group.
-            Plain links — this is a dead view. --%>
-          <%= if @total_pages > 1 do %>
-            <nav class="join mt-8 flex justify-center" aria-label={gettext("Pagination")}>
-              <a
-                :if={@page > 1}
-                href={group_listing_path(@current_language, @group["slug"], page: @page - 1)}
-                class="join-item btn"
-                rel="prev"
-                aria-label={gettext("Previous page")}
-              >
-                «
-              </a>
-              <%= for item <- pagination_window(@page, @total_pages) do %>
-                <%= cond do %>
-                  <% item == :gap -> %>
-                    <span class="join-item btn btn-disabled" aria-hidden="true">…</span>
-                  <% item == @page -> %>
-                    <span class="join-item btn btn-active" aria-current="page">{item}</span>
-                  <% true -> %>
-                    <a
-                      href={group_listing_path(@current_language, @group["slug"], page: item)}
-                      class="join-item btn"
-                    >
-                      {item}
-                    </a>
-                <% end %>
-              <% end %>
-              <a
-                :if={@page < @total_pages}
-                href={group_listing_path(@current_language, @group["slug"], page: @page + 1)}
-                class="join-item btn"
-                rel="next"
-                aria-label={gettext("Next page")}
-              >
-                »
-              </a>
-            </nav>
-          <% end %>
+          <%!-- Pagination: the style is the site's `publishing_pagination_style`
+            (see `pager/1`). Plain links and a GET form — this is a dead view. --%>
+          <.pager
+            :if={@total_pages > 1}
+            page={@page}
+            total_pages={@total_pages}
+            style={assigns[:pagination_style] || "numbered"}
+            path={&group_listing_path(@current_language, @group["slug"], page: &1)}
+            form_action={group_listing_path(@current_language, @group["slug"])}
+          />
         <% end %>
 
         <%= if @total_count == 0 do %>
@@ -2924,14 +2893,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     end
   end
 
+  @pagination_styles ~w(numbered compact simple)
+
+  @doc "The pager styles `publishing_pagination_style` may name."
+  @spec pagination_styles() :: [String.t()]
+  def pagination_styles, do: @pagination_styles
+
+  @doc """
+  The site's pager style: `publishing_pagination_style`, `"numbered"` when it
+  is unset or names no style.
+  """
+  @spec pagination_style(String.t() | nil) :: String.t()
+  def pagination_style(value) when value in @pagination_styles, do: value
+  def pagination_style(_value), do: "numbered"
+
   @doc """
   The page numbers a pager shows: the first and last page, the current one
-  and two either side, with `:gap` where pages are left out.
+  and `radius` either side (2 by default), with `:gap` where pages are left
+  out.
   """
-  @spec pagination_window(pos_integer(), pos_integer()) :: [pos_integer() | :gap]
-  def pagination_window(page, total_pages) do
+  @spec pagination_window(pos_integer(), pos_integer(), non_neg_integer()) ::
+          [pos_integer() | :gap]
+  def pagination_window(page, total_pages, radius \\ 2) do
     shown =
-      [1, total_pages | Enum.to_list(max(page - 2, 1)..min(page + 2, total_pages))]
+      [1, total_pages | Enum.to_list(max(page - radius, 1)..min(page + radius, total_pages))]
       |> Enum.uniq()
       |> Enum.sort()
 
@@ -2941,6 +2926,141 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       {n, prev} when is_integer(prev) and n - prev > 1 -> [:gap, n]
       {n, _prev} -> [n]
     end)
+  end
+
+  attr :page, :integer, required: true
+  attr :total_pages, :integer, required: true
+  attr :style, :string, default: "numbered", doc: "`numbered`, `compact` or `simple`"
+  attr :path, :any, required: true, doc: "a function from a page number to its URL"
+  attr :form_action, :string, required: true, doc: "the listing URL without a page"
+
+  @doc """
+  The pager under a listing, in one of `pagination_styles/0`:
+
+  - `numbered` — first and last page, the current one and two either side
+    (one on a phone, where eleven buttons do not fit), Previous and Next.
+  - `compact` — Previous, "Page 7 of 62" and Next, with a box to jump to a
+    page (a GET form, no JavaScript).
+  - `simple` — Previous and Next only.
+
+  Every style wraps rather than widening the page.
+  """
+  def pager(assigns) do
+    assigns =
+      assigns
+      |> assign(:style, pagination_style(assigns.style))
+      |> assign(:page, assigns.page |> max(1) |> min(assigns.total_pages))
+
+    ~H"""
+    <nav
+      class="mt-8 flex flex-wrap items-center justify-center gap-1 sm:gap-2"
+      aria-label={gettext("Pagination")}
+      data-pager={@style}
+    >
+      <.pager_step :if={@page > 1} href={@path.(@page - 1)} rel="prev" style={@style} />
+      <%= if @style == "numbered" do %>
+        <%!-- Two windows, one per screen width: hiding single buttons of one
+          window on a phone would leave "1 3 4" without a gap mark. --%>
+        <.pager_numbers
+          items={pagination_window(@page, @total_pages, 1)}
+          page={@page}
+          path={@path}
+          window="narrow"
+          class="join flex-wrap justify-center sm:hidden"
+        />
+        <.pager_numbers
+          items={pagination_window(@page, @total_pages, 2)}
+          page={@page}
+          path={@path}
+          window="wide"
+          class="join hidden flex-wrap justify-center sm:inline-flex"
+        />
+      <% end %>
+      <span :if={@style == "compact"} class="px-2 text-sm text-base-content/70" aria-current="page">
+        {gettext("Page %{page} of %{total}", page: @page, total: @total_pages)}
+      </span>
+      <.pager_step
+        :if={@page < @total_pages}
+        href={@path.(@page + 1)}
+        rel="next"
+        style={@style}
+      />
+      <form
+        :if={@style == "compact"}
+        method="get"
+        action={@form_action}
+        class="flex items-center gap-2"
+      >
+        <label class="flex items-center gap-2 text-sm">
+          <span>{gettext("Go to page")}</span>
+          <input
+            type="number"
+            name="page"
+            min="1"
+            max={@total_pages}
+            value={@page}
+            required
+            inputmode="numeric"
+            class="input input-sm w-20"
+          />
+        </label>
+        <button type="submit" class="btn btn-sm">{gettext("Go")}</button>
+      </form>
+    </nav>
+    """
+  end
+
+  attr :href, :string, required: true
+  attr :rel, :string, required: true
+  attr :style, :string, required: true
+
+  # Previous / Next: arrows beside the numbers, words where they stand alone
+  # (in the compact pager only from `sm` up, so a phone keeps one row).
+  defp pager_step(assigns) do
+    ~H"""
+    <a
+      href={@href}
+      rel={@rel}
+      class={["btn btn-sm sm:btn-md", @style == "numbered" && "px-2 sm:px-4"]}
+      aria-label={if @rel == "prev", do: gettext("Previous page"), else: gettext("Next page")}
+    >
+      <%= cond do %>
+        <% @style == "numbered" and @rel == "prev" -> %>
+          «
+        <% @style == "numbered" -> %>
+          »
+        <% @rel == "prev" -> %>
+          « <span class={@style == "compact" && "hidden sm:inline"}>{gettext("Previous page")}</span>
+        <% true -> %>
+          <span class={@style == "compact" && "hidden sm:inline"}>{gettext("Next page")}</span> »
+      <% end %>
+    </a>
+    """
+  end
+
+  attr :items, :list, required: true
+  attr :page, :integer, required: true
+  attr :path, :any, required: true
+  attr :class, :string, required: true
+  attr :window, :string, required: true
+
+  defp pager_numbers(assigns) do
+    ~H"""
+    <span class={@class} data-window={@window}>
+      <%= for item <- @items do %>
+        <%= cond do %>
+          <% item == :gap -> %>
+            <span class="join-item btn btn-sm sm:btn-md btn-disabled px-2 sm:px-4" aria-hidden="true">…</span>
+          <% item == @page -> %>
+            <span class="join-item btn btn-sm sm:btn-md btn-primary px-2 sm:px-4" aria-current="page">
+              {item}
+            </span>
+          <% true -> %>
+            <a href={@path.(item)} class="join-item btn btn-sm sm:btn-md px-2 sm:px-4">{item}</a>
+        <% end %>
+      <% end %>
+    </span>
+    """
   end
 
   @doc """

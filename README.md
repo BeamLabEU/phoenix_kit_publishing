@@ -389,6 +389,7 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_enabled` | `false` | Enable/disable module |
 | `publishing_public_enabled` | `true` | Show public routes |
 | `publishing_posts_per_page` | `20` | Listing pagination (1–200) |
+| `publishing_pagination_style` | `"numbered"` | The listing pager: `numbered` (windowed page numbers), `compact` ("Page 7 of 62" with a go-to-page box) or `simple` (Previous / Next) |
 | `publishing_reading_wpm` | `200` | Words per minute for the reading time (50–1000) |
 | `publishing_editor_lock_minutes` | `30` | Editor owner-lock timeout (1–480) |
 | `publishing_slug_style` | `transliterate` | `transliterate`, `unicode` or `ascii` |

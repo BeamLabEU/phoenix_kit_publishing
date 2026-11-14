@@ -681,6 +681,7 @@ Site-wide keys, all read through `PhoenixKit.Settings`.
 | `publishing_enabled` | `false` | Master on/off switch (via `enable_system/0`) |
 | `publishing_public_enabled` | `true` | Serve public routes |
 | `publishing_posts_per_page` | `20` | Listing pagination size (clamped 1–200) |
+| `publishing_pagination_style` | `"numbered"` | The listing pager (`Web.HTML.pager/1`): `numbered` (first, last, the current page ±2, ±1 on a phone, Previous/Next), `compact` (Previous, "Page 7 of 62", Next and a GET go-to-page box) or `simple` (Previous/Next only); anything else is `numbered`. Read per request, not part of any cache. Every style wraps rather than widening the page |
 | `publishing_reading_wpm` | `200` | Words per minute for the reading-time estimate (clamped 50–1000) |
 | `publishing_editor_lock_minutes` | `30` | Editor owner-lock timeout (clamped 1–480) |
 | `publishing_slug_style` | `"transliterate"` | `transliterate` / `unicode` / `ascii`; anything else, or any error, falls back to `:transliterate` |

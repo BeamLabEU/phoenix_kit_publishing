@@ -479,6 +479,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # ============================================================================
 
   defp handle_group_listing(conn, group_slug, language) do
+    # `?page=` is a query param, like `?q=` (see `search_param/1`): fetched
+    # here, so a host endpoint without Plug.Parsers still pages.
+    conn = Plug.Conn.fetch_query_params(conn)
+
     result =
       case search_param(conn) do
         nil -> Listing.render_group_listing(conn, group_slug, language, conn.params)
@@ -506,6 +510,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:per_page, assigns.per_page)
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
+        |> assign(:pagination_style, pagination_style())
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:search_query, Map.get(assigns, :search_query))
         |> assign(:og, %{
@@ -635,6 +640,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         |> assign(:per_page, assigns.per_page)
         |> assign(:total_count, assigns.total_count)
         |> assign(:total_pages, assigns.total_pages)
+        |> assign(:pagination_style, pagination_style())
         |> assign(:breadcrumbs, assigns.breadcrumbs)
         |> assign(:search_query, nil)
         |> assign(:term_filter, assigns.term_filter)
@@ -841,6 +847,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
   defp public_enabled? do
     Settings.get_boolean_setting("publishing_public_enabled", true)
+  end
+
+  # The site's pager style (`publishing_pagination_style`), read per request
+  # through the settings cache: it is not part of any cached listing.
+  defp pagination_style do
+    PublishingHTML.pagination_style(Settings.get_setting_cached("publishing_pagination_style"))
   end
 
   defp set_gettext_locale(language) do
