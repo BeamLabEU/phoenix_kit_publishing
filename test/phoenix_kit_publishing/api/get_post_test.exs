@@ -83,6 +83,7 @@ defmodule PhoenixKit.Modules.Publishing.API.GetPostTest do
              },
              "tags" => [],
              "category_ids" => [category.uuid],
+             "custom_fields" => %{},
              "url_slug" => "url-slug-value"
            }
   end

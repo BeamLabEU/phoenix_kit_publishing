@@ -90,8 +90,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         "title",
         "og_title",
         "og_description",
-        "og_image_uuid"
+        "og_image_uuid",
+        "custom_fields"
       ])
+      |> Map.update("custom_fields", %{}, &Forms.custom_fields_map/1)
       |> Map.put("content", socket.assigns.content)
 
     params =

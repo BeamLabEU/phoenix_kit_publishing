@@ -642,7 +642,9 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 - **`..._versions`** — source of truth for published state: `post_uuid`,
   `version_number` (unique per post), `status` (draft/published/archived),
   `published_at`, `data` JSONB (`featured_image_uuid`, tags, seo, description,
-  `allow_version_access`, `sitemap_exclude`, notes, `created_from`). Status is
+  `allow_version_access`, `sitemap_exclude`, `custom_fields` (a host's own
+  string fields, normalised by `PublishingVersion.normalize_custom_fields/1`,
+  read as `metadata.custom_fields`), notes, `created_from`). Status is
   version-level: every language in a version shares it.
 - **`..._contents`** — per-language title and body: `version_uuid`, `language`
   (unique per version), `title`, `content` (markdown), `url_slug` (per-language

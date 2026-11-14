@@ -29,6 +29,30 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
 
   defp body(ctx, language \\ "en-US"), do: Fx.content(ctx.post[:uuid], language).content
 
+  test "custom_fields: replaced as a whole, unchanged when equal, null clears, get_post returns them",
+       ctx do
+    assert {:ok,
+            %{
+              "action" => "updated",
+              "changed" => [%{"field" => "custom_fields", "scope" => "version"}]
+            }} =
+             edit(ctx, %{"custom_fields" => %{"Package" => "billing", "version" => "1.0"}})
+
+    assert Fx.version(ctx.post[:uuid]).data["custom_fields"] == %{
+             "package" => "billing",
+             "version" => "1.0"
+           }
+
+    assert {:ok, %{"action" => "unchanged"}} =
+             edit(ctx, %{"custom_fields" => %{"package" => "billing", "version" => "1.0"}})
+
+    assert {:ok, %{"fields" => %{"custom_fields" => %{"version" => "1.0"}}}} =
+             ApiCase.call("publishing.get_post", %{"post" => Fx.ref(ctx.post)})
+
+    assert {:ok, %{"action" => "updated"}} = edit(ctx, %{"custom_fields" => nil})
+    refute Map.has_key?(Fx.version(ctx.post[:uuid]).data, "custom_fields")
+  end
+
   test "a draft edit updates title and content, keeps the slug and never publishes", ctx do
     assert {:ok, %{"action" => "updated", "changed" => changed}} =
              edit(ctx, %{"title" => "New", "content" => "new body"})

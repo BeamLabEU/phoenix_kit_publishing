@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.PublishingVersion
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
   alias PhoenixKit.Modules.Publishing.SitemapRefresh
@@ -1626,6 +1627,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         normalize_featured(Map.get(params, "sitemap_exclude"))
       )
       |> put_audio_uuid(Map.get(params, "audio_uuid"))
+      |> put_custom_fields(params)
 
     # Also update version-level status and published_at if provided.
     # "published" is NEVER written here — it is set atomically with
@@ -1641,6 +1643,21 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     case DBStorage.update_version(version, version_attrs) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Absent: left alone. Present: the whole map is replaced (a field left out
+  # is removed), and an empty map drops the key.
+  defp put_custom_fields(data, params) do
+    case Map.fetch(params, "custom_fields") do
+      :error ->
+        data
+
+      {:ok, fields} ->
+        case PublishingVersion.normalize_custom_fields(fields) do
+          empty when map_size(empty) == 0 -> Map.delete(data, "custom_fields")
+          normalized -> Map.put(data, "custom_fields", normalized)
+        end
     end
   end
 

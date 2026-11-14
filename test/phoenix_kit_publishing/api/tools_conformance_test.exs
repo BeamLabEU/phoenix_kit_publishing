@@ -306,7 +306,9 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
 
   # Properties that are maps from a language code to a text: their keys are free, the handler
   # checks the codes and the values.
-  @free_key_maps ~w(name_i18n)
+  # Maps keyed by the caller: name_i18n (language codes), custom_fields (a
+  # post's own field names, checked by PublishingVersion.normalize_custom_fields/1).
+  @free_key_maps ~w(name_i18n custom_fields)
 
   # Every object node of an input schema, at any depth, is closed.
   defp assert_closed(%{} = schema, path, name) do
