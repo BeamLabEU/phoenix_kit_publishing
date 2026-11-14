@@ -282,8 +282,8 @@ defmodule PhoenixKitPublishing.Migrations do
   @post_categories "phoenix_kit_publishing_post_categories"
   @post_views "phoenix_kit_publishing_post_views"
 
-  # V2's two objects — the only things this chain has ever created that
-  # core's baseline does not. Named in core's `idx_publishing_<table>_<what>`
+  # V2's two objects — with V3's `data` column on the categories table, the
+  # only things this chain has created that core's baseline does not. Named in core's `idx_publishing_<table>_<what>`
   # style so a catalog listing reads as one family.
   @groups_media_folder_index "idx_publishing_groups_media_folder"
   @versions_media_folder_index "idx_publishing_versions_media_folder"
@@ -351,8 +351,8 @@ defmodule PhoenixKitPublishing.Migrations do
   @doc """
   Rolls back to `opts[:version]` (default `0`). Migration-context only.
   Never drops a table or a row in any of the 7, for any target — see the
-  moduledoc. Below V2 it removes V2's two expression indexes (the only
-  objects this chain ever added), matched by shape, and nothing else.
+  moduledoc. Below V2 it removes V2's two expression indexes, matched by
+  shape, and nothing else; V3's column stays with its contents.
   """
   @spec down(keyword() | map()) :: :ok
   def down(opts \\ []) do

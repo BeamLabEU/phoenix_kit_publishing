@@ -119,4 +119,16 @@ defmodule PhoenixKit.Modules.Publishing.ListPublishedTest do
     assert PublishingHTML.build_post_url(slug, post, PublishingHTML.url_context(nil)) ==
              PublishingHTML.build_post_url(slug, post, nil)
   end
+
+  test "a blank description gives way to the excerpt of the body", %{slug: slug} do
+    {:ok, post} =
+      Posts.create_post(slug, %{title: "Blank description", content: "Body text here."})
+
+    {:ok, read} = Posts.read_post_by_uuid(post[:uuid])
+    {:ok, _} = Posts.update_post(slug, read, %{"description" => ""}, %{publish: false})
+    :ok = Versions.publish_version(slug, post[:uuid], 1)
+
+    {:ok, %{entries: entries}} = Publishing.list_published(slug, per_page: 100)
+    assert %{excerpt: "Body text here."} = Enum.find(entries, &(&1.uuid == post[:uuid]))
+  end
 end

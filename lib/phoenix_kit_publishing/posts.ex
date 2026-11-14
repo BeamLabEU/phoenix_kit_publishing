@@ -268,6 +268,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     opts = Map.new(opts)
 
     with :ok <- check_import_shapes(attrs),
+         :ok <- check_import_title(attrs, opts),
          {:ok, published_at} <- import_published_at(attrs["published_at"]),
          {:ok, category_uuids} <- import_category_uuids(group_slug, attrs),
          {:ok, post} <-
@@ -290,22 +291,40 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   # Every attr's shape is checked before anything is written, so a bad one
-  # never leaves a half-made post behind.
+  # never leaves a half-made post behind. Text must be storable too: Postgres
+  # refuses a NUL byte and JSON invalid UTF-8, and either one used to fail
+  # the import after its post was created (a retrying importer then made a
+  # duplicate per attempt).
   @import_text_keys ~w(title content slug description seo_title excerpt featured_image_uuid
                        og_title og_description og_image_uuid)
 
   defp check_import_shapes(attrs) do
     checks = [
-      Enum.all?(@import_text_keys, &(is_nil(attrs[&1]) or is_binary(attrs[&1]))),
+      Enum.all?(@import_text_keys, &storable_text?(attrs[&1])),
       is_nil(attrs["og"]) or
-        (is_map(attrs["og"]) and
-           Enum.all?(Map.values(attrs["og"]), &(is_nil(&1) or is_binary(&1)))),
+        (is_map(attrs["og"]) and Enum.all?(Map.values(attrs["og"]), &storable_text?/1)),
       Enum.all?(~w(category_slugs category_uuids), &string_list?(attrs[&1])),
       is_nil(attrs["custom_fields"]) or is_map(attrs["custom_fields"]) or
         is_list(attrs["custom_fields"])
     ]
 
     if Enum.all?(checks), do: :ok, else: {:error, :invalid_format}
+  end
+
+  defp storable_text?(nil), do: true
+
+  defp storable_text?(text) when is_binary(text),
+    do: String.valid?(text) and not String.contains?(text, <<0>>)
+
+  defp storable_text?(_other), do: false
+
+  # Publishing needs a title (`:title_required`); known before the post exists.
+  defp check_import_title(attrs, opts) do
+    title = attrs["title"]
+
+    if Map.get(opts, :publish, true) != false and (is_nil(title) or String.trim(title) == ""),
+      do: {:error, :title_required},
+      else: :ok
   end
 
   defp string_list?(nil), do: true
@@ -1289,8 +1308,9 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   # The free minute nearest the wanted one for a timestamp-mode post: the
-  # wanted minute, else the earlier ones (up to an hour back), else the later
-  # ones. Earlier first, so a post created in a taken minute stays visible: a
+  # wanted minute, else the earlier ones (up to an hour back, never across
+  # midnight: the date is the post's URL and must stay the wanted one), else
+  # the later ones. Earlier first, so a post created in a taken minute stays visible: a
   # later minute is in the future, where a timestamp post is not published yet
   # (two posts made in the same minute used to push each other a minute ahead,
   # hidden until then). Gives back the wanted minute when the whole window is
@@ -1308,11 +1328,13 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     Enum.find_value(offsets, {date, time}, fn offset ->
       candidate = NaiveDateTime.add(wanted, offset * 60)
       {c_date, c_time} = {NaiveDateTime.to_date(candidate), NaiveDateTime.to_time(candidate)}
+      same_day? = offset >= 0 or c_date == date
 
       # Trashed-INCLUSIVE check: the unique index includes trashed rows, so a
       # version that only looked at live posts would keep handing back a slot
       # the DB rejects, and the collision retry could never converge (M2/M1).
-      if slot_free?(group_slug, c_date, c_time, except_post_uuid), do: {c_date, c_time}
+      if same_day? and slot_free?(group_slug, c_date, c_time, except_post_uuid),
+        do: {c_date, c_time}
     end)
   end
 
@@ -1332,7 +1354,11 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       is_nil(db_post) ->
         {:error, :not_found}
 
-      post[:mode] in @timestamp_modes || db_post.mode == "timestamp" ->
+      # The stored row decides, not the caller's map: an editor opened before
+      # the group was converted to slug URLs still holds a timestamp post, and
+      # saving it down this branch wrote the content and then raised reading
+      # the post back by a slug of nil.
+      db_post.mode == "timestamp" ->
         do_update_post_in_db(db_post, post, params, group_slug, nil, audit_meta, locked_check)
 
       true ->
@@ -1341,7 +1367,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         # the post to its new address. The UI reported a failed save while the
         # old URL had already stopped working, and the redirect that would have
         # covered it is recorded by the part that rolled back.
-        desired_slug = Map.get(params, "slug", post.slug)
+        desired_slug = Map.get(params, "slug") || post[:slug] || db_post.slug
 
         do_update_post_in_db(
           db_post,
@@ -1584,7 +1610,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         version_number
       )
     else
-      DBStorage.read_post(group_slug, final_slug, language, version_number)
+      DBStorage.read_post(group_slug, final_slug || db_post.slug, language, version_number)
     end
   end
 

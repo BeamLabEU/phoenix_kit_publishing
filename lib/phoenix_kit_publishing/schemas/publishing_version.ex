@@ -208,6 +208,62 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
 
   def normalize_custom_fields(_fields), do: %{}
 
+  @doc """
+  Whether a map of custom fields would be stored as given: `:ok`, or
+  `{:error, message}` naming the first thing `normalize_custom_fields/1`
+  would drop or cut without saying so — more than #{@max_custom_fields}
+  fields, a key with nothing left of it, two keys that normalise to one, a
+  value that is not text, a number or a boolean, or one over
+  #{@max_custom_value} characters. A blank or `nil` value is allowed: it
+  leaves the field out. For a caller that must refuse instead of trimming
+  (the machine API); the editor's rows go through `normalize_custom_fields/1`.
+  """
+  @spec check_custom_fields(term()) :: :ok | {:error, String.t()}
+  def check_custom_fields(nil), do: :ok
+
+  def check_custom_fields(fields) when is_map(fields) and not is_struct(fields) do
+    kept = Enum.reject(fields, fn {_key, value} -> blank_custom_value?(value) end)
+    keys = Enum.map(kept, fn {key, _value} -> custom_field_key(key) end)
+
+    cond do
+      Enum.any?(keys, &is_nil/1) ->
+        {:error, "a field name must hold a letter or a digit"}
+
+      length(Enum.uniq(keys)) != length(keys) ->
+        {:error, "two field names are the same once normalised to [a-z0-9_]"}
+
+      length(keys) > @max_custom_fields ->
+        {:error, "at most #{@max_custom_fields} fields"}
+
+      true ->
+        Enum.find_value(kept, :ok, fn {key, value} -> check_custom_value(key, value) end)
+    end
+  end
+
+  def check_custom_fields(_fields), do: {:error, "must be an object"}
+
+  defp blank_custom_value?(nil), do: true
+  defp blank_custom_value?(value) when is_binary(value), do: String.trim(value) == ""
+  defp blank_custom_value?(_value), do: false
+
+  defp check_custom_value(key, value) when is_binary(value) do
+    cond do
+      not String.valid?(value) or String.contains?(value, <<0>>) ->
+        {:error, "#{key}: the value is not valid text"}
+
+      String.length(String.trim(value)) > @max_custom_value ->
+        {:error, "#{key}: at most #{@max_custom_value} characters"}
+
+      true ->
+        nil
+    end
+  end
+
+  defp check_custom_value(_key, value) when is_number(value) or is_boolean(value), do: nil
+
+  defp check_custom_value(key, _value),
+    do: {:error, "#{key}: must be text, a number or a boolean"}
+
   @doc "A custom field key as stored, or nil when nothing of it is left."
   @spec custom_field_key(term()) :: String.t() | nil
   def custom_field_key(key) when is_binary(key) or is_atom(key) do

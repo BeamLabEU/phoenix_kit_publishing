@@ -302,7 +302,9 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
 - **Dual URL modes** (`"timestamp"` / `"slug"`) are set at group creation. The
   one change is `Publishing.convert_to_slug_mode/2` (`ModeConversion`, the
   "Readable URLs" button on the group's edit page): timestamp to slug, one way,
-  every post given a unique slug from its title in one transaction; posts keep
+  every post given a unique slug from its title in one transaction (refused
+  with `:scheduled_posts` while a live post is dated ahead, since only a
+  timestamp post is held back until its date); posts keep
   `post_date`/`post_time`, and a date URL in a slug group answers with a 301 to
   the post's slug URL (`converted_group_url/4` in `Web.Controller`).
 - **Content format** is Markdown plus inline PHK XML components (`<Image>`,
@@ -635,7 +637,7 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
 
 - **`..._groups`** — content containers. `name`, `slug` (unique), `mode`
   (`"timestamp"` / `"slug"`), `status` (`"active"` / `"trashed"`), `position`;
-  `data` JSONB holds type, item names, icon, feature flags, the ~23 display
+  `data` JSONB holds type, item names, icon, feature flags, the 36 display
   settings (including `sitemap_exclude`, read by core's Sitemap source off
   the `list_groups/0` map) and `name_i18n`; `title_i18n` / `description_i18n`
   are reserved.

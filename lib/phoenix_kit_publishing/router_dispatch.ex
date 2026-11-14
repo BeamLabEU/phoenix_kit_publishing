@@ -146,14 +146,24 @@ defmodule PhoenixKitPublishing.RouterDispatch do
     |> Enum.sort_by(&length/1, :desc)
     |> Enum.find_value(:pass, fn segments ->
       with {:ok, rest} <- strip_prefix(path_info, segments),
-           {:rewrite, _conn} = rewritten <-
+           {:rewrite, rewritten} <-
              rest |> dispatch_target() |> dispatch(conn, prefix_segments, rest) do
-        rewritten
+        {:rewrite, mark_non_public_prefix(rewritten, segments != public_segments)}
       else
         _ -> nil
       end
     end)
   end
+
+  # The request came in under the kit prefix while the public pages live
+  # under another: the controllers' canonical check reads this and answers
+  # with a 301 to the public URL (`Language.canonical_redirect?/4`). Without
+  # it only a request whose LANGUAGE was non-canonical was redirected, and a
+  # site with one prefixless language served every page at both addresses.
+  defp mark_non_public_prefix(conn, false), do: conn
+
+  defp mark_non_public_prefix(conn, true),
+    do: Plug.Conn.put_private(conn, :phoenix_kit_publishing_non_public_prefix, true)
 
   # A URL locale segment is valid only if it's an enabled language, or a base code
   # (e.g. "en") that resolves to an enabled dialect (e.g. "en-US"). This is stricter

@@ -31,6 +31,25 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategoriesTest do
   defp stored(g, slug), do: Enum.find(Common.categories!(g["slug"]), &(&1.slug == slug))
   defp actions(result), do: result |> elem(1) |> Map.fetch!("results") |> Enum.map(& &1["action"])
 
+  test "an over-long display value is its row's error; the rest of the batch runs", %{g: g} do
+    assert {:ok, %{"results" => [%{"action" => "created"}, bad, %{"action" => "created"}]}} =
+             upsert(g, [
+               %{"slug" => "ok", "name" => "Ok"},
+               %{"slug" => "long", "name" => "Long", "seo_title" => String.duplicate("x", 121)},
+               # padding is trimmed before the length is measured
+               %{
+                 "slug" => "padded",
+                 "name" => "Padded",
+                 "seo_title" => "  Title" <> String.duplicate(" ", 200)
+               }
+             ])
+
+    assert bad["action"] != "created"
+    assert stored(g, "ok")
+    refute stored(g, "long")
+    assert stored(g, "padded").data["seo_title"] == "Title"
+  end
+
   test "creates by slug: stored with its name and position, attributed", %{g: g} do
     assert {:ok, %{"results" => [%{"action" => "created", "id" => id}]}} =
              upsert(g, [%{"slug" => "news", "name" => "News", "position" => 3}])

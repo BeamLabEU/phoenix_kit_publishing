@@ -45,6 +45,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
     with :ok <- not_empty(input),
          :ok <- texts(input),
          :ok <- title_present(input),
+         :ok <- custom_fields(input),
          {:ok, input} <- images(input),
          {:ok, hit} <- Refs.resolve_post(input["post"], []) |> Refs.post_error(input["post"]),
          :ok <- Refs.ensure_group_active(hit.group) |> Refs.group_error(),
@@ -102,6 +103,18 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePost do
   end
 
   defp title_present(_input), do: :ok
+
+  # The stored form drops and trims quietly (it also reads the editor's rows);
+  # an API write that would lose something is refused instead, as for every
+  # other field.
+  defp custom_fields(%{"custom_fields" => fields}) do
+    case PublishingVersion.check_custom_fields(fields) do
+      :ok -> :ok
+      {:error, message} -> Common.invalid("custom_fields", message, "invalid_custom_fields")
+    end
+  end
+
+  defp custom_fields(_input), do: :ok
 
   defp images(input) do
     Enum.reduce_while(@image_fields, {:ok, input}, fn field, {:ok, acc} ->

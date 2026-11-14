@@ -250,7 +250,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ToolsConformanceTest do
       title_required unknown_category content_too_large not_published not_timestamp_group slot_taken schedule_in_past mode_locked
       immutable_field invalid_setting parent_not_found parent_wrong_group category_cycle ai_not_configured nothing_to_translate
       cursor_stale empty_translation language_missing unknown_file primary_language exclusive_fields
-      invalid_datetime)
+      invalid_datetime invalid_custom_fields)
 
     warnings = ~w(language_missing limit_trimmed unfile_incomplete empty_translation)
 

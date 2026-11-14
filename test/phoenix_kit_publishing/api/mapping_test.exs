@@ -48,7 +48,7 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
   # Everything else is internal_error
   @internal ~w(db_update_failed content_copy_failed params_not_applied no_uuid cache_miss no_active_version no_version
                invalid_content invalid_path invalid_order invalid_status cannot_delete_live cannot_delete_primary_language
-               last_language last_version destination_exists version_access_disabled unpublished)a
+               last_language last_version destination_exists version_access_disabled unpublished scheduled_posts)a
 
   # A literal copy of Errors.error_atom() (lib/phoenix_kit_publishing/errors.ex) plus the extra atoms the API maps.
   @error_atoms ~w(already_exists cache_miss cannot_delete_live category_cycle conflicts_with_post_slug db_update_failed
@@ -57,7 +57,7 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
     no_published_version no_uuid not_found not_published params_not_applied parent_not_found parent_wrong_group post_not_found
     post_trashed resource_not_found reserved_language_code reserved_route_word slug_already_exists slug_taken
     timestamp_collision_unresolvable title_required unpublished version_access_disabled ai_disabled ai_no_prompt
-    ai_endpoint_not_found ai_endpoint_disabled category_not_found invalid_published_at)a ++
+    ai_endpoint_not_found ai_endpoint_disabled category_not_found invalid_published_at scheduled_posts)a ++
                  ~w(source_not_found no_active_version no_version conflicts_with_previous_slug version_not_found
                      content_copy_failed went_live locked_check_failed)a
 

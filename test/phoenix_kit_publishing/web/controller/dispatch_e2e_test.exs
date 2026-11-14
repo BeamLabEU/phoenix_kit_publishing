@@ -173,7 +173,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
 
     :ok = Versions.publish_version(gb_slug, post.uuid, 1)
 
-    conn = build_conn() |> get("#{@prefix}/en-gb/#{gb_slug}")
+    # This harness serves the public pages at "/" and the kit at @prefix, so
+    # the kit-prefixed URL answers with a 301 to the public one: the
+    # sibling's OWN address, never the primary's /en/.
+    kit_conn = build_conn() |> get("#{@prefix}/en-gb/#{gb_slug}")
+    assert kit_conn.status == 301
+    assert location(kit_conn) == "/en-gb/#{gb_slug}"
+    assert_no_internal_leak(kit_conn)
+
+    conn = build_conn() |> get("/en-gb/#{gb_slug}")
 
     # The old core plug 301'd /en-gb/... to /en/... before publishing ran;
     # with the paired core change the sibling listing renders directly.
@@ -211,6 +219,25 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DispatchE2eTest do
       for path_info <- [["not-a-group-#{slug}"], ["phoenix_kit", "not-a-group-#{slug}"]] do
         conn = %Plug.Conn{path_info: path_info, request_path: "/" <> Enum.join(path_info, "/")}
         assert RouterDispatch.maybe_rewrite(conn, @prefix) == :pass
+      end
+    end
+
+    # The redirect used to ride on the language check alone: with one
+    # prefixless language nothing was non-canonical, and every page was
+    # served at both addresses.
+    test "the kit-prefixed URL 301s whatever the language setup", %{slug: slug} do
+      {:ok, _} = Settings.update_boolean_setting("languages_enabled", false)
+
+      for {path, public} <- [
+            {"#{@prefix}/#{slug}/routed", "/#{slug}/routed"},
+            {"#{@prefix}/#{slug}", "/#{slug}"},
+            {"#{@prefix}/#{slug}/feed.xml", "/#{slug}/feed.xml"}
+          ] do
+        conn = build_conn() |> get(path)
+        assert conn.status == 301, "#{path} answered #{conn.status}"
+        assert get_resp_header(conn, "location") == [public]
+
+        assert build_conn() |> get(public) |> Map.get(:status) == 200
       end
     end
 

@@ -66,6 +66,7 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
           | :invalid_content
           | :invalid_format
           | :invalid_mode
+          | :scheduled_posts
           | :invalid_name
           | :invalid_order
           | :invalid_path
@@ -139,6 +140,10 @@ defmodule PhoenixKit.Modules.Publishing.Errors do
   def message(:invalid_content), do: gettext("Invalid content")
   def message(:invalid_format), do: gettext("Invalid format")
   def message(:invalid_mode), do: gettext("Invalid mode")
+
+  def message(:scheduled_posts),
+    do: gettext("This group has scheduled posts; publish or unschedule them first")
+
   def message(:invalid_name), do: gettext("Invalid name")
   def message(:invalid_order), do: gettext("Invalid order")
   def message(:invalid_path), do: gettext("Invalid path")

@@ -352,9 +352,11 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
   # would reject the whole call.
   # A post's own fields: a free-key map like name_i18n (core's validator has
   # no keyword for its values), so PublishingVersion.normalize_custom_fields/1
-  # is the check: names normalised to [a-z0-9_], values strings (numbers and
-  # booleans as text) of at most 2 000 characters, blanks dropped, at most 30;
-  # null clears them all.
+  # is the stored form: names normalised to [a-z0-9_], values strings
+  # (numbers and booleans as text), blanks dropped; null clears them all.
+  # `update_post` refuses (`invalid_custom_fields`) what that would lose: more
+  # than 30 fields, a value over 2 000 characters or of another type, two
+  # names that normalise to one.
   defp custom_fields_schema, do: %{"type" => ["object", "null"]}
 
   def upsert_categories do
@@ -367,11 +369,13 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
         "name_i18n" => %{"type" => "object"},
         "parent" => %{"type" => ["object", "null"]},
         "position" => %{"type" => "integer"},
-        # PublishingCategory.data — null or "" removes the value
-        "color" => %{"type" => ["string", "null"], "maxLength" => 20},
-        "icon" => %{"type" => ["string", "null"], "maxLength" => 100},
-        "seo_title" => %{"type" => ["string", "null"], "maxLength" => 120},
-        "seo_description" => %{"type" => ["string", "null"], "maxLength" => 320}
+        # PublishingCategory.data — null or "" removes the value. Outer
+        # bounds like the caps above: the real limits (and padding trimmed
+        # first) are the handler's, so an over-long one is that row's error.
+        "color" => %{"type" => ["string", "null"], "maxLength" => 200},
+        "icon" => %{"type" => ["string", "null"], "maxLength" => 200},
+        "seo_title" => %{"type" => ["string", "null"], "maxLength" => 5000},
+        "seo_description" => %{"type" => ["string", "null"], "maxLength" => 5000}
       })
 
     object(

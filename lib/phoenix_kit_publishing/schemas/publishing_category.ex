@@ -164,9 +164,12 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
       data = Map.merge(get_field(changeset, :data) || %{}, given)
       data = for {k, v} <- data, v != "", into: %{}, do: {k, v}
 
+      # Only what this write gives is checked: a stored value that fails
+      # today's rules reads as absent (`color/1`, `icon/1`) and must not
+      # refuse an edit of another field.
       changeset
       |> put_change(:data, data)
-      |> validate_display_data(data)
+      |> validate_display_data(Map.take(data, Map.keys(given)))
     end
   end
 

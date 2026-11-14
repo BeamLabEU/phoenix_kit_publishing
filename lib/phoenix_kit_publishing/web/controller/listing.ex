@@ -394,6 +394,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
 
   defp filter_by_search(posts, _search), do: posts
 
+  defp present(text) when is_binary(text), do: if(String.trim(text) == "", do: nil, else: text)
+  defp present(_other), do: nil
+
   defp published_entry(post, group_slug, ctx, date_counts, index, opts) do
     metadata = post.metadata || %{}
 
@@ -401,7 +404,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
       uuid: post.uuid,
       title: metadata[:title] || Constants.default_title(),
       description: metadata[:description],
-      excerpt: metadata[:description] || PublishingHTML.extract_excerpt(post[:content] || ""),
+      excerpt:
+        present(metadata[:description]) || PublishingHTML.extract_excerpt(post[:content] || ""),
       url: PublishingHTML.build_post_url(group_slug, post, ctx, date_counts),
       published_at: metadata[:published_at],
       featured_image_uuid: metadata[:featured_image_uuid],

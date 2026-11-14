@@ -205,7 +205,7 @@ What the rule does NOT do:
 - **language-level** (`"scope": "language"`): `title`, `content`, `og_title`, `og_description`, `og_image_id`. When any `og_*` is sent, all three are written, the unspecified ones kept.
 - **post-level** (`"scope": "post"`): `slug`, slug-mode groups only (`slug_not_allowed` otherwise). A rename moves the live URL, so it needs a confirmation on a post with a live version even when the written version is a draft.
 
-A string field accepts `null`, meaning "clear" (stored as an empty string; `title` cannot be cleared). An absent key means "keep". `featured_image_id` and `og_image_id` are ids of files of the media library (UUIDs) or `null`; an id that names no file, a trashed file or a system file is `unknown_file`. `category_ids` (up to 50) must be categories of the post's group (`unknown_category`). At least one field is required (`empty_update`). A request that changes nothing answers `unchanged` and writes nothing. `update_post` never publishes (`publish: false` always) and never sends `status`, `published_at` or `url_slug`. The language must already have text on the version; `set_translation` creates a language.
+A string field accepts `null`, meaning "clear" (stored as an empty string; `title` cannot be cleared). An absent key means "keep". `featured_image_id` and `og_image_id` are ids of files of the media library (UUIDs) or `null`; an id that names no file, a trashed file or a system file is `unknown_file`. `category_ids` (up to 50) must be categories of the post's group (`unknown_category`). `custom_fields` is an object of the post's own fields (version-level, shared by every language) and replaces them as a whole; `null` clears them, a blank value leaves that field out, and names are normalised to `[a-z0-9_]` (`invalid_custom_fields` when something would be lost). At least one field is required (`empty_update`). A request that changes nothing answers `unchanged` and writes nothing. `update_post` never publishes (`publish: false` always) and never sends `status`, `published_at` or `url_slug`. The language must already have text on the version; `set_translation` creates a language.
 
 **Tags are derived.** Tags come from `#hashtags` in the body on save; there is no `tags` input.
 
@@ -251,6 +251,7 @@ Reasons:
 |---|---|
 | `invalid_ref` | a post, group or category ref is not one of the accepted forms, or names the same record twice in one batch |
 | `empty_update` | `update_post` was given no field to change |
+| `invalid_custom_fields` | `update_post`'s `custom_fields` would not be stored as given: more than 30 fields, a value over 2,000 characters or one that is not text, a number or a boolean, a name with no letter or digit, or two names that are the same once normalised to `[a-z0-9_]` |
 | `no_draft_version` | a write without `version` and no draft version exists |
 | `version_not_found` | the named version does not exist |
 | `language_not_enabled` | the language is not enabled (`allowed` lists the codes), or `translate_post` was asked to translate into the primary language |

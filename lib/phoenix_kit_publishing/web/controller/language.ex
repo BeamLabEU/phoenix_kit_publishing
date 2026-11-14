@@ -289,7 +289,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Whether a request must 301 onto `canonical_url` — the one rule for post,
   listing, term-archive and feed URLs.
 
-  Three shapes are non-canonical: the language resolved to another code
+  Four shapes are non-canonical: the request came in under the kit prefix
+  while the public pages live under `:public_url_prefix` (`RouterDispatch`
+  marks it), the language resolved to another code
   (`/en-US/…` when one English dialect is enabled and the display code is
   `en`), the prefix is redundant for a prefixless default, or the URL's
   language SEGMENT is not the display segment while the language itself is
@@ -300,7 +302,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   """
   @spec canonical_redirect?(Plug.Conn.t(), String.t(), String.t(), String.t()) :: boolean()
   def canonical_redirect?(conn, language, canonical_language, canonical_url) do
-    (canonical_language != language or
+    (conn.private[:phoenix_kit_publishing_non_public_prefix] == true or
+       canonical_language != language or
        prefixed_default_language_request?(conn, canonical_language) or
        non_canonical_language_segment?(conn, language, canonical_language)) and
       not request_matches_canonical_url?(conn, canonical_url)

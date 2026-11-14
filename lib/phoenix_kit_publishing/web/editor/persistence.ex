@@ -628,15 +628,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
   # input-less field adopts the echo, which can't fight a typist who has no
   # input to type in. New posts and new translations adopt everything —
   # creation may legitimately rewrite the slug (uniquification), and the
-  # writer isn't focused in these fields then.
+  # writer isn't focused in these fields then. The custom-field rows are kept
+  # too: the stored form is a map (sorted by name, blank rows gone), and the
+  # inputs are named by row index, so adopting it mid-typing dropped the row
+  # being typed and moved the others under the writer's cursor.
   defp preserve_live_buffers(form, socket) do
     if socket.assigns[:is_new_post] || socket.assigns[:is_new_translation] do
       form
     else
       preserved_keys =
         if socket.assigns[:is_primary_language],
-          do: ["title", "slug"],
-          else: ["title", "url_slug"]
+          do: ["title", "slug", "custom_fields"],
+          else: ["title", "url_slug", "custom_fields"]
 
       Map.merge(form, Map.take(socket.assigns.form, preserved_keys))
     end

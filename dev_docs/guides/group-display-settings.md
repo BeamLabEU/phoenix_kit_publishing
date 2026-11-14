@@ -46,6 +46,11 @@ admin opts in — with these nuances:
   a category, newest first, under the post). A category's colour, icon and
   archive SEO texts live on the category itself (`PublishingCategory`, module
   chain V3).
+- `public_listing` (`publishing` / `host` / `host_with_archives`, default
+  `publishing`): who serves the group's listing page. With `host` the bare
+  listing path goes to the host's router; with `host_with_archives` the
+  category and tag archives go too. Posts and feeds always stay with
+  Publishing (`RouterDispatch`; see `router-dispatch.md`).
 
 Both bands also carry a **style** key (`featured_style` / `newest_style`:
 `classic | cover | cover_panel | minimal | top`, default `classic`) orthogonal to

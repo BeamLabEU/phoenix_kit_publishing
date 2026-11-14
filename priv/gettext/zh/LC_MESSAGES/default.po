@@ -31,8 +31,8 @@ msgstr "“翻译为所有语言”将为所有已启用的语言创建或覆盖
 #: lib/phoenix_kit_publishing/web/html.ex:2683
 #: lib/phoenix_kit_publishing/web/html.ex:2698
 #: lib/phoenix_kit_publishing/web/html.ex:2706
-#: lib/phoenix_kit_publishing/web/html.ex:3000
-#: lib/phoenix_kit_publishing/web/html.ex:3004
+#: lib/phoenix_kit_publishing/web/html.ex:3015
+#: lib/phoenix_kit_publishing/web/html.ex:3019
 #, elixir-autogen, elixir-format
 msgid "%B %-d, %Y"
 msgstr "%Y年%-m月%-d日"
@@ -53,7 +53,7 @@ msgstr[0] "%{count} 个版本"
 
 #: lib/phoenix_kit_publishing/web/html.ex:2700
 #: lib/phoenix_kit_publishing/web/html.ex:2708
-#: lib/phoenix_kit_publishing/web/html.ex:3017
+#: lib/phoenix_kit_publishing/web/html.ex:3032
 #: lib/phoenix_kit_publishing/web/listing.ex:772
 #: lib/phoenix_kit_publishing/web/listing.ex:797
 #, elixir-autogen, elixir-format
@@ -95,27 +95,27 @@ msgstr "AI 翻译"
 msgid "AI Translation"
 msgstr "AI 翻译"
 
-#: lib/phoenix_kit_publishing/errors.ex:199
+#: lib/phoenix_kit_publishing/errors.ex:203
 #, elixir-autogen, elixir-format
 msgid "AI endpoint is disabled"
 msgstr "AI 端点已停用"
 
-#: lib/phoenix_kit_publishing/errors.ex:198
+#: lib/phoenix_kit_publishing/errors.ex:202
 #, elixir-autogen, elixir-format
 msgid "AI endpoint not found"
 msgstr "未找到 AI 端点"
 
-#: lib/phoenix_kit_publishing/errors.ex:196
+#: lib/phoenix_kit_publishing/errors.ex:200
 #, elixir-autogen, elixir-format
 msgid "AI module is not enabled"
 msgstr "AI 模块未启用"
 
-#: lib/phoenix_kit_publishing/errors.ex:210
+#: lib/phoenix_kit_publishing/errors.ex:214
 #, elixir-autogen, elixir-format
 msgid "AI request failed: %{reason}"
 msgstr "AI 请求失败：%{reason}"
 
-#: lib/phoenix_kit_publishing/errors.ex:202
+#: lib/phoenix_kit_publishing/errors.ex:206
 #, elixir-autogen, elixir-format
 msgid "AI translation failed: %{reason}"
 msgstr "AI 翻译失败：%{reason}"
@@ -156,7 +156,7 @@ msgstr "所有语言均已有翻译"
 msgid "All versions of this post have been deleted. Please navigate away."
 msgstr "此帖子的所有版本均已被删除。请离开此页面。"
 
-#: lib/phoenix_kit_publishing/errors.ex:121
+#: lib/phoenix_kit_publishing/errors.ex:122
 #, elixir-autogen, elixir-format
 msgid "Already exists"
 msgstr "已存在"
@@ -176,12 +176,12 @@ msgstr "另一位用户正在编辑此帖子。您可以查看，但无法进行
 msgid "Applies to all languages in this version."
 msgstr "适用于此版本中的所有语言。"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3545
+#: lib/phoenix_kit_publishing/web/html.ex:3572
 #, elixir-autogen, elixir-format
 msgid "Apr"
 msgstr "4月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3528
+#: lib/phoenix_kit_publishing/web/html.ex:3555
 #, elixir-autogen, elixir-format
 msgid "April"
 msgstr "4月"
@@ -198,12 +198,12 @@ msgstr "4月"
 msgid "Archived"
 msgstr "已归档"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3552
+#: lib/phoenix_kit_publishing/web/html.ex:3579
 #, elixir-autogen, elixir-format
 msgid "Aug"
 msgstr "8月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3532
+#: lib/phoenix_kit_publishing/web/html.ex:3559
 #, elixir-autogen, elixir-format
 msgid "August"
 msgstr "8月"
@@ -246,7 +246,7 @@ msgstr "缓存未命中"
 msgid "Cache cleared for %{group}"
 msgstr "已清除 %{group} 的缓存"
 
-#: lib/phoenix_kit_publishing/errors.ex:122
+#: lib/phoenix_kit_publishing/errors.ex:123
 #, elixir-autogen, elixir-format
 msgid "Cache miss"
 msgstr "缓存未命中"
@@ -272,17 +272,17 @@ msgstr "已发布帖子的渲染 HTML 缓存。使用内容哈希作为键，因
 msgid "Cancel"
 msgstr "取消"
 
-#: lib/phoenix_kit_publishing/errors.ex:158
+#: lib/phoenix_kit_publishing/errors.ex:162
 #, elixir-autogen, elixir-format
 msgid "Cannot delete the last language"
 msgstr "无法删除最后一种语言"
 
-#: lib/phoenix_kit_publishing/errors.ex:159
+#: lib/phoenix_kit_publishing/errors.ex:163
 #, elixir-autogen, elixir-format
 msgid "Cannot delete the last version"
 msgstr "无法删除最后一个版本"
 
-#: lib/phoenix_kit_publishing/errors.ex:123
+#: lib/phoenix_kit_publishing/errors.ex:124
 #, elixir-autogen, elixir-format
 msgid "Cannot delete the live version"
 msgstr "无法删除线上版本"
@@ -407,7 +407,7 @@ msgstr "控制默认语言在公开 URL 中是否保留其语言段。"
 msgid "Copy from v%{version}"
 msgstr "从 v%{version} 复制"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1092
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1095
 #, elixir-autogen, elixir-format
 msgid "Could not reload post - it may have been moved or deleted"
 msgstr "无法重新加载帖子——它可能已被移动或删除"
@@ -473,8 +473,8 @@ msgstr "无法恢复此分组。"
 msgid "Couldn't restore this post."
 msgstr "无法恢复此帖子。"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:765
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:875
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:768
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:878
 #, elixir-autogen, elixir-format
 msgid "Couldn't save this post."
 msgstr "无法保存此帖子。"
@@ -574,7 +574,7 @@ msgstr "%{language} 的自定义 URL slug“%{slug}”已被清除，因为它�
 msgid "Custom URL slug '%{slug}' was cleared from %{count} translations because it conflicts with another post's post slug"
 msgstr "自定义 URL slug“%{slug}”已从 %{count} 个翻译中清除，因为它与另一篇帖子的帖子 slug 冲突"
 
-#: lib/phoenix_kit_publishing/errors.ex:135
+#: lib/phoenix_kit_publishing/errors.ex:136
 #, elixir-autogen, elixir-format
 msgid "Database update failed"
 msgstr "数据库更新失败"
@@ -584,12 +584,12 @@ msgstr "数据库更新失败"
 msgid "Date"
 msgstr "日期"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3556
+#: lib/phoenix_kit_publishing/web/html.ex:3583
 #, elixir-autogen, elixir-format
 msgid "Dec"
 msgstr "12月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3536
+#: lib/phoenix_kit_publishing/web/html.ex:3563
 #, elixir-autogen, elixir-format
 msgid "December"
 msgstr "12月"
@@ -647,7 +647,7 @@ msgstr "正在删除…"
 msgid "Description"
 msgstr "描述"
 
-#: lib/phoenix_kit_publishing/errors.ex:136
+#: lib/phoenix_kit_publishing/errors.ex:137
 #, elixir-autogen, elixir-format
 msgid "Destination already exists"
 msgstr "目标已存在"
@@ -720,7 +720,7 @@ msgstr "缓存条目数"
 msgid "Error rendering markdown"
 msgstr "渲染 Markdown 时出错"
 
-#: lib/phoenix_kit_publishing/errors.ex:187
+#: lib/phoenix_kit_publishing/errors.ex:191
 #, elixir-autogen, elixir-format
 msgid "Every time slot on this post's date is taken. Change the date or time, then try again."
 msgstr "此帖子日期的所有时间段均已被占用。请更改日期或时间，然后重试。"
@@ -730,12 +730,12 @@ msgstr "此帖子日期的所有时间段均已被占用。请更改日期或时
 msgid "Examples: \"Create new %{singular}\", \"View all %{plural}\""
 msgstr "示例：“新建 %{singular}”、“查看所有 %{plural}”"
 
-#: lib/phoenix_kit_publishing/errors.ex:206
+#: lib/phoenix_kit_publishing/errors.ex:210
 #, elixir-autogen, elixir-format
 msgid "Failed to extract AI response: %{reason}"
 msgstr "提取 AI 响应失败：%{reason}"
 
-#: lib/phoenix_kit_publishing/errors.ex:214
+#: lib/phoenix_kit_publishing/errors.ex:218
 #, elixir-autogen, elixir-format
 msgid "Failed to read source post: %{reason}"
 msgstr "读取源帖子失败：%{reason}"
@@ -771,12 +771,12 @@ msgstr "已清除特色图片"
 msgid "Featured image selected"
 msgstr "已选择特色图片"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3543
+#: lib/phoenix_kit_publishing/web/html.ex:3570
 #, elixir-autogen, elixir-format
 msgid "Feb"
 msgstr "2月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3526
+#: lib/phoenix_kit_publishing/web/html.ex:3553
 #, elixir-autogen, elixir-format
 msgid "February"
 msgstr "2月"
@@ -830,7 +830,7 @@ msgstr "分组 slug"
 msgid "Group moved to trash"
 msgstr "分组已移至回收站"
 
-#: lib/phoenix_kit_publishing/errors.ex:138
+#: lib/phoenix_kit_publishing/errors.ex:139
 #: lib/phoenix_kit_publishing/web/edit.ex:946
 #, elixir-autogen, elixir-format
 msgid "Group not found"
@@ -903,7 +903,7 @@ msgstr "页内语言切换器已启用——发布页面将渲染自己的切换
 msgid "Invalid URL mode"
 msgstr "无效的 URL 模式"
 
-#: lib/phoenix_kit_publishing/errors.ex:139
+#: lib/phoenix_kit_publishing/errors.ex:140
 #, elixir-autogen, elixir-format
 msgid "Invalid content"
 msgstr "无效的内容"
@@ -919,27 +919,27 @@ msgstr "无效的内容类型"
 msgid "Invalid examples"
 msgstr "无效的示例"
 
-#: lib/phoenix_kit_publishing/errors.ex:140
+#: lib/phoenix_kit_publishing/errors.ex:141
 #, elixir-autogen, elixir-format
 msgid "Invalid format"
 msgstr "无效的格式"
 
-#: lib/phoenix_kit_publishing/errors.ex:141
+#: lib/phoenix_kit_publishing/errors.ex:142
 #, elixir-autogen, elixir-format
 msgid "Invalid mode"
 msgstr "无效的模式"
 
-#: lib/phoenix_kit_publishing/errors.ex:142
+#: lib/phoenix_kit_publishing/errors.ex:146
 #, elixir-autogen, elixir-format
 msgid "Invalid name"
 msgstr "无效的名称"
 
-#: lib/phoenix_kit_publishing/errors.ex:144
+#: lib/phoenix_kit_publishing/errors.ex:148
 #, elixir-autogen, elixir-format
 msgid "Invalid path"
 msgstr "无效的路径"
 
-#: lib/phoenix_kit_publishing/errors.ex:145
+#: lib/phoenix_kit_publishing/errors.ex:149
 #, elixir-autogen, elixir-format
 msgid "Invalid slug"
 msgstr "无效的 slug"
@@ -950,24 +950,24 @@ msgstr "无效的 slug"
 msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
 msgstr "slug 格式无效。请仅使用小写字母、数字和连字符（例如 my-group-name）"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:736
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:837
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:913
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:739
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:840
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:916
 #, elixir-autogen, elixir-format
 msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-post-title)"
 msgstr "slug 格式无效。请仅使用小写字母、数字和连字符（例如 my-post-title）"
 
-#: lib/phoenix_kit_publishing/errors.ex:148
+#: lib/phoenix_kit_publishing/errors.ex:152
 #, elixir-autogen, elixir-format
 msgid "Invalid status"
 msgstr "无效的状态"
 
-#: lib/phoenix_kit_publishing/errors.ex:149
+#: lib/phoenix_kit_publishing/errors.ex:153
 #, elixir-autogen, elixir-format
 msgid "Invalid type"
 msgstr "无效的类型"
 
-#: lib/phoenix_kit_publishing/errors.ex:150
+#: lib/phoenix_kit_publishing/errors.ex:154
 #, elixir-autogen, elixir-format
 msgid "Invalid version"
 msgstr "无效的版本"
@@ -982,32 +982,32 @@ msgstr "条目命名"
 msgid "Items called \"%{plural}\"."
 msgstr "条目称为“%{plural}”。"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3542
+#: lib/phoenix_kit_publishing/web/html.ex:3569
 #, elixir-autogen, elixir-format
 msgid "Jan"
 msgstr "1月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3525
+#: lib/phoenix_kit_publishing/web/html.ex:3552
 #, elixir-autogen, elixir-format
 msgid "January"
 msgstr "1月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3551
+#: lib/phoenix_kit_publishing/web/html.ex:3578
 #, elixir-autogen, elixir-format
 msgid "Jul"
 msgstr "7月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3531
+#: lib/phoenix_kit_publishing/web/html.ex:3558
 #, elixir-autogen, elixir-format
 msgid "July"
 msgstr "7月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3550
+#: lib/phoenix_kit_publishing/web/html.ex:3577
 #, elixir-autogen, elixir-format
 msgid "Jun"
 msgstr "6月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3530
+#: lib/phoenix_kit_publishing/web/html.ex:3557
 #, elixir-autogen, elixir-format
 msgid "June"
 msgstr "6月"
@@ -1073,17 +1073,17 @@ msgstr "管理提示词"
 msgid "Manage caching and performance settings for the publishing module."
 msgstr "管理发布模块的缓存和性能设置。"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3544
+#: lib/phoenix_kit_publishing/web/html.ex:3571
 #, elixir-autogen, elixir-format
 msgid "Mar"
 msgstr "3月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3527
+#: lib/phoenix_kit_publishing/web/html.ex:3554
 #, elixir-autogen, elixir-format
 msgid "March"
 msgstr "3月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3529
+#: lib/phoenix_kit_publishing/web/html.ex:3556
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr "5月"
@@ -1146,7 +1146,7 @@ msgstr "新"
 msgid "New Version"
 msgstr "新版本"
 
-#: lib/phoenix_kit_publishing/errors.ex:197
+#: lib/phoenix_kit_publishing/errors.ex:201
 #, elixir-autogen, elixir-format
 msgid "No AI prompt selected"
 msgstr "未选择 AI 提示词"
@@ -1156,7 +1156,7 @@ msgstr "未选择 AI 提示词"
 msgid "No OG image set."
 msgstr "未设置 OG 图片。"
 
-#: lib/phoenix_kit_publishing/errors.ex:163
+#: lib/phoenix_kit_publishing/errors.ex:167
 #, elixir-autogen, elixir-format
 msgid "No UUID"
 msgstr "缺少 UUID"
@@ -1166,7 +1166,7 @@ msgstr "缺少 UUID"
 msgid "No other languages enabled to translate to"
 msgstr "没有其他已启用的语言可供翻译"
 
-#: lib/phoenix_kit_publishing/errors.ex:161
+#: lib/phoenix_kit_publishing/errors.ex:165
 #, elixir-autogen, elixir-format
 msgid "No post"
 msgstr "缺少帖子"
@@ -1191,7 +1191,7 @@ msgstr "尚无已发布的帖子"
 msgid "No published posts yet."
 msgstr "尚无已发布的帖子。"
 
-#: lib/phoenix_kit_publishing/errors.ex:162
+#: lib/phoenix_kit_publishing/errors.ex:166
 #, elixir-autogen, elixir-format
 msgid "No published version"
 msgstr "没有已发布的版本"
@@ -1206,22 +1206,22 @@ msgstr "尚无发布分组"
 msgid "None"
 msgstr "无"
 
-#: lib/phoenix_kit_publishing/errors.ex:165
+#: lib/phoenix_kit_publishing/errors.ex:169
 #, elixir-autogen, elixir-format
 msgid "Not found"
 msgstr "未找到"
 
-#: lib/phoenix_kit_publishing/errors.ex:166
+#: lib/phoenix_kit_publishing/errors.ex:170
 #, elixir-autogen, elixir-format
 msgid "Not published"
 msgstr "未发布"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3555
+#: lib/phoenix_kit_publishing/web/html.ex:3582
 #, elixir-autogen, elixir-format
 msgid "Nov"
 msgstr "11月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3535
+#: lib/phoenix_kit_publishing/web/html.ex:3562
 #, elixir-autogen, elixir-format
 msgid "November"
 msgstr "11月"
@@ -1271,12 +1271,12 @@ msgstr "确定"
 msgid "ON — primary language URLs are prefixless (e.g. /blog/post). Managed on the Languages page."
 msgstr "开启——主要语言的 URL 不带前缀（例如 /blog/post）。在“语言”页面中管理。"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3554
+#: lib/phoenix_kit_publishing/web/html.ex:3581
 #, elixir-autogen, elixir-format
 msgid "Oct"
 msgstr "10月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3534
+#: lib/phoenix_kit_publishing/web/html.ex:3561
 #, elixir-autogen, elixir-format
 msgid "October"
 msgstr "10月"
@@ -1362,7 +1362,7 @@ msgstr "复数"
 msgid "Post created and saved"
 msgstr "帖子已创建并保存"
 
-#: lib/phoenix_kit_publishing/errors.ex:174
+#: lib/phoenix_kit_publishing/errors.ex:178
 #, elixir-autogen, elixir-format
 msgid "Post is trashed"
 msgstr "帖子位于回收站中"
@@ -1372,7 +1372,7 @@ msgstr "帖子位于回收站中"
 msgid "Post moved to trash"
 msgstr "帖子已移至回收站"
 
-#: lib/phoenix_kit_publishing/errors.ex:173
+#: lib/phoenix_kit_publishing/errors.ex:177
 #: lib/phoenix_kit_publishing/web/editor.ex:356
 #: lib/phoenix_kit_publishing/web/editor.ex:523
 #: lib/phoenix_kit_publishing/web/editor.ex:632
@@ -1388,7 +1388,7 @@ msgstr "未找到帖子"
 msgid "Post restored as draft"
 msgstr "帖子已恢复为草稿"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:680
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:683
 #, elixir-autogen, elixir-format
 msgid "Post saved"
 msgstr "帖子已保存"
@@ -1399,7 +1399,7 @@ msgstr "帖子已保存"
 msgid "Post title"
 msgstr "帖子标题"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1102
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1105
 #, elixir-autogen, elixir-format
 msgid "Post updated by another user"
 msgstr "帖子已被其他用户更新"
@@ -1608,7 +1608,7 @@ msgstr "渲染缓存已停用。每次请求时都会渲染帖子。"
 msgid "Render the language switcher on listing + post pages. Disable when your host layout already provides one."
 msgstr "在列表和帖子页面上渲染语言切换器。如果您的宿主布局已提供语言切换器，请停用此项。"
 
-#: lib/phoenix_kit_publishing/errors.ex:175
+#: lib/phoenix_kit_publishing/errors.ex:179
 #, elixir-autogen, elixir-format
 msgid "Resource not found"
 msgstr "未找到资源"
@@ -1676,12 +1676,12 @@ msgstr "选择端点…"
 msgid "Semantic URLs ideal for evergreen content."
 msgstr "语义化 URL，非常适合长期有效的内容。"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3553
+#: lib/phoenix_kit_publishing/web/html.ex:3580
 #, elixir-autogen, elixir-format
 msgid "Sep"
 msgstr "9月"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3533
+#: lib/phoenix_kit_publishing/web/html.ex:3560
 #, elixir-autogen, elixir-format
 msgid "September"
 msgstr "9月"
@@ -1720,17 +1720,17 @@ msgstr "Slug"
 msgid "Slug Style"
 msgstr "Slug 样式"
 
-#: lib/phoenix_kit_publishing/errors.ex:181
+#: lib/phoenix_kit_publishing/errors.ex:185
 #, elixir-autogen, elixir-format
 msgid "Slug already exists"
 msgstr "Slug 已存在"
 
-#: lib/phoenix_kit_publishing/errors.ex:178
+#: lib/phoenix_kit_publishing/errors.ex:182
 #, elixir-autogen, elixir-format
 msgid "Slug conflicts with a reserved language code"
 msgstr "Slug 与保留的语言代码冲突"
 
-#: lib/phoenix_kit_publishing/errors.ex:180
+#: lib/phoenix_kit_publishing/errors.ex:184
 #, elixir-autogen, elixir-format
 msgid "Slug conflicts with a reserved route word"
 msgstr "Slug 与保留的路由词冲突"
@@ -1745,7 +1745,7 @@ msgstr "Slug 为必填项。输入标题即可自动生成，或手动输入 slu
 msgid "Slug style updated to %{style}"
 msgstr "Slug 样式已更新为 %{style}"
 
-#: lib/phoenix_kit_publishing/errors.ex:182
+#: lib/phoenix_kit_publishing/errors.ex:186
 #, elixir-autogen, elixir-format
 msgid "Slug taken"
 msgstr "Slug 已被占用"
@@ -1762,7 +1762,7 @@ msgstr "基于 slug"
 msgid "Social / OpenGraph"
 msgstr "社交 / OpenGraph"
 
-#: lib/phoenix_kit_publishing/errors.ex:241
+#: lib/phoenix_kit_publishing/errors.ex:245
 #, elixir-autogen, elixir-format
 msgid "Some fields are invalid. Please review and try again."
 msgstr "部分字段无效。请检查后重试。"
@@ -1813,7 +1813,7 @@ msgstr "存储在 :persistent_term 中，读取耗时不到一微秒"
 msgid "That publishing group already exists"
 msgstr "该发布分组已存在"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:886
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:889
 #, elixir-autogen, elixir-format
 msgid "That slug is already used by another post in this group. Please choose a different one."
 msgstr "此分组中的另一篇帖子已使用该 slug。请选择其他 slug。"
@@ -1844,7 +1844,7 @@ msgstr "未找到您请求的页面。正在显示最接近的匹配项。"
 msgid "The requested group could not be found."
 msgstr "找不到请求的分组。"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:890
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:893
 #, elixir-autogen, elixir-format
 msgid "The slug \"%{slug}\" is already used by another post in this group. Choose a different slug or change the title."
 msgstr "此分组中的另一篇帖子已使用 slug“%{slug}”。请选择其他 slug 或更改标题。"
@@ -1909,8 +1909,8 @@ msgstr "此语言（%{code}）已不再在“语言”模块中启用。对于�
 msgid "This prompt predates the current format and may mistranslate. Click to update it."
 msgstr "此提示词早于当前格式，可能导致翻译错误。点击以更新。"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:747
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:848
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:750
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:851
 #, elixir-autogen, elixir-format
 msgid "This slug is reserved because it's a language code (like 'en', 'es', 'fr'). Please choose a different slug to avoid routing conflicts."
 msgstr "此 slug 为保留值，因为它是语言代码（如“en”、“es”、“fr”）。请选择其他 slug 以避免路由冲突。"
@@ -1942,7 +1942,7 @@ msgstr "这会将 %{source} 内容翻译为 %{target}，并覆盖所有现有内
 msgid "Timestamp-based"
 msgstr "基于时间戳"
 
-#: lib/phoenix_kit_publishing/errors.ex:191
+#: lib/phoenix_kit_publishing/errors.ex:195
 #, elixir-autogen, elixir-format
 msgid "Title is required to publish"
 msgstr "发布需要填写标题"
@@ -1953,7 +1953,7 @@ msgstr "发布需要填写标题"
 msgid "Title is required to save."
 msgstr "保存需要填写标题。"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:863
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:866
 #, elixir-autogen, elixir-format
 msgid "Title is required."
 msgstr "标题为必填项。"
@@ -2088,7 +2088,7 @@ msgstr "URL slug 不能是语言代码"
 msgid "URL slug cannot be a reserved word (admin, api, assets, etc.)"
 msgstr "URL slug 不能是保留词（admin、api、assets 等）"
 
-#: lib/phoenix_kit_publishing/errors.ex:129
+#: lib/phoenix_kit_publishing/errors.ex:130
 #, elixir-autogen, elixir-format
 msgid "URL slug conflicts with another post"
 msgstr "URL slug 与另一篇帖子冲突"
@@ -2103,7 +2103,7 @@ msgstr "该 URL slug 是另一篇帖子以前的地址——使用它会劫持�
 msgid "URL slug must be lowercase letters, numbers, and hyphens only"
 msgstr "URL slug 只能包含小写字母、数字和连字符"
 
-#: lib/phoenix_kit_publishing/errors.ex:251
+#: lib/phoenix_kit_publishing/errors.ex:255
 #, elixir-autogen, elixir-format
 msgid "Unexpected error: %{reason}"
 msgstr "意外错误：%{reason}"
@@ -2129,7 +2129,7 @@ msgstr "未知"
 msgid "Unknown language:"
 msgstr "未知语言："
 
-#: lib/phoenix_kit_publishing/errors.ex:192
+#: lib/phoenix_kit_publishing/errors.ex:196
 #, elixir-autogen, elixir-format
 msgid "Unpublished"
 msgstr "未发布"
@@ -2211,12 +2211,12 @@ msgstr "版本 %{version} 已被另一位编辑者发布"
 msgid "Version Settings"
 msgstr "版本设置"
 
-#: lib/phoenix_kit_publishing/errors.ex:193
+#: lib/phoenix_kit_publishing/errors.ex:197
 #, elixir-autogen, elixir-format
 msgid "Version access is disabled"
 msgstr "版本访问已停用"
 
-#: lib/phoenix_kit_publishing/errors.ex:194
+#: lib/phoenix_kit_publishing/errors.ex:198
 #: lib/phoenix_kit_publishing/web/editor.ex:1248
 #: lib/phoenix_kit_publishing/web/editor.ex:1254
 #: lib/phoenix_kit_publishing/web/editor.ex:2736
@@ -2332,7 +2332,7 @@ msgstr "正在显示"
 msgid "your-group"
 msgstr "your-group"
 
-#: lib/phoenix_kit_publishing/web/html.ex:2970
+#: lib/phoenix_kit_publishing/web/html.ex:2985
 #, elixir-autogen, elixir-format
 msgid "%{count} min read"
 msgid_plural "%{count} min read"
@@ -2738,7 +2738,7 @@ msgstr "分类已创建"
 msgid "Category deleted — its children moved to the top level"
 msgstr "分类已删除——其子分类已移至顶层"
 
-#: lib/phoenix_kit_publishing/errors.ex:146
+#: lib/phoenix_kit_publishing/errors.ex:150
 #: lib/phoenix_kit_publishing/web/categories_live.ex:99
 #: lib/phoenix_kit_publishing/web/categories_live.ex:180
 #, elixir-autogen, elixir-format
@@ -3475,7 +3475,7 @@ msgstr "阅读速度（每分钟字数）"
 msgid "Setting updated"
 msgstr "设置已更新"
 
-#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1053
+#: lib/phoenix_kit_publishing/web/editor/persistence.ex:1056
 #, elixir-autogen, elixir-format
 msgid "This post was saved somewhere else. Your unsaved changes are still here — saving will overwrite that copy."
 msgstr "此帖子已在其他地方保存。您未保存的更改仍在此处——保存将覆盖该副本。"
@@ -3501,7 +3501,7 @@ msgstr "注释"
 msgid "live"
 msgstr "线上"
 
-#: lib/phoenix_kit_publishing/errors.ex:126
+#: lib/phoenix_kit_publishing/errors.ex:127
 #, elixir-autogen, elixir-format
 msgid "A category can't be moved inside itself or one of its own children"
 msgstr "分类不能移动到其自身或其子分类内部"
@@ -3511,7 +3511,7 @@ msgstr "分类不能移动到其自身或其子分类内部"
 msgid "Couldn't save the group — please check the values and try again."
 msgstr "无法保存分组——请检查各项值后重试。"
 
-#: lib/phoenix_kit_publishing/errors.ex:143
+#: lib/phoenix_kit_publishing/errors.ex:147
 #, elixir-autogen, elixir-format
 msgid "Invalid order"
 msgstr "无效的顺序"
@@ -3521,12 +3521,12 @@ msgstr "无效的顺序"
 msgid "Moving…"
 msgstr "正在移动…"
 
-#: lib/phoenix_kit_publishing/errors.ex:172
+#: lib/phoenix_kit_publishing/errors.ex:176
 #, elixir-autogen, elixir-format
 msgid "Parent category belongs to another group"
 msgstr "父级分类属于另一个分组"
 
-#: lib/phoenix_kit_publishing/errors.ex:171
+#: lib/phoenix_kit_publishing/errors.ex:175
 #, elixir-autogen, elixir-format
 msgid "Parent category not found"
 msgstr "未找到父级分类"
@@ -3541,7 +3541,7 @@ msgstr "帖子已保存为草稿，但无法发布：主要语言需要标题。
 msgid "Post saved, but publishing failed."
 msgstr "帖子已保存，但发布失败。"
 
-#: lib/phoenix_kit_publishing/errors.ex:169
+#: lib/phoenix_kit_publishing/errors.ex:173
 #, elixir-autogen, elixir-format
 msgid "Save the changes against the new version — creating one doesn't apply them"
 msgstr "请在新版本上保存更改——创建新版本不会应用这些更改"
@@ -3556,7 +3556,7 @@ msgstr "另一个分组已使用该 slug。"
 msgid "The live version stays published — to take it offline, use Unpublish on the group page."
 msgstr "线上版本仍保持发布状态——如需下线，请在分组页面上使用“取消发布”。"
 
-#: lib/phoenix_kit_publishing/errors.ex:154
+#: lib/phoenix_kit_publishing/errors.ex:158
 #, elixir-autogen, elixir-format
 msgid "The primary language's content anchors the post and can't be deleted — edit it instead"
 msgstr "主要语言的内容是帖子的基础，无法删除——请改为编辑它"
@@ -3713,7 +3713,7 @@ msgstr "去重浏览量已启用——每位访客每篇帖子每天计一次浏
 msgid "On: count each visitor once per post per day — by session, else by a keyed hash of the address, so readers sharing one address count once until their browser keeps the marker. Off: count every time the page is opened."
 msgstr "开启：每位访客每篇帖子每天只计一次——依据会话，否则依据地址的带密钥哈希，因此共享同一地址的读者在其浏览器保留标记之前只计一次。关闭：每次打开页面都计数。"
 
-#: lib/phoenix_kit_publishing/errors.ex:229
+#: lib/phoenix_kit_publishing/errors.ex:233
 #, elixir-autogen, elixir-format
 msgid "Saved as a draft, but it could not be published: %{reason}"
 msgstr "已保存为草稿，但无法发布：%{reason}"
@@ -3741,7 +3741,7 @@ msgid "%{count} other viewing"
 msgid_plural "%{count} others viewing"
 msgstr[0] "另有 %{count} 人正在查看"
 
-#: lib/phoenix_kit_publishing/errors.ex:259
+#: lib/phoenix_kit_publishing/errors.ex:263
 #, elixir-autogen, elixir-format
 msgid "%{field} %{message}"
 msgstr "%{field} %{message}"
@@ -3772,7 +3772,7 @@ msgid "Cleared %{count} cached post for %{group}"
 msgid_plural "Cleared %{count} cached posts for %{group}"
 msgstr[0] "已清除 %{group} 的 %{count} 篇缓存帖子"
 
-#: lib/phoenix_kit_publishing/errors.ex:128
+#: lib/phoenix_kit_publishing/errors.ex:129
 #, elixir-autogen, elixir-format
 msgid "Comments are not available"
 msgstr "评论不可用"
@@ -3782,7 +3782,7 @@ msgstr "评论不可用"
 msgid "Comments on your posts"
 msgstr "您帖子上的评论"
 
-#: lib/phoenix_kit_publishing/errors.ex:134
+#: lib/phoenix_kit_publishing/errors.ex:135
 #, elixir-autogen, elixir-format
 msgid "Could not copy the content to the new version"
 msgstr "无法将内容复制到新版本"
@@ -3802,7 +3802,7 @@ msgstr "创建、编辑、移至回收站、恢复和永久删除发布分组及
 msgid "Database-backed CMS pages and multi-language content"
 msgstr "基于数据库的 CMS 页面和多语言内容"
 
-#: lib/phoenix_kit_publishing/web/controller.ex:1370
+#: lib/phoenix_kit_publishing/web/controller.ex:1371
 #, elixir-autogen, elixir-format
 msgid "Edit categories"
 msgstr "编辑分类"
@@ -3854,7 +3854,7 @@ msgstr "渲染展示横幅时出错"
 msgid "Error rendering video"
 msgstr "渲染视频时出错"
 
-#: lib/phoenix_kit_publishing/errors.ex:137
+#: lib/phoenix_kit_publishing/errors.ex:138
 #, elixir-autogen, elixir-format
 msgid "Group is in the trash"
 msgstr "分组位于回收站中"
@@ -3916,23 +3916,23 @@ msgstr "有人评论了您撰写的帖子"
 msgid "Someone replied to a comment you left"
 msgstr "有人回复了您留下的评论"
 
-#: lib/phoenix_kit_publishing/errors.ex:183
+#: lib/phoenix_kit_publishing/errors.ex:187
 #, elixir-autogen, elixir-format
 msgid "Source version not found"
 msgstr "未找到源版本"
 
-#: lib/phoenix_kit_publishing/errors.ex:221
+#: lib/phoenix_kit_publishing/errors.ex:225
 #, elixir-autogen, elixir-format
 msgid "The group still holds %{count} post"
 msgid_plural "The group still holds %{count} posts"
 msgstr[0] "该分组仍包含 %{count} 篇帖子"
 
-#: lib/phoenix_kit_publishing/errors.ex:160
+#: lib/phoenix_kit_publishing/errors.ex:164
 #, elixir-autogen, elixir-format
 msgid "The post has no live version"
 msgstr "该帖子没有线上版本"
 
-#: lib/phoenix_kit_publishing/errors.ex:164
+#: lib/phoenix_kit_publishing/errors.ex:168
 #, elixir-autogen, elixir-format
 msgid "The post has no version"
 msgstr "该帖子没有版本"
@@ -3948,7 +3948,7 @@ msgid "Translation completed successfully for %{count} language"
 msgid_plural "Translation completed successfully for %{count} languages"
 msgstr[0] "已成功完成 %{count} 种语言的翻译"
 
-#: lib/phoenix_kit_publishing/errors.ex:132
+#: lib/phoenix_kit_publishing/errors.ex:133
 #, elixir-autogen, elixir-format
 msgid "URL slug is a previous address of another post"
 msgstr "该 URL slug 是另一篇帖子以前的地址"
@@ -3958,7 +3958,7 @@ msgstr "该 URL slug 是另一篇帖子以前的地址"
 msgid "View this post on the public site"
 msgstr "在公开网站上查看此帖子"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3549
+#: lib/phoenix_kit_publishing/web/html.ex:3576
 #, elixir-autogen, elixir-format
 msgctxt "month abbreviation"
 msgid "May"
@@ -3974,17 +3974,17 @@ msgstr "删除分组前，请先将其移至回收站。"
 msgid "Couldn't create this group."
 msgstr "无法创建此分组。"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3396
+#: lib/phoenix_kit_publishing/web/html.ex:3423
 #, elixir-autogen, elixir-format
 msgid "Next page"
 msgstr "下一页"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3303
+#: lib/phoenix_kit_publishing/web/html.ex:3330
 #, elixir-autogen, elixir-format
 msgid "Pagination"
 msgstr "分页"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3395
+#: lib/phoenix_kit_publishing/web/html.ex:3422
 #, elixir-autogen, elixir-format
 msgid "Previous page"
 msgstr "上一页"
@@ -4009,12 +4009,12 @@ msgstr "此分组已重命名为 %{slug}。您的修改仍会保存；刷新页�
 msgid "Compact — Page 7 of 62, with a page box"
 msgstr "紧凑 — 第 7 页，共 62 页，带页码输入框"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3355
+#: lib/phoenix_kit_publishing/web/html.ex:3382
 #, elixir-autogen, elixir-format
 msgid "Go"
 msgstr "跳转"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3342
+#: lib/phoenix_kit_publishing/web/html.ex:3369
 #, elixir-autogen, elixir-format
 msgid "Go to page"
 msgstr "跳至页码"
@@ -4024,7 +4024,7 @@ msgstr "跳至页码"
 msgid "How a listing with more posts than fit on a page moves between pages."
 msgstr "当列表中的帖子超过一页时，如何在各页之间切换。"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3326
+#: lib/phoenix_kit_publishing/web/html.ex:3353
 #, elixir-autogen, elixir-format
 msgid "Page %{page} of %{total}"
 msgstr "第 %{page} 页，共 %{total} 页"
@@ -4185,14 +4185,14 @@ msgstr "字段名称"
 msgid "Field value"
 msgstr "字段值"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3391
-#: lib/phoenix_kit_publishing/web/html.ex:3394
+#: lib/phoenix_kit_publishing/web/html.ex:3418
+#: lib/phoenix_kit_publishing/web/html.ex:3421
 #, elixir-autogen, elixir-format
 msgid "Newer posts"
 msgstr "较新的帖子"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3392
-#: lib/phoenix_kit_publishing/web/html.ex:3393
+#: lib/phoenix_kit_publishing/web/html.ex:3419
+#: lib/phoenix_kit_publishing/web/html.ex:3420
 #, elixir-autogen, elixir-format
 msgid "Older posts"
 msgstr "较早的帖子"
@@ -4237,7 +4237,7 @@ msgstr "由网站渲染（帖子仍在此处）"
 msgid "The site renders it and the category and tag pages"
 msgstr "由网站渲染，分类页和标签页也是"
 
-#: lib/phoenix_kit_publishing/errors.ex:147
+#: lib/phoenix_kit_publishing/errors.ex:151
 #, elixir-autogen, elixir-format
 msgid "Invalid publish date"
 msgstr "发布日期无效"
@@ -4267,3 +4267,8 @@ msgstr "为每篇帖子生成基于标题的地址（/news/release-notes，而�
 #, elixir-autogen, elixir-format
 msgid "Readable URLs"
 msgstr "易读的网址"
+
+#: lib/phoenix_kit_publishing/errors.ex:145
+#, elixir-autogen, elixir-format
+msgid "This group has scheduled posts; publish or unschedule them first"
+msgstr "此分组有已定时的文章；请先发布或取消定时"

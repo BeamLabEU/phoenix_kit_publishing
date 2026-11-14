@@ -130,7 +130,7 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
   end
 
   defp check_display_text({key, value}, :ok) do
-    case check_text(key, value || "", 320) do
+    case check_text(key, String.trim(value || ""), 320) do
       :ok -> {:cont, :ok}
       error -> {:halt, error}
     end

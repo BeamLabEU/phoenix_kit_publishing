@@ -66,6 +66,23 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
       end
     end
 
+    test "an invalid value stored by hand does not refuse an edit of another field", %{
+      slug: slug
+    } do
+      {:ok, c} = Categories.create_category(slug, %{"name" => "Stale"})
+
+      PhoenixKit.RepoHelper.repo().query!(
+        ~s|UPDATE phoenix_kit_publishing_categories SET data = '{"color":"red"}' WHERE uuid = $1|,
+        [Ecto.UUID.dump!(c.uuid)]
+      )
+
+      assert {:ok, updated} = Categories.update_category(c.uuid, %{"icon" => "hero-tag"})
+      assert PublishingCategory.icon(updated) == "hero-tag"
+      assert PublishingCategory.color(updated) == nil
+      # the write's own value is still checked
+      assert {:error, _} = Categories.update_category(c.uuid, %{"color" => "red"})
+    end
+
     test "an invalid value stored by hand is never handed out", %{slug: slug} do
       {:ok, cat} = Categories.create_category(slug, %{"name" => "Hand"})
       cat = %{cat | data: %{"color" => "red;x", "icon" => "<b>"}}

@@ -29,6 +29,31 @@ defmodule PhoenixKit.Modules.Publishing.API.UpdatePostTest do
 
   defp body(ctx, language \\ "en-US"), do: Fx.content(ctx.post[:uuid], language).content
 
+  test "custom_fields that would be stored cut, dropped or merged are refused", ctx do
+    many = for i <- 1..31, into: %{}, do: {"k#{i}", "v"}
+
+    for fields <- [
+          many,
+          %{"long" => String.duplicate("x", 2001)},
+          %{"A b" => "first", "a-b" => "second"},
+          %{"nested" => %{"x" => 1}},
+          %{"list" => ["a"]},
+          %{"!!!" => "no name left"}
+        ] do
+      assert {:error, :validation_failed, _message,
+              %{errors: [%{path: "custom_fields", reason: "invalid_custom_fields"}]}} =
+               edit(ctx, %{"custom_fields" => fields})
+    end
+
+    refute Map.has_key?(Fx.version(ctx.post[:uuid]).data, "custom_fields")
+
+    # numbers and booleans are text; a blank value leaves its field out
+    assert {:ok, %{"action" => "updated"}} =
+             edit(ctx, %{"custom_fields" => %{"n" => 3, "ok" => true, "gone" => " "}})
+
+    assert Fx.version(ctx.post[:uuid]).data["custom_fields"] == %{"n" => "3", "ok" => "true"}
+  end
+
   test "custom_fields: replaced as a whole, unchanged when equal, null clears, get_post returns them",
        ctx do
     assert {:ok,

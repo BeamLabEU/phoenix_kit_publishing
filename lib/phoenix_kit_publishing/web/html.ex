@@ -1512,7 +1512,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         @image_links && "pointer-events-none"
       ]}>
         <.band_badge band={@band} />
-        <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} class="relative z-20 mb-2" />
+        <.category_chips categories={@categories} language={@current_language} group_slug={@group_slug} class="pointer-events-auto relative z-20 mb-2" />
         <h3 class={["font-bold", (@layout == "card" && "text-2xl") || "text-2xl lg:text-3xl"]}>
           <.link
             navigate={@post_url}
@@ -3117,10 +3117,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     end
   end
 
+  # Warned once per value: this runs for every URL built and every request
+  # the dispatch sees, so a typo in the config would otherwise fill the log.
   defp invalid_public_prefix(value) do
-    Logger.warning(
-      "[Publishing] :public_url_prefix #{inspect(value)} is not a plain path; using PhoenixKit's url_prefix"
-    )
+    key = {__MODULE__, :invalid_public_prefix_warned}
+
+    if :persistent_term.get(key, nil) != value do
+      :persistent_term.put(key, value)
+
+      Logger.warning(
+        "[Publishing] :public_url_prefix #{inspect(value)} is not a plain path; using PhoenixKit's url_prefix"
+      )
+    end
 
     Config.get_url_prefix()
   end

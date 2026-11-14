@@ -107,4 +107,41 @@ defmodule PhoenixKit.Modules.Publishing.ImportPostTest do
     {:ok, post} = Publishing.import_post(slug, %{title: "Draft"}, publish: false)
     assert DBStorage.get_post_by_uuid(post[:uuid]).active_version_uuid == nil
   end
+
+  test "input that cannot be stored or published is refused before a post exists", %{slug: slug} do
+    count = fn -> length(Posts.list_raw_posts(slug)) end
+    before = count.()
+
+    # publishing needs a title
+    assert {:error, :title_required} = Publishing.import_post(slug, %{content: "Body."})
+    assert {:error, :title_required} = Publishing.import_post(slug, %{title: "  ", content: "B"})
+
+    # Postgres refuses a NUL byte, JSON invalid UTF-8
+    for bad <- [
+          %{title: "T\0"},
+          %{title: "T", description: "a\0b"},
+          %{title: "T", seo_title: <<0xFF, 0xFE>>},
+          %{title: "T", og: %{title: "a\0b"}}
+        ] do
+      assert {:error, :invalid_format} = Publishing.import_post(slug, Map.put(bad, :content, "B"))
+    end
+
+    assert count.() == before
+
+    # a draft needs no title
+    assert {:ok, _} = Publishing.import_post(slug, %{content: "Body."}, publish: false)
+  end
+
+  test "a taken minute just after midnight does not move the post to the day before", %{
+    slug: slug
+  } do
+    dates =
+      for at <- ["2026-03-02T00:00:10Z", "2026-03-02T00:00:20Z"] do
+        {:ok, post} = Publishing.import_post(slug, %{title: "Midnight", published_at: at})
+        db_post = DBStorage.get_post_by_uuid(post[:uuid])
+        {db_post.post_date, db_post.post_time}
+      end
+
+    assert dates == [{~D[2026-03-02], ~T[00:00:00]}, {~D[2026-03-02], ~T[00:01:00]}]
+  end
 end

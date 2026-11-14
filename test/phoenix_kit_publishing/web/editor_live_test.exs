@@ -351,6 +351,50 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
                Publishing.list_posts(group["slug"])
     end
 
+    test "a save leaves the custom-field rows as the writer has them", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      saver_uuid = "019cce93-0000-7000-8000-00000000ee04"
+
+      TestRepo.query!(
+        """
+        INSERT INTO phoenix_kit_users (uuid, email, hashed_password, inserted_at, updated_at)
+        VALUES ($1::uuid, 'rows-saver@example.com', 'x', now(), now())
+        ON CONFLICT (email) DO NOTHING
+        """,
+        [Ecto.UUID.dump!(saver_uuid)]
+      )
+
+      {:ok, view, _} =
+        conn
+        |> put_test_scope(fake_scope(user_uuid: saver_uuid))
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      for _ <- 1..3, do: render_click(view, "add_custom_field", %{})
+
+      render_change(view, "update_meta", %{
+        "custom_fields" => %{
+          "0" => %{"key" => "version", "value" => "0.33.0"},
+          "1" => %{"key" => "package", "value" => "billing"},
+          # still being typed: a name without a value yet
+          "2" => %{"key" => "channel", "value" => ""}
+        },
+        "_target" => ["custom_fields", "2", "key"]
+      })
+
+      rows = assigns_of(view).form["custom_fields"]
+      _ = render_click(view, "save", %{})
+
+      # the stored map is sorted by name and has no blank row; adopting it
+      # dropped the row being typed and moved the others under the cursor
+      assert assigns_of(view).form["custom_fields"] == rows
+
+      assert DBStorage.get_version(post[:uuid], 1).data["custom_fields"] ==
+               %{"package" => "billing", "version" => "0.33.0"}
+    end
+
     test "warns before a save takes the live version down", %{
       conn: conn,
       group: group,

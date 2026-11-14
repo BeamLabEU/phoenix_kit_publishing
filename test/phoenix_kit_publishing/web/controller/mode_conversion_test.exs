@@ -11,7 +11,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ModeConversionTest do
   import Ecto.Query, only: [from: 2]
 
   alias PhoenixKit.Modules.Publishing
-  alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts, PublishingPost}
+  alias PhoenixKit.Modules.Publishing.{DBStorage, Errors, Groups, Posts}
+  alias PhoenixKit.Modules.Publishing.{PublishingGroup, PublishingPost}
   alias PhoenixKit.Settings
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
@@ -118,5 +119,73 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ModeConversionTest do
     assert conn.status != 301
     refute (get_resp_header(conn, "location") |> List.first() || "") =~ "secret-plans"
     assert slugs[draft[:uuid]] == "secret-plans"
+  end
+
+  test "is refused while a live post is scheduled ahead: a slug post has no embargo", %{
+    slug: slug
+  } do
+    future = DateTime.utc_now() |> DateTime.add(10 * 86_400) |> DateTime.to_iso8601()
+
+    {:ok, _} =
+      Publishing.import_post(slug, %{title: "Embargoed", content: "x", published_at: future})
+
+    {:ok, %{total: before}} = Publishing.list_published(slug)
+
+    assert {:error, :scheduled_posts} = Publishing.convert_to_slug_mode(slug)
+    assert Groups.get_group_mode(slug) == "timestamp"
+    assert {:ok, %{total: ^before}} = Publishing.list_published(slug)
+    assert Errors.message(:scheduled_posts) =~ "scheduled"
+  end
+
+  test "no post is given a slug another post answers to through a url_slug", %{slug: slug} do
+    {:ok, alpha} =
+      Publishing.import_post(slug, %{title: "Alpha", published_at: "2026-10-01T10:00:00Z"})
+
+    {:ok, alpha} = Posts.read_post_by_uuid(alpha[:uuid])
+    {:ok, _} = Posts.update_post(slug, alpha, %{"url_slug" => "hello"}, %{publish: false})
+
+    {:ok, hello} =
+      Publishing.import_post(slug, %{title: "Hello", published_at: "2026-10-02T10:00:00Z"})
+
+    {:ok, %{slugs: slugs}} = Publishing.convert_to_slug_mode(slug)
+    assert slugs[alpha[:uuid]] == "alpha"
+    assert slugs[hello[:uuid]] == "hello-2"
+
+    {:ok, %{entries: entries}} = Publishing.list_published(slug)
+    urls = Enum.map(entries, & &1.url)
+    assert urls == Enum.uniq(urls)
+  end
+
+  test "a title that is a language code or a route word gets a routable slug", %{slug: slug} do
+    {:ok, admin} =
+      Publishing.import_post(slug, %{title: "Admin", published_at: "2026-10-03T10:00:00Z"})
+
+    {:ok, %{slugs: slugs}} = Publishing.convert_to_slug_mode(slug)
+    assert slugs[admin[:uuid]] == "admin-post"
+    assert {:ok, _} = Posts.read_post(slug, "admin-post")
+  end
+
+  test "an editor opened before the conversion still saves", %{slug: slug, posts: posts} do
+    {:ok, stale} = Posts.read_post_by_uuid(posts.a[:uuid])
+    {:ok, _} = Publishing.convert_to_slug_mode(slug)
+
+    assert {:ok, saved} =
+             Posts.update_post(slug, stale, %{"title" => "Projects 0.34", "content" => "New."}, %{
+               publish: false
+             })
+
+    assert saved.metadata.title == "Projects 0.34"
+    assert DBStorage.get_post_by_uuid(posts.a[:uuid]).slug == "projects-0-33-0"
+  end
+
+  test "the audit row names the group", %{slug: slug} do
+    import PhoenixKitPublishing.ActivityLogAssertions
+
+    {:ok, _} = Publishing.convert_to_slug_mode(slug)
+    group = TestRepo.get_by!(PublishingGroup, slug: slug)
+
+    row = assert_activity_logged("publishing.group.updated", resource_uuid: group.uuid)
+    assert row.metadata["mode_converted"] == "timestamp_to_slug"
+    assert row.metadata["slug"] == slug
   end
 end
