@@ -16,7 +16,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Settings
 
   @timestamp_modes Constants.timestamp_modes()
-  @slug_modes Constants.slug_modes()
 
   @og_render_key "publishing_render_og_tags"
 
@@ -1039,6 +1038,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             path={&group_listing_path(@current_language, @group["slug"], listing_params(assigns, &1))}
             form_action={group_listing_path(@current_language, @group["slug"])}
             extra_params={listing_params(assigns, nil)}
+            order={listing_order(@group)}
           />
         <% end %>
 
@@ -2546,62 +2546,60 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   - If only one post exists on the date, uses date-only URL (e.g., /group/2025-12-09)
   - If multiple posts exist on the date, includes time (e.g., /group/2025-12-09/16:26)
   """
-  @spec build_post_url(String.t(), map(), String.t() | nil, map() | nil) :: String.t()
-  def build_post_url(group_slug, post, language, date_counts \\ nil) do
-    # The ORIGINAL language keeps its identity for the per-language slug
-    # lookup (an "en-GB" caller must get the en-GB slug) and for the prefix
-    # decision; only the rendered path segment goes through
-    # public_url_segment (sibling dialects → lowercase full code).
-    language = language || LanguageHelpers.get_primary_language()
-    segment = LanguageHelpers.public_url_segment(language)
+  @spec build_post_url(String.t(), map(), String.t() | url_context() | nil, map() | nil) ::
+          String.t()
+  def build_post_url(group_slug, post, language_or_context, date_counts \\ nil)
 
+  def build_post_url(group_slug, post, %{__url_context__: true} = ctx, date_counts) do
     case post.mode do
-      mode when mode in @slug_modes ->
-        # Use language-specific URL slug for SEO-friendly localized URLs
-        url_slug = get_url_slug_for_language(post, language)
-
-        segments =
-          if LanguageHelpers.use_language_prefix?(language),
-            do: [segment, group_slug, url_slug],
-            else: [group_slug, url_slug]
-
-        build_public_path(segments)
-
       mode when mode in @timestamp_modes ->
         date = get_timestamp_date(post)
         post_count = lookup_date_count(date_counts, group_slug, date)
+        tail = if post_count > 1, do: [date, get_timestamp_time(post)], else: [date]
+        build_public_path(context_segments(ctx, [group_slug | tail]))
 
-        segments =
-          timestamp_url_segments({language, segment}, group_slug, date, post_count > 1, post)
-
-        build_public_path(segments)
-
+      # slug mode, and the fallback for anything else: the language's own
+      # URL slug for SEO-friendly localized URLs
       _ ->
-        # Use language-specific URL slug for fallback mode as well
-        url_slug = get_url_slug_for_language(post, language)
-
-        segments =
-          if LanguageHelpers.use_language_prefix?(language),
-            do: [segment, group_slug, url_slug],
-            else: [group_slug, url_slug]
-
-        build_public_path(segments)
+        url_slug = get_url_slug_for_language(post, ctx.language)
+        build_public_path(context_segments(ctx, [group_slug, url_slug]))
     end
   end
 
-  defp timestamp_url_segments({language, segment}, group_slug, date, true = _include_time, post) do
-    time = get_timestamp_time(post)
+  def build_post_url(group_slug, post, language, date_counts),
+    do: build_post_url(group_slug, post, url_context(language), date_counts)
 
-    if LanguageHelpers.use_language_prefix?(language),
-      do: [segment, group_slug, date, time],
-      else: [group_slug, date, time]
+  @typedoc "What `url_context/1` returns."
+  @type url_context :: %{
+          __url_context__: true,
+          language: String.t(),
+          segment: String.t(),
+          prefix?: boolean()
+        }
+
+  @doc """
+  Everything `build_post_url/4` reads from the settings for `language` (nil:
+  the primary language), read once. Building many URLs, pass it in place of
+  the language: each URL is then string work only (with `date_counts` for a
+  timestamp group, see `build_date_counts/1`, there is no query either). The
+  ORIGINAL language keeps its identity for the per-language slug lookup and
+  the prefix decision; only the path segment goes through
+  `LanguageHelpers.public_url_segment/1`.
+  """
+  @spec url_context(String.t() | nil) :: url_context()
+  def url_context(language) do
+    language = language || LanguageHelpers.get_primary_language()
+
+    %{
+      __url_context__: true,
+      language: language,
+      segment: LanguageHelpers.public_url_segment(language),
+      prefix?: LanguageHelpers.use_language_prefix?(language)
+    }
   end
 
-  defp timestamp_url_segments({language, segment}, group_slug, date, false = _include_time, _post) do
-    if LanguageHelpers.use_language_prefix?(language),
-      do: [segment, group_slug, date],
-      else: [group_slug, date]
-  end
+  defp context_segments(%{prefix?: true, segment: segment}, segments), do: [segment | segments]
+  defp context_segments(_ctx, segments), do: segments
 
   # Gets the URL slug for a specific language
   # Priority:
@@ -3160,6 +3158,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   @doc false
+  # A timestamp group's listing is chronological, so its pager can say
+  # Newer/Older; a slug group's order is not about time.
+  def listing_order(%{"mode" => "timestamp"} = group) do
+    if Map.get(group, "listing_sort", "newest") == "oldest",
+      do: :oldest_first,
+      else: :newest_first
+  end
+
+  def listing_order(_group), do: nil
+
+  @doc false
   # The listing's query params for a page (nil: none), carrying the active
   # category filter, in the order the canonical URL has them.
   def listing_params(assigns, page) do
@@ -3223,6 +3232,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   attr :path, :any, required: true, doc: "a function from a page number to its URL"
   attr :form_action, :string, required: true, doc: "the listing URL without a page"
 
+  attr :order, :atom,
+    default: nil,
+    values: [nil, :newest_first, :oldest_first],
+    doc: "a chronological listing's order: Previous/Next then read as Newer/Older"
+
   attr :extra_params, :list,
     default: [],
     doc: "query params the page box keeps (`[{\"category\", \"a,b\"}]`)"
@@ -3250,7 +3264,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       aria-label={gettext("Pagination")}
       data-pager={@style}
     >
-      <.pager_step :if={@page > 1} href={@path.(@page - 1)} rel="prev" style={@style} />
+      <.pager_step :if={@page > 1} href={@path.(@page - 1)} rel="prev" style={@style} order={@order} />
       <%= if @style == "numbered" do %>
         <%!-- Two windows, one per screen width: hiding single buttons of one
           window on a phone would leave "1 3 4" without a gap mark. --%>
@@ -3277,6 +3291,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         href={@path.(@page + 1)}
         rel="next"
         style={@style}
+        order={@order}
       />
       <form
         :if={@style == "compact"}
@@ -3307,6 +3322,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   attr :href, :string, required: true
   attr :rel, :string, required: true
   attr :style, :string, required: true
+  attr :order, :atom, default: nil
 
   # Previous / Next: arrows beside the numbers, words where they stand alone
   # (in the compact pager only from `sm` up, so a phone keeps one row).
@@ -3316,7 +3332,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       href={@href}
       rel={@rel}
       class={["btn btn-sm sm:btn-md", @style == "numbered" && "px-2 sm:px-4"]}
-      aria-label={if @rel == "prev", do: gettext("Previous page"), else: gettext("Next page")}
+      aria-label={step_label(@rel, @order)}
     >
       <%= cond do %>
         <% @style == "numbered" and @rel == "prev" -> %>
@@ -3324,13 +3340,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <% @style == "numbered" -> %>
           »
         <% @rel == "prev" -> %>
-          « <span class={@style == "compact" && "hidden sm:inline"}>{gettext("Previous page")}</span>
+          « <span class={@style == "compact" && "hidden sm:inline"}>{step_label(@rel, @order)}</span>
         <% true -> %>
-          <span class={@style == "compact" && "hidden sm:inline"}>{gettext("Next page")}</span> »
+          <span class={@style == "compact" && "hidden sm:inline"}>{step_label(@rel, @order)}</span> »
       <% end %>
     </a>
     """
   end
+
+  # On a chronological listing the steps say which way in time they go.
+  defp step_label("prev", :newest_first), do: gettext("Newer posts")
+  defp step_label("next", :newest_first), do: gettext("Older posts")
+  defp step_label("prev", :oldest_first), do: gettext("Older posts")
+  defp step_label("next", :oldest_first), do: gettext("Newer posts")
+  defp step_label("prev", _order), do: gettext("Previous page")
+  defp step_label(_rel, _order), do: gettext("Next page")
 
   attr :items, :list, required: true
   attr :page, :integer, required: true

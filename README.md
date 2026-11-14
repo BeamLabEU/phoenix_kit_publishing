@@ -250,6 +250,33 @@ Publishing.regenerate_cache("docs")
 Publishing.invalidate_cache("docs")
 ```
 
+## Listing posts from a host
+
+A host that draws its own listing (a news page with its own filters, a "latest
+posts" block) reads the published posts as data instead of rendering
+Publishing's page:
+
+```elixir
+{:ok, %{entries: entries, total: total, total_pages: pages}} =
+  PhoenixKit.Modules.Publishing.list_published("news",
+    language: "en",
+    categories: ["billing", "crm"],   # any of them, subcategories included
+    page: 3,
+    per_page: 20
+  )
+
+{:ok, counts} = PhoenixKit.Modules.Publishing.category_counts("news", language: "en")
+# %{"billing" => 44, "crm" => 12, ...}
+```
+
+Each entry has `uuid`, `title`, `description`, `excerpt`, `url`, `published_at`,
+`featured_image_uuid` (`featured_image_url` with `images: true`), `categories`
+(`slug`, `name`, `color`, `color_css`, `icon`, `url`) and `custom` (the post's
+custom fields, edited in the post editor's sidebar). Building many post URLs
+yourself, pass `Web.HTML.url_context(language)` in place of the language to
+`build_post_url/4`, with `build_date_counts/1` for a timestamp group: the
+settings are then read once, and no URL costs a query.
+
 ## Admin Routes
 
 | Route | LiveView | Purpose |

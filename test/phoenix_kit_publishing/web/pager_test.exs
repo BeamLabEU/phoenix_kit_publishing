@@ -128,6 +128,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.PagerTest do
     end
   end
 
+  test "a chronological listing says Newer and Older, in its order" do
+    newest =
+      rendered_to_string(
+        PublishingHTML.pager(%{
+          style: "simple",
+          page: 2,
+          total_pages: 5,
+          path: &"/news?page=#{&1}",
+          form_action: "/news",
+          order: :newest_first,
+          __changed__: nil
+        })
+      )
+
+    assert newest =~ ~r/rel="prev"[^>]*aria-label="Newer posts"/
+    assert newest =~ ~r/rel="next"[^>]*aria-label="Older posts"/
+    assert newest =~ "Older posts</span> »"
+
+    assert PublishingHTML.listing_order(%{"mode" => "timestamp", "listing_sort" => "oldest"}) ==
+             :oldest_first
+
+    assert PublishingHTML.listing_order(%{"mode" => "slug"}) == nil
+  end
+
   test "an unknown style draws the numbered pager; a page past the end draws the last" do
     html = pager("fancy", 99, 62)
     assert html =~ ~s(data-pager="numbered")

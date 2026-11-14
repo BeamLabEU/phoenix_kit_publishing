@@ -35,6 +35,43 @@ defmodule PhoenixKit.Modules.Publishing do
   # Language Utility Delegates
   # ============================================================================
 
+  @doc """
+  One page of a group's published posts, for a host that draws its own
+  listing (a news page with its own filters, a "latest posts" block):
+
+      {:ok, %{entries: entries, total: 252, page: 3, per_page: 20, total_pages: 13}} =
+        Publishing.list_published("news", language: "en", categories: ["billing", "crm"], page: 3)
+
+  Options: `:language` (default the primary), `:categories` (slugs; posts in
+  any of them, subcategories included; unknown slugs are ignored),
+  `:search` (a case-insensitive match on title, description and excerpt),
+  `:page` (default 1, capped at the last), `:per_page` (default 20, at most
+  200), `:sort` (`"newest"` / `"oldest"`, default the group's
+  `listing_sort`), `:images` (`true` resolves `featured_image_url`; a
+  storage lookup per post, so off by default).
+
+  Each entry: `uuid`, `title`, `description`, `excerpt`, `url` (the public
+  path, built from one URL context and the group's date counts, so no query
+  per post), `published_at`, `featured_image_uuid`, `featured_image_url`,
+  `categories` (`%{slug, name, color, color_css, icon, url}`, in the
+  categories' order) and `custom` (the post's custom fields). Reads the
+  listing cache. `{:error, :group_not_found}` for an unknown group.
+  """
+  @spec list_published(String.t(), keyword()) :: {:ok, map()} | {:error, atom()}
+  defdelegate list_published(group_slug, opts \\ []),
+    to: PhoenixKit.Modules.Publishing.Web.Controller.Listing,
+    as: :published_page
+
+  @doc """
+  Published posts per category of a group in a language (`:language`,
+  default the primary), each counting its subcategories' posts, keyed by
+  slug: `{:ok, %{"billing" => 44, "invoices" => 12, ...}}`.
+  """
+  @spec category_counts(String.t(), keyword()) ::
+          {:ok, %{String.t() => non_neg_integer()}} | {:error, atom()}
+  defdelegate category_counts(group_slug, opts \\ []),
+    to: PhoenixKit.Modules.Publishing.Web.Controller.Listing
+
   defdelegate get_language_info(language_code), to: LanguageHelpers
   defdelegate enabled_language_codes(), to: LanguageHelpers
   defdelegate get_primary_language(), to: LanguageHelpers

@@ -295,6 +295,139 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
 
   @max_filter_categories 20
 
+  # ============================================================================
+  # The listing as data, for hosts that draw their own (Publishing.list_published/2)
+  # ============================================================================
+
+  @default_page_size 20
+  @max_page_size 200
+
+  @doc """
+  One page of a group's published posts in a language, as data — see
+  `PhoenixKit.Modules.Publishing.list_published/2` for the options and the
+  entry shape.
+  """
+  @spec published_page(String.t(), keyword()) :: {:ok, map()} | {:error, atom()}
+  def published_page(group_slug, opts \\ []) do
+    with {:ok, group} <- fetch_group(group_slug) do
+      language = Keyword.get(opts, :language) || LanguageHelpers.get_primary_language()
+      categories = Categories.list_categories(group_slug)
+      filter = resolve_category_filter(categories, slug_list(Keyword.get(opts, :categories)))
+
+      posts =
+        group_slug
+        |> chronological_posts(language)
+        |> filter_by_categories(filter.uuids)
+        |> filter_by_search(Keyword.get(opts, :search))
+        |> sort_published(Keyword.get(opts, :sort) || Map.get(group, "listing_sort", "newest"))
+
+      per_page = page_size(Keyword.get(opts, :per_page))
+      total = length(posts)
+      total_pages = max(ceil(total / per_page), 1)
+      page = opts |> Keyword.get(:page, 1) |> page_number() |> min(total_pages)
+
+      ctx = PublishingHTML.url_context(language)
+      date_counts = group_date_counts(group_slug)
+      index = Map.new(categories, &{&1.uuid, &1})
+
+      entries =
+        posts
+        |> paginate(page, per_page)
+        |> Enum.map(&published_entry(&1, group_slug, ctx, date_counts, index, opts))
+
+      {:ok,
+       %{
+         entries: entries,
+         total: total,
+         page: page,
+         per_page: per_page,
+         total_pages: total_pages,
+         language: language
+       }}
+    end
+  end
+
+  @doc """
+  Published posts per category in a language, a category's subcategories
+  included, keyed by slug — see `PhoenixKit.Modules.Publishing.category_counts/2`.
+  """
+  @spec category_counts(String.t(), keyword()) ::
+          {:ok, %{String.t() => non_neg_integer()}} | {:error, atom()}
+  def category_counts(group_slug, opts \\ []) do
+    with {:ok, _group} <- fetch_group(group_slug) do
+      language = Keyword.get(opts, :language) || LanguageHelpers.get_primary_language()
+      categories = Categories.list_categories(group_slug)
+      counts = category_post_counts(categories, chronological_posts(group_slug, language))
+      {:ok, Map.new(categories, &{&1.slug, Map.get(counts, &1.uuid, 0)})}
+    end
+  end
+
+  defp slug_list(nil), do: []
+
+  defp slug_list(slugs),
+    do: category_filter_param(%{"category" => slugs |> List.wrap() |> Enum.map(&to_string/1)})
+
+  defp page_size(n) when is_integer(n) and n > 0, do: min(n, @max_page_size)
+  defp page_size(_n), do: @default_page_size
+
+  defp page_number(n) when is_integer(n) and n > 0, do: n
+  defp page_number(_n), do: 1
+
+  defp sort_published(posts, sort) when sort in [:oldest, "oldest"], do: Enum.reverse(posts)
+  defp sort_published(posts, _sort), do: posts
+
+  # A plain, case-insensitive match on the title, the description and the
+  # excerpt of the language (no query: the posts are already in memory).
+  defp filter_by_search(posts, search) when is_binary(search) do
+    case search |> String.trim() |> String.downcase() do
+      "" ->
+        posts
+
+      needle ->
+        Enum.filter(posts, fn post ->
+          [post.metadata[:title], post.metadata[:description], post[:content]]
+          |> Enum.filter(&is_binary/1)
+          |> Enum.any?(&String.contains?(String.downcase(&1), needle))
+        end)
+    end
+  end
+
+  defp filter_by_search(posts, _search), do: posts
+
+  defp published_entry(post, group_slug, ctx, date_counts, index, opts) do
+    metadata = post.metadata || %{}
+
+    %{
+      uuid: post.uuid,
+      title: metadata[:title] || Constants.default_title(),
+      description: metadata[:description],
+      excerpt: metadata[:description] || PublishingHTML.extract_excerpt(post[:content] || ""),
+      url: PublishingHTML.build_post_url(group_slug, post, ctx, date_counts),
+      published_at: metadata[:published_at],
+      featured_image_uuid: metadata[:featured_image_uuid],
+      featured_image_url:
+        if(Keyword.get(opts, :images, false),
+          do: PublishingHTML.featured_image_url(post, "medium")
+        ),
+      categories:
+        post
+        |> PublishingHTML.post_card_categories(index)
+        |> Enum.map(&category_entry(&1, group_slug, ctx.language)),
+      custom: metadata[:custom_fields] || %{}
+    }
+  end
+
+  defp category_entry(category, group_slug, language) do
+    %{
+      slug: category.slug,
+      name: PublishingCategory.translated_name(category, language),
+      color: PublishingCategory.color(category),
+      color_css: PublishingCategory.color_css(category),
+      icon: PublishingCategory.icon(category),
+      url: PublishingHTML.term_archive_path(language, group_slug, {:category, category.slug})
+    }
+  end
+
   @doc """
   The category slugs a listing request filters by: `?category=a,b` (or a
   list), trimmed, lowercased, deduplicated, in the order given, at most #{@max_filter_categories};
