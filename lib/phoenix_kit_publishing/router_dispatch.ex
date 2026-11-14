@@ -51,6 +51,7 @@ defmodule PhoenixKitPublishing.RouterDispatch do
   alias PhoenixKit.ModuleRegistry
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
 
   @internal_prefix "__phoenix_kit_publishing_dispatch"
   @localized_segment "localized"
@@ -128,15 +129,26 @@ defmodule PhoenixKitPublishing.RouterDispatch do
 
   def maybe_rewrite(%Plug.Conn{path_info: path_info} = conn, url_prefix)
       when is_binary(url_prefix) do
+    # The internal scope lives under PhoenixKit's url_prefix; the public
+    # pages under the public prefix (`PublishingHTML.public_url_prefix/0`),
+    # the same unless the host set `:public_url_prefix`. A request under
+    # either is served: under the kit prefix it is an old or core-built URL
+    # (the sitemap's), which the controllers' canonical check then 301s to
+    # the public one.
     prefix_segments = split_prefix(url_prefix)
+    public_segments = split_prefix(PublishingHTML.public_url_prefix())
 
-    case strip_prefix(path_info, prefix_segments) do
-      {:ok, rest} ->
-        rest |> dispatch_target() |> dispatch(conn, prefix_segments, rest)
-
-      :mismatch ->
-        :pass
-    end
+    [public_segments, prefix_segments]
+    |> Enum.uniq()
+    |> Enum.find_value(:pass, fn segments ->
+      with {:ok, rest} <- strip_prefix(path_info, segments),
+           {:rewrite, _conn} = rewritten <-
+             rest |> dispatch_target() |> dispatch(conn, prefix_segments, rest) do
+        rewritten
+      else
+        _ -> nil
+      end
+    end)
   end
 
   # A URL locale segment is valid only if it's an enabled language, or a base code

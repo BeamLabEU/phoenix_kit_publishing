@@ -5,6 +5,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   use PhoenixKitWeb, :html
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  require Logger
+
   alias PhoenixKit.Config
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
@@ -3064,11 +3066,48 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   defp url_prefix_segments do
-    Config.get_url_prefix()
+    public_url_prefix()
     |> case do
       "/" -> []
       prefix -> prefix |> String.trim("/") |> String.split("/", trim: true)
     end
+  end
+
+  @prefix_shape ~r{\A/(?:[A-Za-z0-9_.~-]+(?:/[A-Za-z0-9_.~-]+)*)?\z}
+
+  @doc """
+  The path every public Publishing URL starts with: the host's
+  `config :phoenix_kit_publishing, public_url_prefix: "/"` when set, else
+  PhoenixKit's own `url_prefix`. Setting it lets a host keep the admin under
+  `/phoenix_kit` and serve `/blog` at the site root. A value that is not a
+  plain path (`/`, `/a`, `/a/b`) is ignored with a warning.
+  """
+  @spec public_url_prefix() :: String.t()
+  def public_url_prefix do
+    case Application.get_env(:phoenix_kit_publishing, :public_url_prefix) do
+      nil ->
+        Config.get_url_prefix()
+
+      prefix when is_binary(prefix) ->
+        prefix = if prefix == "/", do: "/", else: String.trim_trailing(prefix, "/")
+
+        if Regex.match?(@prefix_shape, prefix) do
+          prefix
+        else
+          invalid_public_prefix(prefix)
+        end
+
+      other ->
+        invalid_public_prefix(other)
+    end
+  end
+
+  defp invalid_public_prefix(value) do
+    Logger.warning(
+      "[Publishing] :public_url_prefix #{inspect(value)} is not a plain path; using PhoenixKit's url_prefix"
+    )
+
+    Config.get_url_prefix()
   end
 
   attr :categories, :list, required: true, doc: "`PublishingCategory` structs, in display order"

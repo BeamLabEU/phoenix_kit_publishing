@@ -277,6 +277,19 @@ yourself, pass `Web.HTML.url_context(language)` in place of the language to
 `build_post_url/4`, with `build_date_counts/1` for a timestamp group: the
 settings are then read once, and no URL costs a query.
 
+## Public pages at the site root
+
+With PhoenixKit mounted under a prefix (`/phoenix_kit`), the public pages
+follow it by default. To serve them at the root while the admin stays under the
+prefix:
+
+```elixir
+config :phoenix_kit_publishing, public_url_prefix: "/"
+```
+
+Old URLs under the kit prefix 301 to the new ones. Core's sitemap still lists
+the kit-prefixed URLs until its Publishing source reads this setting.
+
 ## Importing posts from code
 
 `PhoenixKit.Modules.Publishing.import_post/3` creates a post with everything it
