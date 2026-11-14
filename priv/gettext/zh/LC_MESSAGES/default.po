@@ -326,7 +326,7 @@ msgstr "请为此帖子选择其他 URL slug，或更改另一篇帖子的 slug�
 msgid "Choose how to create the new version:"
 msgstr "选择创建新版本的方式："
 
-#: lib/phoenix_kit_publishing/web/edit.ex:476
+#: lib/phoenix_kit_publishing/web/edit.ex:486
 #, elixir-autogen, elixir-format
 msgid "Chronological URLs ideal for news and updates."
 msgstr "按时间顺序排列的 URL，非常适合新闻和动态。"
@@ -781,7 +781,7 @@ msgstr "2月"
 msgid "February"
 msgstr "2月"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:453
+#: lib/phoenix_kit_publishing/web/edit.ex:463
 #: lib/phoenix_kit_publishing/web/new.ex:376
 #, elixir-autogen, elixir-format
 msgid "Format"
@@ -814,7 +814,7 @@ msgstr "生成的 OG 图片预览"
 msgid "Group"
 msgstr "分组"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:416
+#: lib/phoenix_kit_publishing/web/edit.ex:426
 #: lib/phoenix_kit_publishing/web/new.ex:352
 #, elixir-autogen, elixir-format
 msgid "Group Name"
@@ -831,7 +831,7 @@ msgid "Group moved to trash"
 msgstr "分组已移至回收站"
 
 #: lib/phoenix_kit_publishing/errors.ex:136
-#: lib/phoenix_kit_publishing/web/edit.ex:870
+#: lib/phoenix_kit_publishing/web/edit.ex:891
 #, elixir-autogen, elixir-format
 msgid "Group not found"
 msgstr "未找到分组"
@@ -846,7 +846,7 @@ msgstr "分组已永久删除"
 msgid "Group restored"
 msgstr "分组已恢复"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:831
+#: lib/phoenix_kit_publishing/web/edit.ex:852
 #, elixir-autogen, elixir-format
 msgid "Group updated"
 msgstr "分组已更新"
@@ -913,7 +913,7 @@ msgstr "无效的内容"
 msgid "Invalid content type"
 msgstr "无效的内容类型"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:463
+#: lib/phoenix_kit_publishing/web/edit.ex:473
 #: lib/phoenix_kit_publishing/web/new.ex:386
 #, elixir-autogen, elixir-format
 msgid "Invalid examples"
@@ -944,7 +944,7 @@ msgstr "无效的路径"
 msgid "Invalid slug"
 msgstr "无效的 slug"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:861
+#: lib/phoenix_kit_publishing/web/edit.ex:882
 #: lib/phoenix_kit_publishing/web/new.ex:677
 #, elixir-autogen, elixir-format
 msgid "Invalid slug format. Please use only lowercase letters, numbers, and hyphens (e.g. my-group-name)"
@@ -1281,7 +1281,7 @@ msgstr "10月"
 msgid "October"
 msgstr "10月"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:454
+#: lib/phoenix_kit_publishing/web/edit.ex:464
 #: lib/phoenix_kit_publishing/web/new.ex:377
 #, elixir-autogen, elixir-format
 msgid "Only lowercase letters (a-z), numbers (0-9), and hyphens (-) are allowed. Must not start or end with a hyphen."
@@ -1328,7 +1328,7 @@ msgstr "永久删除此分组及其所有帖子？此操作无法撤销。"
 msgid "Please enter a valid name"
 msgstr "请输入有效的名称"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:853
+#: lib/phoenix_kit_publishing/web/edit.ex:874
 #, elixir-autogen, elixir-format
 msgid "Please provide a valid group name."
 msgstr "请提供有效的分组名称。"
@@ -1648,7 +1648,7 @@ msgstr "已保存"
 msgid "Saving..."
 msgstr "正在保存…"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:785
+#: lib/phoenix_kit_publishing/web/edit.ex:806
 #: lib/phoenix_kit_publishing/web/editor.ex:3950
 #, elixir-autogen, elixir-format
 msgid "Saving…"
@@ -1671,7 +1671,7 @@ msgstr "选择提示词…"
 msgid "Select an endpoint..."
 msgstr "选择端点…"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:474
+#: lib/phoenix_kit_publishing/web/edit.ex:484
 #, elixir-autogen, elixir-format
 msgid "Semantic URLs ideal for evergreen content."
 msgstr "语义化 URL，非常适合长期有效的内容。"
@@ -1706,7 +1706,7 @@ msgstr "单数"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:504
 #: lib/phoenix_kit_publishing/web/categories_live.ex:605
-#: lib/phoenix_kit_publishing/web/edit.ex:444
+#: lib/phoenix_kit_publishing/web/edit.ex:454
 #: lib/phoenix_kit_publishing/web/editor.ex:4092
 #: lib/phoenix_kit_publishing/web/index.ex:501
 #: lib/phoenix_kit_publishing/web/post_show.ex:181
@@ -1750,7 +1750,7 @@ msgstr "Slug 样式已更新为 %{style}"
 msgid "Slug taken"
 msgstr "Slug 已被占用"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:474
+#: lib/phoenix_kit_publishing/web/edit.ex:484
 #: lib/phoenix_kit_publishing/web/index.ex:514
 #: lib/phoenix_kit_publishing/web/new.ex:569
 #, elixir-autogen, elixir-format
@@ -1767,7 +1767,7 @@ msgstr "社交 / OpenGraph"
 msgid "Some fields are invalid. Please review and try again."
 msgstr "部分字段无效。请检查后重试。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:902
+#: lib/phoenix_kit_publishing/web/edit.ex:923
 #, elixir-autogen, elixir-format
 msgid "Something went wrong while saving this group."
 msgstr "保存此分组时出错。"
@@ -1849,7 +1849,7 @@ msgstr "找不到请求的分组。"
 msgid "The slug \"%{slug}\" is already used by another post in this group. Choose a different slug or change the title."
 msgstr "此分组中的另一篇帖子已使用 slug“%{slug}”。请选择其他 slug 或更改标题。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:450
+#: lib/phoenix_kit_publishing/web/edit.ex:460
 #, elixir-autogen, elixir-format
 msgid "The slug is used in URLs for this group's public pages."
 msgstr "该 slug 用于此分组公开页面的 URL。"
@@ -1935,7 +1935,7 @@ msgstr "这将覆盖以下语言中的现有内容：%{languages}"
 msgid "This will translate the %{source} content to %{target}, overwriting any existing content."
 msgstr "这会将 %{source} 内容翻译为 %{target}，并覆盖所有现有内容。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:476
+#: lib/phoenix_kit_publishing/web/edit.ex:486
 #: lib/phoenix_kit_publishing/web/index.ex:516
 #: lib/phoenix_kit_publishing/web/new.ex:544
 #, elixir-autogen, elixir-format
@@ -2068,7 +2068,7 @@ msgstr "URL 模式"
 msgid "URL Slug"
 msgstr "URL slug"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:471
+#: lib/phoenix_kit_publishing/web/edit.ex:481
 #, elixir-autogen, elixir-format
 msgid "URL mode"
 msgstr "URL 模式"
@@ -2190,7 +2190,7 @@ msgstr "用于 URL，并作为此分组的唯一标识符。"
 msgid "Uses semantic URLs and editable slugs. Ideal for documentation, guides, and evergreen content."
 msgstr "使用语义化 URL 和可编辑的 slug。非常适合文档、指南和长期有效的内容。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:459
+#: lib/phoenix_kit_publishing/web/edit.ex:469
 #: lib/phoenix_kit_publishing/web/new.ex:382
 #, elixir-autogen, elixir-format
 msgid "Valid examples"
@@ -2290,7 +2290,7 @@ msgstr "由于长时间未操作，您的编辑锁将在 %{minutes} 分钟后过
 msgid "auto-generated from title"
 msgstr "根据标题自动生成"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:417
+#: lib/phoenix_kit_publishing/web/edit.ex:427
 #: lib/phoenix_kit_publishing/web/new.ex:353
 #, elixir-autogen, elixir-format
 msgid "e.g. Product Updates"
@@ -2306,7 +2306,7 @@ msgstr "例如：帖子、问题"
 msgid "e.g. posts, questions"
 msgstr "例如：帖子、问题"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:445
+#: lib/phoenix_kit_publishing/web/edit.ex:455
 #: lib/phoenix_kit_publishing/web/new.ex:366
 #, elixir-autogen, elixir-format
 msgid "e.g. product-updates"
@@ -2338,83 +2338,83 @@ msgid "%{count} min read"
 msgid_plural "%{count} min read"
 msgstr[0] "%{count} 分钟阅读"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:597
+#: lib/phoenix_kit_publishing/web/edit.ex:618
 #, elixir-autogen, elixir-format
 msgid "A clickable date rail down the side to jump through the archive."
 msgstr "沿侧边显示可点击的日期导航栏，用于在归档中跳转。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:656
+#: lib/phoenix_kit_publishing/web/edit.ex:677
 #, elixir-autogen, elixir-format
 msgid "A large hero image above the title."
 msgstr "标题上方的大幅主图。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:742
+#: lib/phoenix_kit_publishing/web/edit.ex:763
 #, elixir-autogen, elixir-format
 msgid "A side rail of the post's headings; hidden on short posts."
 msgstr "帖子各级标题的侧边导航栏；短帖子中不显示。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:735
+#: lib/phoenix_kit_publishing/web/edit.ex:756
 #, elixir-autogen, elixir-format
 msgid "A thin bar at the top that fills as the reader scrolls."
 msgstr "页面顶部的细条，随读者滚动而填充。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:284
-#: lib/phoenix_kit_publishing/web/edit.ex:323
+#: lib/phoenix_kit_publishing/web/edit.ex:294
+#: lib/phoenix_kit_publishing/web/edit.ex:333
 #, elixir-autogen, elixir-format
 msgid "Above the title"
 msgstr "标题上方"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:728
+#: lib/phoenix_kit_publishing/web/edit.ex:749
 #, elixir-autogen, elixir-format
 msgid "An estimated 'N min read' under the title."
 msgstr "在标题下方显示预计的“N 分钟阅读”。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:751
+#: lib/phoenix_kit_publishing/web/edit.ex:772
 #, elixir-autogen, elixir-format
 msgid "Appearance"
 msgstr "外观"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:754
+#: lib/phoenix_kit_publishing/web/edit.ex:775
 #, elixir-autogen, elixir-format
 msgid "Applies to every public page in this group."
 msgstr "适用于此分组中的所有公开页面。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:249
+#: lib/phoenix_kit_publishing/web/edit.ex:250
 #, elixir-autogen, elixir-format
 msgid "Automatic (fit to the posts)"
 msgstr "自动（根据帖子调整）"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:322
+#: lib/phoenix_kit_publishing/web/edit.ex:332
 #, elixir-autogen, elixir-format
 msgid "Below the title"
 msgstr "标题下方"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:353
+#: lib/phoenix_kit_publishing/web/edit.ex:363
 #, elixir-autogen, elixir-format
 msgid "Branded — recolored to match the theme"
 msgstr "品牌化——重新着色以匹配主题"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:252
+#: lib/phoenix_kit_publishing/web/edit.ex:253
 #, elixir-autogen, elixir-format
 msgid "By day"
 msgstr "按日"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:251
+#: lib/phoenix_kit_publishing/web/edit.ex:252
 #, elixir-autogen, elixir-format
 msgid "By month"
 msgstr "按月"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:250
+#: lib/phoenix_kit_publishing/web/edit.ex:251
 #, elixir-autogen, elixir-format
 msgid "By year"
 msgstr "按年"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:630
+#: lib/phoenix_kit_publishing/web/edit.ex:651
 #, elixir-autogen, elixir-format
 msgid "Content width"
 msgstr "内容宽度"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:352
+#: lib/phoenix_kit_publishing/web/edit.ex:362
 #, elixir-autogen, elixir-format
 msgid "Default — the browser's native scrollbar"
 msgstr "默认——浏览器原生滚动条"
@@ -2431,32 +2431,32 @@ msgstr "设为精选帖子"
 msgid "Featured"
 msgstr "精选"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:548
+#: lib/phoenix_kit_publishing/web/edit.ex:569
 #, elixir-autogen, elixir-format
 msgid "Featured layout"
 msgstr "精选布局"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:430
+#: lib/phoenix_kit_publishing/web/edit.ex:440
 #, elixir-autogen, elixir-format
 msgid "Group Name (%{lang})"
 msgstr "分组名称（%{lang}）"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:260
+#: lib/phoenix_kit_publishing/web/edit.ex:261
 #, elixir-autogen, elixir-format
 msgid "Hero band — a large banner above the list"
 msgstr "主图横幅——列表上方的大幅横幅"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:324
+#: lib/phoenix_kit_publishing/web/edit.ex:334
 #, elixir-autogen, elixir-format
 msgid "Hidden"
 msgstr "隐藏"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:537
+#: lib/phoenix_kit_publishing/web/edit.ex:558
 #, elixir-autogen, elixir-format
 msgid "Highlight featured posts"
 msgstr "突出显示精选帖子"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:261
+#: lib/phoenix_kit_publishing/web/edit.ex:262
 #, elixir-autogen, elixir-format
 msgid "Highlighted card — a larger card within the grid"
 msgstr "突出卡片——网格中较大的卡片"
@@ -2466,32 +2466,33 @@ msgstr "突出卡片——网格中较大的卡片"
 msgid "Jump to date"
 msgstr "跳转到日期"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:434
+#: lib/phoenix_kit_publishing/web/edit.ex:444
 #, elixir-autogen, elixir-format
 msgid "Leave blank to use the primary-language name."
 msgstr "留空则使用主要语言的名称。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:487
+#: lib/phoenix_kit_publishing/web/edit.ex:497
+#: lib/phoenix_kit_publishing/web/edit.ex:518
 #, elixir-autogen, elixir-format
 msgid "Listing page"
 msgstr "列表页面"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:332
+#: lib/phoenix_kit_publishing/web/edit.ex:342
 #, elixir-autogen, elixir-format
 msgid "Narrow"
 msgstr "窄"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:303
+#: lib/phoenix_kit_publishing/web/edit.ex:313
 #, elixir-autogen, elixir-format
 msgid "Newest first (by publish date)"
 msgstr "最新优先（按发布日期）"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:333
+#: lib/phoenix_kit_publishing/web/edit.ex:343
 #, elixir-autogen, elixir-format
 msgid "Normal"
 msgstr "正常"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:304
+#: lib/phoenix_kit_publishing/web/edit.ex:314
 #, elixir-autogen, elixir-format
 msgid "Oldest first (by publish date)"
 msgstr "最早优先（按发布日期）"
@@ -2501,7 +2502,7 @@ msgstr "最早优先（按发布日期）"
 msgid "On this page"
 msgstr "本页内容"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:764
+#: lib/phoenix_kit_publishing/web/edit.ex:785
 #, elixir-autogen, elixir-format
 msgid "Only recolors the real scrollbar — keyboard and touch scrolling stay normal."
 msgstr "仅重新着色真实的滚动条——键盘和触摸滚动保持不变。"
@@ -2511,117 +2512,117 @@ msgstr "仅重新着色真实的滚动条——键盘和触摸滚动保持不变
 msgid "Pins this post to the top of its listing and shows it larger. The group's settings control whether featured posts appear and how they're displayed."
 msgstr "将此帖子固定在其列表顶部并以更大尺寸显示。分组的设置决定精选帖子是否显示以及如何显示。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:636
+#: lib/phoenix_kit_publishing/web/edit.ex:657
 #, elixir-autogen, elixir-format
 msgid "Post date position"
 msgstr "帖子日期位置"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:496
+#: lib/phoenix_kit_publishing/web/edit.ex:506
 #, elixir-autogen, elixir-format
 msgid "Post order"
 msgstr "帖子排序"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:621
+#: lib/phoenix_kit_publishing/web/edit.ex:642
 #, elixir-autogen, elixir-format
 msgid "Post page"
 msgstr "帖子页面"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:539
+#: lib/phoenix_kit_publishing/web/edit.ex:560
 #, elixir-autogen, elixir-format
 msgid "Posts marked featured in the editor are pinned to the top and shown larger."
 msgstr "在编辑器中标记为精选的帖子会固定在顶部并以更大尺寸显示。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:760
+#: lib/phoenix_kit_publishing/web/edit.ex:781
 #, elixir-autogen, elixir-format
 msgid "Scrollbar style"
 msgstr "滚动条样式"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:595
+#: lib/phoenix_kit_publishing/web/edit.ex:616
 #, elixir-autogen, elixir-format
 msgid "Show a date-timeline rail"
 msgstr "显示日期时间线导航栏"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:740
+#: lib/phoenix_kit_publishing/web/edit.ex:761
 #, elixir-autogen, elixir-format
 msgid "Show a heading navigation rail"
 msgstr "显示标题导航栏"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:733
+#: lib/phoenix_kit_publishing/web/edit.ex:754
 #, elixir-autogen, elixir-format
 msgid "Show a reading-progress bar"
 msgstr "显示阅读进度条"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:647
+#: lib/phoenix_kit_publishing/web/edit.ex:668
 #, elixir-autogen, elixir-format
 msgid "Show the breadcrumb trail"
 msgstr "显示面包屑导航"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:654
+#: lib/phoenix_kit_publishing/web/edit.ex:675
 #, elixir-autogen, elixir-format
 msgid "Show the featured image"
 msgstr "显示特色图片"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:530
+#: lib/phoenix_kit_publishing/web/edit.ex:551
 #, elixir-autogen, elixir-format
 msgid "Show the post count"
 msgstr "显示帖子数量"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:726
+#: lib/phoenix_kit_publishing/web/edit.ex:747
 #, elixir-autogen, elixir-format
 msgid "Show the reading time"
 msgstr "显示阅读时间"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:649
+#: lib/phoenix_kit_publishing/web/edit.ex:670
 #, elixir-autogen, elixir-format
 msgid "The 'Home / Blog / …' navigation trail above the title."
 msgstr "标题上方的“首页 / 博客 / …”导航路径。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:490
+#: lib/phoenix_kit_publishing/web/edit.ex:500
 #, elixir-autogen, elixir-format
 msgid "The public page that lists this group's posts (e.g. /blog)."
 msgstr "列出此分组帖子的公开页面（例如 /blog）。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:532
+#: lib/phoenix_kit_publishing/web/edit.ex:553
 #, elixir-autogen, elixir-format
 msgid "The total number of posts, shown under the listing title."
 msgstr "帖子总数，显示在列表标题下方。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:354
+#: lib/phoenix_kit_publishing/web/edit.ex:364
 #, elixir-autogen, elixir-format
 msgid "Thin — branded and slimmer"
 msgstr "纤细——品牌化且更窄"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:604
+#: lib/phoenix_kit_publishing/web/edit.ex:625
 #, elixir-autogen, elixir-format
 msgid "Timeline markers"
 msgstr "时间线标记"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:624
+#: lib/phoenix_kit_publishing/web/edit.ex:645
 #, elixir-autogen, elixir-format
 msgid "What shows on an individual post and how it's laid out."
 msgstr "单篇帖子页面上显示的内容及其布局。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:334
+#: lib/phoenix_kit_publishing/web/edit.ex:344
 #, elixir-autogen, elixir-format
 msgid "Wide"
 msgstr "宽"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:583
+#: lib/phoenix_kit_publishing/web/edit.ex:604
 #, elixir-autogen, elixir-format
 msgid "A post card's image clicks through to the post, same as the title."
 msgstr "帖子卡片的图片可点击进入帖子，与标题相同。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:663
+#: lib/phoenix_kit_publishing/web/edit.ex:684
 #, elixir-autogen, elixir-format
 msgid "A subtle 'Back to %{group}' link above the post, mirroring the footer button."
 msgstr "帖子上方的低调“返回 %{group}”链接，与页脚按钮相呼应。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:581
+#: lib/phoenix_kit_publishing/web/edit.ex:602
 #, elixir-autogen, elixir-format
 msgid "Clickable card images"
 msgstr "可点击的卡片图片"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:559
+#: lib/phoenix_kit_publishing/web/edit.ex:580
 #, elixir-autogen, elixir-format
 msgid "Highlight the latest post"
 msgstr "突出显示最新帖子"
@@ -2633,73 +2634,73 @@ msgstr "突出显示最新帖子"
 msgid "Latest"
 msgstr "最新"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:570
+#: lib/phoenix_kit_publishing/web/edit.ex:591
 #, elixir-autogen, elixir-format
 msgid "Latest layout"
 msgstr "最新布局"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:661
+#: lib/phoenix_kit_publishing/web/edit.ex:682
 #, elixir-autogen, elixir-format
 msgid "Show the top back link"
 msgstr "显示顶部返回链接"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:561
+#: lib/phoenix_kit_publishing/web/edit.ex:582
 #, elixir-autogen, elixir-format
 msgid "The most recent post is pinned into its own 'Latest' band under any featured posts and shown larger."
 msgstr "最新的帖子会固定在精选帖子下方单独的“最新”区块中，并以更大尺寸显示。"
 
 #: lib/phoenix_kit_publishing/web/categories_live.ex:668
-#: lib/phoenix_kit_publishing/web/edit.ex:775
+#: lib/phoenix_kit_publishing/web/edit.ex:796
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr "保存"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:787
+#: lib/phoenix_kit_publishing/web/edit.ex:808
 #, elixir-autogen, elixir-format
 msgid "Save and exit"
 msgstr "保存并退出"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:273
+#: lib/phoenix_kit_publishing/web/edit.ex:274
 #, elixir-autogen, elixir-format
 msgid "Classic — image beside or above the text"
 msgstr "经典——图片位于文字旁边或上方"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:275
+#: lib/phoenix_kit_publishing/web/edit.ex:276
 #, elixir-autogen, elixir-format
 msgid "Cover panel — background image with a solid text panel"
 msgstr "封面面板——背景图片配实色文字面板"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:274
+#: lib/phoenix_kit_publishing/web/edit.ex:275
 #, elixir-autogen, elixir-format
 msgid "Cover — the image is the background, text overlaid"
 msgstr "封面——图片作为背景，文字叠加其上"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:553
+#: lib/phoenix_kit_publishing/web/edit.ex:574
 #, elixir-autogen, elixir-format
 msgid "Featured style"
 msgstr "精选样式"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:575
+#: lib/phoenix_kit_publishing/web/edit.ex:596
 #, elixir-autogen, elixir-format
 msgid "Latest style"
 msgstr "最新样式"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:276
+#: lib/phoenix_kit_publishing/web/edit.ex:277
 #, elixir-autogen, elixir-format
 msgid "Minimal — text only, no image"
 msgstr "极简——仅文字，无图片"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:277
+#: lib/phoenix_kit_publishing/web/edit.ex:278
 #, elixir-autogen, elixir-format
 msgid "Top image — a wide image banner above the text"
 msgstr "顶部图片——文字上方的宽幅图片横幅"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:588
+#: lib/phoenix_kit_publishing/web/edit.ex:609
 #, elixir-autogen, elixir-format
 msgid "Card hover animations"
 msgstr "卡片悬停动画"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:590
+#: lib/phoenix_kit_publishing/web/edit.ex:611
 #, elixir-autogen, elixir-format
 msgid "Cards lift slightly on hover as a click cue."
 msgstr "鼠标悬停时卡片会轻微上浮，提示可点击。"
@@ -2753,7 +2754,7 @@ msgstr "分类已更新"
 msgid "Category: %{name}"
 msgstr "分类：%{name}"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:719
+#: lib/phoenix_kit_publishing/web/edit.ex:740
 #, elixir-autogen, elixir-format
 msgid "Chronological newer/older post links at the bottom of the post page."
 msgstr "帖子页面底部按时间顺序排列的较新/较早帖子链接。"
@@ -2808,7 +2809,7 @@ msgstr "在帖子页面上输出 schema.org Article 脚本，以获得更丰富�
 msgid "Filter posts…"
 msgstr "筛选帖子…"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:312
+#: lib/phoenix_kit_publishing/web/edit.ex:322
 #, elixir-autogen, elixir-format
 msgid "Grid — cards with images"
 msgstr "网格——带图片的卡片"
@@ -2829,17 +2830,17 @@ msgstr "JSON-LD 结构化数据已停用"
 msgid "JSON-LD structured data enabled on post pages"
 msgstr "已在帖子页面上启用 JSON-LD 结构化数据"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:313
+#: lib/phoenix_kit_publishing/web/edit.ex:323
 #, elixir-autogen, elixir-format
 msgid "List — horizontal rows with a thumbnail"
 msgstr "列表——带缩略图的横向行"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:502
+#: lib/phoenix_kit_publishing/web/edit.ex:512
 #, elixir-autogen, elixir-format
 msgid "Listing layout"
 msgstr "列表布局"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:314
+#: lib/phoenix_kit_publishing/web/edit.ex:324
 #, elixir-autogen, elixir-format
 msgid "Minimal — date and title only, no images"
 msgstr "极简——仅日期和标题，无图片"
@@ -2914,7 +2915,7 @@ msgstr "RSS 订阅源已停用——订阅源 URL 返回 404"
 msgid "RSS feeds enabled — every group serves /<group>/feed.xml"
 msgstr "RSS 订阅源已启用——每个分组都在 /<group>/feed.xml 提供订阅源"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:525
+#: lib/phoenix_kit_publishing/web/edit.ex:546
 #, elixir-autogen, elixir-format
 msgid "Readers can search this group's published posts by title and text."
 msgstr "读者可以按标题和正文搜索此分组的已发布帖子。"
@@ -2934,17 +2935,17 @@ msgstr "搜索帖子…"
 msgid "Serve an RSS 2.0 feed for every group at /<group>/feed.xml (newest 50 published posts, per language)."
 msgstr "为每个分组在 /<group>/feed.xml 提供 RSS 2.0 订阅源（每种语言最新的 50 篇已发布帖子）。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:523
+#: lib/phoenix_kit_publishing/web/edit.ex:544
 #, elixir-autogen, elixir-format
 msgid "Show a search box"
 msgstr "显示搜索框"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:671
+#: lib/phoenix_kit_publishing/web/edit.ex:692
 #, elixir-autogen, elixir-format
 msgid "Show category chips"
 msgstr "显示分类标签"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:717
+#: lib/phoenix_kit_publishing/web/edit.ex:738
 #, elixir-autogen, elixir-format
 msgid "Show previous/next navigation"
 msgstr "显示上一篇/下一篇导航"
@@ -2976,22 +2977,22 @@ msgid "%{count} view"
 msgid_plural "%{count} views"
 msgstr[0] "%{count} 次浏览"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:711
+#: lib/phoenix_kit_publishing/web/edit.ex:732
 #, elixir-autogen, elixir-format
 msgid "A subtle 'N views' line on the post page."
 msgstr "帖子页面上低调的“N 次浏览”一行。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:699
+#: lib/phoenix_kit_publishing/web/edit.ex:720
 #, elixir-autogen, elixir-format
 msgid "Count views"
 msgstr "统计浏览量"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:701
+#: lib/phoenix_kit_publishing/web/edit.ex:722
 #, elixir-autogen, elixir-format
 msgid "Per-day view counts; bot-filtered and session-deduped, no reader data stored."
 msgstr "按日统计浏览量；已过滤机器人并按会话去重，不存储任何读者数据。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:709
+#: lib/phoenix_kit_publishing/web/edit.ex:730
 #, elixir-autogen, elixir-format
 msgid "Show view counts"
 msgstr "显示浏览量"
@@ -3002,7 +3003,7 @@ msgid "%{count} comment"
 msgid_plural "%{count} comments"
 msgstr[0] "%{count} 条评论"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:692
+#: lib/phoenix_kit_publishing/web/edit.ex:713
 #, elixir-autogen, elixir-format
 msgid "A comment thread under each post. Requires the Comments module; logged-in readers can post."
 msgstr "每篇帖子下方的评论区。需要评论模块；已登录的读者可以发表评论。"
@@ -3022,7 +3023,7 @@ msgstr "评论已发布。"
 msgid "Couldn't post your comment — please try again."
 msgstr "无法发表您的评论——请重试。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:690
+#: lib/phoenix_kit_publishing/web/edit.ex:711
 #, elixir-autogen, elixir-format
 msgid "Enable comments"
 msgstr "启用评论"
@@ -3152,7 +3153,7 @@ msgstr[0] "此注释有 %{count} 条评论"
 msgid "Author notes"
 msgstr "作者注释"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:642
+#: lib/phoenix_kit_publishing/web/edit.ex:663
 #, elixir-autogen, elixir-format
 msgid "Author notes style"
 msgstr "作者注释样式"
@@ -3168,7 +3169,7 @@ msgstr "关闭注释"
 msgid "Comment on this note…"
 msgstr "评论此注释…"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:343
+#: lib/phoenix_kit_publishing/web/edit.ex:353
 #, elixir-autogen, elixir-format
 msgid "Footnotes — numbered refs, notes collected at the bottom"
 msgstr "脚注——带编号的引用，注释集中在底部"
@@ -3193,7 +3194,7 @@ msgstr "发表回复"
 msgid "Reply"
 msgstr "回复"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:344
+#: lib/phoenix_kit_publishing/web/edit.ex:354
 #, elixir-autogen, elixir-format
 msgid "Slide-out panel — click the phrase, note opens on the right"
 msgstr "滑出面板——点击短语，注释在右侧打开"
@@ -3670,7 +3671,7 @@ msgstr "正在收集您的编辑…"
 msgid "Exclude from the sitemap"
 msgstr "从站点地图中排除"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:610
+#: lib/phoenix_kit_publishing/web/edit.ex:631
 #, elixir-autogen, elixir-format
 msgid "Exclude this group from the sitemap"
 msgstr "从站点地图中排除此分组"
@@ -3680,7 +3681,7 @@ msgstr "从站点地图中排除此分组"
 msgid "Leaves this post out of the site's sitemap. The post stays public at its URL."
 msgstr "将此帖子排除在网站的站点地图之外。帖子在其 URL 上仍保持公开。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:612
+#: lib/phoenix_kit_publishing/web/edit.ex:633
 #, elixir-autogen, elixir-format
 msgid "Neither the listing nor any post in this group is listed in the sitemap."
 msgstr "此分组的列表页面和所有帖子都不会列入站点地图。"
@@ -4077,17 +4078,17 @@ msgstr "SEO 标题"
 msgid "Shown on the category's chips. Colour: a hex value or a theme colour; icon: a Heroicons name."
 msgstr "显示在分类标签上。颜色：十六进制值或主题颜色；图标：Heroicons 名称。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:294
+#: lib/phoenix_kit_publishing/web/edit.ex:304
 #, elixir-autogen, elixir-format
 msgid "3 posts"
 msgstr "3 篇帖子"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:295
+#: lib/phoenix_kit_publishing/web/edit.ex:305
 #, elixir-autogen, elixir-format
 msgid "6 posts"
 msgstr "6 篇帖子"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:286
+#: lib/phoenix_kit_publishing/web/edit.ex:296
 #, elixir-autogen, elixir-format
 msgid "After the content"
 msgstr "正文之后"
@@ -4097,17 +4098,17 @@ msgstr "正文之后"
 msgid "All"
 msgstr "全部"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:285
+#: lib/phoenix_kit_publishing/web/edit.ex:295
 #, elixir-autogen, elixir-format
 msgid "Beside the date"
 msgstr "日期旁边"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:679
+#: lib/phoenix_kit_publishing/web/edit.ex:700
 #, elixir-autogen, elixir-format
 msgid "Category chip position"
 msgstr "分类标签位置"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:509
+#: lib/phoenix_kit_publishing/web/edit.ex:530
 #, elixir-autogen, elixir-format
 msgid "Each post's categories on its card, in the category's colour and icon."
 msgstr "在每篇帖子的卡片上显示其分类，使用分类的颜色和图标。"
@@ -4117,7 +4118,7 @@ msgstr "在每篇帖子的卡片上显示其分类，使用分类的颜色和图
 msgid "Filter by category"
 msgstr "按分类筛选"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:673
+#: lib/phoenix_kit_publishing/web/edit.ex:694
 #, elixir-autogen, elixir-format
 msgid "Linked category badges, each leading to its archive page."
 msgstr "带链接的分类徽章，每个都指向其归档页面。"
@@ -4127,7 +4128,7 @@ msgstr "带链接的分类徽章，每个都指向其归档页面。"
 msgid "More from %{category}"
 msgstr "更多 %{category} 内容"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:685
+#: lib/phoenix_kit_publishing/web/edit.ex:706
 #, elixir-autogen, elixir-format
 msgid "More from this category"
 msgstr "更多同类内容"
@@ -4137,7 +4138,7 @@ msgstr "更多同类内容"
 msgid "Not in the suggested set: shows only if the site's CSS includes it."
 msgstr "不在推荐集合中：只有当网站的 CSS 包含它时才会显示。"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:293
+#: lib/phoenix_kit_publishing/web/edit.ex:303
 #, elixir-autogen, elixir-format
 msgid "Off"
 msgstr "关闭"
@@ -4147,17 +4148,17 @@ msgstr "关闭"
 msgid "Related posts"
 msgstr "相关帖子"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:514
+#: lib/phoenix_kit_publishing/web/edit.ex:535
 #, elixir-autogen, elixir-format
 msgid "Show a category filter"
 msgstr "显示分类筛选"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:507
+#: lib/phoenix_kit_publishing/web/edit.ex:528
 #, elixir-autogen, elixir-format
 msgid "Show categories on the cards"
 msgstr "在卡片上显示分类"
 
-#: lib/phoenix_kit_publishing/web/edit.ex:516
+#: lib/phoenix_kit_publishing/web/edit.ex:537
 #, elixir-autogen, elixir-format
 msgid "The group's categories above the listing; readers can pick one or several."
 msgstr "在列表上方显示该组的分类；读者可以选择一个或多个。"
@@ -4213,3 +4214,23 @@ msgstr "名称"
 #, elixir-autogen, elixir-format
 msgid "value"
 msgstr "值"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:522
+#, elixir-autogen, elixir-format
+msgid "For a site that draws its own listing at this group's address: its router answers there, and post pages and feeds stay with Publishing."
+msgstr "适用于在该组地址显示自己列表的网站：由网站的路由处理该地址，帖子页面和订阅源仍由 Publishing 提供。"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:285
+#, elixir-autogen, elixir-format
+msgid "Publishing renders it"
+msgstr "由 Publishing 渲染"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:286
+#, elixir-autogen, elixir-format
+msgid "The site renders it (posts stay here)"
+msgstr "由网站渲染（帖子仍在此处）"
+
+#: lib/phoenix_kit_publishing/web/edit.ex:287
+#, elixir-autogen, elixir-format
+msgid "The site renders it and the category and tag pages"
+msgstr "由网站渲染，分类页和标签页也是"

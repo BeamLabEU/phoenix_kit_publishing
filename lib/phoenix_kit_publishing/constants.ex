@@ -325,6 +325,17 @@ defmodule PhoenixKit.Modules.Publishing.Constants do
   @spec default_related_posts() :: String.t()
   def default_related_posts, do: @default_related_posts
 
+  @public_listings ["publishing", "host", "host_with_archives"]
+  @default_public_listing "publishing"
+
+  @doc ~S|Who serves a group's public listing pages: "publishing" (this module), "host" (the bare listing path goes to the host's router) or "host_with_archives" (the category and tag archives too). Posts and feeds are always this module's.|
+  @spec public_listings() :: [String.t()]
+  def public_listings, do: @public_listings
+
+  @doc ~S|Default public-listing owner ("publishing").|
+  @spec default_public_listing() :: String.t()
+  def default_public_listing, do: @default_public_listing
+
   @listing_layouts ["grid", "list", "minimal"]
   @default_listing_layout "grid"
 

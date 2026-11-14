@@ -193,6 +193,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       "related_posts" => group["related_posts"],
       "listing_show_categories" => group["listing_show_categories"],
       "listing_category_filter" => group["listing_category_filter"],
+      "public_listing" => group["public_listing"],
       "views_enabled" => group["views_enabled"],
       "comments_enabled" => group["comments_enabled"],
       "show_view_counts" => group["show_view_counts"],
@@ -275,6 +276,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
       {gettext("Cover panel — background image with a solid text panel"), "cover_panel"},
       {gettext("Minimal — text only, no image"), "minimal"},
       {gettext("Top image — a wide image banner above the text"), "top"}
+    ]
+  end
+
+  # Values must match Publishing.Constants.public_listings/0.
+  defp public_listing_options do
+    [
+      {gettext("Publishing renders it"), "publishing"},
+      {gettext("The site renders it (posts stay here)"), "host"},
+      {gettext("The site renders it and the category and tag pages"), "host_with_archives"}
     ]
   end
 
@@ -502,6 +512,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   label={gettext("Listing layout")}
                   options={listing_layout_options()}
                 />
+
+                <.select
+                  field={@form[:public_listing]}
+                  label={gettext("Listing page")}
+                  options={public_listing_options()}
+                />
+                <p class="-mt-2 text-xs text-base-content/60">
+                  {gettext(
+                    "For a site that draws its own listing at this group's address: its router answers there, and post pages and feeds stay with Publishing."
+                  )}
+                </p>
 
                 <.checkbox field={@form[:listing_show_categories]}>
                   {gettext("Show categories on the cards")}

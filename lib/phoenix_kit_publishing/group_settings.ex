@@ -58,6 +58,17 @@ defmodule PhoenixKit.Modules.Publishing.GroupSettings do
     [
       # --- Listing page -----------------------------------------------------
       %{
+        key: "public_listing",
+        type: :enum,
+        allowed: Constants.public_listings(),
+        default: Constants.default_public_listing(),
+        scope: :listing,
+        label: "Listing served by",
+        description:
+          "\"publishing\" renders the group's listing page; \"host\" leaves the bare listing path (and its language-prefixed form) to the host app's router, for a host that draws its own listing (see Publishing.list_published/2); \"host_with_archives\" also leaves the category and tag archive pages. Post pages and feeds always stay with Publishing.",
+        depends_on: nil
+      },
+      %{
         key: "listing_show_categories",
         type: :boolean,
         allowed: @boolean_allowed,

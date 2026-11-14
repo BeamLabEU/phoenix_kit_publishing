@@ -515,4 +515,47 @@ defmodule PhoenixKitPublishing.RouterDispatchIntegrationTest do
       _ -> :ok
     end
   end
+
+  describe "maybe_rewrite/1 — a group whose listing the host serves (public_listing)" do
+    defp request(path_info),
+      do: %Plug.Conn{
+        path_info: path_info,
+        request_path: "/" <> Enum.join(path_info, "/"),
+        private: %{}
+      }
+
+    defp owner(path_info) do
+      case RouterDispatch.maybe_rewrite(request(path_info)) do
+        :pass -> :host
+        {:rewrite, _conn} -> :publishing
+      end
+    end
+
+    test "host: the bare listing path is the host's; posts, feeds and archives stay" do
+      {:ok, group} = Groups.add_group(unique_name())
+      slug = group["slug"]
+
+      assert owner([slug]) == :publishing
+      {:ok, _} = Groups.update_group(slug, %{"public_listing" => "host"})
+
+      assert owner([slug]) == :host
+      assert owner(["en", slug]) == :host
+      assert owner([slug, "a-post"]) == :publishing
+      assert owner(["en", slug, "a-post"]) == :publishing
+      assert owner([slug, "feed.xml"]) == :publishing
+      assert owner([slug, "category", "billing"]) == :publishing
+    end
+
+    test "host_with_archives: the category and tag archives too, but not their feeds" do
+      {:ok, group} = Groups.add_group(unique_name())
+      slug = group["slug"]
+      {:ok, _} = Groups.update_group(slug, %{"public_listing" => "host_with_archives"})
+
+      assert owner([slug]) == :host
+      assert owner([slug, "category", "billing"]) == :host
+      assert owner(["en", slug, "tag", "elixir"]) == :host
+      assert owner([slug, "category", "billing", "feed.xml"]) == :publishing
+      assert owner([slug, "2026-11-14"]) == :publishing
+    end
+  end
 end

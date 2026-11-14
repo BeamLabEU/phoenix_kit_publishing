@@ -40,6 +40,8 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   @category_chips_positions Constants.category_chips_positions()
   @default_related_posts Constants.default_related_posts()
   @related_posts Constants.related_posts_options()
+  @default_public_listing Constants.default_public_listing()
+  @public_listings Constants.public_listings()
   @default_listing_layout Constants.default_listing_layout()
   @listing_layouts Constants.listing_layouts()
   @default_timeline_granularity Constants.default_timeline_granularity()
@@ -351,6 +353,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     {"listing_layout", @listing_layouts},
     {"category_chips_position", @category_chips_positions},
     {"related_posts", @related_posts},
+    {"public_listing", @public_listings},
     {"post_date_position", @post_date_positions},
     {"post_width", @post_widths},
     {"notes_style", @notes_styles}
@@ -854,6 +857,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       "related_posts" => Map.get(data, "related_posts", @default_related_posts),
       "listing_show_categories" => Map.get(data, "listing_show_categories", false),
       "listing_category_filter" => Map.get(data, "listing_category_filter", false),
+      "public_listing" => Map.get(data, "public_listing", @default_public_listing),
       "views_enabled" => Map.get(data, "views_enabled", false),
       "show_view_counts" => Map.get(data, "show_view_counts", false),
       "comments_enabled" => Map.get(data, "comments_enabled", false),

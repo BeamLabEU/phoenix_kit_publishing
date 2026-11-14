@@ -63,6 +63,25 @@ The override is emitted unconditionally inside `phoenix_kit_routes/0`
 (compile-time gated on `Code.ensure_loaded?(PhoenixKitPublishing.RouterDispatch)`),
 so installs that don't have publishing in the dep tree get a no-op.
 
+## A group whose listing the host serves (`public_listing`)
+
+A host that draws its own page at a group's address (a news page with its own
+filters, built on `Publishing.list_published/2`) sets the group's
+`public_listing`:
+
+| Value | `maybe_rewrite/2` leaves to the host's router |
+|---|---|
+| `"publishing"` (default) | nothing |
+| `"host"` | the bare listing path, `/<group>` and `/<locale>/<group>` (any query string) |
+| `"host_with_archives"` | that, and `/<group>/category/<slug>` and `/<group>/tag/<tag>` |
+
+Post pages and every feed (`…/feed.xml`, category feeds included) are always
+rewritten to Publishing. The host declares the path in its own router (`live
+"/news", NewsLive` inside its live_session); nothing else is needed, no
+endpoint plug in front of the router. The group map is the one
+`maybe_rewrite/2` already reads to recognise the group, so the setting costs
+no extra query.
+
 ## `mix phx.routes` blind spot
 
 The publishing routes appear under the `__phoenix_kit_publishing_dispatch`
