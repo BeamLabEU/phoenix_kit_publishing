@@ -83,6 +83,12 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategoriesTest do
 
     assert PublishingCategory.color(stored(g, "billing")) == "#4f46e5"
 
+    # the dry run's preview shows the stored value as "from"
+    assert {:preview, %{"rows" => preview}, _} =
+             upsert(g, [%{"slug" => "billing", "color" => "accent"}], %{dry_run?: true})
+
+    assert inspect(preview) =~ ~s("from" => "#4f46e5")
+
     assert {:ok, %{"categories" => [listed]}} =
              ApiCase.call("publishing.list_categories", %{"group" => g["slug"]})
 

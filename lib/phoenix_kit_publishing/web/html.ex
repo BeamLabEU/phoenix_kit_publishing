@@ -3225,7 +3225,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   # and always lands on page 1.
   def category_filter_href(assigns, slug) do
     current = assigns[:category_filter] || []
-    next = if slug in current, do: List.delete(current, slug), else: current ++ [slug]
+    # the request keeps at most 20 slugs: adding one past that drops the
+    # oldest, never the one just picked
+    next =
+      if slug in current, do: List.delete(current, slug), else: Enum.take(current ++ [slug], -20)
+
     params = if next == [], do: [], else: [{"category", Enum.join(next, ",")}]
     group_listing_path(assigns.current_language, assigns.group["slug"], params)
   end

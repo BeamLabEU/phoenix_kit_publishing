@@ -13,6 +13,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ListingCategoriesTest do
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
 
   setup do
@@ -166,6 +167,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ListingCategoriesTest do
 
       html = get(build_conn(), "/#{slug}?page=2&category=billing") |> html_response(200)
       assert length(texts(html, "article h2")) == 1
+    end
+
+    test "a pick past twenty drops the oldest, never the new one" do
+      current = Enum.map(1..20, &"c#{&1}")
+
+      href =
+        PublishingHTML.category_filter_href(
+          %{category_filter: current, current_language: "en", group: %{"slug" => "news"}},
+          "new"
+        )
+
+      [_, query] = String.split(href, "?")
+      slugs = URI.decode_query(query)["category"] |> String.split(",")
+      assert length(slugs) == 20 and List.last(slugs) == "new" and hd(slugs) == "c2"
     end
 
     test "unknown slugs are dropped; with the filter off the parameter is ignored", %{

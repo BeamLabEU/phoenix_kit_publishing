@@ -11,8 +11,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ModeConversionTest do
   import Ecto.Query, only: [from: 2]
 
   alias PhoenixKit.Modules.Publishing
-  alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts}
+  alias PhoenixKit.Modules.Publishing.{DBStorage, Groups, Posts, PublishingPost}
   alias PhoenixKit.Settings
+  alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   setup do
     {:ok, _} = Settings.update_boolean_setting("publishing_enabled", true)
@@ -103,8 +104,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ModeConversionTest do
     # a timestamp post's slug was never in its URL; one shaped like a date
     # would be read as a date after the conversion
     {1, _} =
-      PhoenixKitPublishing.Test.Repo.update_all(
-        from(p in PhoenixKit.Modules.Publishing.PublishingPost,
+      TestRepo.update_all(
+        from(p in PublishingPost,
           where: p.uuid == ^dated[:uuid]
         ),
         set: [slug: "2026-11-11"]

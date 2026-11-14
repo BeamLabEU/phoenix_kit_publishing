@@ -463,6 +463,15 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
   defp shown_id(category), do: if(planned?(category), do: nil, else: category.uuid)
 
   defp from_value(category, "parent_uuid"), do: category.parent_uuid
+
+  # Colour, icon and the SEO texts live in the category's `data` map.
+  defp from_value(category, key) when key in @display_keys do
+    case stored_display(category, key) do
+      "" -> nil
+      value -> value
+    end
+  end
+
   defp from_value(category, key), do: Map.get(category, String.to_existing_atom(key))
   defp clip(value) when is_binary(value), do: String.slice(value, 0, 500)
   defp clip(value), do: value
