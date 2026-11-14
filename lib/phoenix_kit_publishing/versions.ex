@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.SitemapRefresh
   alias PhoenixKit.Utils.Date, as: UtilsDate
 
   @doc "Lists version numbers for a post."
@@ -370,6 +371,8 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
   defp broadcast_publish(group_slug, post_uuid, version, opts) do
     source_id = Keyword.get(opts, :source_id)
     ListingCache.regenerate(group_slug)
+    # The live post set changed: core's sitemap catches up (debounced, guarded).
+    SitemapRefresh.request()
     PublishingPubSub.broadcast_version_live_changed(group_slug, post_uuid, version)
     PublishingPubSub.broadcast_post_version_published(group_slug, post_uuid, version, source_id)
   end
@@ -445,6 +448,7 @@ defmodule PhoenixKit.Modules.Publishing.Versions do
         source_id = Keyword.get(opts, :source_id)
         broadcast_id = db_post.uuid
         ListingCache.regenerate(group_slug)
+        SitemapRefresh.request()
         PublishingPubSub.broadcast_version_live_changed(group_slug, broadcast_id, nil)
 
         PublishingPubSub.broadcast_post_version_published(

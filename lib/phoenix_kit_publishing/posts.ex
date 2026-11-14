@@ -29,6 +29,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.SitemapRefresh
   alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.StaleFixer
   alias PhoenixKit.Utils.Date, as: UtilsDate
@@ -541,6 +542,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         case DBStorage.update_post(db_post, %{trashed_at: nil}) do
           {:ok, _} ->
             ListingCache.regenerate(group_slug)
+            # A restored post with a live version is back on the public site.
+            if db_post.active_version_uuid, do: SitemapRefresh.request()
             PublishingPubSub.broadcast_post_updated(group_slug, %{uuid: db_post.uuid})
 
             ActivityLog.log_manual(
@@ -595,6 +598,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
           {:ok, _} ->
             broadcast_id = db_post.uuid
             ListingCache.regenerate(group_slug)
+            # Only a post that was live leaves the public site.
+            if db_post.active_version_uuid, do: SitemapRefresh.request()
             PublishingPubSub.broadcast_post_deleted(group_slug, broadcast_id)
 
             ActivityLog.log_manual(
