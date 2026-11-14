@@ -22,7 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.ExpectedSchema do
   @schema_token "__SCHEMA__"
   @name_marker_exempt "__PK_NAME_EXEMPT__"
   @name_marker_always "__PK_NAME_ALWAYS__"
-  @chain_hash "81e4824ffa4c686cd375df325c3f909cff0d23f2ccdb11dcaf680331283c8ca8"
+  @chain_hash "4d3f766ff4fc9cf5dc88947cb0fa8e200c28c4cfcfe7ae1d94c1e8f0b21c4e4a"
 
   def objects(prefix) do
     prefix = normalize_prefix!(prefix)
@@ -173,6 +173,19 @@ defmodule PhoenixKit.Modules.Publishing.ExpectedSchema do
         revisions: [{1, %{}}],
         presence: :required,
         backfill: nil
+      },
+      %{
+        id: "column:phoenix_kit_publishing_categories.data",
+        owner: :phoenix_kit_publishing,
+        check:
+          {:catalog, %{table: "phoenix_kit_publishing_categories", column: "data", kind: :column}},
+        create:
+          "ALTER TABLE __SCHEMA__.phoenix_kit_publishing_categories ADD COLUMN IF NOT EXISTS \"data\" jsonb DEFAULT '{}'::jsonb NOT NULL",
+        since: 1,
+        class: :column,
+        backfill: :default,
+        presence: :required,
+        revisions: [{1, %{default: "'{}'::jsonb", type: "jsonb", pos: 11, not_null: true}}]
       },
       %{
         id: "column:phoenix_kit_publishing_categories.description",
