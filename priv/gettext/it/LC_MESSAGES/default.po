@@ -637,13 +637,13 @@ msgstr "Definisci il tuo tipo di contenuto e i nomi degli elementi."
 msgid "Delete Forever"
 msgstr "Elimina definitivamente"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:557
+#: lib/phoenix_kit_publishing/web/categories_live.ex:566
 #: lib/phoenix_kit_publishing/web/index.ex:641
 #, elixir-autogen, elixir-format
 msgid "Deleting…"
 msgstr "Eliminazione…"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:611
+#: lib/phoenix_kit_publishing/web/categories_live.ex:620
 #: lib/phoenix_kit_publishing/web/post_show.ex:268
 #, elixir-autogen, elixir-format
 msgid "Description"
@@ -685,7 +685,7 @@ msgstr "Bozza"
 msgid "Duplicate all content and translations from version %{version}"
 msgstr "Duplica tutto il contenuto e le traduzioni dalla versione %{version}"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:538
+#: lib/phoenix_kit_publishing/web/categories_live.ex:547
 #: lib/phoenix_kit_publishing/web/edit.ex:82
 #: lib/phoenix_kit_publishing/web/editor.ex:182
 #: lib/phoenix_kit_publishing/web/editor.ex:297
@@ -1406,7 +1406,7 @@ msgstr "Titolo dell'articolo"
 msgid "Post updated by another user"
 msgstr "Articolo aggiornato da un altro utente"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:497
+#: lib/phoenix_kit_publishing/web/categories_live.ex:506
 #: lib/phoenix_kit_publishing/web/index.ex:524
 #: lib/phoenix_kit_publishing/web/settings.ex:1001
 #, elixir-autogen, elixir-format
@@ -1479,7 +1479,7 @@ msgstr "Pubblicato (Live)"
 
 #: lib/phoenix_kit_publishing/publishing.ex:542
 #: lib/phoenix_kit_publishing/publishing.ex:574
-#: lib/phoenix_kit_publishing/web/categories_live.ex:40
+#: lib/phoenix_kit_publishing/web/categories_live.ex:41
 #: lib/phoenix_kit_publishing/web/edit.ex:83
 #: lib/phoenix_kit_publishing/web/editor.ex:183
 #: lib/phoenix_kit_publishing/web/index.ex:75
@@ -1706,8 +1706,8 @@ msgstr "Impostazioni"
 msgid "Singular"
 msgstr "Singolare"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:495
-#: lib/phoenix_kit_publishing/web/categories_live.ex:596
+#: lib/phoenix_kit_publishing/web/categories_live.ex:504
+#: lib/phoenix_kit_publishing/web/categories_live.ex:605
 #: lib/phoenix_kit_publishing/web/edit.ex:422
 #: lib/phoenix_kit_publishing/web/editor.ex:4071
 #: lib/phoenix_kit_publishing/web/index.ex:501
@@ -1840,7 +1840,7 @@ msgstr "Lo slug URL %{slug} è già utilizzato da un altro articolo in questo gr
 msgid "The page you requested was not found. Showing closest match."
 msgstr "La pagina richiesta non è stata trovata. Viene mostrata la corrispondenza più simile."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:61
+#: lib/phoenix_kit_publishing/web/categories_live.ex:62
 #: lib/phoenix_kit_publishing/web/edit.ex:73
 #, elixir-autogen, elixir-format
 msgid "The requested group could not be found."
@@ -2650,7 +2650,7 @@ msgstr "Mostra il link per tornare indietro in alto"
 msgid "The most recent post is pinned into its own 'Latest' band under any featured posts and shown larger."
 msgstr "L'articolo più recente viene fissato in una propria fascia \"Più recente\" sotto gli articoli in evidenza e mostrato più grande."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:614
+#: lib/phoenix_kit_publishing/web/categories_live.ex:652
 #: lib/phoenix_kit_publishing/web/edit.ex:725
 #, elixir-autogen, elixir-format
 msgid "Save"
@@ -2713,7 +2713,7 @@ msgid_plural "%{count} results for “%{query}”"
 msgstr[0] "%{count} risultato per «%{query}»"
 msgstr[1] "%{count} risultati per «%{query}»"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:453
+#: lib/phoenix_kit_publishing/web/categories_live.ex:462
 #, elixir-autogen, elixir-format
 msgid "A category can't be moved under one of its own subcategories."
 msgstr "Una categoria non può essere spostata sotto una delle proprie sottocategorie."
@@ -2723,30 +2723,30 @@ msgstr "Una categoria non può essere spostata sotto una delle proprie sottocate
 msgid "All posts"
 msgstr "Tutti gli articoli"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:38
+#: lib/phoenix_kit_publishing/web/categories_live.ex:39
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:181
 #: lib/phoenix_kit_publishing/web/listing.ex:1014
 #, elixir-autogen, elixir-format
 msgid "Categories"
 msgstr "Categorie"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:135
+#: lib/phoenix_kit_publishing/web/categories_live.ex:140
 #, elixir-autogen, elixir-format
 msgid "Category created"
 msgstr "Categoria creata"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:276
+#: lib/phoenix_kit_publishing/web/categories_live.ex:281
 #, elixir-autogen, elixir-format
 msgid "Category deleted — its children moved to the top level"
 msgstr "Categoria eliminata — le sue sottocategorie sono passate al livello principale"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:94
-#: lib/phoenix_kit_publishing/web/categories_live.ex:175
+#: lib/phoenix_kit_publishing/web/categories_live.ex:99
+#: lib/phoenix_kit_publishing/web/categories_live.ex:180
 #, elixir-autogen, elixir-format
 msgid "Category not found"
 msgstr "Categoria non trovata"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:134
+#: lib/phoenix_kit_publishing/web/categories_live.ex:139
 #, elixir-autogen, elixir-format
 msgid "Category updated"
 msgstr "Categoria aggiornata"
@@ -2766,37 +2766,37 @@ msgstr "Collegamenti cronologici all'articolo precedente/successivo in fondo all
 msgid "Clear search"
 msgstr "Cancella la ricerca"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:280
+#: lib/phoenix_kit_publishing/web/categories_live.ex:285
 #, elixir-autogen, elixir-format
 msgid "Couldn't delete this category."
 msgstr "Impossibile eliminare questa categoria."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:448
+#: lib/phoenix_kit_publishing/web/categories_live.ex:457
 #, elixir-autogen, elixir-format
 msgid "Couldn't save this category — check the fields and try again."
 msgstr "Impossibile salvare questa categoria — controlla i campi e riprova."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:461
+#: lib/phoenix_kit_publishing/web/categories_live.ex:470
 #, elixir-autogen, elixir-format
 msgid "Couldn't save this category."
 msgstr "Impossibile salvare questa categoria."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:614
+#: lib/phoenix_kit_publishing/web/categories_live.ex:652
 #, elixir-autogen, elixir-format
 msgid "Create"
 msgstr "Crea"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:559
+#: lib/phoenix_kit_publishing/web/categories_live.ex:568
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Elimina"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:562
+#: lib/phoenix_kit_publishing/web/categories_live.ex:571
 #, elixir-autogen, elixir-format
 msgid "Delete “%{name}”? Its subcategories move to the top level and posts lose this category."
 msgstr "Eliminare «%{name}»? Le sue sottocategorie passano al livello principale e gli articoli perdono questa categoria."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:581
+#: lib/phoenix_kit_publishing/web/categories_live.ex:590
 #, elixir-autogen, elixir-format
 msgid "Edit category"
 msgstr "Modifica categoria"
@@ -2857,15 +2857,15 @@ msgstr "Minimale — solo data e titolo, senza immagini"
 msgid "More posts"
 msgstr "Altri articoli"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:494
-#: lib/phoenix_kit_publishing/web/categories_live.ex:593
+#: lib/phoenix_kit_publishing/web/categories_live.ex:503
+#: lib/phoenix_kit_publishing/web/categories_live.ex:602
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr "Nome"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:471
-#: lib/phoenix_kit_publishing/web/categories_live.ex:486
-#: lib/phoenix_kit_publishing/web/categories_live.ex:583
+#: lib/phoenix_kit_publishing/web/categories_live.ex:480
+#: lib/phoenix_kit_publishing/web/categories_live.ex:495
+#: lib/phoenix_kit_publishing/web/categories_live.ex:592
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:257
 #, elixir-autogen, elixir-format
 msgid "New category"
@@ -2886,7 +2886,7 @@ msgstr "Nessun articolo corrisponde al filtro"
 msgid "No posts match your search."
 msgstr "Nessun articolo corrisponde alla ricerca."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:431
+#: lib/phoenix_kit_publishing/web/categories_live.ex:440
 #, elixir-autogen, elixir-format
 msgid "None (top level)"
 msgstr "Nessuna (livello principale)"
@@ -2896,12 +2896,12 @@ msgstr "Nessuna (livello principale)"
 msgid "Older"
 msgstr "Meno recenti"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:600
+#: lib/phoenix_kit_publishing/web/categories_live.ex:609
 #, elixir-autogen, elixir-format
 msgid "Parent"
 msgstr "Categoria padre"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:610
+#: lib/phoenix_kit_publishing/web/categories_live.ex:619
 #, elixir-autogen, elixir-format
 msgid "Position"
 msgstr "Posizione"
@@ -2962,17 +2962,17 @@ msgstr "Mostra la navigazione precedente/successivo"
 msgid "Tag: %{name}"
 msgstr "Tag: %{name}"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:447
+#: lib/phoenix_kit_publishing/web/categories_live.ex:456
 #, elixir-autogen, elixir-format
 msgid "That slug is already used in this group."
 msgstr "Questo slug è già usato in questo gruppo."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:456
+#: lib/phoenix_kit_publishing/web/categories_live.ex:465
 #, elixir-autogen, elixir-format
 msgid "The parent must belong to the same group."
 msgstr "La categoria padre deve appartenere allo stesso gruppo."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:597
+#: lib/phoenix_kit_publishing/web/categories_live.ex:606
 #, elixir-autogen, elixir-format
 msgid "auto from the name"
 msgstr "automatico dal nome"
@@ -3105,48 +3105,48 @@ msgstr "Il tuo browser non supporta l'elemento audio."
 msgid "to join the conversation."
 msgstr "per partecipare alla conversazione."
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:203
+#: lib/phoenix_kit_publishing/web/categories_live.ex:208
 #, elixir-autogen, elixir-format
 msgid "Category moved"
 msgstr "Categoria spostata"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:509
+#: lib/phoenix_kit_publishing/web/categories_live.ex:518
 #, elixir-autogen, elixir-format
 msgid "Drag to reorder (among siblings)"
 msgstr "Trascina per riordinare (tra pari livello)"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:247
-#: lib/phoenix_kit_publishing/web/categories_live.ex:255
+#: lib/phoenix_kit_publishing/web/categories_live.ex:252
+#: lib/phoenix_kit_publishing/web/categories_live.ex:260
 #, elixir-autogen, elixir-format
 msgid "Failed to save the new order"
 msgstr "Impossibile salvare il nuovo ordine"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:640
+#: lib/phoenix_kit_publishing/web/categories_live.ex:678
 #, elixir-autogen, elixir-format
 msgid "Move"
 msgstr "Sposta"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:550
+#: lib/phoenix_kit_publishing/web/categories_live.ex:559
 #, elixir-autogen, elixir-format
 msgid "Move to…"
 msgstr "Sposta in…"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:624
+#: lib/phoenix_kit_publishing/web/categories_live.ex:662
 #, elixir-autogen, elixir-format
 msgid "Move “%{name}”"
 msgstr "Sposta «%{name}»"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:628
+#: lib/phoenix_kit_publishing/web/categories_live.ex:666
 #, elixir-autogen, elixir-format
 msgid "New parent"
 msgstr "Nuova categoria padre"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:544
+#: lib/phoenix_kit_publishing/web/categories_live.ex:553
 #, elixir-autogen, elixir-format
 msgid "New subcategory"
 msgstr "Nuova sottocategoria"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:481
+#: lib/phoenix_kit_publishing/web/categories_live.ex:490
 #, elixir-autogen, elixir-format
 msgid "No categories yet — create the first one."
 msgstr "Nessuna categoria — creane una."
@@ -3254,7 +3254,7 @@ msgstr "Rimuovi la versione audio"
 msgid "Audio version removed"
 msgstr "Versione audio rimossa"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:235
+#: lib/phoenix_kit_publishing/web/categories_live.ex:240
 #, elixir-autogen, elixir-format
 msgid "Order unchanged — use “Move to…” to change a parent."
 msgstr "Ordine invariato — usa «Sposta in…» per cambiare la categoria padre."
@@ -3525,7 +3525,7 @@ msgstr "Impossibile salvare il gruppo — controlla i valori e riprova."
 msgid "Invalid order"
 msgstr "Ordine non valido"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:641
+#: lib/phoenix_kit_publishing/web/categories_live.ex:679
 #, elixir-autogen, elixir-format
 msgid "Moving…"
 msgstr "Spostamento…"
@@ -3605,7 +3605,7 @@ msgstr "Questa pubblicazione non esiste più."
 msgid "Try it"
 msgstr "Provalo"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:459
+#: lib/phoenix_kit_publishing/web/categories_live.ex:468
 #, elixir-autogen, elixir-format
 msgid "That parent no longer exists."
 msgstr "Questa categoria superiore non esiste più."
@@ -3989,8 +3989,8 @@ msgstr "Sposta il gruppo nel cestino prima di eliminarlo."
 msgid "Couldn't create this group."
 msgstr "Impossibile creare questo gruppo."
 
-#: lib/phoenix_kit_publishing/web/html.ex:3024
-#: lib/phoenix_kit_publishing/web/html.ex:3034
+#: lib/phoenix_kit_publishing/web/html.ex:3025
+#: lib/phoenix_kit_publishing/web/html.ex:3035
 #, elixir-autogen, elixir-format
 msgid "Next page"
 msgstr "Pagina successiva"
@@ -4000,8 +4000,8 @@ msgstr "Pagina successiva"
 msgid "Pagination"
 msgstr "Paginazione"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3024
-#: lib/phoenix_kit_publishing/web/html.ex:3032
+#: lib/phoenix_kit_publishing/web/html.ex:3025
+#: lib/phoenix_kit_publishing/web/html.ex:3033
 #, elixir-autogen, elixir-format
 msgid "Previous page"
 msgstr "Pagina precedente"
@@ -4066,3 +4066,33 @@ msgstr "Stile di paginazione aggiornato"
 #, elixir-autogen, elixir-format
 msgid "Previous and next only"
 msgstr "Solo precedente e successiva"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:626
+#, elixir-autogen, elixir-format
+msgid "#4f46e5 or primary"
+msgstr "#4f46e5 o primary"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:625
+#, elixir-autogen, elixir-format
+msgid "Colour"
+msgstr "Colore"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:635
+#, elixir-autogen, elixir-format
+msgid "Icon"
+msgstr "Icona"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:647
+#, elixir-autogen, elixir-format
+msgid "SEO description"
+msgstr "Descrizione SEO"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:644
+#, elixir-autogen, elixir-format
+msgid "SEO title"
+msgstr "Titolo SEO"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:640
+#, elixir-autogen, elixir-format
+msgid "Shown on the category's chips. Colour: a hex value or a theme colour; icon: a Heroicons name."
+msgstr "Mostrato sulle etichette della categoria. Colore: un valore esadecimale o un colore del tema; icona: un nome Heroicons."

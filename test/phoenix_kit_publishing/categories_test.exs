@@ -20,6 +20,60 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
     %{group: group, slug: group["slug"]}
   end
 
+  describe "colour, icon and SEO fields (data)" do
+    alias PhoenixKit.Modules.Publishing.PublishingCategory
+
+    test "are stored, read back and blanked away", %{slug: slug} do
+      {:ok, cat} =
+        Categories.create_category(slug, %{
+          "name" => "Billing",
+          "color" => "#4F46E5",
+          "icon" => "hero-banknotes",
+          "seo_title" => "Billing news",
+          "seo_description" => "Releases of the billing module."
+        })
+
+      assert PublishingCategory.color(cat) == "#4F46E5"
+      assert PublishingCategory.color_css(cat) == "#4F46E5"
+      assert PublishingCategory.icon(cat) == "hero-banknotes"
+      assert PublishingCategory.seo_title(cat) == "Billing news"
+      assert PublishingCategory.seo_description(cat) == "Releases of the billing module."
+
+      # a key the update leaves out keeps its value; a blank one goes
+      {:ok, cat} = Categories.update_category(cat.uuid, %{"color" => "primary", "icon" => ""})
+      assert PublishingCategory.color_css(cat) == "var(--color-primary)"
+      assert PublishingCategory.icon(cat) == nil
+      assert PublishingCategory.seo_title(cat) == "Billing news"
+
+      # atom keys work too, and the name alone leaves data alone
+      {:ok, cat} = Categories.update_category(cat.uuid, %{name: "Billing 2", icon: "hero-cube"})
+      assert PublishingCategory.icon(cat) == "hero-cube"
+      assert PublishingCategory.color(cat) == "primary"
+    end
+
+    test "refuse a colour or icon that could escape a style attribute or class", %{slug: slug} do
+      for {key, bad} <- [
+            {"color", "red; background: url(x)"},
+            {"color", "#12345"},
+            {"color", "rebeccapurple"},
+            {"icon", "hero-cube\" onclick=\"x"},
+            {"icon", "fa-home"}
+          ] do
+        assert {:error, %Ecto.Changeset{} = cs} =
+                 Categories.create_category(slug, %{"name" => unique_name(), key => bad})
+
+        assert Keyword.has_key?(cs.errors, :data), "#{key}=#{bad} was accepted"
+      end
+    end
+
+    test "an invalid value stored by hand is never handed out", %{slug: slug} do
+      {:ok, cat} = Categories.create_category(slug, %{"name" => "Hand"})
+      cat = %{cat | data: %{"color" => "red;x", "icon" => "<b>"}}
+      assert PublishingCategory.color_css(cat) == nil
+      assert PublishingCategory.icon(cat) == nil
+    end
+  end
+
   describe "create_category/3" do
     test "derives the slug from the name when absent", %{slug: slug} do
       {:ok, cat} = Categories.create_category(slug, %{"name" => "Hello World"})

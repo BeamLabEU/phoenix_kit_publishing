@@ -358,7 +358,12 @@ defmodule PhoenixKit.Modules.Publishing.API.Schemas do
         "description" => %{"type" => ["string", "null"], "maxLength" => 5000},
         "name_i18n" => %{"type" => "object"},
         "parent" => %{"type" => ["object", "null"]},
-        "position" => %{"type" => "integer"}
+        "position" => %{"type" => "integer"},
+        # PublishingCategory.data — null or "" removes the value
+        "color" => %{"type" => ["string", "null"], "maxLength" => 20},
+        "icon" => %{"type" => ["string", "null"], "maxLength" => 100},
+        "seo_title" => %{"type" => ["string", "null"], "maxLength" => 120},
+        "seo_description" => %{"type" => ["string", "null"], "maxLength" => 320}
       })
 
     object(

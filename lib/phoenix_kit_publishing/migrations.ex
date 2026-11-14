@@ -207,6 +207,23 @@ defmodule PhoenixKitPublishing.Migrations do
   `dev_docs/squash/generate_baseline.exs`), or the next squash recreates
   the old shape. V2 alters nothing core created.
 
+  ### V3 adds a `data` map to categories
+
+  V3 adds one column, `data jsonb NOT NULL DEFAULT '{}'`, to
+  `phoenix_kit_publishing_categories` (`ADD COLUMN IF NOT EXISTS`, so a
+  re-run is a no-op and existing rows get `{}` in the same statement). It
+  holds what a category says about itself beyond its name: `color`,
+  `icon`, `seo_title`, `seo_description` (`PublishingCategory`), and later
+  keys without another migration. This is the first time the chain alters
+  a table core created; core's `ModuleOwnedTables` lists the table as this
+  module's, which is what sanctions it. `mix phoenix_kit.repair` reports
+  the column as an info-level "extra column", and core's next baseline
+  squash must not recreate the table without it — under core's plan that
+  squash leaves module-owned tables out altogether (Phase 2 below).
+  `down/1` below V3 only moves the marker: the column and what it holds stay
+  (an extra column is harmless to older code, and this chain never destroys
+  data). A re-run of V3 then finds it in place.
+
   ### Phase 2 — creation leaves core's baseline at the next squash cycle
 
   When core cuts its next baseline, module-owned tables are simply not
@@ -253,7 +270,7 @@ defmodule PhoenixKitPublishing.Migrations do
   alias PhoenixKit.Modules.Publishing.PublishingVersion
 
   @initial_version 1
-  @current_version 2
+  @current_version 3
   @default_prefix "public"
   @marker_prefix "pkpub_schema:"
 
@@ -411,7 +428,9 @@ defmodule PhoenixKitPublishing.Migrations do
     if target == 0 do
       []
     else
-      v1_statements(prefix) ++ v2_statements(prefix, target) ++ marker_statements(prefix, target)
+      v1_statements(prefix) ++
+        v2_statements(prefix, target) ++
+        v3_statements(prefix, target) ++ marker_statements(prefix, target)
     end
   end
 
@@ -452,6 +471,28 @@ defmodule PhoenixKitPublishing.Migrations do
   defp marker_statements(prefix, target) do
     ["COMMENT ON TABLE #{Helpers.qualify_table(@groups, prefix)} IS '#{@marker_prefix}#{target}'"]
   end
+
+  # ── V3 statement builder ────────────────────────────────────────────────
+
+  # A `data` JSONB map on categories, for what a category says about itself
+  # beyond its name: `color`, `icon`, `seo_title`, `seo_description`
+  # (`PublishingCategory`), and later keys without another migration. The
+  # table is core-created but module-owned (core's `ModuleOwnedTables`), so
+  # the change belongs to this chain. `NOT NULL DEFAULT '{}'` fills existing
+  # rows in the same statement; `IF NOT EXISTS` makes a re-run a no-op.
+  defp v3_statements(prefix, target) when target >= 3 do
+    [
+      "ALTER TABLE #{Helpers.qualify_table(@categories, prefix)} " <>
+        "ADD COLUMN IF NOT EXISTS data jsonb NOT NULL DEFAULT '{}'::jsonb"
+    ]
+  end
+
+  defp v3_statements(_prefix, _target), do: []
+
+  # There is no V3 removal: down below V3 leaves the column, and what the
+  # categories hold in it, where it is. Dropping it would destroy colours and
+  # SEO texts, which this chain never does; an extra column is harmless to
+  # older code (Ecto selects the fields it names).
 
   # ── V2 statement builder ────────────────────────────────────────────────
 

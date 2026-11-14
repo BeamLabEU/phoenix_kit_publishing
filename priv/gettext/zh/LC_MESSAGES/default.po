@@ -635,13 +635,13 @@ msgstr "定义您自己的内容类型和条目名称。"
 msgid "Delete Forever"
 msgstr "永久删除"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:557
+#: lib/phoenix_kit_publishing/web/categories_live.ex:566
 #: lib/phoenix_kit_publishing/web/index.ex:641
 #, elixir-autogen, elixir-format
 msgid "Deleting…"
 msgstr "正在删除…"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:611
+#: lib/phoenix_kit_publishing/web/categories_live.ex:620
 #: lib/phoenix_kit_publishing/web/post_show.ex:268
 #, elixir-autogen, elixir-format
 msgid "Description"
@@ -683,7 +683,7 @@ msgstr "草稿"
 msgid "Duplicate all content and translations from version %{version}"
 msgstr "复制版本 %{version} 的所有内容和翻译"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:538
+#: lib/phoenix_kit_publishing/web/categories_live.ex:547
 #: lib/phoenix_kit_publishing/web/edit.ex:82
 #: lib/phoenix_kit_publishing/web/editor.ex:182
 #: lib/phoenix_kit_publishing/web/editor.ex:297
@@ -1404,7 +1404,7 @@ msgstr "帖子标题"
 msgid "Post updated by another user"
 msgstr "帖子已被其他用户更新"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:497
+#: lib/phoenix_kit_publishing/web/categories_live.ex:506
 #: lib/phoenix_kit_publishing/web/index.ex:524
 #: lib/phoenix_kit_publishing/web/settings.ex:1001
 #, elixir-autogen, elixir-format
@@ -1477,7 +1477,7 @@ msgstr "已发布（线上）"
 
 #: lib/phoenix_kit_publishing/publishing.ex:542
 #: lib/phoenix_kit_publishing/publishing.ex:574
-#: lib/phoenix_kit_publishing/web/categories_live.ex:40
+#: lib/phoenix_kit_publishing/web/categories_live.ex:41
 #: lib/phoenix_kit_publishing/web/edit.ex:83
 #: lib/phoenix_kit_publishing/web/editor.ex:183
 #: lib/phoenix_kit_publishing/web/index.ex:75
@@ -1704,8 +1704,8 @@ msgstr "设置"
 msgid "Singular"
 msgstr "单数"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:495
-#: lib/phoenix_kit_publishing/web/categories_live.ex:596
+#: lib/phoenix_kit_publishing/web/categories_live.ex:504
+#: lib/phoenix_kit_publishing/web/categories_live.ex:605
 #: lib/phoenix_kit_publishing/web/edit.ex:422
 #: lib/phoenix_kit_publishing/web/editor.ex:4071
 #: lib/phoenix_kit_publishing/web/index.ex:501
@@ -1838,7 +1838,7 @@ msgstr "此分组中的另一篇帖子已使用 URL slug %{slug}："
 msgid "The page you requested was not found. Showing closest match."
 msgstr "未找到您请求的页面。正在显示最接近的匹配项。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:61
+#: lib/phoenix_kit_publishing/web/categories_live.ex:62
 #: lib/phoenix_kit_publishing/web/edit.ex:73
 #, elixir-autogen, elixir-format
 msgid "The requested group could not be found."
@@ -2647,7 +2647,7 @@ msgstr "显示顶部返回链接"
 msgid "The most recent post is pinned into its own 'Latest' band under any featured posts and shown larger."
 msgstr "最新的帖子会固定在精选帖子下方单独的“最新”区块中，并以更大尺寸显示。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:614
+#: lib/phoenix_kit_publishing/web/categories_live.ex:652
 #: lib/phoenix_kit_publishing/web/edit.ex:725
 #, elixir-autogen, elixir-format
 msgid "Save"
@@ -2709,7 +2709,7 @@ msgid "%{count} result for “%{query}”"
 msgid_plural "%{count} results for “%{query}”"
 msgstr[0] "找到 %{count} 个“%{query}”的结果"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:453
+#: lib/phoenix_kit_publishing/web/categories_live.ex:462
 #, elixir-autogen, elixir-format
 msgid "A category can't be moved under one of its own subcategories."
 msgstr "分类不能移到其自身的子分类下。"
@@ -2719,30 +2719,30 @@ msgstr "分类不能移到其自身的子分类下。"
 msgid "All posts"
 msgstr "所有帖子"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:38
+#: lib/phoenix_kit_publishing/web/categories_live.ex:39
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:181
 #: lib/phoenix_kit_publishing/web/listing.ex:1014
 #, elixir-autogen, elixir-format
 msgid "Categories"
 msgstr "分类"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:135
+#: lib/phoenix_kit_publishing/web/categories_live.ex:140
 #, elixir-autogen, elixir-format
 msgid "Category created"
 msgstr "分类已创建"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:276
+#: lib/phoenix_kit_publishing/web/categories_live.ex:281
 #, elixir-autogen, elixir-format
 msgid "Category deleted — its children moved to the top level"
 msgstr "分类已删除——其子分类已移至顶层"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:94
-#: lib/phoenix_kit_publishing/web/categories_live.ex:175
+#: lib/phoenix_kit_publishing/web/categories_live.ex:99
+#: lib/phoenix_kit_publishing/web/categories_live.ex:180
 #, elixir-autogen, elixir-format
 msgid "Category not found"
 msgstr "未找到分类"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:134
+#: lib/phoenix_kit_publishing/web/categories_live.ex:139
 #, elixir-autogen, elixir-format
 msgid "Category updated"
 msgstr "分类已更新"
@@ -2762,37 +2762,37 @@ msgstr "帖子页面底部按时间顺序排列的较新/较早帖子链接。"
 msgid "Clear search"
 msgstr "清除搜索"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:280
+#: lib/phoenix_kit_publishing/web/categories_live.ex:285
 #, elixir-autogen, elixir-format
 msgid "Couldn't delete this category."
 msgstr "无法删除此分类。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:448
+#: lib/phoenix_kit_publishing/web/categories_live.ex:457
 #, elixir-autogen, elixir-format
 msgid "Couldn't save this category — check the fields and try again."
 msgstr "无法保存此分类——请检查字段后重试。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:461
+#: lib/phoenix_kit_publishing/web/categories_live.ex:470
 #, elixir-autogen, elixir-format
 msgid "Couldn't save this category."
 msgstr "无法保存此分类。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:614
+#: lib/phoenix_kit_publishing/web/categories_live.ex:652
 #, elixir-autogen, elixir-format
 msgid "Create"
 msgstr "创建"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:559
+#: lib/phoenix_kit_publishing/web/categories_live.ex:568
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "删除"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:562
+#: lib/phoenix_kit_publishing/web/categories_live.ex:571
 #, elixir-autogen, elixir-format
 msgid "Delete “%{name}”? Its subcategories move to the top level and posts lose this category."
 msgstr "删除“%{name}”？其子分类将移至顶层，帖子将失去此分类。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:581
+#: lib/phoenix_kit_publishing/web/categories_live.ex:590
 #, elixir-autogen, elixir-format
 msgid "Edit category"
 msgstr "编辑分类"
@@ -2853,15 +2853,15 @@ msgstr "极简——仅日期和标题，无图片"
 msgid "More posts"
 msgstr "更多帖子"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:494
-#: lib/phoenix_kit_publishing/web/categories_live.ex:593
+#: lib/phoenix_kit_publishing/web/categories_live.ex:503
+#: lib/phoenix_kit_publishing/web/categories_live.ex:602
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr "名称"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:471
-#: lib/phoenix_kit_publishing/web/categories_live.ex:486
-#: lib/phoenix_kit_publishing/web/categories_live.ex:583
+#: lib/phoenix_kit_publishing/web/categories_live.ex:480
+#: lib/phoenix_kit_publishing/web/categories_live.ex:495
+#: lib/phoenix_kit_publishing/web/categories_live.ex:592
 #: lib/phoenix_kit_publishing/web/components/categories_picker.ex:257
 #, elixir-autogen, elixir-format
 msgid "New category"
@@ -2882,7 +2882,7 @@ msgstr "没有符合筛选条件的帖子"
 msgid "No posts match your search."
 msgstr "没有符合搜索条件的帖子。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:431
+#: lib/phoenix_kit_publishing/web/categories_live.ex:440
 #, elixir-autogen, elixir-format
 msgid "None (top level)"
 msgstr "无（顶层）"
@@ -2892,12 +2892,12 @@ msgstr "无（顶层）"
 msgid "Older"
 msgstr "较早"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:600
+#: lib/phoenix_kit_publishing/web/categories_live.ex:609
 #, elixir-autogen, elixir-format
 msgid "Parent"
 msgstr "父级分类"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:610
+#: lib/phoenix_kit_publishing/web/categories_live.ex:619
 #, elixir-autogen, elixir-format
 msgid "Position"
 msgstr "位置"
@@ -2958,17 +2958,17 @@ msgstr "显示上一篇/下一篇导航"
 msgid "Tag: %{name}"
 msgstr "标签：%{name}"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:447
+#: lib/phoenix_kit_publishing/web/categories_live.ex:456
 #, elixir-autogen, elixir-format
 msgid "That slug is already used in this group."
 msgstr "此分组中已使用该 slug。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:456
+#: lib/phoenix_kit_publishing/web/categories_live.ex:465
 #, elixir-autogen, elixir-format
 msgid "The parent must belong to the same group."
 msgstr "父级分类必须属于同一分组。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:597
+#: lib/phoenix_kit_publishing/web/categories_live.ex:606
 #, elixir-autogen, elixir-format
 msgid "auto from the name"
 msgstr "根据名称自动生成"
@@ -3099,48 +3099,48 @@ msgstr "您的浏览器不支持 audio 元素。"
 msgid "to join the conversation."
 msgstr "后即可参与讨论。"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:203
+#: lib/phoenix_kit_publishing/web/categories_live.ex:208
 #, elixir-autogen, elixir-format
 msgid "Category moved"
 msgstr "分类已移动"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:509
+#: lib/phoenix_kit_publishing/web/categories_live.ex:518
 #, elixir-autogen, elixir-format
 msgid "Drag to reorder (among siblings)"
 msgstr "拖动以重新排序（同级之间）"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:247
-#: lib/phoenix_kit_publishing/web/categories_live.ex:255
+#: lib/phoenix_kit_publishing/web/categories_live.ex:252
+#: lib/phoenix_kit_publishing/web/categories_live.ex:260
 #, elixir-autogen, elixir-format
 msgid "Failed to save the new order"
 msgstr "保存新顺序失败"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:640
+#: lib/phoenix_kit_publishing/web/categories_live.ex:678
 #, elixir-autogen, elixir-format
 msgid "Move"
 msgstr "移动"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:550
+#: lib/phoenix_kit_publishing/web/categories_live.ex:559
 #, elixir-autogen, elixir-format
 msgid "Move to…"
 msgstr "移动到…"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:624
+#: lib/phoenix_kit_publishing/web/categories_live.ex:662
 #, elixir-autogen, elixir-format
 msgid "Move “%{name}”"
 msgstr "移动“%{name}”"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:628
+#: lib/phoenix_kit_publishing/web/categories_live.ex:666
 #, elixir-autogen, elixir-format
 msgid "New parent"
 msgstr "新的父级分类"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:544
+#: lib/phoenix_kit_publishing/web/categories_live.ex:553
 #, elixir-autogen, elixir-format
 msgid "New subcategory"
 msgstr "新建子分类"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:481
+#: lib/phoenix_kit_publishing/web/categories_live.ex:490
 #, elixir-autogen, elixir-format
 msgid "No categories yet — create the first one."
 msgstr "暂无分类——创建第一个吧。"
@@ -3247,7 +3247,7 @@ msgstr "移除音频版本"
 msgid "Audio version removed"
 msgstr "音频版本已移除"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:235
+#: lib/phoenix_kit_publishing/web/categories_live.ex:240
 #, elixir-autogen, elixir-format
 msgid "Order unchanged — use “Move to…” to change a parent."
 msgstr "顺序未变——使用“移动到…”更改父级分类。"
@@ -3518,7 +3518,7 @@ msgstr "无法保存分组——请检查各项值后重试。"
 msgid "Invalid order"
 msgstr "无效的顺序"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:641
+#: lib/phoenix_kit_publishing/web/categories_live.ex:679
 #, elixir-autogen, elixir-format
 msgid "Moving…"
 msgstr "正在移动…"
@@ -3598,7 +3598,7 @@ msgstr "该帖子已不存在。"
 msgid "Try it"
 msgstr "试一试"
 
-#: lib/phoenix_kit_publishing/web/categories_live.ex:459
+#: lib/phoenix_kit_publishing/web/categories_live.ex:468
 #, elixir-autogen, elixir-format
 msgid "That parent no longer exists."
 msgstr "该父级分类已不存在。"
@@ -3975,8 +3975,8 @@ msgstr "删除分组前，请先将其移至回收站。"
 msgid "Couldn't create this group."
 msgstr "无法创建此分组。"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3024
-#: lib/phoenix_kit_publishing/web/html.ex:3034
+#: lib/phoenix_kit_publishing/web/html.ex:3025
+#: lib/phoenix_kit_publishing/web/html.ex:3035
 #, elixir-autogen, elixir-format
 msgid "Next page"
 msgstr "下一页"
@@ -3986,8 +3986,8 @@ msgstr "下一页"
 msgid "Pagination"
 msgstr "分页"
 
-#: lib/phoenix_kit_publishing/web/html.ex:3024
-#: lib/phoenix_kit_publishing/web/html.ex:3032
+#: lib/phoenix_kit_publishing/web/html.ex:3025
+#: lib/phoenix_kit_publishing/web/html.ex:3033
 #, elixir-autogen, elixir-format
 msgid "Previous page"
 msgstr "上一页"
@@ -4052,3 +4052,33 @@ msgstr "分页样式已更新"
 #, elixir-autogen, elixir-format
 msgid "Previous and next only"
 msgstr "仅上一页和下一页"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:626
+#, elixir-autogen, elixir-format
+msgid "#4f46e5 or primary"
+msgstr "#4f46e5 或 primary"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:625
+#, elixir-autogen, elixir-format
+msgid "Colour"
+msgstr "颜色"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:635
+#, elixir-autogen, elixir-format
+msgid "Icon"
+msgstr "图标"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:647
+#, elixir-autogen, elixir-format
+msgid "SEO description"
+msgstr "SEO 描述"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:644
+#, elixir-autogen, elixir-format
+msgid "SEO title"
+msgstr "SEO 标题"
+
+#: lib/phoenix_kit_publishing/web/categories_live.ex:640
+#, elixir-autogen, elixir-format
+msgid "Shown on the category's chips. Colour: a hex value or a theme colour; icon: a Heroicons name."
+msgstr "显示在分类标签上。颜色：十六进制值或主题颜色；图标：Heroicons 名称。"

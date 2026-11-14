@@ -55,6 +55,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     assert reloaded.name == "Renamed"
   end
 
+  test "the form edits colour, icon and SEO texts", %{conn: conn, slug: slug} do
+    alias PhoenixKit.Modules.Publishing.PublishingCategory
+
+    {:ok, cat} = Categories.create_category(slug, %{"name" => "Styled", "color" => "accent"})
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+
+    view |> element("button[phx-value-uuid='#{cat.uuid}'][phx-click='edit']") |> render_click()
+    assert has_element?(view, "#category-form input[name='category[color]'][value='accent']")
+
+    view
+    |> form("#category-form",
+      category: %{
+        "name" => "Styled",
+        "slug" => cat.slug,
+        "color" => "#0ea5e9",
+        "icon" => "hero-sparkles",
+        "seo_title" => "Styled posts",
+        "seo_description" => "Everything styled."
+      }
+    )
+    |> render_submit()
+
+    {:ok, reloaded} = Categories.fetch_category(cat.uuid)
+    assert PublishingCategory.color(reloaded) == "#0ea5e9"
+    assert PublishingCategory.icon(reloaded) == "hero-sparkles"
+    assert PublishingCategory.seo_title(reloaded) == "Styled posts"
+    assert PublishingCategory.seo_description(reloaded) == "Everything styled."
+  end
+
   test "'New subcategory' prefills the parent", %{conn: conn, slug: slug} do
     {:ok, parent} = Categories.create_category(slug, %{"name" => "Parent"})
     {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")

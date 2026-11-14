@@ -4,6 +4,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ListCategories do
   # reads: a database error raises (core answers internal_error) instead of an empty tree.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
+  alias PhoenixKit.Modules.Publishing.PublishingCategory
 
   @spec call(map(), map()) :: {:ok, map()} | {:error, atom(), String.t(), map()}
   def call(input, _ctx) do
@@ -23,6 +24,10 @@ defmodule PhoenixKit.Modules.Publishing.API.ListCategories do
               "name_i18n" => category.name_i18n || %{},
               "description" => category.description,
               "position" => category.position,
+              "color" => PublishingCategory.color(category),
+              "icon" => PublishingCategory.icon(category),
+              "seo_title" => PublishingCategory.seo_title(category),
+              "seo_description" => PublishingCategory.seo_description(category),
               "parent_id" => category.parent_uuid,
               "depth" => depth,
               "published_post_count" => Map.get(counts, category.uuid, 0)

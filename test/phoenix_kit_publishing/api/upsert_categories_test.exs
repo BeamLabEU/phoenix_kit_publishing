@@ -56,6 +56,39 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategoriesTest do
              ["unchanged"]
   end
 
+  test "colour, icon and SEO texts: created, unchanged when equal, refused when invalid", %{g: g} do
+    alias PhoenixKit.Modules.Publishing.PublishingCategory
+
+    row = %{
+      "slug" => "billing",
+      "name" => "Billing",
+      "color" => "#4f46e5",
+      "icon" => "hero-banknotes",
+      "seo_title" => "Billing news",
+      "seo_description" => "Releases."
+    }
+
+    assert actions(upsert(g, [row])) == ["created"]
+    c = stored(g, "billing")
+    assert PublishingCategory.color(c) == "#4f46e5"
+    assert PublishingCategory.icon(c) == "hero-banknotes"
+
+    assert actions(confirmed(g, [row])) == ["unchanged"]
+    assert actions(confirmed(g, [%{"slug" => "billing", "icon" => nil}])) == ["updated"]
+    assert PublishingCategory.icon(stored(g, "billing")) == nil
+
+    assert {:ok,
+            %{"results" => [%{"action" => "error", "error" => %{"code" => "validation_failed"}}]}} =
+             confirmed(g, [%{"slug" => "billing", "color" => "red; x"}])
+
+    assert PublishingCategory.color(stored(g, "billing")) == "#4f46e5"
+
+    assert {:ok, %{"categories" => [listed]}} =
+             ApiCase.call("publishing.list_categories", %{"group" => g["slug"]})
+
+    assert listed["color"] == "#4f46e5" and listed["seo_title"] == "Billing news"
+  end
+
   test "an update without a confirmation is refused row by row and nothing is written", %{g: g} do
     Fx.category!(g["slug"], "Old", %{slug: "old"})
 

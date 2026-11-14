@@ -125,9 +125,10 @@ Deliberate non-features, so nobody adds them assuming they were missed.
   still *creates* all 7 on every install (V135 baseline for
   groups/posts/versions/contents, V159 for categories/post_categories/
   post_views, V164 rebuilds one index). V1 of this chain is a pure adoption
-  of that current shape and V2 only adds two expression indexes (see
-  "Database & migrations" below and the chain's own moduledoc) — no column,
-  constraint or table has ever changed through it.
+  of that current shape, V2 only adds two expression indexes and V3 one
+  column, `data` on categories (see "Database & migrations" below and the
+  chain's own moduledoc); no table or constraint has changed through it, and
+  a rollback never drops a column's contents.
 - **No all-groups public overview.** If one returns it returns as an opt-in
   reserved route, not as a catch-all sibling.
 - **No guest commenting.** The comments seam requires a logged-in user because
@@ -645,7 +646,10 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
   routing), plus reserved `status` / `data`. Read fallback: requested language →
   site default → first available.
 - **`..._categories`** — hierarchical per-group taxonomy; nullable `parent_uuid`
-  self-FK, `slug` unique per group, `name_i18n` display names. Deleting a group
+  self-FK, `slug` unique per group, `name_i18n` display names, `data` JSONB
+  (module chain V3) with `color` (hex or a daisyUI theme colour), `icon` (a
+  heroicon name), `seo_title`, `seo_description` — validated strictly, since
+  colour and icon reach a `style` attribute and a class. Deleting a group
   cascades; deleting a parent lifts children to the root. A parent is picked in
   core's `TreePicker` (the category form and the Move dialog), never an
   indented flat select; the tree leaves out the category's own subtree and the
@@ -798,7 +802,12 @@ already taken by ANOTHER expression gets the shape under `<name>_v2`,
 stamps V2 over a missing index. `down/1` never drops any of the 7 tables,
 for any target — below V2 it removes exactly those two indexes by the same
 shape match, whatever name they landed under, leaving a same-named index on
-a different expression alone, then re-stamps or clears the marker. See
+a different expression alone, then re-stamps or clears the marker. V3
+adds `data jsonb NOT NULL DEFAULT '{}'` to `phoenix_kit_publishing_categories`
+(`ADD COLUMN IF NOT EXISTS`; core's `ModuleOwnedTables` lists the table as
+this module's, which sanctions altering it); a rollback below V3 only moves
+the marker and leaves the column and its contents. `mix phoenix_kit.repair`
+reports it as an info-level extra column. See
 `PhoenixKitPublishing.Migrations`' moduledoc for the full ownership
 writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL` safety-net
 section here.
@@ -807,7 +816,9 @@ V2 needs nothing from core's `ExpectedSchema` manifest: `mix
 phoenix_kit.repair` reports drift and never drops an object, and no
 module's own chain registers its objects there. The one core-side step a
 shape change here can need is excluding, from core's baseline generator,
-an object that core created and this chain alters — V2 alters none. Phase
+an object that core created and this chain alters — V3's column, which
+core's next baseline squash must not drop; under core's plan that squash
+leaves module-owned tables out altogether. Phase
 2 (a future core baseline
 squash that drops these tables from core) is already covered: the chain
 alone builds the complete shape of all 7 tables from nothing, so a fresh
@@ -961,7 +972,7 @@ newest-created release as Latest and demotes the current one.
   `phoenix_kit_publishing_contents (version_uuid/group, language, url_slug)` for
   non-trashed rows, so a duplicate becomes impossible at the source instead of
   something the read path's auto-renamer cleans up. This is a shape change, so it
-  is V3 of `PhoenixKitPublishing.Migrations`; core needs nothing for a new
+  is V4 of `PhoenixKitPublishing.Migrations`; core needs nothing for a new
   index (see Database & migrations).
 - **Unify the two base→dialect resolvers.** `new_translation_request?/2` (against
   `post.available_languages`) and `Posts.resolve_language_to_dialect/1` (against

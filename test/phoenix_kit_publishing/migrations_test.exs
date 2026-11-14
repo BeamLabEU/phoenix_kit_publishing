@@ -48,7 +48,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     alias PhoenixKit.Migrations.Postgres.Helpers
 
     test "current_version/0 and version_table/0" do
-      assert Migrations.current_version() == 2
+      assert Migrations.current_version() == 3
       assert Migrations.version_table() == "phoenix_kit_publishing_groups"
     end
 
@@ -100,14 +100,14 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # `migrated_version_runtime/1` (both default their target to
     # `initial_version/0`, well under the ceiling) — 0, 1 and 2 must all
     # stay reachable for every public builder.
-    test "validate_target! admits 0, 1 and 2, and nothing above current_version/0" do
-      for target <- [0, 1, 2] do
+    test "validate_target! admits 0 to 3, and nothing above current_version/0" do
+      for target <- [0, 1, 2, 3] do
         assert Migrations.up_statements("public", target) |> is_list()
         assert Migrations.down_statements("public", target) |> is_list()
       end
 
-      assert_raise ArgumentError, fn -> Migrations.up_statements("public", 3) end
-      assert_raise ArgumentError, fn -> Migrations.down_statements("public", 3) end
+      assert_raise ArgumentError, fn -> Migrations.up_statements("public", 4) end
+      assert_raise ArgumentError, fn -> Migrations.down_statements("public", 4) end
     end
 
     # This chain interpolates the prefix into every object it creates, and
@@ -310,7 +310,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     end
 
     test "up stamps the version marker, and stamps it last, for every target" do
-      for target <- [1, 2] do
+      for target <- [1, 2, 3] do
         statements = Migrations.up_statements("public", target)
 
         assert List.last(statements) ==
@@ -322,7 +322,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       end
 
       assert List.last(Migrations.up_statements()) ==
-               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:2'",
+               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:3'",
              "the default target is current_version/0"
     end
 
@@ -512,6 +512,30 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     end
   end
 
+  describe "V3 — the categories' data map" do
+    test "V3 adds exactly one guarded column, after V2's guards and before the marker" do
+      v2 = Migrations.up_statements("public", 2)
+      v3 = Migrations.up_statements("public", 3)
+
+      assert Enum.drop(v3, -1) -- Enum.drop(v2, -1) == [
+               "ALTER TABLE public.phoenix_kit_publishing_categories " <>
+                 "ADD COLUMN IF NOT EXISTS data jsonb NOT NULL DEFAULT '{}'::jsonb"
+             ]
+
+      assert List.last(v3) ==
+               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:3'"
+    end
+
+    test "down below V3 only moves the marker: the column and what it holds stay" do
+      for prefix <- ["public", "publishing_alt"] do
+        assert Migrations.down_statements(prefix, 2) ==
+                 ["COMMENT ON TABLE #{prefix}.phoenix_kit_publishing_groups IS 'pkpub_schema:2'"]
+
+        refute Enum.any?(Migrations.down_statements(prefix, 0), &(&1 =~ ~r/DROP COLUMN/i))
+      end
+    end
+  end
+
   describe "the chain can never destroy any of the 7 tables" do
     # Compared against the WHOLE expected content, not scanned for a
     # forbidden substring — a substring check only sees statements the
@@ -524,7 +548,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # appears, in any target — and that each block drops on ONE of the two
     # V2 tables, through the guard's own shape match, never by a name.
     test "down/1 emits the two V2 index removals below V2 and the marker bookkeeping, nothing else" do
-      for prefix <- ["public", "publishing_alt"], target <- [0, 1, 2] do
+      for prefix <- ["public", "publishing_alt"], target <- [0, 1, 2, 3] do
         statements = Migrations.down_statements(prefix, target)
 
         {removals, rest} = Enum.split_with(statements, &String.starts_with?(&1, "DO $$"))
@@ -564,6 +588,8 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # without changing it. Captured from a real run, same as the pinned
     # literal list above.
     @up_operations [
+      # V3: the categories' `data` map
+      {"ALTER TABLE", "phoenix_kit_publishing_categories"},
       {"CREATE TABLE", "phoenix_kit_publishing_groups"},
       {"CREATE TABLE", "phoenix_kit_publishing_posts"},
       {"CREATE TABLE", "phoenix_kit_publishing_versions"},
@@ -702,7 +728,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
                  "up_statements(#{inspect(prefix)}) contains: #{stmt}"
         end
 
-        for target <- [0, 1, 2] do
+        for target <- [0, 1, 2, 3] do
           for stmt <- Migrations.down_statements(prefix, target) do
             refute strip_referential_actions(stmt) =~ forbidden,
                    "down_statements(#{inspect(prefix)}, #{target}) contains: #{stmt}"

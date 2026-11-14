@@ -14,6 +14,13 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
   - `name_i18n` carries per-language display-name overrides keyed by
     language code (`%{"et" => "Uudised"}`); the primary-language name
     lives in `name`. Resolution is base-tolerant via `translated_name/2`.
+  - `data` (module chain V3) holds what a category says about itself beyond
+    its name: `color` (`#rgb` / `#rrggbb`, or a daisyUI theme colour such as
+    `"primary"`, see `colors/0`), `icon` (a heroicon name, `"hero-cube"`),
+    `seo_title` and `seo_description` for its archive page. They are cast
+    from flat attrs of the same names (`changeset/2`); a blank value removes
+    the key. Read them through `color/1`, `color_css/1`, `icon/1`,
+    `seo_title/1` and `seo_description/1`.
   """
 
   use Ecto.Schema
@@ -40,6 +47,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
           position: integer(),
           group_uuid: Ecto.UUID.t() | nil,
           parent_uuid: Ecto.UUID.t() | nil,
+          data: map(),
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -50,6 +58,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
     field :name_i18n, :map, default: %{}
     field :description, :string
     field :position, :integer, default: 0
+    field :data, :map, default: %{}
 
     belongs_to :group, PhoenixKit.Modules.Publishing.PublishingGroup,
       foreign_key: :group_uuid,
@@ -81,6 +90,7 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
       message: "must be lowercase letters, numbers, and hyphens"
     )
     |> normalize_name_i18n()
+    |> put_display_data(attrs)
     |> unique_constraint([:group_uuid, :slug],
       name: :phoenix_kit_publishing_categories_group_slug_uniq
     )
@@ -97,6 +107,140 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
     |> validate_required([:group_uuid])
     |> changeset(attrs)
   end
+
+  @colors ~w(primary secondary accent neutral info success warning error)
+  @hex_color ~r/\A#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\z/
+  @icon ~r/\Ahero-[a-z0-9]+(?:-[a-z0-9]+)*\z/
+  @display_keys ~w(color icon seo_title seo_description)
+  @display_limits %{"seo_title" => 120, "seo_description" => 320}
+
+  @doc "The daisyUI theme colours a category's `color` may name instead of a hex value."
+  @spec colors() :: [String.t()]
+  def colors, do: @colors
+
+  @doc "The `data` keys `changeset/2` casts from flat attrs."
+  @spec display_keys() :: [String.t()]
+  def display_keys, do: @display_keys
+
+  # The flat display attrs (string or atom keys) into `data`, validated. A
+  # key the attrs do not mention keeps its stored value; a blank one is
+  # removed. The values reach a `style` attribute and a class, so the
+  # formats are strict: a hex colour or a theme colour name, a heroicon name.
+  defp put_display_data(changeset, attrs) when is_map(attrs) do
+    given =
+      for key <- @display_keys,
+          {:ok, value} <- [fetch_attr(attrs, key)],
+          into: %{},
+          do: {key, value |> to_string() |> String.trim()}
+
+    if given == %{} do
+      changeset
+    else
+      data = Map.merge(get_field(changeset, :data) || %{}, given)
+      data = for {k, v} <- data, v != "", into: %{}, do: {k, v}
+
+      changeset
+      |> put_change(:data, data)
+      |> validate_display_data(data)
+    end
+  end
+
+  defp put_display_data(changeset, _attrs), do: changeset
+
+  defp fetch_attr(attrs, key) do
+    case Map.fetch(attrs, key) do
+      {:ok, value} when is_binary(value) or is_nil(value) -> {:ok, value || ""}
+      {:ok, _other} -> :error
+      :error -> fetch_atom_attr(attrs, key)
+    end
+  end
+
+  @atom_keys %{
+    "color" => :color,
+    "icon" => :icon,
+    "seo_title" => :seo_title,
+    "seo_description" => :seo_description
+  }
+
+  defp fetch_atom_attr(attrs, key) do
+    case Map.fetch(attrs, Map.fetch!(@atom_keys, key)) do
+      {:ok, value} when is_binary(value) or is_nil(value) -> {:ok, value || ""}
+      _ -> :error
+    end
+  end
+
+  defp validate_display_data(changeset, data) do
+    changeset
+    |> check_display(
+      data["color"],
+      &valid_color?/1,
+      :data,
+      "color must be #rgb, #rrggbb or a theme colour"
+    )
+    |> check_display(
+      data["icon"],
+      &Regex.match?(@icon, &1),
+      :data,
+      "icon must be a heroicon name such as hero-cube"
+    )
+    |> check_lengths(data)
+  end
+
+  defp check_display(changeset, nil, _valid?, _field, _message), do: changeset
+
+  defp check_display(changeset, value, valid?, field, message) do
+    if valid?.(value), do: changeset, else: add_error(changeset, field, message)
+  end
+
+  defp check_lengths(changeset, data) do
+    Enum.reduce(@display_limits, changeset, fn {key, max}, acc ->
+      if String.length(data[key] || "") > max,
+        do: add_error(acc, :data, "#{key} must be at most #{max} characters"),
+        else: acc
+    end)
+  end
+
+  defp valid_color?(value), do: value in @colors or Regex.match?(@hex_color, value)
+
+  @doc "The category's colour as stored (`#hex` or a theme colour name), or nil."
+  @spec color(t()) :: String.t() | nil
+  def color(%__MODULE__{data: data}), do: display_value(data, "color", &valid_color?/1)
+
+  @doc """
+  The category's colour as a CSS value: the hex as stored, a theme colour as
+  `var(--color-<name>)`; nil when it has none (or holds something invalid —
+  it is read straight into a `style` attribute).
+  """
+  @spec color_css(t()) :: String.t() | nil
+  def color_css(%__MODULE__{} = category) do
+    case color(category) do
+      nil -> nil
+      "#" <> _ = hex -> hex
+      token -> "var(--color-#{token})"
+    end
+  end
+
+  @doc "The category's heroicon name, or nil."
+  @spec icon(t()) :: String.t() | nil
+  def icon(%__MODULE__{data: data}), do: display_value(data, "icon", &Regex.match?(@icon, &1))
+
+  @doc "The SEO title of the category's archive page, or nil."
+  @spec seo_title(t()) :: String.t() | nil
+  def seo_title(%__MODULE__{data: data}), do: display_value(data, "seo_title", &(&1 != ""))
+
+  @doc "The meta description of the category's archive page, or nil."
+  @spec seo_description(t()) :: String.t() | nil
+  def seo_description(%__MODULE__{data: data}),
+    do: display_value(data, "seo_description", &(&1 != ""))
+
+  defp display_value(data, key, valid?) when is_map(data) do
+    case Map.get(data, key) do
+      value when is_binary(value) -> if valid?.(value), do: value
+      _ -> nil
+    end
+  end
+
+  defp display_value(_data, _key, _valid?), do: nil
 
   @doc """
   `character varying` column widths for `phoenix_kit_publishing_categories`,

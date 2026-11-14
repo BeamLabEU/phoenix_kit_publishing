@@ -4,10 +4,12 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Refs}
   alias PhoenixKit.Modules.Publishing.Categories
+  alias PhoenixKit.Modules.Publishing.PublishingCategory
 
   @tool "publishing.upsert_categories"
   @slug ~r/\A[a-z0-9]+(-[a-z0-9]+)*\z/
-  @attr_keys ~w(name description name_i18n position)
+  @attr_keys ~w(name description name_i18n position color icon seo_title seo_description)
+  @display_keys PublishingCategory.display_keys()
   @int4 -2_147_483_648..2_147_483_647
 
   @spec call(map(), map()) ::
@@ -106,8 +108,45 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
     with :ok <- check_name(row),
          :ok <- check_text("description", row["description"], 1024),
          :ok <- check_name_i18n(row),
+         :ok <- check_display(row),
          do: check_position(row)
   end
+
+  # Colour, icon and the SEO texts go through the schema's own rules, so a
+  # dry run refuses exactly what the write would.
+  defp check_display(row) do
+    given = for key <- @display_keys, Map.has_key?(row, key), into: %{}, do: {key, row[key]}
+
+    cond do
+      given == %{} ->
+        :ok
+
+      Enum.any?(given, fn {_key, value} -> not (is_binary(value) or is_nil(value)) end) ->
+        {:error, "validation_failed", "colour, icon and SEO fields must be strings or null"}
+
+      true ->
+        given |> Enum.reduce_while(:ok, &check_display_text/2) |> display_rules(given)
+    end
+  end
+
+  defp check_display_text({key, value}, :ok) do
+    case check_text(key, value || "", 320) do
+      :ok -> {:cont, :ok}
+      error -> {:halt, error}
+    end
+  end
+
+  defp display_rules(:ok, given) do
+    changeset =
+      PublishingCategory.changeset(%PublishingCategory{name: "x", slug: "x", data: %{}}, given)
+
+    case Keyword.get_values(changeset.errors, :data) do
+      [] -> :ok
+      [{message, _} | _] -> {:error, "validation_failed", message}
+    end
+  end
+
+  defp display_rules(error, _given), do: error
 
   defp check_name(row) do
     case Map.fetch(row, "name") do
@@ -181,8 +220,19 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
     Map.filter(attrs, fn
       {"parent_uuid", value} -> value != category.parent_uuid
       {"name_i18n", value} -> value != (category.name_i18n || %{})
+      {key, value} when key in @display_keys -> blank(value) != stored_display(category, key)
       {key, value} -> value != Map.get(category, String.to_existing_atom(key))
     end)
+  end
+
+  defp blank(value) when is_binary(value), do: String.trim(value)
+  defp blank(_value), do: ""
+
+  defp stored_display(category, key) do
+    case Map.get(category, :data) do
+      %{} = data -> data |> Map.get(key, "") |> blank()
+      _ -> ""
+    end
   end
 
   # Absent keeps; null is the top level; {id} / {slug} are resolved over the stored categories AND the
