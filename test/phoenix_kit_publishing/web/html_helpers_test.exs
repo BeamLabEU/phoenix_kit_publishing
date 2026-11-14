@@ -271,6 +271,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTMLHelpersTest do
     end
   end
 
+  test "an excerpt keeps a component shown in a fence that holds a blank line" do
+    body = "```\n<Image src=\"/x.png\"/>\n\n```\n\nReal text"
+
+    assert HTML.extract_excerpt(body) =~
+             ~s(<Image src="/x.png"/>)
+  end
+
   describe "pagination_window/2" do
     alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
 

@@ -2843,6 +2843,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     # plain-text-ish, and per-row target resolution would be a read per link.
     html =
       excerpt_markdown
+      |> close_open_fence()
       |> Shared.strip_components()
       |> Renderer.post_links_to_text()
       |> Renderer.render_markdown()
@@ -2857,6 +2858,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   def extract_excerpt(_), do: ""
+
+  # A fence holding a blank line is cut open by the paragraph split above;
+  # closed again, its text stays code (as the page shows it) instead of a
+  # component the strip and the renderer would remove.
+  defp close_open_fence(markdown) do
+    fences = Regex.scan(~r/^\s*(?:```|~~~)/m, markdown) |> length()
+    if rem(fences, 2) == 1, do: markdown <> "\n```", else: markdown
+  end
 
   @description_limit 160
   @sentence_end_re ~r/[.!?…]["'”’»)\]]*(?=\s|$)|[。！？]/u
