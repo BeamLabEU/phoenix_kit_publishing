@@ -297,7 +297,9 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   defp check_import_shapes(attrs) do
     checks = [
       Enum.all?(@import_text_keys, &(is_nil(attrs[&1]) or is_binary(attrs[&1]))),
-      is_nil(attrs["og"]) or is_map(attrs["og"]),
+      is_nil(attrs["og"]) or
+        (is_map(attrs["og"]) and
+           Enum.all?(Map.values(attrs["og"]), &(is_nil(&1) or is_binary(&1)))),
       Enum.all?(~w(category_slugs category_uuids), &string_list?(attrs[&1])),
       is_nil(attrs["custom_fields"]) or is_map(attrs["custom_fields"]) or
         is_list(attrs["custom_fields"])
@@ -411,11 +413,13 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
   defp backdate_slot(_group_slug, db_post, _published_at, _attempt), do: {:ok, db_post}
 
-  defp slot_taken_error?(changeset),
-    do:
-      Enum.any?(changeset.errors, fn {_field, {_message, meta}} ->
-        meta[:constraint] == :unique
-      end)
+  # Only the slot's own index: a backdate writes nothing else that is unique.
+  defp slot_taken_error?(changeset) do
+    Enum.any?(changeset.errors, fn {_field, {_message, meta}} ->
+      meta[:constraint] == :unique and
+        meta[:constraint_name] == "idx_publishing_posts_group_date_time_unique"
+    end)
+  end
 
   defp maybe_publish_import(_group_slug, _post, false, _opts), do: :ok
 

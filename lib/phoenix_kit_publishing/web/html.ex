@@ -2862,9 +2862,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   # A fence holding a blank line is cut open by the paragraph split above;
   # closed again, its text stays code (as the page shows it) instead of a
   # component the strip and the renderer would remove.
+  # A fence is up to three spaces of indent then three or more backticks or
+  # tildes (four spaces is indented code, not a fence); the closer repeats
+  # the opener's marker.
   defp close_open_fence(markdown) do
-    fences = Regex.scan(~r/^\s*(?:```|~~~)/m, markdown) |> length()
-    if rem(fences, 2) == 1, do: markdown <> "\n```", else: markdown
+    markers = Regex.scan(~r/^ {0,3}(`{3,}|~{3,})/m, markdown, capture: :all_but_first)
+
+    if rem(length(markers), 2) == 1,
+      do: markdown <> "\n" <> (markers |> List.last() |> hd()),
+      else: markdown
   end
 
   @description_limit 160

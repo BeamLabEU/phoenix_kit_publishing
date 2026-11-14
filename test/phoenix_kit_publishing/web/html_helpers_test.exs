@@ -276,6 +276,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTMLHelpersTest do
 
     assert HTML.extract_excerpt(body) =~
              ~s(<Image src="/x.png"/>)
+
+    for fence <- ["~~~", "````"] do
+      body = "#{fence}\n<Image src=\"/y.png\"/>\n\n#{fence}\n\nReal text"
+      assert HTML.extract_excerpt(body) =~ ~s(<Image src="/y.png"/>), fence
+    end
   end
 
   describe "pagination_window/2" do

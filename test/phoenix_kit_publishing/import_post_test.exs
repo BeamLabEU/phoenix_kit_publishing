@@ -90,7 +90,13 @@ defmodule PhoenixKit.Modules.Publishing.ImportPostTest do
     assert {:error, :invalid_published_at} =
              Publishing.import_post(slug, %{title: "X", published_at: "yesterday"})
 
-    for bad <- [%{og: 42}, %{category_slugs: "projects"}, %{custom_fields: "x"}, %{content: 1}] do
+    for bad <- [
+          %{og: 42},
+          %{og: %{title: 123}},
+          %{category_slugs: "projects"},
+          %{custom_fields: "x"},
+          %{content: 1}
+        ] do
       assert {:error, :invalid_format} = Publishing.import_post(slug, Map.put(bad, :title, "X"))
     end
 
