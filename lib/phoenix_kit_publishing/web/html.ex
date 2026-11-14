@@ -45,6 +45,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         <meta name="twitter:title" content={@og[:title]} />
       <% end %>
       <%= if @og[:description] do %>
+        <meta name="description" content={@og[:description]} />
         <meta property="og:description" content={@og[:description]} />
         <meta name="twitter:description" content={@og[:description]} />
       <% end %>
@@ -2849,6 +2850,71 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   def extract_excerpt(_), do: ""
+
+  @description_limit 160
+  @sentence_end_re ~r/[.!?…]["'”’»)\]]*(?=\s|$)|[。！？]/u
+
+  @doc """
+  Shortens a derived description to at most `limit` graphemes (default 160,
+  the length search results and link cards show) for `og:description` and
+  `<meta name="description">`.
+
+  Text that fits is returned as is. Otherwise it is cut after the last
+  sentence end inside the limit, when that keeps at least a third of it;
+  failing that, at the last word boundary, with `…` appended (counted in the
+  limit). Lengths are graphemes, never bytes, so an accented letter or an
+  emoji is never split. Only for text the module derives: a description the
+  author wrote is used whole.
+  """
+  @spec trim_description(String.t(), pos_integer()) :: String.t()
+  def trim_description(text, limit \\ @description_limit)
+      when is_binary(text) and is_integer(limit) and limit > 1 do
+    text = String.trim(text)
+
+    if String.length(text) <= limit do
+      text
+    else
+      sentence_cut(text, limit) || word_cut(text, limit)
+    end
+  end
+
+  # The longest prefix within `limit` that ends a sentence. One grapheme past
+  # the limit is read too, so a full stop on the limit counts only when
+  # whitespace follows it ("3.14" is not a sentence end).
+  defp sentence_cut(text, limit) do
+    window = String.slice(text, 0, limit + 1)
+    max_bytes = byte_size(String.slice(text, 0, limit))
+
+    @sentence_end_re
+    |> Regex.scan(window, return: :index)
+    |> Enum.map(fn [{start, len}] -> start + len end)
+    |> Enum.filter(&(&1 <= max_bytes))
+    |> List.last()
+    |> case do
+      nil ->
+        nil
+
+      cut ->
+        prefix = window |> binary_part(0, cut) |> String.trim_trailing()
+        if String.length(prefix) >= div(limit, 3), do: prefix
+    end
+  end
+
+  # Cut at the last whitespace inside `limit - 1` graphemes (room for the
+  # ellipsis), dropping a trailing comma or dash; one long word is cut hard.
+  defp word_cut(text, limit) do
+    head = String.slice(text, 0, limit - 1)
+    next = String.slice(text, limit - 1, 1)
+
+    head =
+      cond do
+        String.trim(next) == "" -> head
+        String.match?(head, ~r/\s/u) -> Regex.replace(~r/\s+\S*\z/u, head, "")
+        true -> head
+      end
+
+    String.replace(head, ~r/[\s,;:–—-]+\z/u, "") <> "…"
+  end
 
   # The renderer HTML-escapes text; after tag-stripping the excerpt is plain
   # text that HEEx will escape AGAIN, so "Fish & chips" read "Fish &amp;

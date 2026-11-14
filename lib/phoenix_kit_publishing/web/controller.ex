@@ -963,11 +963,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   end
 
   # The per-language og:description default: a plain-text excerpt of the
-  # language's own body. nil (not "") when there is nothing to derive, so the
-  # caller's `||` chain can fall through to the version-level description.
+  # language's own body, shortened to a search-result length (~160
+  # graphemes, at a sentence end when one fits). nil (not "") when there is
+  # nothing to derive, so the caller's `||` chain can fall through to the
+  # version-level description. An explicit description is never trimmed.
   defp derived_og_description(post) do
     case PublishingHTML.extract_excerpt(post.content) do
-      text when is_binary(text) and text != "" -> String.slice(text, 0, 300)
+      text when is_binary(text) and text != "" -> PublishingHTML.trim_description(text)
       _ -> nil
     end
   end
