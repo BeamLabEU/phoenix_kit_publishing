@@ -446,6 +446,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.DisplaySettingsRenderTest
       refute html =~ ~s(type="application/ld+json")
       {:ok, _} = Settings.update_boolean_setting("publishing_render_jsonld", true)
     end
+
+    test "the author is the site, or the post's author custom field", %{
+      conn: conn,
+      group_slug: slug,
+      post: post
+    } do
+      html = post_html(conn, slug, "display-post")
+      assert html =~ ~s("author":{"@type":"Organization")
+
+      {:ok, post} = Posts.read_post(slug, post[:uuid])
+
+      {:ok, _} =
+        Posts.update_post(slug, post, %{"custom_fields" => %{"author" => "Ada Lovelace"}}, %{})
+
+      html = post_html(conn, slug, "display-post")
+      assert html =~ ~s("author":{"@type":"Person","name":"Ada Lovelace"})
+    end
   end
 
   # ==========================================================================

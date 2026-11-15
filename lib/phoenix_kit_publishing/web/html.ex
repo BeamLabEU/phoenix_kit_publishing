@@ -107,7 +107,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Renders the JSON-LD `Article` structured-data script for a post page, built
   from the same `:og` map the meta tags use (title/description/image/url are
-  already override- and plugin-refined there) plus the post's publish date.
+  already override- and plugin-refined there) plus the post's publish date and
+  its author: a `Person` named by the post's `author` custom field, else the
+  site as an `Organization`.
   Rendered in-page for the same reason as the OG tags: search engines read
   body placement, and the host owns `<head>`.
   """
@@ -141,10 +143,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       |> maybe_put_jsonld("image", og[:image])
       |> maybe_put_jsonld("mainEntityOfPage", og[:url])
       |> maybe_put_jsonld("datePublished", jsonld_date_published(post))
+      |> maybe_put_jsonld("author", jsonld_author(post))
       |> maybe_put_jsonld("publisher", %{
         "@type" => "Organization",
         "name" => Settings.get_project_title()
       })
+    end
+  end
+
+  # The post's own "author" custom field names a person; without one the
+  # site is the author, as it is the publisher. Never the account that wrote
+  # the post: that is an admin's identity, not a byline.
+  defp jsonld_author(post) do
+    case get_in(post, [:metadata, :custom_fields, "author"]) do
+      name when is_binary(name) and name != "" -> %{"@type" => "Person", "name" => name}
+      _ -> %{"@type" => "Organization", "name" => Settings.get_project_title()}
     end
   end
 
