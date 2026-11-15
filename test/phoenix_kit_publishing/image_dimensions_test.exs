@@ -61,6 +61,7 @@ defmodule PhoenixKit.Modules.Publishing.ImageDimensionsTest do
 
     assert img =~ ~s(width="640")
     assert Image.dimensions(%{"src" => "/l.png", "width" => %{}, "height" => 3}) == nil
+    assert Image.dimensions(%{"width" => 640, "height" => 480}) == {640, 480}
   end
 
   test "a src image without them, or with unusable ones, gets none" do

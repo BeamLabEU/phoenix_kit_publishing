@@ -87,16 +87,24 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
   end
 
   defp author_dimensions(attributes) do
-    with w when is_binary(w) <- Map.get(attributes, "width"),
-         h when is_binary(h) <- Map.get(attributes, "height"),
-         {w, ""} <- Integer.parse(String.trim(w)),
-         {h, ""} <- Integer.parse(String.trim(h)),
-         true <- w > 0 and h > 0 do
+    with {:ok, w} <- positive_integer(Map.get(attributes, "width")),
+         {:ok, h} <- positive_integer(Map.get(attributes, "height")) do
       {w, h}
     else
       _ -> nil
     end
   end
+
+  defp positive_integer(n) when is_integer(n) and n > 0, do: {:ok, n}
+
+  defp positive_integer(text) when is_binary(text) do
+    case Integer.parse(String.trim(text)) do
+      {n, ""} when n > 0 -> {:ok, n}
+      _ -> :error
+    end
+  end
+
+  defp positive_integer(_), do: :error
 
   defp stored_dimensions(%{"file_uuid" => uuid} = attributes)
        when is_binary(uuid) and uuid != "" do

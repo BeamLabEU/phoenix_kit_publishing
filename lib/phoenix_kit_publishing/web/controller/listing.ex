@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PublishingCategory
+  alias PhoenixKit.Modules.Publishing.PublishingVersion
 
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostFetching
@@ -376,7 +377,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   # key must match, as the post's custom field (a string) equals the value
   # written as text, or one of a list of them.
   defp filter_by_custom(posts, custom) when is_map(custom) and map_size(custom) > 0 do
-    wanted = Map.new(custom, fn {key, value} -> {to_string(key), wanted_values(value)} end)
+    # keys as the editor stores them ("Author" is stored as "author")
+    wanted =
+      Map.new(custom, fn {key, value} ->
+        {wanted_key(key), wanted_values(value)}
+      end)
 
     Enum.filter(posts, fn post ->
       fields = get_in(post, [:metadata, :custom_fields]) || %{}
@@ -389,6 +394,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   # Stored custom fields are strings. A requested value is compared as text;
   # nil matches a post without the field; a value that cannot be text (a map,
   # a tuple) matches nothing rather than raising.
+  # A key that cannot be a custom field's matches no post.
+  defp wanted_key(key) when is_binary(key) or is_atom(key),
+    do: PublishingVersion.custom_field_key(key) || {:no_field, key}
+
+  defp wanted_key(key), do: {:no_field, key}
+
   defp wanted_values(nil), do: [nil]
 
   defp wanted_values(value) do
