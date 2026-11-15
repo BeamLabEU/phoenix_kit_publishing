@@ -255,7 +255,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @import_version_keys ~w(description seo_title excerpt featured featured_image_uuid
-                           og_title og_description og_image_uuid sitemap_exclude)
+                           og_title og_description og_image_uuid sitemap_exclude version_label)
 
   @doc """
   Creates a post with everything it carries, in one call: for an importer, a
@@ -296,7 +296,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # the import after its post was created (a retrying importer then made a
   # duplicate per attempt).
   @import_text_keys ~w(title content slug description seo_title excerpt featured_image_uuid
-                       og_title og_description og_image_uuid)
+                       og_title og_description og_image_uuid version_label)
 
   defp check_import_shapes(attrs) do
     checks = [

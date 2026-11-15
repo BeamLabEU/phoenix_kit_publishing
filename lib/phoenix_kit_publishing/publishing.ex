@@ -190,8 +190,10 @@ defmodule PhoenixKit.Modules.Publishing do
   (slug mode), `description`, `seo_title`, `excerpt`, `featured`,
   `featured_image_uuid`, `sitemap_exclude`, `og` (`%{title, description,
   image_uuid}`, or `og_title` / `og_description` / `og_image_uuid`),
-  `category_slugs` and/or `category_uuids`, `custom_fields`, and
-  `published_at` (a `DateTime` or ISO 8601 string, past or future). With
+  `category_slugs` and/or `category_uuids`, `custom_fields`, `version_label`
+  (the version's label in the public version menu, "Projects 0.34.0"; at
+  most 60 characters), and `published_at` (a `DateTime` or ISO 8601 string,
+  past or future). With
   `published_at` the version is published at that instant and a timestamp
   post's URL minute is that instant on the site's clock, or the nearest free
   minute (earlier first), so posts imported together never collide.
@@ -217,6 +219,13 @@ defmodule PhoenixKit.Modules.Publishing do
 
   defdelegate read_post(group_slug, identifier, language \\ nil, version \\ nil), to: Posts
   defdelegate read_post_by_uuid(post_uuid, language \\ nil, version \\ nil), to: Posts
+
+  @doc """
+  Saves a post's version and the content of one language. Among the params,
+  `"version_label"` sets the version's label for the public version menu
+  ("Projects 0.34.0"; blank removes it, absent leaves it). See
+  `PhoenixKit.Modules.Publishing.Posts.update_post/4`.
+  """
   defdelegate update_post(group_slug, post, params, opts \\ %{}), to: Posts
   defdelegate trash_post(group_slug, post_uuid), to: Posts
   defdelegate trash_post(group_slug, post_uuid, opts), to: Posts
