@@ -68,6 +68,16 @@ defmodule PhoenixKit.Modules.Publishing.ImportPostTest do
     assert times == [~T[10:05:00], ~T[10:04:00], ~T[10:03:00]]
   end
 
+  test "same-minute imports list newest first by their URL minute, not by uuid", %{slug: slug} do
+    at = "2026-11-06T01:13:20Z"
+    {:ok, first} = Publishing.import_post(slug, %{title: "First", published_at: at})
+    {:ok, second} = Publishing.import_post(slug, %{title: "Second", published_at: at})
+
+    # first holds 01:13, second the free minute before it, 01:12
+    {:ok, %{entries: entries}} = Publishing.list_published(slug)
+    assert Enum.map(entries, & &1.uuid) == [first[:uuid], second[:uuid]]
+  end
+
   test "two posts created now never push each other into the future", %{slug: slug} do
     {:ok, a} = Posts.create_post(slug, %{title: "First"})
     {:ok, b} = Posts.create_post(slug, %{title: "Second"})

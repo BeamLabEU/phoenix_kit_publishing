@@ -312,19 +312,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
     with {:ok, group} <- fetch_group(group_slug) do
       language = Keyword.get(opts, :language) || LanguageHelpers.get_primary_language()
       categories = Categories.list_categories(group_slug)
-      filter = resolve_category_filter(categories, slug_list(Keyword.get(opts, :categories)))
+      asked = slug_list(Keyword.get(opts, :categories))
+      filter = resolve_category_filter(categories, asked)
 
       posts =
         group_slug
         |> chronological_posts(language)
+        # categories asked for, none of them the group's: no post is in them
+        |> then(&if(asked != [] and filter.slugs == [], do: [], else: &1))
         |> filter_by_categories(filter.uuids)
+        |> filter_by_custom(Keyword.get(opts, :custom))
         |> filter_by_search(Keyword.get(opts, :search))
         |> sort_published(Keyword.get(opts, :sort) || Map.get(group, "listing_sort", "newest"))
 
       per_page = page_size(Keyword.get(opts, :per_page))
       total = length(posts)
-      total_pages = max(ceil(total / per_page), 1)
-      page = opts |> Keyword.get(:page, 1) |> page_number() |> min(total_pages)
+      # 0 pages for no posts, as the public listing counts them
+      total_pages = ceil(total / per_page)
+      page = opts |> Keyword.get(:page, 1) |> page_number() |> min(max(total_pages, 1))
 
       ctx = PublishingHTML.url_context(language)
       date_counts = group_date_counts(group_slug)
@@ -366,6 +371,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
 
   defp slug_list(slugs),
     do: category_filter_param(%{"category" => slugs |> List.wrap() |> Enum.map(&to_string/1)})
+
+  # `custom: %{"written" => true, "package" => ["billing", "crm"]}`: every
+  # key must match, as the post's custom field (a string) equals the value
+  # written as text, or one of a list of them.
+  defp filter_by_custom(posts, custom) when is_map(custom) and map_size(custom) > 0 do
+    wanted =
+      Map.new(custom, fn {key, value} ->
+        {to_string(key), value |> List.wrap() |> Enum.map(&to_string/1)}
+      end)
+
+    Enum.filter(posts, fn post ->
+      fields = get_in(post, [:metadata, :custom_fields]) || %{}
+      Enum.all?(wanted, fn {key, values} -> Map.get(fields, key) in values end)
+    end)
+  end
+
+  defp filter_by_custom(posts, _custom), do: posts
 
   defp page_size(n) when is_integer(n) and n > 0, do: min(n, @max_page_size)
   defp page_size(_n), do: @default_page_size
