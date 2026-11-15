@@ -53,6 +53,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditLiveTest do
     refute has_element?(view, "[data-convert-to-slugs]")
   end
 
+  test "the listing section and the who-renders-it select are named apart", %{
+    conn: conn,
+    group: group
+  } do
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/edit-group/#{group["slug"]}")
+
+    html = render(view)
+    # once, as the section heading; the select is "Rendered by"
+    assert length(Regex.scan(~r/>\s*Listing page\s*</, html)) == 1
+    assert html =~ ~r/>\s*Rendered by\s*</
+  end
+
   test "form renders with the current name and slug, save button shows phx-disable-with",
        %{conn: conn, group: group} do
     {:ok, _view, html} =
