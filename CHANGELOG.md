@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.19.0 - 2026-11-15
+
+PRs #64 and #65, and the fix for issue #54. **Requires phoenix_kit 3.5.0 or later** (`>= 3.5.0 and < 4.0.0`, the ecosystem-wide floor), and adds V3 of the module's migration chain: run `mix phoenix_kit.update`.
+
+### Added
+
+- **Categories carry a colour, an icon and an SEO title and description** (module chain V3 adds a `data` column to `phoenix_kit_publishing_categories`; a rollback keeps the column). The category form, `upsert_categories` and `list_categories` take and return them; the archive page uses the SEO texts.
+- **Category chips, a category filter and related posts on the public pages**, all off by default per group: `listing_show_categories`, `listing_category_filter` (`?category=a,b`), `category_chips_position` and `related_posts`.
+- **A listing pager in three styles** (`publishing_pagination_style`: `numbered`, `compact`, `simple`), which never widens a phone screen. A timestamp group's pager says "Newer posts" / "Older posts".
+- **`Publishing.list_published/2` and `category_counts/2`**: a page of a group's published posts as data, with URLs, categories and custom fields, filtered by category, search and `custom:` fields. `Web.HTML.url_context/1` makes building many post URLs cheap.
+- **Custom fields on posts** (version data `custom_fields`): edited in the editor's sidebar, written by `update_post/4`, read as `metadata.custom_fields` and exposed through the machine API.
+- **Version labels** ("Billing 0.27"), edited in the editor and shown in the public version menu; `import_post/3` takes one too.
+- **`Publishing.import_post/3`**: creates a post with content, SEO and OpenGraph fields, categories, custom fields and a past or future `published_at` in one call, checking every attribute before anything is written.
+- **Converting a timestamp group to readable URLs** (`convert_to_slug_mode/2`, a "Readable URLs" button on the group's edit page): one way, every post gets a slug from its title, and the old date URLs 301 to the slug URLs. Refused while a live post is scheduled ahead.
+- **`public_url_prefix`**: the public pages can live under their own prefix (for example `/`) when PhoenixKit is mounted elsewhere; kit-prefixed URLs 301 to it.
+- **`public_listing`** per group: a host can serve a group's listing page (and optionally its archives) itself.
+- **Light/dark image pairs**: `<Image dark_src="…">` / `dark_file_uuid` shows the copy that matches the reader's theme, without JavaScript.
+- **`<Image>` gets width and height** (the author's, else the stored dimensions of the served copy), so pages do not shift while images load.
+- **A debounced sitemap refresh** when a post goes live or leaves, its URL or `sitemap_exclude` changes, or a group changes, through core's Sitemap scheduler. It is skipped while core's automatic regeneration is off, and can be switched off with `publishing_sitemap_refresh`.
+- The Article JSON-LD has an author: the post's `author` custom field, else the site.
+- `<meta name="description">` next to the og and twitter descriptions; a derived description is cut to 160 characters at a sentence or word boundary.
+
+### Changed
+
+- **The `:phoenix_kit` requirement is `>= 3.5.0 and < 4.0.0`.** The runtime probes for older cores are gone; the core APIs they guarded are called directly.
+- **A stored slug never moves on its own** (issue #54). The editor re-derives a slug from the title only when the title changes, and only while the post has never been published and its slug still follows its title. A slug change on a post that has been public shows a notice that the URL moves and the old one redirects.
+- **Each translation's URL slug is its own.** A translation saved with an empty URL slug gets one from its own title (the post slug when that is taken), a new translation no longer starts with the source language's slug, and a post-slug rename moves only the primary language's slug (`DBStorage.rename_default_url_slugs/4`).
+- The public dispatch keeps every group slug in `:persistent_term` (`GroupSlugs`), so a host request outside Publishing costs no query.
+- The render cache moves to `v13`, so every post re-renders once after deploy.
+- The README shows how to render OpenGraph tags in the host's `<head>`.
+
+### Fixed
+
+- Fixing a typo in a published post rewrote its slug from the title and carried every translation along, so the live URL and the redirects pointing at it returned 404 (issue #54).
+- Listing excerpts dropped component-shaped text shown in code, and could come out empty when the body opened with a fence holding a blank line.
+- Related-post cards in one row differed in height.
+- The category form showed a bad colour, icon or SEO text as a generic error instead of under its input; the `upsert_categories` dry run reported their old values as nil.
+- The new-group form said the URL mode can never change; a group with nothing published had no Public button; the group settings showed "Listing page" twice.
+- A version label with invalid UTF-8 raised.
+- grpc and grpc_core updated to 1.1.0 (EEF-CVE-2026-121808).
+
 ## 0.18.0 - 2026-11-08
 
 The open items of the 2026-11-08 audit (`dev_docs/2026-11-08-full-module-audit.md`, "Open items, second pass"). Requires no new core: everything here is in phoenix_kit 2.65.0, the floor.
