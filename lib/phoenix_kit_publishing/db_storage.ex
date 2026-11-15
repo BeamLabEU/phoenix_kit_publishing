@@ -745,8 +745,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   defp do_create_cloned_version(post_uuid, source_version, opts) do
     new_number = next_version_number(post_uuid)
 
-    # Carry forward version-level data (featured_image, tags, seo, etc.)
-    source_data = source_version.data || %{}
+    # Carry forward version-level data (featured_image, tags, seo, etc.), but
+    # not the label: it names the version it was given to ("Billing 0.27"),
+    # and a copy is the next one.
+    source_data = Map.delete(source_version.data || %{}, "label")
 
     version_data =
       Map.merge(source_data, %{"created_from" => source_version.version_number})

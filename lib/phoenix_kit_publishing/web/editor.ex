@@ -4373,6 +4373,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                   </p>
                 </div>
 
+                <%!-- A name for this version, shown beside its number in the
+                      public version menu ("v3 · Billing 0.27"). --%>
+                <div>
+                  <label for="post-version-label" class="label py-1">
+                    <span class="fieldset-legend text-sm font-semibold text-base-content">
+                      {gettext("Version label")}
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    id="post-version-label"
+                    name="version_label"
+                    value={@form["version_label"]}
+                    maxlength="60"
+                    placeholder={gettext("e.g. Billing 0.27")}
+                    disabled={edit_disabled? or @viewing_older_version}
+                    class="input input-sm w-full"
+                  />
+                  <p class="text-xs text-base-content/60 mt-1 ml-1">
+                    {gettext(
+                      "Optional. Shown beside the version number in the public version menu, so a reader can find the version for their release."
+                    )}
+                  </p>
+                </div>
+
                 <%!-- Sitemap exclusion. Core's Sitemap source reads
                       `metadata.sitemap_exclude` off the post map; rides the
                       form exactly like `allow_version_access` above, hidden

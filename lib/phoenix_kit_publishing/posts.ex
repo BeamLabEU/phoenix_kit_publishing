@@ -1845,6 +1845,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       )
       |> put_audio_uuid(Map.get(params, "audio_uuid"))
       |> put_custom_fields(params)
+      |> put_version_label(params)
 
     # Also update version-level status and published_at if provided.
     # "published" is NEVER written here — it is set atomically with
@@ -1874,6 +1875,20 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         case PublishingVersion.normalize_custom_fields(fields) do
           empty when map_size(empty) == 0 -> Map.delete(data, "custom_fields")
           normalized -> Map.put(data, "custom_fields", normalized)
+        end
+    end
+  end
+
+  # Absent: left alone; blank: removed.
+  defp put_version_label(data, params) do
+    case Map.fetch(params, "version_label") do
+      :error ->
+        data
+
+      {:ok, label} ->
+        case PublishingVersion.normalize_label(label) do
+          nil -> Map.delete(data, "label")
+          label -> Map.put(data, "label", label)
         end
     end
   end

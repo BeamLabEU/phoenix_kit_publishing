@@ -24,6 +24,11 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
     characters), at most 30 of them: "package" and "version" on a release
     post, say. Written through `normalize_custom_fields/1`; read with
     `get_custom_fields/1` and on the post map as `metadata.custom_fields`.
+  - `label` - A short name for this version ("Billing 0.27", "Before the
+    redesign"), shown beside its number in the public version menu and the
+    editor. Written through `normalize_label/1`; read with `get_label/1`, on
+    the post map as `metadata.version_label` and, for every version,
+    `version_labels`.
   - `sitemap_exclude` - Leave this post out of the site's sitemap (core's
     Sitemap source reads it as `metadata.sitemap_exclude` on the post map)
   - `featured` - Whether this post is featured (pinned to the top of the group
@@ -330,4 +335,28 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   @doc "Returns version notes."
   @spec get_notes(t()) :: String.t() | nil
   def get_notes(%__MODULE__{data: data}), do: Map.get(data, "notes")
+
+  @max_label 60
+
+  @doc "The version's label, or nil."
+  @spec get_label(t()) :: String.t() | nil
+  def get_label(%__MODULE__{data: data}), do: data |> Map.get("label") |> normalize_label()
+
+  @doc """
+  A label as stored: trimmed, inner whitespace collapsed, at most
+  #{@max_label} characters; nil for a blank or non-text value.
+  """
+  @spec normalize_label(term()) :: String.t() | nil
+  def normalize_label(label) when is_binary(label) do
+    label =
+      label
+      |> String.replace(~r/\s+/u, " ")
+      |> String.trim()
+      |> String.slice(0, @max_label)
+      |> String.trim()
+
+    if label == "" or not String.valid?(label), do: nil, else: label
+  end
+
+  def normalize_label(_label), do: nil
 end

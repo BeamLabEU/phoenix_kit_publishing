@@ -97,6 +97,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.VersionAccessGateTest do
     assert Enum.map(dropdown.versions, & &1.version) == [3, 1]
   end
 
+  test "the version menu names each version by its label", ctx do
+    {:ok, v1} = Publishing.read_post_by_uuid(ctx.post.uuid, "en", 1)
+    {:ok, _} = Posts.update_post(ctx.slug, v1, %{"version_label" => "Billing 0.26"}, %{})
+    {:ok, _} = Versions.create_version_from(ctx.slug, ctx.post.uuid, 1)
+    {:ok, v2} = Publishing.read_post_by_uuid(ctx.post.uuid, "en", 2)
+    {:ok, _} = Posts.update_post(ctx.slug, v2, %{"version_label" => "Billing 0.27"}, %{})
+    :ok = Versions.publish_version(ctx.slug, ctx.post.uuid, 2)
+
+    {:ok, live} = Publishing.read_post_by_uuid(ctx.post.uuid, "en", 2)
+    dropdown = PostRendering.build_version_dropdown(ctx.slug, live, "en")
+
+    assert Enum.map(dropdown.versions, &{&1.version, &1.label}) == [
+             {2, "Billing 0.27"},
+             {1, "Billing 0.26"}
+           ]
+
+    assert dropdown.current_label == "Billing 0.27"
+
+    html = build_conn() |> get("/#{ctx.slug}/gate") |> html_response(200)
+    assert html =~ ~r/v2<span> · Billing 0\.27<\/span>/
+    [menu] = Regex.run(~r/<ul[^>]*data-version-menu.*?<\/ul>/s, html)
+    assert menu =~ "Billing 0.26"
+  end
+
   test "taking the post down closes its version history", ctx do
     assert get_version(ctx, 1).status == 200
 

@@ -2205,22 +2205,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <%!-- Version History Dropdown --%>
             <%= if @version_dropdown do %>
               <div class="dropdown dropdown-end">
-                <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1">
-                  <.icon name="hero-clock" class="w-4 h-4" />
-                  v{@version_dropdown.current_version}
-                  <.icon name="hero-chevron-down" class="w-3 h-3" />
+                <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1 max-w-64">
+                  <.icon name="hero-clock" class="w-4 h-4 shrink-0" />
+                  <span class="truncate">
+                    v{@version_dropdown.current_version}<span :if={@version_dropdown[:current_label]}> · {@version_dropdown.current_label}</span>
+                  </span>
+                  <.icon name="hero-chevron-down" class="w-3 h-3 shrink-0" />
                 </div>
                 <ul
                   tabindex="0"
-                  class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-40 border border-base-200"
+                  class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56 max-w-[calc(100vw-2rem)] border border-base-200"
+                  data-version-menu
                 >
                   <%= for v <- @version_dropdown.versions do %>
                     <li>
                       <.link
                         navigate={v.url}
-                        class={"flex items-center justify-between #{if v.is_current, do: "active"}"}
+                        class={"flex items-center justify-between gap-2 #{if v.is_current, do: "active"}"}
                       >
-                        <span>v{v.version}</span>
+                        <span class="min-w-0">
+                          v{v.version}<span
+                            :if={v[:label]}
+                            class="block text-xs opacity-70 whitespace-normal break-words"
+                          >{v.label}</span>
+                        </span>
                         <%= if v.is_live do %>
                           <span class="badge badge-success badge-xs h-auto">{gettext("live")}</span>
                         <% end %>
