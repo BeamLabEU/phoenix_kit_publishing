@@ -77,6 +77,7 @@ defmodule PhoenixKit.Modules.Publishing.VersionAccessTest do
       refute Map.has_key?(DBStorage.get_version(post.uuid, 1).data, "label")
 
       assert PublishingVersion.normalize_label(42) == nil
+      assert PublishingVersion.normalize_label(<<255>>) == nil
     end
 
     test "a new version made from a labelled one starts without its label" do

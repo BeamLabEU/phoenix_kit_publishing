@@ -608,6 +608,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                         <span
                           class="tooltip flex-1 sm:flex-none min-w-0"
                           data-tip={gettext("Nothing published yet")}
+                          tabindex="0"
                           data-public-disabled
                         >
                           <.button

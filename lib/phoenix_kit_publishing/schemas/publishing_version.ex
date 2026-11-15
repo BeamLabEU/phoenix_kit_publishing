@@ -348,6 +348,12 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
   """
   @spec normalize_label(term()) :: String.t() | nil
   def normalize_label(label) when is_binary(label) do
+    if String.valid?(label), do: clean_label(label), else: nil
+  end
+
+  def normalize_label(_label), do: nil
+
+  defp clean_label(label) do
     label =
       label
       |> String.replace(~r/\s+/u, " ")
@@ -355,8 +361,6 @@ defmodule PhoenixKit.Modules.Publishing.PublishingVersion do
       |> String.slice(0, @max_label)
       |> String.trim()
 
-    if label == "" or not String.valid?(label), do: nil, else: label
+    if label == "", do: nil, else: label
   end
-
-  def normalize_label(_label), do: nil
 end
