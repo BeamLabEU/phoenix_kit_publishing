@@ -7,6 +7,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   alias PhoenixKit.Modules.Publishing.API.TextScan
   alias PhoenixKit.Modules.Publishing.{Constants, LanguageHelpers, PublishingVersion}
   alias PhoenixKit.Modules.Publishing.Web.HTML
+  alias PhoenixKit.Utils.Routes
 
   @doc "trashed | scheduled | published | draft `versions` is accepted for symmetry and not read."
   def status(db_post, _versions \\ [], now \\ nil, tz \\ nil) do
@@ -87,23 +88,14 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
 
   # A language with a domain of its own: that domain, and core drops the language segment when it is
   # the base code of the language (a sibling dialect such as `/en-gb` keeps its own segment).
-  # Everything else (no resolver, no domain for the language, an older core): the site's configured
+  # Everything else (no resolver, no domain for the language): the site's configured
   # origin, never core's ctx.base_url (which follows the Host header), and the prefixed path.
   defp with_origin(path, language), do: language_domain_url(path, language) || site_origin(path)
 
-  # Core's language-domain helper arrived after the Hex 2.63.0 core this module still builds on. The
-  # module is built at runtime so the compiler cannot flag it as undefined on that core, and its
-  # availability is checked at runtime, so a core swapped under an already compiled module (a path
-  # dependency) is still read correctly. One resolver call per URL: the helper answers `nil` for a
-  # language without a host, so no probe comes first.
-  @routes_path ["PhoenixKit", "Utils", "Routes"]
-
-  defp language_domain_url(path, language) do
-    routes = Module.concat(@routes_path)
-
-    if Code.ensure_loaded?(routes) and function_exported?(routes, :canonical_absolute_or_nil, 2),
-      do: routes.canonical_absolute_or_nil(path, language)
-  end
+  # One resolver call per URL: core's helper answers `nil` for a language without a host, so no
+  # probe comes first.
+  defp language_domain_url(path, language),
+    do: Routes.canonical_absolute_or_nil(path, language)
 
   defp site_origin(path) do
     case HTML.public_origin() do

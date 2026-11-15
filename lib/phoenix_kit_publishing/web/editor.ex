@@ -29,10 +29,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   # we tell it the symbol is expected to be undefined in that case.
   @compile {:no_warn_undefined, PhoenixKitOG}
 
-  # `get_editor_mode/0` only exists in newer phoenix_kit builds, but the pin
-  # still allows older ones — `default_editor_mode/0` probes for it at runtime.
-  @compile {:no_warn_undefined, {PhoenixKit.Settings, :get_editor_mode, 0}}
-
   alias Phoenix.LiveView.JS
   alias PhoenixKit.Modules.Languages.DialectMapper
   alias PhoenixKit.Modules.Publishing
@@ -80,7 +76,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   @flush_abandon_ms 6_000
 
   @leaf_editor_modes [:visual, :hybrid, :markdown, :html]
-  # Fallback when the site-wide setting is unavailable (older core, no repo).
+  # Fallback when the site-wide setting is unavailable (no repo).
   # Markdown, not :hybrid, to match what this editor always opened in before
   # it honored the setting — the PHK component blocks are markdown-first.
   @default_editor_mode :markdown
@@ -138,17 +134,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   end
 
   # Site-wide default editor mode (admin-set under Settings → Content Editor).
-  # `PhoenixKit.Settings.get_editor_mode/0` only exists in newer core builds,
-  # but the pin allows older ones — probe before calling (the
-  # `no_warn_undefined` above covers the compile side). Settings reads can
-  # also raise when no repo is configured — hence the rescue. Mirrors
-  # phoenix_kit_posts, which reads the same setting.
+  # Settings reads can raise when no repo is configured — hence the rescue.
+  # Mirrors phoenix_kit_posts, which reads the same setting.
   defp default_editor_mode do
-    if Code.ensure_loaded?(Settings) and function_exported?(Settings, :get_editor_mode, 0) do
-      normalize_editor_mode(Settings.get_editor_mode())
-    else
-      @default_editor_mode
-    end
+    normalize_editor_mode(Settings.get_editor_mode())
   rescue
     _ -> @default_editor_mode
   end

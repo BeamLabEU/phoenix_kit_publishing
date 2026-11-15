@@ -48,23 +48,18 @@ defmodule PhoenixKit.Modules.Publishing.RendererCacheTest do
     assert :ok = Renderer.invalidate_cache("group", "post-slug", "en")
   end
 
-  # The signal ships in core. A publishing suite pinned to an older core
-  # has nothing to refuse, and still stores the placeholder.
-  if Code.ensure_loaded?(PhoenixKit.Modules.Shared.RenderCache) and
-       function_exported?(PhoenixKit.Modules.Shared.RenderCache, :take, 1) do
-    test "a raised image lookup is shown and not stored" do
-      post = post(~s(<Image file_uuid="not-a-uuid" alt="Boat"/>))
+  test "a raised image lookup is shown and not stored" do
+    post = post(~s(<Image file_uuid="not-a-uuid" alt="Boat"/>))
 
-      assert {:ok, html} = Renderer.render_post(post)
-      assert html =~ "Image not available"
-      assert {:ok, 0} = Cache.clear_by_prefix(:publishing_posts, prefix(post))
+    assert {:ok, html} = Renderer.render_post(post)
+    assert html =~ "Image not available"
+    assert {:ok, 0} = Cache.clear_by_prefix(:publishing_posts, prefix(post))
 
-      # The article text did not change. A second render tries again
-      # rather than replaying the placeholder from the cache.
-      assert {:ok, again} = Renderer.render_post(post)
-      assert again =~ "Image not available"
-      assert {:ok, 0} = Cache.clear_by_prefix(:publishing_posts, prefix(post))
-    end
+    # The article text did not change. A second render tries again
+    # rather than replaying the placeholder from the cache.
+    assert {:ok, again} = Renderer.render_post(post)
+    assert again =~ "Image not available"
+    assert {:ok, 0} = Cache.clear_by_prefix(:publishing_posts, prefix(post))
   end
 
   test "a page with a form carrying the visitor's CSRF token is not stored" do

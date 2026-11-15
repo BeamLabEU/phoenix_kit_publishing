@@ -95,39 +95,13 @@ defmodule PhoenixKitPublishing.MixProject do
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, and core infrastructure.
-      # 2.63 is a hard floor, not a preference: it is the first Hex release with the
-      # machine API (`PhoenixKit.API` with `Tool`, `Executor`, `Keys`, `Flow` and
-      # `ToolLint`), which the 20 `publishing.*` tools in `lib/phoenix_kit_publishing/api/`
-      # are compiled against; an older core does not build the package.
-      # The floor the media code needs, 2.38, is covered by it: that is where the
-      # group media folders' toolkit shipped, `Storage.ResourceFolders` (MediaFolders,
-      # MediaAdoption) and the reorganizer's `ResourceSource` (MediaReorganizer). An
-      # older core has neither module, and every media pick in the editor asks
-      # `MediaFolders.enabled?/0`, which calls into `ResourceFolders` — so on any
-      # host, opted in or not, choosing a file would crash the editor. The other
-      # reasons for a floor, all still covered:
-      #
-      #   * `PublishingGroup.changeset/2` calls `PhoenixKit.Utils.Slug.put_slug/3`,
-      #     which core added in 2.4.0. Under the older `~> 2.0` a host resolving
-      #     2.0-2.3 compiled fine and then raised UndefinedFunctionError on every
-      #     group create — in the host's app, not ours.
-      #   * `Constants.to_site_wall/2` and `from_site_wall/3` reach core's
-      #     `Utils.Date.shift_to_offset/2` and `parse_datetime_local/2` to resolve
-      #     the site `time_zone`. Before 2.13.9 both parsed it with
-      #     `offset_to_seconds/1`, which reads an IANA id as 0 — so on an older
-      #     core every timestamp post is stamped, released and syndicated on UTC
-      #     while the editor shows the site's clock, silently, which is the exact
-      #     bug PR #45 fixed.
-      #   * 2.38.0 was the floor before the machine API: the category parent
-      #     pickers are core's `TreePicker` (`Utils.Tree`), the actor and activity log come from
-      #     `PhoenixKitWeb.Actor` and `Activity.log/3`, and the edit forms use
-      #     `mount_multilang(open_on:)` — none feature-detected, so an older
-      #     core fails to compile the package. Patch-precise floor in the
-      #     compound form so the ceiling stays open through every later 2.x
-      #     minor (see test/core_pin_conformance_test.exs).
-      # Floor 2.65.0: the first core with the `file_references/0` and `expected_schema/0`
-      # callbacks this module implements (`@impl`). The ceiling is open through core 3.x.
-      pk_dep(:phoenix_kit, ">= 2.65.0 and < 4.0.0"),
+      # Floor 3.5.0, the ecosystem-wide minimum core; it carries everything this
+      # module compiles against (the machine API `PhoenixKit.API`,
+      # `Storage.ResourceFolders`, `TreePicker`, `PhoenixKitWeb.Actor`,
+      # `Activity.log/3`, the `file_references/0` and `expected_schema/0`
+      # callbacks). Compound form, so the ceiling stays open through every core
+      # 3.x (see test/core_pin_conformance_test.exs).
+      pk_dep(:phoenix_kit, ">= 3.5.0 and < 4.0.0"),
       # PhoenixKitAI owns the generic AI-translation pipeline that this module's
       # `AITranslatable` adapter plugs into. 0.17 ships ai_multilang_tabs/1,
       # which the group editor imports directly.

@@ -47,7 +47,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
   alias PhoenixKitWeb.Actor
-  @admin_edit_helper_mod PhoenixKitWeb.AdminEditHelper
 
   # Phase 2 seam: the `phoenix_kit_og` plugin (PhoenixKitOG) exports `refine_og/4`
   # and gets the final say over the OG map, layering a rendered image on top of the
@@ -1055,7 +1054,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # Phase 2 extension seam: when the `phoenix_kit_og` plugin is installed it gets
   # the final say, layering a rendered OG image on top of the per-post simple
   # override resolved above. Guarded so a host without the (optional) plugin falls
-  # back to the override/default map. Mirrors maybe_assign_admin_edit/3.
+  # back to the override/default map.
   defp maybe_refine_og_with_module(og, conn, post, language) do
     mod = @og_module
 
@@ -1350,15 +1349,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     end)
   end
 
-  defp maybe_assign_admin_edit(conn, path, label) do
-    mod = @admin_edit_helper_mod
-
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :assign_admin_edit, 3) do
-      mod.assign_admin_edit(conn, path, label)
-    else
-      conn
-    end
-  end
+  defp maybe_assign_admin_edit(conn, path, label),
+    do: PhoenixKitWeb.AdminEditHelper.assign_admin_edit(conn, path, label)
 
   # Category archives link to the categories admin page. Tags have no
   # admin surface of their own — "Body hashtags ARE the tag system" (see

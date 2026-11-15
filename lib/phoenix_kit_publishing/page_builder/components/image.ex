@@ -128,14 +128,10 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
   @spec dark_theme_names() :: [String.t()]
   def dark_theme_names do
     themes =
-      if Code.ensure_loaded?(ThemeConfig) and function_exported?(ThemeConfig, :base_map, 0) do
-        try do
-          for {name, "dark"} <- ThemeConfig.base_map(), do: name
-        rescue
-          _ -> @fallback_dark_themes
-        end
-      else
-        @fallback_dark_themes
+      try do
+        for {name, "dark"} <- ThemeConfig.base_map(), do: name
+      rescue
+        _ -> @fallback_dark_themes
       end
 
     themes

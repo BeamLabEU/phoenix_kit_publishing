@@ -565,8 +565,7 @@ REST, `/mcp/admin` over MCP): an AI agent, a script or an integration can read
 and edit groups, posts, versions, translations and categories the way an admin
 does in the editor. Core owns keys, scopes, rate limits, validation and the
 confirmation flow; this module declares the tools and the data rules. It needs
-`phoenix_kit` 2.63.0 or later, the first release that carries the machine API; the
-module as a whole requires 2.65.0. The tools appear only while
+`phoenix_kit` 3.5.0 or later, the floor the module as a whole requires. The tools appear only while
 Publishing is enabled.
 
 **Enable it.** Switch on `api_admin_enabled` and create a key in

@@ -167,15 +167,13 @@ end
 # Core's API (keys, rate limits) and `Auth.register_user/2` count hits in the Hammer ETS table
 # this backend owns; without it the table is absent and the executor tests die at
 # `:ets.update_counter/4`.
-if Code.ensure_loaded?(PhoenixKit.Users.RateLimiter.Backend) do
-  case PhoenixKit.Users.RateLimiter.Backend.start_link([]) do
-    {:ok, _} -> :ok
-    {:error, {:already_started, _}} -> :ok
-  end
+case PhoenixKit.Users.RateLimiter.Backend.start_link([]) do
+  {:ok, _} -> :ok
+  {:error, {:already_started, _}} -> :ok
 end
 
 # Integration tests are excluded only when the database cannot be reached. Every
 # core API the suite once probed for (the machine API's executor, the canonical URL
-# helpers, ModuleChainCheck, the built-in file references) ships in 2.65.0, this
+# helpers, ModuleChainCheck, the built-in file references) ships in 3.5.0, this
 # module's floor, so nothing else is ever excluded.
 ExUnit.start(exclude: if(repo_available, do: [], else: [:integration]))

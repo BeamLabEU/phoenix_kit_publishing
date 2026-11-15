@@ -21,7 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.API do
   (`Gate.available?/0`) EVERY tool with a `danger` is withheld, because a core without the
   flow ignores `danger` completely and `update_post` on a live version would apply on the
   first call. On such a core only the reads and `create_version` remain, and one warning
-  names the functions the core lacks (a later 2.x core that moves one of them must be
+  names the functions the core lacks (a later core that moves one of them must be
   followed in `Gate`).
   """
   @spec tools(boolean()) :: [PhoenixKit.API.Tool.t()]

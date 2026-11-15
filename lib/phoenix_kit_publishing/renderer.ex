@@ -2079,8 +2079,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   # visitor's token and get a 403, and that token would be shown to everyone.
   defp per_request_html?(html), do: String.contains?(html, ~s(name="_csrf_token"))
 
-  # `{:retry, html}` when an image lookup raised (core 2.41.1 and later).
-  # Older cores report `{:ok, html}` and the render is stored.
+  # `{:retry, html}` when an image lookup raised.
   defp cache_render(fun) when is_function(fun, 0), do: RenderSignal.take(fun)
 
   defp build_cache_key(post, opts) do

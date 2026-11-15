@@ -11,10 +11,8 @@ the `PhoenixKit.Module` behaviour, so a host app gets it by adding the dependenc
 — no config, no route wiring. Public pages are served by a plain Phoenix
 controller (dead views); the admin side is LiveView.
 
-- **Depends on:** `phoenix_kit` `>= 2.65.0 and < 4.0.0` (Hex — 2.65.0 is the first release
-  with the `file_references/0` and `expected_schema/0` callbacks; the machine API,
-  `PhoenixKit.API`, came with 2.63.0, and `PhoenixKitWeb.Actor`, `Activity.log/3` and
-  `Components.TreePicker` with 2.38.0; the compound form keeps the ceiling open through
+- **Depends on:** `phoenix_kit` `>= 3.5.0 and < 4.0.0` (Hex — floor 3.5.0, the
+  ecosystem-wide minimum core; the compound form keeps the ceiling open through
   core 3.x), `phoenix_kit_ai` `~> 0.27`
   (hard — it owns the `Translatable` adapter behaviour, the per-language Oban
   fan-out, the LLM call and `ai_multilang_tabs/1`; publishing contributes only
@@ -42,8 +40,8 @@ controller (dead views); the admin side is LiveView.
 - **Module key** `"publishing"`; settings prefix `publishing_`.
 
 The core pin is a hard floor, not a preference (reasons in `mix.exs`): the
-machine API is compiled against `PhoenixKit.API`, first released in core 2.63.0; the
-group media folders are built on core 2.38's `Storage.ResourceFolders` and the
+machine API is compiled against `PhoenixKit.API`; the
+group media folders are built on core's `Storage.ResourceFolders` and the
 reorganizer's `ResourceSource`; `PublishingGroup.changeset/2` needs
 `PhoenixKit.Utils.Slug.put_slug/3`, and `Constants.to_site_wall/2` /
 `from_site_wall/3` need a core that parses an IANA time-zone id rather than
@@ -173,11 +171,11 @@ This repo's `precommit` alias also runs `deps.unlock --check-unused` and
 `precommit` that compiles and tests cleanly.
 
 The machine API (`lib/phoenix_kit_publishing/api/`) compiles only against a core
-that carries `PhoenixKit.API`, which Hex has from 2.63.0 on (the floor in `mix.exs`),
+that carries `PhoenixKit.API`, and the floor in `mix.exs` is core 3.5.0,
 so a host on an older core cannot resolve the package. Raise the floor, and the line
 under "Depends on", in the same change that starts using a newer core API. To run the
 suite against an unreleased core, point `PHOENIX_KIT_PATH` at a checkout, as above.
-Every core API the suite once probed for ships in 2.65.0, the floor, so `test_helper.exs`
+Every core API the suite once probed for ships in 3.5.0, the floor, so `test_helper.exs`
 excludes nothing but `:integration`, and that only when the database cannot be reached.
 The test database name is hard-coded in
 `config/test.exs` as `phoenix_kit_publishing_test#{MIX_TEST_PARTITION}` (`PGDATABASE`
@@ -432,8 +430,7 @@ version pointer cleared), `publishing.version.orphan_demoted`,
 ### Machine API
 
 `lib/phoenix_kit_publishing/api/` declares 20 admin tools (`API.Tools`, handed to
-core by `Publishing.api_tools/0`, an optional `PhoenixKit.Module` callback that
-the 2.63.0 floor declares). Core owns keys, scopes, validation, rate limits
+core by `Publishing.api_tools/0`, an optional `PhoenixKit.Module` callback). Core owns keys, scopes, validation, rate limits
 and the confirmation flow; the module owns the tools and the data rules. Guide:
 [dev_docs/guides/machine-api.md](dev_docs/guides/machine-api.md).
 
@@ -500,7 +497,7 @@ writes too, and caps a body field at 262,144 bytes. Tools exist only when the
 loaded core can enforce the flow (`API.Gate`): otherwise every tool with a
 `danger` is withheld, with one warning in the log. `Gate`'s `@markers` are two
 internal functions of core, `PhoenixKit.API.Keys.active?/1` and
-`PhoenixKit.API.Flow.gate/1`: a later 2.x core that renames or moves either one
+`PhoenixKit.API.Flow.gate/1`: a later core that renames or moves either one
 takes the dangerous tools away on every host (with that one warning) until `@markers` follows.
 
 ### Landmines
