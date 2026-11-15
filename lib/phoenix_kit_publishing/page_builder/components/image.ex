@@ -147,22 +147,19 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
       {w, h} ->
         # the first <img> tag; quoted values are blanked before looking for
         # an attribute, so an alt reading "width=640" is not one
-        Regex.replace(
-          ~r/<img\b[^>]*>/,
-          html,
-          fn tag ->
-            unquoted = Regex.replace(~r/"[^"]*"|'[^']*'/, tag, "\"\"")
-
-            if Regex.match?(~r/\s(?:width|height)\s*=/i, unquoted),
-              do: tag,
-              else: String.replace_prefix(tag, "<img", ~s(<img width="#{w}" height="#{h}"))
-          end,
-          global: false
-        )
+        Regex.replace(~r/<img\s[^>]*>/, html, &size_tag(&1, w, h), global: false)
 
       nil ->
         html
     end
+  end
+
+  defp size_tag(tag, w, h) do
+    unquoted = Regex.replace(~r/"[^"]*"|'[^']*'/, tag, "\"\"")
+
+    if Regex.match?(~r/\s(?:width|height)\s*=/i, unquoted),
+      do: tag,
+      else: String.replace_prefix(tag, "<img", ~s(<img width="#{w}" height="#{h}"))
   end
 
   @doc """

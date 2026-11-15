@@ -124,6 +124,11 @@ defmodule PhoenixKit.Modules.Publishing.ListPublishedTest do
 
     # keys are normalised as the editor stores them
     {:ok, %{total: 1}} = Publishing.list_published(slug, custom: %{"Version" => "1.2.0"})
+    # both spellings are checked, and a key with nothing left matches nothing
+    {:ok, %{total: 0}} =
+      Publishing.list_published(slug, custom: %{"Version" => "1.2.0", "version" => "9"})
+
+    {:ok, %{total: 0}} = Publishing.list_published(slug, custom: %{"" => nil})
   end
 
   test "categories that are none of the group's give no posts, and no pages", %{slug: slug} do

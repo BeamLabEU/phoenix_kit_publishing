@@ -3,8 +3,8 @@ defmodule PhoenixKit.Modules.Publishing.GroupSlugsTest do
   # set never misses a group that exists.
   use PhoenixKitPublishing.DataCase, async: false
 
-  alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.Groups
+  alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.ListingCache.CacheSync
   alias PhoenixKitPublishing.RouterDispatch
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo

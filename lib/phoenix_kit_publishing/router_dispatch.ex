@@ -49,8 +49,8 @@ defmodule PhoenixKitPublishing.RouterDispatch do
   require Logger
 
   alias PhoenixKit.ModuleRegistry
-  alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.Groups
+  alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
 

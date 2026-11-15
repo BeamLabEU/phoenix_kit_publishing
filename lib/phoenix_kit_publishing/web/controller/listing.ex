@@ -378,14 +378,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   # written as text, or one of a list of them.
   defp filter_by_custom(posts, custom) when is_map(custom) and map_size(custom) > 0 do
     # keys as the editor stores them ("Author" is stored as "author")
-    wanted =
-      Map.new(custom, fn {key, value} ->
-        {wanted_key(key), wanted_values(value)}
-      end)
+    # a list, not a map: two keys that normalise alike are both checked
+    wanted = Enum.map(custom, fn {key, value} -> {wanted_key(key), wanted_values(value)} end)
 
     Enum.filter(posts, fn post ->
       fields = get_in(post, [:metadata, :custom_fields]) || %{}
-      Enum.all?(wanted, fn {key, values} -> Map.get(fields, key) in values end)
+      Enum.all?(wanted, &field_matches?(fields, &1))
     end)
   end
 
@@ -394,11 +392,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   # Stored custom fields are strings. A requested value is compared as text;
   # nil matches a post without the field; a value that cannot be text (a map,
   # a tuple) matches nothing rather than raising.
-  # A key that cannot be a custom field's matches no post.
+  # A key that cannot be a custom field's matches no post, nil or not.
   defp wanted_key(key) when is_binary(key) or is_atom(key),
-    do: PublishingVersion.custom_field_key(key) || {:no_field, key}
+    do: PublishingVersion.custom_field_key(key) || :no_field
 
-  defp wanted_key(key), do: {:no_field, key}
+  defp wanted_key(_key), do: :no_field
+
+  defp field_matches?(_fields, {:no_field, _values}), do: false
+  defp field_matches?(fields, {key, values}), do: Map.get(fields, key) in values
 
   defp wanted_values(nil), do: [nil]
 
