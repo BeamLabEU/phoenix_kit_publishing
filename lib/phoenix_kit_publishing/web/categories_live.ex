@@ -144,6 +144,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
          |> reload_tree()}
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        changeset = translate_display_errors(changeset)
+
         {:noreply,
          socket
          |> put_flash(:error, changeset_error_message(changeset))
@@ -452,11 +454,46 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLive do
   end
 
   defp changeset_error_message(%Ecto.Changeset{errors: errors}) do
-    case Keyword.get(errors, :slug) || Keyword.get(errors, :group_uuid) do
-      {_, _} -> gettext("That slug is already used in this group.")
-      _ -> gettext("Couldn't save this category — check the fields and try again.")
+    display_error =
+      Enum.find_value(PublishingCategory.display_error_keys(), &Keyword.get(errors, &1))
+
+    cond do
+      Keyword.has_key?(errors, :slug) or Keyword.has_key?(errors, :group_uuid) ->
+        gettext("That slug is already used in this group.")
+
+      display_error ->
+        elem(display_error, 0)
+
+      true ->
+        gettext("Couldn't save this category — check the fields and try again.")
     end
   end
+
+  # The schema's colour, icon and SEO errors in the admin's language, so the
+  # input under which each shows and the flash both read as a sentence.
+  defp translate_display_errors(%Ecto.Changeset{errors: errors} = changeset) do
+    keys = PublishingCategory.display_error_keys()
+
+    errors =
+      Enum.map(errors, fn
+        {key, {_message, opts}} = error ->
+          if key in keys, do: {key, {display_error_text(key, opts), []}}, else: error
+      end)
+
+    %{changeset | errors: errors}
+  end
+
+  defp display_error_text(:color, _opts),
+    do: gettext("Use a hex colour such as #4f46e5 or a theme colour such as primary.")
+
+  defp display_error_text(:icon, _opts),
+    do: gettext("Use a Heroicons name such as hero-cube.")
+
+  defp display_error_text(:seo_title, opts),
+    do: gettext("The SEO title can be at most %{count} characters.", count: opts[:count])
+
+  defp display_error_text(:seo_description, opts),
+    do: gettext("The SEO description can be at most %{count} characters.", count: opts[:count])
 
   defp parent_error_message(:category_cycle),
     do: gettext("A category can't be moved under one of its own subcategories.")

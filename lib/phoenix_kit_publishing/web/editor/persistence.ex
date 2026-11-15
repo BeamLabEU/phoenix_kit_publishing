@@ -86,6 +86,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
         "audio_uuid",
         "allow_version_access",
         "sitemap_exclude",
+        "version_label",
         "url_slug",
         "title",
         "og_title",

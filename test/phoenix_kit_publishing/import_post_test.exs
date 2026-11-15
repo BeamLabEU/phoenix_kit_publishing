@@ -56,6 +56,35 @@ defmodule PhoenixKit.Modules.Publishing.ImportPostTest do
     assert uuid == post[:uuid]
   end
 
+  test "a version label: on import, and from code on a later version", %{slug: slug} do
+    assert {:ok, post} =
+             Publishing.import_post(slug, %{
+               title: "Projects guide",
+               content: "For 0.33.",
+               version_label: "Projects 0.33.0",
+               published_at: "2026-11-06T01:13:00Z"
+             })
+
+    assert DBStorage.get_version(post[:uuid], 1).data["label"] == "Projects 0.33.0"
+
+    # the guides importer's flow: a new version, then update_post/3
+    {:ok, _} = Publishing.create_version_from(slug, post[:uuid], 1)
+    {:ok, v2} = Publishing.read_post_by_uuid(post[:uuid], "en", 2)
+    assert v2.metadata.version_label == nil
+
+    {:ok, saved} =
+      Publishing.update_post(slug, v2, %{
+        "content" => "For 0.34.",
+        "status" => "published",
+        "version_label" => "Projects 0.34.0"
+      })
+
+    assert saved.version_labels == %{1 => "Projects 0.33.0", 2 => "Projects 0.34.0"}
+
+    assert {:error, :invalid_format} =
+             Publishing.import_post(slug, %{title: "Bad", version_label: <<255>>})
+  end
+
   test "posts imported into the same minute get the nearest earlier free minutes", %{slug: slug} do
     at = "2026-11-06T10:05:30Z"
 
@@ -66,6 +95,16 @@ defmodule PhoenixKit.Modules.Publishing.ImportPostTest do
       end
 
     assert times == [~T[10:05:00], ~T[10:04:00], ~T[10:03:00]]
+  end
+
+  test "same-minute imports list newest first by their URL minute, not by uuid", %{slug: slug} do
+    at = "2026-11-06T01:13:20Z"
+    {:ok, first} = Publishing.import_post(slug, %{title: "First", published_at: at})
+    {:ok, second} = Publishing.import_post(slug, %{title: "Second", published_at: at})
+
+    # first holds 01:13, second the free minute before it, 01:12
+    {:ok, %{entries: entries}} = Publishing.list_published(slug)
+    assert Enum.map(entries, & &1.uuid) == [first[:uuid], second[:uuid]]
   end
 
   test "two posts created now never push each other into the future", %{slug: slug} do

@@ -86,6 +86,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       version_statuses: version_statuses,
       version_publication_dates:
         Map.new(all_versions, &{&1.version_number, format_datetime(&1.published_at)}),
+      version_labels: version_labels(all_versions),
       version_dates: version_dates,
       content: content.content,
       content_updated_at: content.updated_at,
@@ -153,6 +154,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       version_statuses: version_statuses,
       version_publication_dates:
         Map.new(all_versions, &{&1.version_number, format_datetime(&1.published_at)}),
+      version_labels: version_labels(all_versions),
       version_dates: version_dates,
       content: primary_content && extract_excerpt(primary_content),
       metadata:
@@ -255,6 +257,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
       allow_version_access: PublishingVersion.get_allow_version_access(version),
       sitemap_exclude: PublishingVersion.get_sitemap_exclude(version),
       custom_fields: PublishingVersion.get_custom_fields(version),
+      version_label: PublishingVersion.get_label(version),
       url_slug: content.url_slug,
       previous_url_slugs: PublishingContent.get_previous_url_slugs(content),
       published_at: format_datetime(published_at),
@@ -416,4 +419,12 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage.Mapper do
   defp safe_mode_atom("timestamp"), do: :timestamp
   defp safe_mode_atom("slug"), do: :slug
   defp safe_mode_atom(_), do: :timestamp
+
+  # Only the versions that carry one.
+  defp version_labels(versions) do
+    for version <- versions,
+        label = PublishingVersion.get_label(version),
+        into: %{},
+        do: {version.version_number, label}
+  end
 end

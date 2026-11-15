@@ -560,7 +560,7 @@ lib/phoenix_kit_publishing/
 ├── migrations.ex                                # module-owned versioned migration chain (V1 = adoption)
 ├── stale_fixer.ex, activity_log.ex, group_settings.ex, comments.ex, gettext.ex
 ├── media_folders.ex, media_adoption.ex, media_reorganizer.ex   # group media folders
-├── listing_cache.ex (+ cache_sync, lock_table_owner), renderer.ex
+├── listing_cache.ex (+ cache_sync, lock_table_owner), group_slugs.ex, renderer.ex
 ├── page_builder.ex (+ parser, renderer, components/)
 ├── schemas/               # 6 Ecto schemas
 └── web/                   # admin LiveViews, public Controller (+ 9 submodules), HTML
@@ -586,6 +586,14 @@ lib/phoenix_kit_publishing/
   old listing nor overwrite the tombstone. Reads stay lock-free
   `:persistent_term` lookups. `ListingCache.CacheSync` erases on a peer's
   invalidation or regeneration.
+- `Publishing.GroupSlugs` — every group slug in `:persistent_term`, so
+  `RouterDispatch` answers a request for no group without a query. A
+  negative filter that must never miss a group: `DBStorage`'s group writes
+  bump an `:atomics` generation (a set built under an older one is unused),
+  `CacheSync` erases on every `publishing:groups` broadcast (sent after the
+  commit, on every node) and a set lives five minutes at most. The counter is
+  created by `CacheSync`; without it (this suite) every lookup asks the
+  database.
 - `Publishing.Renderer` — Markdown → HTML via MDEx/comrak, cached in
   `PhoenixKit.Cache` under `:publishing_posts` (24h TTL, max 2000, FIFO). The key
   folds a content hash and a `@cache_version` token, so an edit or a renderer
@@ -650,7 +658,10 @@ Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many
   `published_at`, `data` JSONB (`featured_image_uuid`, tags, seo, description,
   `allow_version_access`, `sitemap_exclude`, `custom_fields` (a host's own
   string fields, normalised by `PublishingVersion.normalize_custom_fields/1`,
-  read as `metadata.custom_fields`), notes, `created_from`). Status is
+  read as `metadata.custom_fields`), `label` (a short name for the version,
+  "Billing 0.27", shown in the public version menu; `metadata.version_label`
+  and `version_labels` on the post map; not copied to a new version), notes,
+  `created_from`). Status is
   version-level: every language in a version shares it.
 - **`..._contents`** — per-language title and body: `version_uuid`, `language`
   (unique per version), `title`, `content` (markdown), `url_slug` (per-language
@@ -705,7 +716,8 @@ Site-wide keys, all read through `PhoenixKit.Settings`.
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group override for the render cache |
 | `publishing_show_language_switcher` | `true` | Render the in-page language switcher on listing + post pages. Turn off when the host layout provides one |
 | `publishing_render_og_tags` | `true` | Render og/twitter/`name="description"` meta tags **in-page** (inside the public body), so previews work even when the host root layout ignores the forwarded `:og`. **Some scrapers read only `<head>`**: the recommended host setup is `<PhoenixKit.Modules.Publishing.Web.HTML.og_meta_tags og={assigns[:og]} />` in the root layout's `<head>` with this setting off (README, "OpenGraph tags belong in `<head>`"); core's own root layout already prints `@og` in `<head>`. Off avoids duplicates. The default stays on |
-| `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD in-page on post pages, from the same refined `:og` map. `escape: :html_safe` on the encode so no value can close the script tag early |
+| `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD in-page on post pages, from the same refined `:og` map; `author` is a `Person` from the post's `author` custom field, else the site as an `Organization`. `escape: :html_safe` on the encode so no value can close the script tag early |
+| `publishing_sitemap_refresh` | `true` | Ask core's Sitemap module for a debounced regeneration when a public URL appears, disappears or moves (`SitemapRefresh`). Also needs core's Sitemap module and its automatic regeneration on |
 | `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → 404, never the smart fallback (a feed URL must not redirect to HTML). Canonical-prefix 301s ARE emitted feed-to-feed, matching `rel="self"` |
 | `publishing_unique_views` | `true` | One view per visitor per post per day: a session carrying the dedup marker is the visitor, a cookieless request is a keyed hash of its address (the LAST `x-forwarded-for` hop, the one the site's proxy appended — the first is the client's to forge — else `remote_ip`) held for the day in `Views.VisitorTable`, capped at 500k rows a day, never the raw address; readers behind one address count once until their browser keeps the marker. Off → every page open counts |
 | `publishing_translation_endpoint_uuid` | unset | Admin override for the AI endpoint used by translation |
@@ -930,7 +942,7 @@ repeat loop in Commands is the stability check.
 | Public dispatch (`RouterDispatch`) | The host router's `call/2` override and `restore_path/2` are a pair: without the restore, the canonical-URL redirect emits the internal prefix and loops forever. Never add a second `call/2` override. | [dev_docs/guides/router-dispatch.md](dev_docs/guides/router-dispatch.md) |
 | Smart fallback / 404 policy | A missing GROUP renders 404; only a missing child of an existing group redirects. Under `url_prefix: "/"` the alternative hijacks host paths. | [dev_docs/guides/router-dispatch.md](dev_docs/guides/router-dispatch.md) |
 | Sitemap exclusion | The sitemap knobs live where core's Sitemap source reads them: `sitemap_exclude` is a top-level key on the `list_groups/0` group map and `metadata.sitemap_exclude` on the `list_posts/2` post map (version `data`, mapped from the latest version like `allow_version_access`). Publishing never filters for the sitemap itself; `integration/sitemap_source_test.exs` runs core's real source against both. | — |
-| Sitemap refresh | Publishing, unpublishing, and trashing or restoring a post with a live version call `SitemapRefresh.request/0`, which inserts core's `Sitemap.SchedulerWorker` job (the `regenerate_module_now/1` args, `source: "publishing"`) 30 s out and unique over the waiting jobs, because core's job is not unique: a bulk import queues one regeneration, not one per post. Guarded like every optional seam (`Code.ensure_loaded?` + `function_exported?` + rescue/catch, skipped while `sitemap_enabled` is off or Oban is not running); it never fails a publish. `integration/sitemap_refresh_test.exs`. | `@moduledoc` on `Publishing.SitemapRefresh` |
+| Sitemap refresh | Publishing, unpublishing, and trashing or restoring a post with a live version, a live post's slug, `url_slug` or `sitemap_exclude` change, a group's slug or `sitemap_exclude` change, a group trash, restore or delete and a mode conversion call `SitemapRefresh.request/0`, which inserts core's `Sitemap.SchedulerWorker` job (the `regenerate_module_now/1` args, `source: "publishing"`) 30 s out and unique over the waiting jobs, because core's job is not unique: a bulk import queues one regeneration, not one per post. Guarded like every optional seam (`Code.ensure_loaded?` + `function_exported?` + rescue/catch, skipped while `sitemap_enabled`, core's `sitemap_schedule_enabled` ("Automatic regeneration"; core's worker does not check it for a manual job, so Publishing does) or `publishing_sitemap_refresh` is off, or Oban is not running); it never fails a publish. `integration/sitemap_refresh_test.exs`. | `@moduledoc` on `Publishing.SitemapRefresh` |
 | Per-group display settings | A new setting must be added in all five places (`Constants` → schema accessor → `merge_group_config`/`db_group_to_map` → edit form → `GroupSettings` spec) or the spec test fails; `update_group/3` stays lenient, `validate_group_settings/1` stays strict. | [dev_docs/guides/group-display-settings.md](dev_docs/guides/group-display-settings.md) |
 | Translatable group name | Overrides live in an isolated `data["name_i18n"]` map, never in the multilang helper's `data`-owning convention, which would clobber the display settings. The slug is never translated. | [dev_docs/guides/group-display-settings.md](dev_docs/guides/group-display-settings.md) |
 | Activity logging | An audit failure never crashes its mutation, and a changeset never reaches metadata. | [dev_docs/guides/activity-logging.md](dev_docs/guides/activity-logging.md) |

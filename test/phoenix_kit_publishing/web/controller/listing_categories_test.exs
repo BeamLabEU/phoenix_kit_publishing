@@ -230,6 +230,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.ListingCategoriesTest do
 
       assert texts(html, "[data-related-posts] h2") == ["More from Billing"]
       assert texts(html, "[data-related-posts] li") == ["Billing two"]
+      # cards in a row are as tall as the row
+      assert count(html, "[data-related-posts] li > a.h-full") == 1
     end
   end
 

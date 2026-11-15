@@ -301,6 +301,40 @@ defmodule PhoenixKit.Modules.Publishing.Web.EditorLiveTest do
       assert DBStorage.get_version(post[:uuid], 1).data["sitemap_exclude"] == true
     end
 
+    test "the version label saves into the version and reads back on the post map", %{
+      conn: conn,
+      group: group,
+      post: post
+    } do
+      saver_uuid = "019cce93-0000-7000-8000-00000000ee03"
+
+      TestRepo.query!(
+        """
+        INSERT INTO phoenix_kit_users (uuid, email, hashed_password, inserted_at, updated_at)
+        VALUES ($1::uuid, 'label-saver@example.com', 'x', now(), now())
+        ON CONFLICT (email) DO NOTHING
+        """,
+        [Ecto.UUID.dump!(saver_uuid)]
+      )
+
+      {:ok, view, html} =
+        conn
+        |> put_test_scope(fake_scope(user_uuid: saver_uuid))
+        |> live("/admin/publishing/#{group["slug"]}/#{post[:uuid]}/edit")
+
+      assert html =~ ~s(id="post-version-label")
+
+      render_change(view, "update_meta", %{
+        "version_label" => " Billing 0.27 ",
+        "_target" => ["version_label"]
+      })
+
+      _ = render_click(view, "save", %{})
+
+      assert DBStorage.get_version(post[:uuid], 1).data["label"] == "Billing 0.27"
+      assert has_element?(view, "#post-version-label[value='Billing 0.27']")
+    end
+
     test "custom fields: rows are added, typed, removed and saved as a map", %{
       conn: conn,
       group: group,

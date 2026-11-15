@@ -140,13 +140,23 @@ defmodule PhoenixKit.Modules.Publishing.API.UpsertCategories do
     changeset =
       PublishingCategory.changeset(%PublishingCategory{name: "x", slug: "x", data: %{}}, given)
 
-    case Keyword.get_values(changeset.errors, :data) do
-      [] -> :ok
-      [{message, _} | _] -> {:error, "validation_failed", message}
+    case Enum.find(
+           PublishingCategory.display_error_keys(),
+           &Keyword.has_key?(changeset.errors, &1)
+         ) do
+      nil -> :ok
+      key -> {:error, "validation_failed", display_rule_message(key, changeset.errors[key])}
     end
   end
 
   defp display_rules(error, _given), do: error
+
+  defp display_rule_message(key, {message, opts}) do
+    case opts[:validation] do
+      :length -> "#{key} must be at most #{opts[:count]} characters"
+      _ -> "#{key} #{message}"
+    end
+  end
 
   defp check_name(row) do
     case Map.fetch(row, "name") do

@@ -56,7 +56,7 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
   #      kind instead of ending at it.
   # v12: `<Image dark_src|dark_file_uuid>` renders a light/dark pair plus its
   #      stylesheet; a cached v11 entry would keep showing the light image only.
-  @cache_version "v12"
+  @cache_version "v13"
 
   @generated_styles_key :pk_publishing_generated_styles
 

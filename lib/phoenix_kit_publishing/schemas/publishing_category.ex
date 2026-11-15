@@ -202,31 +202,49 @@ defmodule PhoenixKit.Modules.Publishing.PublishingCategory do
     |> check_display(
       data["color"],
       &valid_color?/1,
-      :data,
-      "color must be #rgb, #rrggbb or a theme colour"
+      :color,
+      "must be #rgb, #rrggbb or a theme colour"
     )
     |> check_display(
       data["icon"],
       &Regex.match?(@icon, &1),
-      :data,
-      "icon must be a heroicon name such as hero-cube"
+      :icon,
+      "must be a heroicon name such as hero-cube"
     )
     |> check_lengths(data)
   end
 
+  # Each error sits on its form key (`:color`, `:icon`, `:seo_title`,
+  # `:seo_description`), so a form shows it under its own input; the values
+  # themselves live in `:data`.
   defp check_display(changeset, nil, _valid?, _field, _message), do: changeset
 
   defp check_display(changeset, value, valid?, field, message) do
-    if valid?.(value), do: changeset, else: add_error(changeset, field, message)
+    if valid?.(value),
+      do: changeset,
+      else: add_error(changeset, field, message, validation: :format)
   end
 
   defp check_lengths(changeset, data) do
     Enum.reduce(@display_limits, changeset, fn {key, max}, acc ->
       if String.length(data[key] || "") > max,
-        do: add_error(acc, :data, "#{key} must be at most #{max} characters"),
+        do:
+          add_error(acc, Map.fetch!(@atom_keys, key), "should be at most %{count} character(s)",
+            count: max,
+            validation: :length,
+            kind: :max,
+            type: :string
+          ),
         else: acc
     end)
   end
+
+  @doc """
+  The display keys whose errors a changeset carries under their own name
+  (`:color`, `:icon`, `:seo_title`, `:seo_description`), in that order.
+  """
+  @spec display_error_keys() :: [atom()]
+  def display_error_keys, do: Enum.map(@display_keys, &Map.fetch!(@atom_keys, &1))
 
   defp valid_color?(value), do: value in @colors or Regex.match?(@hex_color, value)
 

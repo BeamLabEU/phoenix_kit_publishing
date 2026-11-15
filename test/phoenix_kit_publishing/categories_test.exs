@@ -62,7 +62,8 @@ defmodule PhoenixKit.Modules.Publishing.CategoriesTest do
         assert {:error, %Ecto.Changeset{} = cs} =
                  Categories.create_category(slug, %{"name" => unique_name(), key => bad})
 
-        assert Keyword.has_key?(cs.errors, :data), "#{key}=#{bad} was accepted"
+        assert Keyword.has_key?(cs.errors, String.to_existing_atom(key)),
+               "#{key}=#{bad} was accepted"
       end
     end
 

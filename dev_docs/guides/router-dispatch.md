@@ -50,6 +50,14 @@ bump of the `function_exported?/3` guard in core.
    - cache miss → conn passes through unchanged; `super` matches host routes
      normally.
 
+   "Known group" is asked of `GroupSlugs` first, the set of every group slug
+   in `:persistent_term`: a segment outside it is answered without a query,
+   so a host request pays nothing for the dispatch, and only a slug in it
+   reads the group (`Groups.fetch_group/1`, for `public_listing`). The set
+   must never miss a group: group writes bump its generation, every
+   `publishing:groups` broadcast erases it on every node, and it lives five
+   minutes at most (the bound for a group written outside this module).
+
 3. **Path restore.** `restore_path/2` (run as part of the internal scope's
    pipeline, after route bindings are extracted into `conn.params`) un-mutates
    `request_path` and `path_info` so controllers reading them for canonical-URL
