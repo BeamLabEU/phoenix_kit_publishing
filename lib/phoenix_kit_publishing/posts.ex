@@ -1589,21 +1589,28 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   defp resolve_slug_in_tx(ctx),
     do: maybe_update_db_slug(ctx.db_post, ctx.desired_slug, ctx.group_slug)
 
-  # A post-slug rename must carry the default url_slugs with it. Content rows
-  # are stamped with the post slug at creation (create_content), so on a fresh
-  # post the very first autosave freezes the public URL at however much title
-  # was typed in that window — every later rename moved the post row while the
-  # content row (which is what public routing resolves) kept the frozen slug.
-  # Runs AFTER upsert_post_content so it also catches the row that upsert just
-  # re-wrote with the pre-rename slug via its "empty means leave alone" rule.
-  # Rows whose url_slug differs from the old post slug were customized on
-  # purpose and are left alone.
+  # A post-slug rename must carry the primary language's url_slug with it.
+  # That row is stamped with the post slug at creation (create_content), so on
+  # a fresh post the very first autosave freezes the public URL at however
+  # much title was typed in that window — every later rename moved the post
+  # row while the content row (which is what public routing resolves) kept the
+  # frozen slug. Runs AFTER upsert_post_content so it also catches the row that
+  # upsert just re-wrote with the pre-rename slug via its "empty means leave
+  # alone" rule. Translations never follow: their URL is their own, and
+  # carrying them along gave an `et` page a transliteration of the Russian
+  # title (issue #54). A customized primary url_slug is left alone too.
   defp sync_default_url_slugs(_db_post, nil), do: :ok
 
   defp sync_default_url_slugs(%{slug: old_slug}, final_slug) when final_slug == old_slug, do: :ok
 
   defp sync_default_url_slugs(db_post, final_slug) do
-    DBStorage.rename_default_url_slugs(db_post.uuid, db_post.slug, final_slug)
+    DBStorage.rename_default_url_slugs(
+      db_post.uuid,
+      db_post.slug,
+      final_slug,
+      LanguageHelpers.get_primary_language()
+    )
+
     :ok
   end
 

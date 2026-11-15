@@ -4,7 +4,7 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageMentionAndRenameTest do
   `[[` publication-mention popup and the post-slug rename sync (PR #48):
 
     * `search_posts_for_mention/2` — the picker's data source.
-    * `rename_default_url_slugs/3` — carries default-tracking `url_slug`s
+    * `rename_default_url_slugs/4` — carries default-tracking `url_slug`s
       along with a post-slug rename.
 
   Neither existed before this PR and neither had a test.
@@ -139,10 +139,10 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageMentionAndRenameTest do
   end
 
   # ============================================================================
-  # rename_default_url_slugs/3
+  # rename_default_url_slugs/4
   # ============================================================================
 
-  describe "rename_default_url_slugs/3" do
+  describe "rename_default_url_slugs/4" do
     test "a content row still tracking the old post slug follows the rename" do
       {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
 
@@ -154,7 +154,12 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageMentionAndRenameTest do
       assert content.url_slug == "default-tracker"
 
       languages =
-        DBStorage.rename_default_url_slugs(post.uuid, "default-tracker", "renamed-tracker")
+        DBStorage.rename_default_url_slugs(
+          post.uuid,
+          "default-tracker",
+          "renamed-tracker",
+          content.language
+        )
 
       assert content.language in languages
 
@@ -174,7 +179,12 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageMentionAndRenameTest do
       {:ok, _} = DBStorage.update_content(content, %{url_slug: "hand-picked-slug"})
 
       languages =
-        DBStorage.rename_default_url_slugs(post.uuid, "customized-post", "customized-post-2")
+        DBStorage.rename_default_url_slugs(
+          post.uuid,
+          "customized-post",
+          "customized-post-2",
+          content.language
+        )
 
       assert languages == []
 
@@ -182,13 +192,17 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageMentionAndRenameTest do
       assert reloaded.url_slug == "hand-picked-slug"
     end
 
-    test "carries every default-tracking language, not just the primary" do
+    # Issue #54: a translation that still carries the post slug keeps it. Its
+    # URL is its own, and following the rename gave an `et` page a
+    # transliteration of the Russian title.
+    test "moves only the given language; a translation keeps its url_slug" do
       {:ok, group} = Groups.add_group(unique_name(), mode: "slug")
 
       {:ok, post} =
         Posts.create_post(group["slug"], %{title: "Multilang Tracker", slug: "multilang"})
 
       [version] = DBStorage.list_versions(post.uuid)
+      [primary] = DBStorage.list_contents(version.uuid)
 
       {:ok, _} =
         DBStorage.create_content(%{
@@ -197,17 +211,22 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageMentionAndRenameTest do
           title: "Multilang Tracker (DE)",
           content: "de body",
           status: "draft",
-          # Default-tracking: stamped with the post slug, same as the primary row.
           url_slug: "multilang"
         })
 
-      languages = DBStorage.rename_default_url_slugs(post.uuid, "multilang", "multilang-neu")
+      languages =
+        DBStorage.rename_default_url_slugs(
+          post.uuid,
+          "multilang",
+          "multilang-neu",
+          primary.language
+        )
 
-      assert Enum.sort(languages) == Enum.sort(["en", "de"])
+      assert languages == [primary.language]
 
-      for content <- DBStorage.list_contents(version.uuid) do
-        assert content.url_slug == "multilang-neu"
-      end
+      slugs = Map.new(DBStorage.list_contents(version.uuid), &{&1.language, &1.url_slug})
+      assert slugs[primary.language] == "multilang-neu"
+      assert slugs["de"] == "multilang"
     end
 
     test "no matching rows returns an empty list and touches nothing" do
@@ -216,11 +235,16 @@ defmodule PhoenixKit.Integration.Publishing.DBStorageMentionAndRenameTest do
       {:ok, post} =
         Posts.create_post(group["slug"], %{title: "Untouched", slug: "untouched-post"})
 
-      assert DBStorage.rename_default_url_slugs(post.uuid, "never-was-the-slug", "new-slug") ==
-               []
-
       [version] = DBStorage.list_versions(post.uuid)
       [content] = DBStorage.list_contents(version.uuid)
+
+      assert DBStorage.rename_default_url_slugs(
+               post.uuid,
+               "never-was-the-slug",
+               "new-slug",
+               content.language
+             ) == []
+
       assert content.url_slug == "untouched-post"
     end
   end

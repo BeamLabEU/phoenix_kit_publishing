@@ -115,10 +115,20 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
       url_slug_from_post not in [nil, ""] and url_slug_from_post != post.slug ->
         url_slug_from_post
 
+      # A saved row without a url_slug is served under the post slug: show
+      # that, so an empty field only ever means "generate it from the title"
+      # (`restore_default_url_slug` in Persistence) and never moves a URL
+      # nobody touched.
+      saved_language?(post) ->
+        post.slug || ""
+
       true ->
         ""
     end
   end
+
+  defp saved_language?(post),
+    do: Map.get(post, :language) in (Map.get(post, :available_languages) || [])
 
   defp add_slug_field_if_needed(form, post) do
     case get_post_mode(post) do
@@ -264,6 +274,83 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
     |> Phoenix.Component.assign(:url_slug_manually_set, url_slug_manually_set)
   end
 
+  @doc """
+  Assigns the form of a post just read from the database.
+
+  A stored slug starts out locked (`slug_manually_set` / `url_slug_manually_set`
+  true) unless it still follows the saved title of a post that was never public —
+  see `slug_locked?/3`. Without this, opening a published post and fixing a typo
+  re-derived its slug from the title and moved its live URL.
+  """
+  @spec assign_loaded_form(Phoenix.LiveView.Socket.t(), map(), map()) ::
+          Phoenix.LiveView.Socket.t()
+  def assign_loaded_form(socket, form, post) do
+    title = Map.get(form, "title", "")
+    url_slug = Map.get(form, "url_slug", "")
+
+    assign_form_with_tracking(socket, form,
+      slug_manually_set: slug_locked?(post, Map.get(form, "slug", ""), title),
+      url_slug_manually_set: slug_locked?(post, url_slug, title),
+      last_auto_url_slug: ""
+    )
+  end
+
+  @doc """
+  Whether a stored slug must stay as it is when the title changes.
+
+  A blank slug is never locked. Otherwise it is locked once the post has had a
+  public version (published or archived), or when it no longer follows the
+  title (a hand-picked slug). An auto slug with a uniqueness suffix (`title-2`)
+  still follows its title.
+  """
+  @spec slug_locked?(map(), String.t() | nil, String.t() | nil) :: boolean()
+  def slug_locked?(_post, slug, _title) when slug in [nil, ""], do: false
+
+  def slug_locked?(post, slug, title),
+    do: ever_public?(post) or not follows_title?(slug, title)
+
+  @doc """
+  Whether any saved version of the post has been public. Reads the persisted
+  `version_statuses`, never the form's status select, so choosing "published"
+  on an unsaved post does not count.
+  """
+  @spec ever_public?(map() | nil) :: boolean()
+  def ever_public?(post) when is_map(post) do
+    public = [Constants.status_published(), Constants.status_archived()]
+
+    post
+    |> Map.get(:version_statuses)
+    |> Kernel.||(%{})
+    |> Map.values()
+    |> Enum.any?(&(&1 in public))
+  end
+
+  def ever_public?(_post), do: false
+
+  defp follows_title?(slug, title) do
+    base =
+      case Publishing.slugify(title || "") do
+        "" -> "untitled"
+        generated -> generated
+      end
+
+    slug == base or Regex.match?(~r/\A#{Regex.escape(base)}-\d+\z/, slug)
+  end
+
+  @doc """
+  The url_slug a translation gets when it is saved with the field empty: one
+  slugified from its own title, so an `et` page is not served under a
+  transliteration of the primary language's title. Falls back to the post slug
+  when the title gives nothing.
+  """
+  @spec default_translation_url_slug(String.t() | nil, String.t() | nil) :: String.t()
+  def default_translation_url_slug(title, post_slug) do
+    case Publishing.slugify(title || "") do
+      "" -> post_slug || ""
+      slug -> slug
+    end
+  end
+
   defp resolve_slug_tracking(socket, form, opts) do
     slug = Map.get(form, "slug", "")
 
@@ -339,7 +426,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
     force? = Keyword.get(opts, :force, false)
     slug_manually_set? = Map.get(socket.assigns, :slug_manually_set, false)
 
-    if not force? and slug_manually_set? do
+    # `ever_public?` covers a post published during this session: the lock
+    # computed on load predates it.
+    if not force? and (slug_manually_set? or ever_public?(socket.assigns.post)) do
       no_slug_update(socket)
     else
       socket = maybe_warn_slug_truncated(socket, title)
@@ -359,6 +448,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Forms do
     force? = Keyword.get(opts, :force, false)
     url_slug_manually_set? = Map.get(socket.assigns, :url_slug_manually_set, false)
 
+    # No in-session `ever_public?` check here: a translation added to a live
+    # post becomes one of its languages on the first autosave, and locking
+    # then would freeze its URL at however much title was typed by that
+    # point. The lock from `assign_loaded_form/3` covers a reopened one.
     if not force? and url_slug_manually_set? do
       no_slug_update(socket)
     else

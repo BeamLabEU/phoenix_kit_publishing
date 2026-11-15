@@ -453,7 +453,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Helpers do
     |> Map.put(:language, new_language)
     |> Map.put(:group, group_slug || "group")
     |> Map.put(:content, "")
-    |> Map.put(:metadata, Map.put(post.metadata, :title, ""))
+    # The url_slug is the source language's: a new translation gets one from
+    # its own title instead (issue #54), so it must not start with this one.
+    |> Map.put(:metadata, Map.merge(post.metadata, %{title: "", url_slug: nil}))
+    |> Map.put(:url_slug, nil)
     |> Map.put(:mode, post.mode)
     |> Map.put(:slug, post.slug || Map.get(socket.assigns.form, "slug"))
   end

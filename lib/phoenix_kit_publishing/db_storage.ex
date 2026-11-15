@@ -1266,20 +1266,23 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   end
 
   @doc """
-  Carries default url_slugs along with a post-slug rename.
+  Carries the primary language's url_slug along with a post-slug rename.
 
-  Content rows are stamped with the post slug at creation, so a row whose
-  `url_slug` still equals the OLD post slug is tracking the default, not a
-  custom choice — repoint it at the new slug, filing the old one as a
-  previous slug so established URLs keep 301ing. Rows with a customized
-  `url_slug` are left alone. Returns the languages updated.
+  The primary content row is stamped with the post slug at creation, so a
+  `language` row whose `url_slug` still equals the OLD post slug is tracking
+  it — repoint it at the new slug, filing the old one as a previous slug so
+  established URLs keep 301ing. A customized `url_slug` is left alone, and so
+  is every other language: a translation's URL is its own and does not move
+  with the post slug (issue #54). Returns the languages updated.
   """
-  @spec rename_default_url_slugs(String.t(), String.t(), String.t()) :: [String.t()]
-  def rename_default_url_slugs(post_uuid, old_slug, new_slug) do
+  @spec rename_default_url_slugs(String.t(), String.t(), String.t(), String.t()) :: [String.t()]
+  def rename_default_url_slugs(post_uuid, old_slug, new_slug, language) do
     contents =
       from(c in PublishingContent,
         join: v in assoc(c, :version),
-        where: v.post_uuid == ^post_uuid and c.url_slug == ^old_slug
+        where:
+          v.post_uuid == ^post_uuid and c.url_slug == ^old_slug and
+            c.language == ^language
       )
       |> repo().all()
 

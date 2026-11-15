@@ -305,6 +305,16 @@ for i in $(seq 1 10); do mix test; done                  # stability check for s
   timestamp post is held back until its date); posts keep
   `post_date`/`post_time`, and a date URL in a slug group answers with a 301 to
   the post's slug URL (`converted_group_url/4` in `Web.Controller`).
+- **A stored slug never moves on its own** (issue #54). The editor re-derives a
+  slug from the title only on a title change, and only while the post has no
+  published or archived version and the slug still is its title's (a `-N`
+  suffix included): `Forms.assign_loaded_form/3` sets the lock on every load
+  (`slug_locked?/3`). Each translation's `url_slug` is its own: an empty field
+  saves one slugified from that translation's title (the post slug if that is
+  taken), a saved translation shows the slug it serves, and a post-slug rename
+  moves only the primary language's row (`rename_default_url_slugs/4`). A
+  slug change on a post that has been public shows `slug_move_notice` before the
+  save; the old slug becomes a 301 through `previous_url_slugs`.
 - **Content format** is Markdown plus inline PHK XML components (`<Image>`,
   `<Hero>`, `<CTA>`, `<Video>`, `<Headline>`, `<Subheadline>`, `<EntityForm>`,
   `<Audio>`), parsed by Saxy.

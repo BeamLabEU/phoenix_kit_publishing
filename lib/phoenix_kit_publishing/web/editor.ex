@@ -650,7 +650,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:post, virtual_post)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign_page_trail(nil)
-      |> Forms.assign_form_with_tracking(form, slug_manually_set: false)
+      |> Forms.assign_form_with_tracking(form,
+        slug_manually_set: false,
+        url_slug_manually_set: false,
+        last_auto_url_slug: ""
+      )
       |> assign(:content, "")
       |> assign(:available_languages, virtual_post.available_languages)
       |> assign(:all_enabled_languages, all_enabled_languages)
@@ -761,7 +765,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> Map.put(:language, switch_to_lang)
       |> Map.put(:group, group_slug)
       |> Map.put(:content, "")
-      |> Map.put(:metadata, Map.put(post.metadata, :title, ""))
+      # The source language's url_slug is not this translation's: it gets one
+      # from its own title (issue #54).
+      |> Map.put(:metadata, Map.merge(post.metadata, %{title: "", url_slug: nil}))
+      |> Map.put(:url_slug, nil)
       |> Map.put(:mode, post.mode)
       |> Map.put(:slug, post.slug)
 
@@ -776,7 +783,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:post, virtual_post)
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign_page_trail(post)
-      |> Forms.assign_form_with_tracking(form, slug_manually_set: false)
+      |> Forms.assign_form_with_tracking(form,
+        slug_manually_set: false,
+        url_slug_manually_set: false,
+        last_auto_url_slug: ""
+      )
       |> assign(:content, "")
       |> assign(:available_languages, post.available_languages)
       |> assign(:all_enabled_languages, all_enabled_languages)
@@ -825,7 +836,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
       |> assign(:post, %{post | group: group_slug})
       |> assign(:group_name, Publishing.group_name(group_slug) || group_slug)
       |> assign_page_trail(post)
-      |> Forms.assign_form_with_tracking(form)
+      |> Forms.assign_loaded_form(form, post)
       |> assign(:content, post.content)
       |> assign(:available_languages, post.available_languages)
       |> assign(:all_enabled_languages, all_enabled_languages)
@@ -2539,7 +2550,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
 
         socket
         |> assign(:post, %{post | group: socket.assigns.group_slug})
-        |> Forms.assign_form_with_tracking(form)
+        |> Forms.assign_loaded_form(form, post)
         |> Helpers.mark_clean()
         |> Helpers.set_editor_content(post.content)
         |> Collaborative.maybe_start_lock_expiration_timer()
@@ -2576,7 +2587,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
          slug_manually_set,
          url_slug_manually_set
        ) do
-    if Map.has_key?(params, "title") do
+    # Only an actual title change re-derives a slug. The meta form sends the
+    # title with every change, so keying on its presence re-slugged a post
+    # whenever any other field in the form was touched.
+    if Map.has_key?(params, "title") and form["title"] != socket.assigns.form["title"] do
       socket
       |> assign(:form, form)
       |> assign(:slug_manually_set, slug_manually_set)
@@ -2936,7 +2950,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
     socket =
       socket
       |> assign(:post, virtual_post)
-      |> Forms.assign_form_with_tracking(form, slug_manually_set: false)
+      |> Forms.assign_form_with_tracking(form,
+        slug_manually_set: false,
+        url_slug_manually_set: false,
+        last_auto_url_slug: ""
+      )
       |> Helpers.assign_current_language(new_language)
       |> assign(
         :viewing_older_version,
@@ -3348,6 +3366,44 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
   defp media_slot_flash("og_image_uuid"), do: gettext("OG image selected")
   defp media_slot_flash("audio_uuid"), do: gettext("Audio version selected")
   defp media_slot_flash(_target), do: gettext("Featured image selected")
+
+  # Issue #54: a slug change on a post that has been public moves a live URL,
+  # so the writer sees it before saving. The old slug is filed under
+  # previous_url_slugs by the save and 301s to the new one.
+  attr :post, :map, required: true
+  attr :saved, :string, default: nil
+  attr :current, :string, default: nil
+
+  defp slug_move_notice(assigns) do
+    ~H"""
+    <p
+      :if={slug_moves?(@post, @saved, @current)}
+      id={"slug-move-notice-#{@post[:language]}"}
+      class="text-xs text-warning mt-1 flex items-start gap-1"
+    >
+      <.icon name="hero-exclamation-triangle" class="w-3 h-3 mt-0.5 shrink-0" />
+      {gettext(
+        "This post has been published: saving moves its URL from %{old} to %{new}. The old URL will redirect to the new one.",
+        old: @saved,
+        new: @current
+      )}
+    </p>
+    """
+  end
+
+  defp slug_moves?(post, saved, current),
+    do:
+      saved not in [nil, ""] and current not in [nil, ""] and saved != current and
+        Forms.ever_public?(post)
+
+  # What a save writes for the translation's url_slug: the typed value, or for
+  # an empty field the slug of its own title (`restore_default_url_slug`).
+  defp translation_url_slug_after_save(form),
+    do:
+      if(form["url_slug"] in [nil, ""],
+        do: Forms.default_translation_url_slug(form["title"], form["slug"]),
+        else: form["url_slug"]
+      )
 
   @impl true
   def render(assigns) do
@@ -4097,7 +4153,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                       <div class="mt-1 flex items-start justify-between gap-2">
                         <p class="text-xs text-base-content/60">
                           {gettext("Use lowercase letters, numbers, and hyphens only.")}
-                          {gettext("This will be the default URL for all languages.")}
+                          {gettext("Translations keep their own URL slugs.")}
                         </p>
                         <%!-- The handler existed with no control, so a slug that
                               drifted from a retitled post could only be fixed by
@@ -4116,6 +4172,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           {gettext("From title")}
                         </.button>
                       </div>
+                      <.slug_move_notice
+                        post={@post}
+                        saved={@db_post_slug}
+                        current={@form["slug"]}
+                      />
                     </div>
                   <% else %>
                     <%!-- Translation: per-language URL slug for SEO-friendly localized URLs --%>
@@ -4133,20 +4194,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           "lowercase",
                           (edit_disabled? or @viewing_older_version) && "bg-base-200"
                         ]}
-                        placeholder={@form["slug"] || ""}
-                        title={
-                          gettext(
-                            "Use lowercase letters, numbers, and hyphens only. Leave empty to use the default slug."
-                          )
+                        placeholder={
+                          Forms.default_translation_url_slug(@form["title"], @form["slug"])
                         }
+                        title={gettext("Use lowercase letters, numbers, and hyphens only.")}
                         readonly={edit_disabled? or @viewing_older_version}
                       />
                       <p class="text-xs text-base-content/60 mt-1">
                         {gettext(
-                          "Custom URL for this language. Leave empty to use default: %{slug}",
-                          slug: @form["slug"]
+                          "Leave empty to generate it from this translation's title: %{slug}",
+                          slug: Forms.default_translation_url_slug(@form["title"], @form["slug"])
                         )}
                       </p>
+                      <.slug_move_notice
+                        post={@post}
+                        saved={@post.metadata[:url_slug] || @db_post_slug}
+                        current={translation_url_slug_after_save(@form)}
+                      />
                       <p class="text-xs text-base-content/50 mt-0.5">
                         <%!-- Through the public builder: a sibling dialect lives
                               at /en-gb/…, a base owner at /en/…, a prefixless
@@ -4155,10 +4219,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
                           path:
                             PublishingHTML.group_listing_path(@current_language, @group_slug) <>
                               "/" <>
-                              if(@form["url_slug"] != "",
-                                do: @form["url_slug"],
-                                else: @form["slug"]
-                              )
+                              translation_url_slug_after_save(@form)
                         )}
                       </p>
                     </div>

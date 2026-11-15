@@ -102,7 +102,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
       |> normalize_typed_slug("slug")
       |> normalize_typed_slug("url_slug")
 
-    params = restore_default_url_slug(params, socket.assigns.post)
+    params = restore_default_url_slug(params, socket)
 
     params =
       case {socket.assigns.group_mode, Map.get(params, "slug")} do
@@ -176,18 +176,49 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor.Persistence do
     end
   end
 
-  # The UI promises "leave empty to restore the default slug", but the
-  # domain layer deliberately reads a blank url_slug as "leave it alone"
-  # (protecting programmatic partial maps — see upsert_post_content).
-  # Translate the promise here: an erased field becomes an EXPLICIT write of
-  # the post's default slug, which also files the old custom slug as a 301.
-  # Timestamp posts have no slug to restore — leave blank alone.
-  defp restore_default_url_slug(%{"url_slug" => ""} = params, %{slug: default_slug})
-       when is_binary(default_slug) and default_slug != "" do
-    Map.put(params, "url_slug", default_slug)
+  # The UI promises "leave empty to generate it from this translation's
+  # title", but the domain layer deliberately reads a blank url_slug as
+  # "leave it alone" (protecting programmatic partial maps — see
+  # upsert_post_content). Translate the promise here into an EXPLICIT write
+  # (which also files an erased custom slug as a 301) of
+  # a slug from the translation's own title (issue #54: an `et` page used to
+  # be stamped with the primary language's transliterated slug). The field is
+  # empty only for a new translation or one the writer erased: a saved one
+  # shows the slug it serves, the post slug included (`Forms.post_form/1`).
+  #
+  # Timestamp posts have no slug — leave blank alone. On the primary language
+  # the field is only a mirror and is dropped before the write anyway.
+  defp restore_default_url_slug(%{"url_slug" => ""} = params, socket) do
+    post_slug = socket.assigns.post[:slug]
+
+    if post_slug in [nil, ""] or socket.assigns[:is_primary_language],
+      do: params,
+      else: Map.put(params, "url_slug", free_title_url_slug(socket, Map.get(params, "title")))
   end
 
-  defp restore_default_url_slug(params, _post), do: params
+  defp restore_default_url_slug(params, _socket), do: params
+
+  # Like the AI translation path: the title's slug only when it is free in
+  # this group and language, otherwise the post slug. A slug the writer never
+  # typed must not end in the conflict modal.
+  defp free_title_url_slug(socket, title) do
+    post_slug = socket.assigns.post[:slug]
+    candidate = Forms.default_translation_url_slug(title, post_slug)
+
+    owner_slug =
+      socket.assigns[:db_post_slug] || persisted_post_slug(socket.assigns.post) ||
+        socket.assigns.post[:uuid]
+
+    case Publishing.validate_url_slug(
+           socket.assigns.group_slug,
+           candidate,
+           editor_language(socket.assigns),
+           owner_slug
+         ) do
+      {:ok, _} -> candidate
+      {:error, _} -> post_slug
+    end
+  end
 
   # On the primary language no url_slug input is rendered — the slug IS the
   # URL — so the form's "url_slug" is only a mirror of where the content was
