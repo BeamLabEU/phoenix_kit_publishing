@@ -261,6 +261,7 @@ Publishing's page:
   PhoenixKit.Modules.Publishing.list_published("news",
     language: "en",
     categories: ["billing", "crm"],   # any of them, subcategories included
+    custom: %{"product" => ["crm", "erp"]},  # custom fields: every key, any listed value
     page: 3,
     per_page: 20
   )
@@ -272,7 +273,9 @@ Publishing's page:
 Each entry has `uuid`, `title`, `description`, `excerpt`, `url`, `published_at`,
 `featured_image_uuid` (`featured_image_url` with `images: true`), `categories`
 (`slug`, `name`, `color`, `color_css`, `icon`, `url`) and `custom` (the post's
-custom fields, edited in the post editor's sidebar). Building many post URLs
+custom fields, edited in the post editor's sidebar). Category slugs that match no
+category give no posts (`total: 0`, `total_pages: 0`) rather than every post.
+Building many post URLs
 yourself, pass `Web.HTML.url_context(language)` in place of the language to
 `build_post_url/4`, with `build_date_counts/1` for a timestamp group: the
 settings are then read once, and no URL costs a query.
@@ -424,6 +427,10 @@ Regular **Markdown** content with all GitHub-flavored features.
 
 <Image file_id="019a6f96-..." alt="Description" />
 
+<!-- width/height reserve the image's box while it loads; left out, a Storage
+     file's stored dimensions are used -->
+<Image src="/images/chart.png" width="1200" height="800" alt="Description" />
+
 <!-- A light/dark pair: the reader sees the one matching the site theme -->
 <Image file_uuid="019a6f96-..." dark_file_uuid="019a6f97-..." alt="Description" />
 
@@ -450,7 +457,8 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_slug_style` | `transliterate` | `transliterate`, `unicode` or `ascii` |
 | `publishing_show_language_switcher` | `true` | In-page language switcher on public pages |
 | `publishing_render_og_tags` | `true` | In-page OpenGraph/Twitter meta tags; turn off once your root layout renders them in `<head>` (see below) |
-| `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD on post pages |
+| `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD on post pages; the author is the post's `author` custom field, else the site |
+| `publishing_sitemap_refresh` | `true` | Regenerate core's sitemap shortly after a public URL appears, disappears or moves (needs the Sitemap module with automatic regeneration on) |
 | `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` |
 | `publishing_unique_views` | `true` | One view per visitor per post per day |
 | `publishing_memory_cache_enabled` | `true` | Listing cache toggle |

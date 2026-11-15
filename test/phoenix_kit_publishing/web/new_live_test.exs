@@ -25,6 +25,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.NewLiveTest do
     assert html =~ ~s|phx-disable-with="Creating…"|
   end
 
+  test "the URL-mode hint names the one-way switch to readable URLs", %{conn: conn} do
+    {:ok, _view, html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing/new-group")
+
+    refute html =~ "locks in after creation"
+    assert html =~ "readable slug URLs"
+  end
+
   # Behind a TLS-terminating proxy the LiveView's connect URI is http, so the
   # sample URLs said http://. The `site_url` setting is the public origin.
   test "the site_url setting is the origin of the sample URLs", %{conn: conn} do

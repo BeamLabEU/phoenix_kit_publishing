@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.SitemapRefresh
   alias PhoenixKit.Modules.Publishing.StaleFixer
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Slug
@@ -267,13 +268,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
         with {:ok, name} <- extract_and_validate_name(db_group, params),
              {:ok, sanitized_slug} <- extract_and_validate_slug(db_group, params, name),
              {:ok, updated} <- write_group_update_locked(db_group, name, sanitized_slug, params) do
-          # A slug rename orphans the old slug's listing cache entry — it leaks in
-          # :persistent_term and keeps serving stale data under the old key (L6).
-          if db_group.slug != updated.slug do
-            ListingCache.invalidate(db_group.slug)
-            move_render_cache_setting(db_group.slug, updated.slug)
-          end
-
+          after_group_update(db_group, updated)
           group = db_group_to_map(updated)
           PublishingPubSub.broadcast_group_updated(group)
 
@@ -512,6 +507,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           {:ok, _} ->
             ListingCache.invalidate(slug)
             PublishingPubSub.broadcast_group_deleted(slug)
+            SitemapRefresh.request()
 
             ActivityLog.log_manual(
               "publishing.group.trashed",
@@ -676,11 +672,30 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     end
   end
 
+  defp after_group_update(old, updated) do
+    # A slug rename orphans the old slug's listing cache entry — it leaks in
+    # :persistent_term and keeps serving stale data under the old key (L6).
+    if old.slug != updated.slug do
+      ListingCache.invalidate(old.slug)
+      move_render_cache_setting(old.slug, updated.slug)
+    end
+
+    if sitemap_changed?(old, updated), do: SitemapRefresh.request()
+  end
+
+  # Every URL of the group moves with its slug, and `sitemap_exclude` adds or
+  # takes them all out of core's sitemap source.
+  defp sitemap_changed?(old, saved) do
+    old.slug != saved.slug or
+      Map.get(old.data, "sitemap_exclude", false) != Map.get(saved.data, "sitemap_exclude", false)
+  end
+
   defp delete_and_broadcast_group(db_group, slug, opts) do
     case DBStorage.delete_group(db_group) do
       {:ok, _} ->
         ListingCache.invalidate(slug)
         PublishingPubSub.broadcast_group_deleted(slug)
+        SitemapRefresh.request()
 
         ActivityLog.log_manual(
           "publishing.group.deleted",
@@ -712,6 +727,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       {:ok, _} ->
         ListingCache.regenerate(slug)
         PublishingPubSub.broadcast_group_created(%{"uuid" => db_group.uuid, "slug" => slug})
+        SitemapRefresh.request()
 
         ActivityLog.log_manual(
           "publishing.group.restored",

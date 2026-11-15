@@ -431,7 +431,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                   language_tabs={@language_tabs}
                   current_lang={@current_lang}
                   class=""
-                  ai_row_class="flex items-center gap-3 -mt-3"
+                  ai_row_class="flex items-center gap-3 -mt-2 mb-4"
                   ai_translate={FormGlue.ai_translate_config(assigns)}
                 />
 
@@ -546,7 +546,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
 
                 <.select
                   field={@form[:public_listing]}
-                  label={gettext("Listing page")}
+                  label={gettext("Rendered by")}
                   options={public_listing_options()}
                 />
                 <p class="-mt-2 text-xs text-base-content/60">

@@ -104,6 +104,38 @@ defmodule PhoenixKit.Modules.Publishing.ListPublishedTest do
     assert {:error, _} = Publishing.list_published("no-such-group")
   end
 
+  test "custom fields filter: every key must match; a list matches any of its values", %{
+    slug: slug
+  } do
+    {:ok, %{entries: [%{title: "Invoice run"}]}} =
+      Publishing.list_published(slug, custom: %{"version" => "1.2.0"})
+
+    {:ok, %{entries: [%{title: "Invoice run"}]}} =
+      Publishing.list_published(slug, custom: %{version: ["9.9", "1.2.0"]})
+
+    {:ok, %{total: 0}} =
+      Publishing.list_published(slug, custom: %{"version" => "1.2.0", "x" => "y"})
+
+    {:ok, %{total: 8}} = Publishing.list_published(slug, custom: %{})
+
+    # nil: posts without the field; a value that is not text matches nothing
+    {:ok, %{total: 7}} = Publishing.list_published(slug, custom: %{"version" => nil})
+    {:ok, %{total: 0}} = Publishing.list_published(slug, custom: %{"version" => %{}})
+
+    # keys are normalised as the editor stores them
+    {:ok, %{total: 1}} = Publishing.list_published(slug, custom: %{"Version" => "1.2.0"})
+    # both spellings are checked, and a key with nothing left matches nothing
+    {:ok, %{total: 0}} =
+      Publishing.list_published(slug, custom: %{"Version" => "1.2.0", "version" => "9"})
+
+    {:ok, %{total: 0}} = Publishing.list_published(slug, custom: %{"" => nil})
+  end
+
+  test "categories that are none of the group's give no posts, and no pages", %{slug: slug} do
+    assert {:ok, %{entries: [], total: 0, total_pages: 0, page: 1}} =
+             Publishing.list_published(slug, categories: ["typo"])
+  end
+
   test "category_counts counts each category's subtree in the language", %{slug: slug} do
     assert {:ok, %{"billing" => 6, "invoices" => 1, "crm" => 1}} =
              Publishing.category_counts(slug)

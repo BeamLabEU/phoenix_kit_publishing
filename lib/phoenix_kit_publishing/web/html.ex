@@ -107,7 +107,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @doc """
   Renders the JSON-LD `Article` structured-data script for a post page, built
   from the same `:og` map the meta tags use (title/description/image/url are
-  already override- and plugin-refined there) plus the post's publish date.
+  already override- and plugin-refined there) plus the post's publish date and
+  its author: a `Person` named by the post's `author` custom field, else the
+  site as an `Organization`.
   Rendered in-page for the same reason as the OG tags: search engines read
   body placement, and the host owns `<head>`.
   """
@@ -141,10 +143,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       |> maybe_put_jsonld("image", og[:image])
       |> maybe_put_jsonld("mainEntityOfPage", og[:url])
       |> maybe_put_jsonld("datePublished", jsonld_date_published(post))
+      |> maybe_put_jsonld("author", jsonld_author(post))
       |> maybe_put_jsonld("publisher", %{
         "@type" => "Organization",
         "name" => Settings.get_project_title()
       })
+    end
+  end
+
+  # The post's own "author" custom field names a person; without one the
+  # site is the author, as it is the publisher. Never the account that wrote
+  # the post: that is an admin's identity, not a byline.
+  defp jsonld_author(post) do
+    case get_in(post, [:metadata, :custom_fields, "author"]) do
+      name when is_binary(name) and name != "" -> %{"@type" => "Person", "name" => name}
+      _ -> %{"@type" => "Organization", "name" => Settings.get_project_title()}
     end
   end
 
@@ -2192,22 +2205,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <%!-- Version History Dropdown --%>
             <%= if @version_dropdown do %>
               <div class="dropdown dropdown-end">
-                <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1">
-                  <.icon name="hero-clock" class="w-4 h-4" />
-                  v{@version_dropdown.current_version}
-                  <.icon name="hero-chevron-down" class="w-3 h-3" />
+                <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-1 max-w-64">
+                  <.icon name="hero-clock" class="w-4 h-4 shrink-0" />
+                  <span class="truncate">
+                    v{@version_dropdown.current_version}<span :if={@version_dropdown[:current_label]}> · {@version_dropdown.current_label}</span>
+                  </span>
+                  <.icon name="hero-chevron-down" class="w-3 h-3 shrink-0" />
                 </div>
                 <ul
                   tabindex="0"
-                  class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-40 border border-base-200"
+                  class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56 max-w-[calc(100vw-2rem)] border border-base-200"
+                  data-version-menu
                 >
                   <%= for v <- @version_dropdown.versions do %>
                     <li>
                       <.link
                         navigate={v.url}
-                        class={"flex items-center justify-between #{if v.is_current, do: "active"}"}
+                        class={"flex items-center justify-between gap-2 #{if v.is_current, do: "active"}"}
                       >
-                        <span>v{v.version}</span>
+                        <span class="min-w-0">
+                          v{v.version}<span
+                            :if={v[:label]}
+                            class="block text-xs opacity-70 whitespace-normal break-words"
+                          >{v.label}</span>
+                        </span>
                         <%= if v.is_live do %>
                           <span class="badge badge-success badge-xs h-auto">{gettext("live")}</span>
                         <% end %>
@@ -2285,8 +2306,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <% end %>
           </h2>
           <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <%!-- h-full: the grid stretches each cell to the row's height,
+              the link has to fill its cell for the cards to match --%>
             <li :for={related <- @related_post_links}>
-              <.link navigate={related.url} class="block rounded-box border border-base-300 p-3 hover:border-primary">
+              <.link
+                navigate={related.url}
+                class="block h-full rounded-box border border-base-300 p-3 hover:border-primary"
+              >
                 <span class="block font-medium">{related.title}</span>
               </.link>
             </li>

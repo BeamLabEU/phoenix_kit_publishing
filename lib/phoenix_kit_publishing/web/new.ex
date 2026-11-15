@@ -586,7 +586,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.New do
               <label class="label">
                 <span class="fieldset-label text-xs text-base-content/60">
                   {gettext(
-                    "The URL mode locks in after creation to keep your structure consistent."
+                    "A timestamp group can later switch to readable slug URLs (\"Readable URLs\" in its settings; old date URLs redirect). That switch is one way, and a slug group stays slug."
                   )}
                 </span>
               </label>

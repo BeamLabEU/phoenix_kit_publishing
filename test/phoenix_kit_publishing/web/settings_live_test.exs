@@ -221,6 +221,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.SettingsLiveTest do
     assert Settings.get_boolean_setting("publishing_unique_views", true)
   end
 
+  test "toggle_sitemap_refresh flips Publishing's sitemap-refresh switch", %{conn: conn} do
+    {:ok, view, html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/settings/publishing")
+
+    assert html =~ ~s|phx-click="toggle_sitemap_refresh"|
+    assert Settings.get_boolean_setting("publishing_sitemap_refresh", true)
+
+    render_click(view, "toggle_sitemap_refresh", %{})
+    refute Settings.get_boolean_setting("publishing_sitemap_refresh", true)
+
+    render_click(view, "toggle_sitemap_refresh", %{})
+    assert Settings.get_boolean_setting("publishing_sitemap_refresh", true)
+  end
+
   test "clear_render_cache clears the global cache", %{conn: conn} do
     {:ok, view, _html} =
       conn

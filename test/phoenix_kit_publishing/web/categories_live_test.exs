@@ -84,6 +84,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.CategoriesLiveTest do
     assert PublishingCategory.seo_description(reloaded) == "Everything styled."
   end
 
+  test "a bad colour, icon or SEO text is named under its own input and in the flash", %{
+    conn: conn,
+    slug: slug
+  } do
+    {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")
+
+    for {field, value, text} <- [
+          {"color", "rebeccapurple", "Use a hex colour such as #4f46e5"},
+          {"icon", "fa-home", "Use a Heroicons name such as hero-cube."},
+          {"seo_title", String.duplicate("t", 121),
+           "The SEO title can be at most 120 characters."},
+          {"seo_description", String.duplicate("d", 321),
+           "The SEO description can be at most 320 characters."}
+        ] do
+      render_click(view, "new", %{})
+
+      html =
+        view
+        |> form("#category-form", category: %{"name" => "Bad #{field}", field => value})
+        |> render_submit()
+
+      # the flash and the input's own error both carry the sentence
+      escaped = text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
+      assert length(String.split(html, escaped)) - 1 == 2, field
+    end
+
+    assert Categories.list_categories(slug) == []
+  end
+
   test "'New subcategory' prefills the parent", %{conn: conn, slug: slug} do
     {:ok, parent} = Categories.create_category(slug, %{"name" => "Parent"})
     {:ok, view, _} = live(conn, "/admin/publishing/categories/#{slug}")

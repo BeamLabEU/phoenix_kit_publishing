@@ -255,7 +255,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @import_version_keys ~w(description seo_title excerpt featured featured_image_uuid
-                           og_title og_description og_image_uuid sitemap_exclude)
+                           og_title og_description og_image_uuid sitemap_exclude version_label)
 
   @doc """
   Creates a post with everything it carries, in one call: for an importer, a
@@ -296,7 +296,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   # the import after its post was created (a retrying importer then made a
   # duplicate per attempt).
   @import_text_keys ~w(title content slug description seo_title excerpt featured_image_uuid
-                       og_title og_description og_image_uuid)
+                       og_title og_description og_image_uuid version_label)
 
   defp check_import_shapes(attrs) do
     checks = [
@@ -610,6 +610,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     case result do
       {:ok, updated_post} ->
         ListingCache.regenerate(group_slug)
+        if sitemap_changed?(post, updated_post), do: SitemapRefresh.request()
 
         unless Map.get(opts_map, :skip_broadcast, false) do
           PublishingPubSub.broadcast_post_updated(group_slug, updated_post)
@@ -645,6 +646,25 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
     maybe_publish_after_save(result, group_slug, post, params, opts_map, audit_meta)
   end
+
+  # A save that moved or hid a public URL: the post's slug (shared by every
+  # version, so it moves the live URL from any version's editor) on a post
+  # with a live version, or the live version's own url_slug or
+  # sitemap_exclude. A publish in the same save requests one itself.
+  defp sitemap_changed?(old, saved) do
+    live_version? = Constants.published?(get_in(saved, [:metadata, :status]))
+
+    has_live? =
+      live_version? or
+        Enum.any?(Map.values(saved[:version_statuses] || %{}), &Constants.published?/1)
+
+    (has_live? and old[:slug] != saved[:slug]) or
+      (live_version? and
+         (old[:url_slug] != saved[:url_slug] or
+            sitemap_exclude(old) != sitemap_exclude(saved)))
+  end
+
+  defp sitemap_exclude(post), do: get_in(post, [:metadata, :sitemap_exclude]) == true
 
   # The save asked for "published" and the saved version is not the live
   # one: publish it. See `update_post/4`'s doc for why this is a second step
@@ -1825,6 +1845,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       )
       |> put_audio_uuid(Map.get(params, "audio_uuid"))
       |> put_custom_fields(params)
+      |> put_version_label(params)
 
     # Also update version-level status and published_at if provided.
     # "published" is NEVER written here — it is set atomically with
@@ -1854,6 +1875,20 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         case PublishingVersion.normalize_custom_fields(fields) do
           empty when map_size(empty) == 0 -> Map.delete(data, "custom_fields")
           normalized -> Map.put(data, "custom_fields", normalized)
+        end
+    end
+  end
+
+  # Absent: left alone; blank: removed.
+  defp put_version_label(data, params) do
+    case Map.fetch(params, "version_label") do
+      :error ->
+        data
+
+      {:ok, label} ->
+        case PublishingVersion.normalize_label(label) do
+          nil -> Map.delete(data, "label")
+          label -> Map.put(data, "label", label)
         end
     end
   end

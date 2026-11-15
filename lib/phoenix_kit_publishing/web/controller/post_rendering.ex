@@ -445,17 +445,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
          current_version,
          live_version
        ) do
+    labels = Map.get(post, :version_labels) || %{}
+
     versions_with_urls =
       Enum.map(published_versions, fn version ->
         %{
           version: version,
+          label: Map.get(labels, version),
           url: build_version_url(group_slug, post, language, version),
           is_current: version == current_version,
           is_live: version == live_version
         }
       end)
 
-    %{versions: versions_with_urls, current_version: current_version}
+    %{
+      versions: versions_with_urls,
+      current_version: current_version,
+      current_label: Map.get(labels, current_version)
+    }
   end
 
   @doc """

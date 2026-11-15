@@ -47,6 +47,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.IndexLiveTest do
     assert html =~ ~s|phx-disable-with="Trashing…"|
   end
 
+  test "a group with nothing published shows a disabled Public button, not none", %{conn: conn} do
+    {:ok, group} =
+      Groups.add_group("Index Empty #{System.unique_integer([:positive])}", mode: "slug")
+
+    {:ok, view, _html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/publishing")
+
+    assert has_element?(view, "[data-public-disabled] button[disabled]", "Public")
+    refute has_element?(view, "a[href$='/#{group["slug"]}']", "Public")
+  end
+
   test "switching to the trashed view fires the right event handler",
        %{conn: conn} do
     {:ok, group} =

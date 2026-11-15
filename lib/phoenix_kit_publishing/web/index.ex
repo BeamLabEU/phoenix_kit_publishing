@@ -602,6 +602,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Index do
                           <.icon name="hero-eye" class="w-4 h-4 sm:mr-1" />
                           <span class="hidden sm:inline">{gettext("Public")}</span>
                         </.button>
+                      <% else %>
+                        <%!-- Same place in every card's row: disabled until a
+                              post is published, with the reason as its hint --%>
+                        <span
+                          class="tooltip flex-1 sm:flex-none min-w-0"
+                          data-tip={gettext("Nothing published yet")}
+                          tabindex="0"
+                          data-public-disabled
+                        >
+                          <.button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            class="sm:btn-sm w-full min-w-0"
+                            disabled
+                            aria-label={gettext("View public site (nothing published yet)")}
+                          >
+                            <.icon name="hero-eye" class="w-4 h-4 sm:mr-1" />
+                            <span class="hidden sm:inline">{gettext("Public")}</span>
+                          </.button>
+                        </span>
                       <% end %>
                       <.button
                         :if={@can_manage_groups}
