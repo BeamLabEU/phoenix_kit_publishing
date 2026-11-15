@@ -37,6 +37,8 @@ defmodule PhoenixKit.Integration.Publishing.SitemapRefreshTest do
     post
   end
 
+  defp read(post), do: elem({:ok, _} = Posts.read_post_by_uuid(post.uuid, "en", 1), 1)
+
   defp sitemap_jobs, do: all_enqueued(worker: SchedulerWorker)
 
   defp clear_jobs, do: TestRepo.delete_all(Oban.Job)
@@ -99,6 +101,75 @@ defmodule PhoenixKit.Integration.Publishing.SitemapRefreshTest do
       draft = new_post(slug, 1)
       assert {:ok, _} = Posts.trash_post(slug, draft.uuid)
       assert sitemap_jobs() == []
+    end
+
+    test "a live post's slug, url_slug or sitemap_exclude change refreshes it", %{
+      group_slug: slug
+    } do
+      post = new_post(slug, 1)
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+
+      for params <- [
+            %{"slug" => "renamed"},
+            %{"url_slug" => "custom-address"},
+            %{"sitemap_exclude" => "true"}
+          ] do
+        clear_jobs()
+        assert {:ok, _} = Posts.update_post(slug, read(post), params, %{})
+        assert [_] = sitemap_jobs(), inspect(params)
+      end
+    end
+
+    test "an edit that moves no public URL leaves the sitemap alone", %{group_slug: slug} do
+      live = new_post(slug, 1)
+      :ok = Versions.publish_version(slug, live.uuid, 1)
+      draft = new_post(slug, 2)
+      clear_jobs()
+
+      assert {:ok, _} = Posts.update_post(slug, read(live), %{"title" => "New title"}, %{})
+      assert {:ok, _} = Posts.update_post(slug, read(draft), %{"slug" => "elsewhere"}, %{})
+      assert {:ok, _} = Posts.update_post(slug, read(draft), %{"sitemap_exclude" => "true"}, %{})
+      assert sitemap_jobs() == []
+    end
+
+    test "trashing, restoring, renaming or excluding a group refreshes it", %{group_slug: slug} do
+      {:ok, _} = Groups.update_group(slug, %{"name" => "Renamed", "slug" => slug <> "-x"})
+      assert [_] = sitemap_jobs()
+      slug = slug <> "-x"
+
+      clear_jobs()
+      {:ok, _} = Groups.update_group(slug, %{"sitemap_exclude" => "true"})
+      assert [_] = sitemap_jobs()
+
+      clear_jobs()
+      {:ok, _} = Groups.update_group(slug, %{"show_breadcrumbs" => "false"})
+      assert sitemap_jobs() == []
+
+      {:ok, _} = Groups.trash_group(slug)
+      assert [_] = sitemap_jobs()
+
+      clear_jobs()
+      {:ok, _} = Groups.restore_group(slug)
+      assert [_] = sitemap_jobs()
+    end
+
+    test "core's automatic regeneration off, or Publishing's own switch off, queues nothing",
+         %{group_slug: slug} do
+      post = new_post(slug, 1)
+
+      {:ok, _} = Settings.update_boolean_setting("sitemap_schedule_enabled", false)
+      refute SitemapRefresh.enabled?()
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+      assert sitemap_jobs() == []
+
+      {:ok, _} = Settings.update_boolean_setting("sitemap_schedule_enabled", true)
+      {:ok, _} = Settings.update_boolean_setting("publishing_sitemap_refresh", false)
+      refute SitemapRefresh.enabled?()
+      :ok = Versions.unpublish_post(slug, post.uuid)
+      assert sitemap_jobs() == []
+
+      {:ok, _} = Settings.update_boolean_setting("publishing_sitemap_refresh", true)
+      assert SitemapRefresh.enabled?()
     end
 
     test "nothing is queued while the Sitemap module is disabled", %{group_slug: slug} do

@@ -1,13 +1,22 @@
 defmodule PhoenixKit.Modules.Publishing.SitemapRefresh do
   @moduledoc """
-  Asks core's Sitemap module to regenerate after a post goes live or stops
-  being live (publish, unpublish, trash or restore of a post with a live
-  version).
+  Asks core's Sitemap module to regenerate after a public URL appears,
+  disappears or moves: a post goes live or stops being live (publish,
+  unpublish, trash or restore of a post with a live version), a live post's
+  slug changes, a post's or group's `sitemap_exclude` flips, a group is
+  trashed or restored, or a group is converted to slug URLs.
+
+  It is automatic regeneration, so it follows the two switches that govern
+  that: core's `sitemap_schedule_enabled` ("Automatic regeneration" on the
+  Sitemap settings page; a site that turned it off regenerates by hand, and
+  core's job bypasses the switch for manual jobs, so this module checks it)
+  and Publishing's own `publishing_sitemap_refresh` (default on), for a site
+  that wants the schedule but not a refresh per publish.
 
   The seam is optional and fully guarded, like the module's other ones: no
-  Sitemap module loaded, the Sitemap module disabled, no Oban running, or any
-  raise or exit, and `request/0` returns without a word to the caller. It
-  never fails or blocks the mutation that called it.
+  Sitemap module loaded, the Sitemap module or either switch off, no Oban
+  running, or any raise or exit, and `request/0` returns without a word to
+  the caller. It never fails or blocks the mutation that called it.
 
   Core's `SchedulerWorker.regenerate_module_now/1` inserts an Oban job with
   args `%{scheduled: false, manual: true, source: "publishing"}`, but neither
@@ -26,6 +35,7 @@ defmodule PhoenixKit.Modules.Publishing.SitemapRefresh do
   @sitemap PhoenixKit.Modules.Sitemap
 
   @delay_seconds 30
+  @setting_key "publishing_sitemap_refresh"
   @source "publishing"
 
   @doc false
@@ -38,7 +48,7 @@ defmodule PhoenixKit.Modules.Publishing.SitemapRefresh do
   """
   @spec request() :: :ok
   def request do
-    if available?() and sitemap_enabled?() do
+    if available?() and enabled?() do
       enqueue(@worker)
     end
 
@@ -58,9 +68,19 @@ defmodule PhoenixKit.Modules.Publishing.SitemapRefresh do
       Code.ensure_loaded?(Oban) and function_exported?(Oban, :insert, 1)
   end
 
-  defp sitemap_enabled? do
-    Code.ensure_loaded?(@sitemap) and function_exported?(@sitemap, :enabled?, 0) and
-      @sitemap.enabled?() == true
+  @doc """
+  Whether a request would queue a job: Publishing's `publishing_sitemap_refresh`
+  and core's Sitemap module and its automatic regeneration all on.
+  """
+  @spec enabled?() :: boolean()
+  def enabled? do
+    PhoenixKit.Settings.get_boolean_setting(@setting_key, true) and
+      sitemap_says?(:enabled?) and sitemap_says?(:schedule_enabled?)
+  end
+
+  defp sitemap_says?(function) do
+    Code.ensure_loaded?(@sitemap) and function_exported?(@sitemap, function, 0) and
+      apply(@sitemap, function, []) == true
   end
 
   defp enqueue(worker) do

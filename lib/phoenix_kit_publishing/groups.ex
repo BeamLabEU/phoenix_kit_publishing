@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.SitemapRefresh
   alias PhoenixKit.Modules.Publishing.StaleFixer
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Slug
@@ -276,6 +277,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
 
           group = db_group_to_map(updated)
           PublishingPubSub.broadcast_group_updated(group)
+          if sitemap_changed?(db_group, updated), do: SitemapRefresh.request()
 
           ActivityLog.log_manual(
             "publishing.group.updated",
@@ -512,6 +514,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
           {:ok, _} ->
             ListingCache.invalidate(slug)
             PublishingPubSub.broadcast_group_deleted(slug)
+            SitemapRefresh.request()
 
             ActivityLog.log_manual(
               "publishing.group.trashed",
@@ -676,11 +679,20 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
     end
   end
 
+  # Every URL of the group moves with its slug, and `sitemap_exclude` adds or
+  # takes them all out of core's sitemap source.
+  defp sitemap_changed?(old, saved) do
+    old.slug != saved.slug or
+      Map.get(old.data || %{}, "sitemap_exclude", false) !=
+        Map.get(saved.data || %{}, "sitemap_exclude", false)
+  end
+
   defp delete_and_broadcast_group(db_group, slug, opts) do
     case DBStorage.delete_group(db_group) do
       {:ok, _} ->
         ListingCache.invalidate(slug)
         PublishingPubSub.broadcast_group_deleted(slug)
+        SitemapRefresh.request()
 
         ActivityLog.log_manual(
           "publishing.group.deleted",
@@ -712,6 +724,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
       {:ok, _} ->
         ListingCache.regenerate(slug)
         PublishingPubSub.broadcast_group_created(%{"uuid" => db_group.uuid, "slug" => slug})
+        SitemapRefresh.request()
 
         ActivityLog.log_manual(
           "publishing.group.restored",
