@@ -2285,8 +2285,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             <% end %>
           </h2>
           <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <%!-- h-full: the grid stretches each cell to the row's height,
+              the link has to fill its cell for the cards to match --%>
             <li :for={related <- @related_post_links}>
-              <.link navigate={related.url} class="block rounded-box border border-base-300 p-3 hover:border-primary">
+              <.link
+                navigate={related.url}
+                class="block h-full rounded-box border border-base-300 p-3 hover:border-primary"
+              >
                 <span class="block font-medium">{related.title}</span>
               </.link>
             </li>
