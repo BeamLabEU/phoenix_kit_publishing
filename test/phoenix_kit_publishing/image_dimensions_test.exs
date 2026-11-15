@@ -48,6 +48,21 @@ defmodule PhoenixKit.Modules.Publishing.ImageDimensionsTest do
     assert img =~ ~s(height="360")
   end
 
+  test "text in a quoted value is not an attribute, and a non-string size is ignored" do
+    assert [img] =
+             imgs(
+               render(%{
+                 "src" => "/l.png",
+                 "alt" => "a width=1 shot",
+                 "width" => "640",
+                 "height" => "360"
+               })
+             )
+
+    assert img =~ ~s(width="640")
+    assert Image.dimensions(%{"src" => "/l.png", "width" => %{}, "height" => 3}) == nil
+  end
+
   test "a src image without them, or with unusable ones, gets none" do
     for attrs <- [
           %{"src" => "/l.png"},

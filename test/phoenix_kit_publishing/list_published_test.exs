@@ -117,6 +117,10 @@ defmodule PhoenixKit.Modules.Publishing.ListPublishedTest do
       Publishing.list_published(slug, custom: %{"version" => "1.2.0", "x" => "y"})
 
     {:ok, %{total: 8}} = Publishing.list_published(slug, custom: %{})
+
+    # nil: posts without the field; a value that is not text matches nothing
+    {:ok, %{total: 7}} = Publishing.list_published(slug, custom: %{"version" => nil})
+    {:ok, %{total: 0}} = Publishing.list_published(slug, custom: %{"version" => %{}})
   end
 
   test "categories that are none of the group's give no posts, and no pages", %{slug: slug} do

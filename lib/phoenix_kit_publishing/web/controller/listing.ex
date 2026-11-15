@@ -376,10 +376,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   # key must match, as the post's custom field (a string) equals the value
   # written as text, or one of a list of them.
   defp filter_by_custom(posts, custom) when is_map(custom) and map_size(custom) > 0 do
-    wanted =
-      Map.new(custom, fn {key, value} ->
-        {to_string(key), value |> List.wrap() |> Enum.map(&to_string/1)}
-      end)
+    wanted = Map.new(custom, fn {key, value} -> {to_string(key), wanted_values(value)} end)
 
     Enum.filter(posts, fn post ->
       fields = get_in(post, [:metadata, :custom_fields]) || %{}
@@ -388,6 +385,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   end
 
   defp filter_by_custom(posts, _custom), do: posts
+
+  # Stored custom fields are strings. A requested value is compared as text;
+  # nil matches a post without the field; a value that cannot be text (a map,
+  # a tuple) matches nothing rather than raising.
+  defp wanted_values(nil), do: [nil]
+
+  defp wanted_values(value) do
+    value
+    |> List.wrap()
+    |> Enum.flat_map(fn
+      nil -> [nil]
+      v when is_binary(v) -> [v]
+      v when is_atom(v) or is_number(v) -> [to_string(v)]
+      _ -> []
+    end)
+  end
 
   defp page_size(n) when is_integer(n) and n > 0, do: min(n, @max_page_size)
   defp page_size(_n), do: @default_page_size

@@ -47,7 +47,8 @@ defmodule PhoenixKit.Modules.Publishing do
   none known means no posts),
   `:search` (a case-insensitive match on title, description and excerpt),
   `:custom` (custom fields that must match: `%{"written" => true}`, a list
-  for any of several values; values compare as text),
+  for any of several values; values compare as text, `nil` matches a post
+  without the field),
   `:page` (default 1, capped at the last), `:per_page` (default 20, at most
   200), `:sort` (`"newest"` / `"oldest"`, default the group's
   `listing_sort`), `:images` (`true` resolves `featured_image_url`; a

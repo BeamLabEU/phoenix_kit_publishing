@@ -87,8 +87,10 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
   end
 
   defp author_dimensions(attributes) do
-    with {w, ""} <- Integer.parse(to_string(Map.get(attributes, "width", ""))),
-         {h, ""} <- Integer.parse(to_string(Map.get(attributes, "height", ""))),
+    with w when is_binary(w) <- Map.get(attributes, "width"),
+         h when is_binary(h) <- Map.get(attributes, "height"),
+         {w, ""} <- Integer.parse(String.trim(w)),
+         {h, ""} <- Integer.parse(String.trim(h)),
          true <- w > 0 and h > 0 do
       {w, h}
     else
@@ -112,6 +114,8 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
     # a uuid that is not one, storage unavailable: no dimensions, never a
     # failed render
     _ -> nil
+  catch
+    :exit, _ -> nil
   end
 
   defp stored_dimensions(_attributes), do: nil
@@ -133,7 +137,18 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
   defp put_dimensions(html, attributes) do
     case dimensions(attributes) do
       {w, h} ->
-        Regex.replace(~r/<img(?![^>]*\swidth=)/, html, ~s(<img width="#{w}" height="#{h}"),
+        # the first <img> tag; quoted values are blanked before looking for
+        # an attribute, so an alt reading "width=640" is not one
+        Regex.replace(
+          ~r/<img\b[^>]*>/,
+          html,
+          fn tag ->
+            unquoted = Regex.replace(~r/"[^"]*"|'[^']*'/, tag, "\"\"")
+
+            if Regex.match?(~r/\s(?:width|height)\s*=/i, unquoted),
+              do: tag,
+              else: String.replace_prefix(tag, "<img", ~s(<img width="#{w}" height="#{h}"))
+          end,
           global: false
         )
 
