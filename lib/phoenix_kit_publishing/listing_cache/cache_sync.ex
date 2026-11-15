@@ -15,10 +15,15 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.CacheSync do
   Delivery is Phoenix.PubSub at-most-once — a node partitioned when the
   broadcast fires misses the purge until its next local mutation or restart.
   The listing cache is eventually consistent, not strongly.
+
+  It also creates `GroupSlugs`' generation counter and erases that slug set
+  on every `publishing:groups` broadcast, so a group created, renamed or
+  deleted on a peer reaches this node's public dispatch.
   """
 
   use GenServer
 
+  alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
 
@@ -36,7 +41,10 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.CacheSync do
 
   @impl true
   def handle_continue(:subscribe, state) do
+    GroupSlugs.init()
     PublishingPubSub.subscribe_to_cache_invalidations()
+    # a group created, renamed or deleted on any node: RouterDispatch's slug set
+    PublishingPubSub.subscribe_to_groups()
     {:noreply, state}
   end
 
@@ -51,6 +59,12 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.CacheSync do
   # The origin node keeps the listing it just installed.
   def handle_info({:cache_regenerated, group_slug, origin}, state) do
     if origin != node(), do: ListingCache.erase_local(group_slug)
+    {:noreply, state}
+  end
+
+  def handle_info({event, _group}, state)
+      when event in [:group_created, :group_updated, :group_deleted] do
+    GroupSlugs.erase()
     {:noreply, state}
   end
 

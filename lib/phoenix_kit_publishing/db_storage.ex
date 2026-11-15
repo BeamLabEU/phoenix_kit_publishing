@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   alias PhoenixKit.Modules.Publishing.ActivityLog
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage.Mapper
+  alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.PublishingContent
@@ -40,6 +41,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     %PublishingGroup{}
     |> PublishingGroup.changeset(attrs)
     |> repo().insert()
+    |> group_slugs_changed()
   end
 
   @doc "Updates a publishing group."
@@ -48,7 +50,16 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
     group
     |> PublishingGroup.changeset(attrs)
     |> repo().update()
+    |> group_slugs_changed()
   end
+
+  # RouterDispatch's slug set (`GroupSlugs`) must never miss a group.
+  defp group_slugs_changed({:ok, _} = result) do
+    GroupSlugs.erase()
+    result
+  end
+
+  defp group_slugs_changed(result), do: result
 
   @doc "Gets a group by slug."
   @spec get_group_by_slug(String.t()) :: PublishingGroup.t() | nil
@@ -104,7 +115,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   @doc "Deletes a group and all its posts (cascade)."
   @spec delete_group(PublishingGroup.t()) :: changeset_or_struct(PublishingGroup.t())
   def delete_group(%PublishingGroup{} = group) do
-    repo().delete(group)
+    group |> repo().delete() |> group_slugs_changed()
   end
 
   # ===========================================================================

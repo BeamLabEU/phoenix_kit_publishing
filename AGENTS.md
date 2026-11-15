@@ -560,7 +560,7 @@ lib/phoenix_kit_publishing/
 ├── migrations.ex                                # module-owned versioned migration chain (V1 = adoption)
 ├── stale_fixer.ex, activity_log.ex, group_settings.ex, comments.ex, gettext.ex
 ├── media_folders.ex, media_adoption.ex, media_reorganizer.ex   # group media folders
-├── listing_cache.ex (+ cache_sync, lock_table_owner), renderer.ex
+├── listing_cache.ex (+ cache_sync, lock_table_owner), group_slugs.ex, renderer.ex
 ├── page_builder.ex (+ parser, renderer, components/)
 ├── schemas/               # 6 Ecto schemas
 └── web/                   # admin LiveViews, public Controller (+ 9 submodules), HTML
@@ -586,6 +586,14 @@ lib/phoenix_kit_publishing/
   old listing nor overwrite the tombstone. Reads stay lock-free
   `:persistent_term` lookups. `ListingCache.CacheSync` erases on a peer's
   invalidation or regeneration.
+- `Publishing.GroupSlugs` — every group slug in `:persistent_term`, so
+  `RouterDispatch` answers a request for no group without a query. A
+  negative filter that must never miss a group: `DBStorage`'s group writes
+  bump an `:atomics` generation (a set built under an older one is unused),
+  `CacheSync` erases on every `publishing:groups` broadcast (sent after the
+  commit, on every node) and a set lives five minutes at most. The counter is
+  created by `CacheSync`; without it (this suite) every lookup asks the
+  database.
 - `Publishing.Renderer` — Markdown → HTML via MDEx/comrak, cached in
   `PhoenixKit.Cache` under `:publishing_posts` (24h TTL, max 2000, FIFO). The key
   folds a content hash and a `@cache_version` token, so an edit or a renderer

@@ -49,6 +49,7 @@ defmodule PhoenixKitPublishing.RouterDispatch do
   require Logger
 
   alias PhoenixKit.ModuleRegistry
+  alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
@@ -98,8 +99,9 @@ defmodule PhoenixKitPublishing.RouterDispatch do
   URL had no locale prefix. That sends the request to the controller
   with `language=<group-slug>, group=<post-slug>` and the lookup fails.
 
-  The DB lookup is small and indexed; a future optimization would
-  cache the slug set in `:persistent_term`.
+  A segment that is no group's slug is answered from `GroupSlugs` (the
+  slug set in `:persistent_term`) without a query, so a host request pays
+  nothing for the dispatch; only a group's own requests read the group.
   """
   @spec maybe_rewrite(Plug.Conn.t()) :: {:rewrite, Plug.Conn.t()} | :pass
   def maybe_rewrite(conn), do: maybe_rewrite(conn, "/")
@@ -283,7 +285,7 @@ defmodule PhoenixKitPublishing.RouterDispatch do
   defp known_group(nil), do: nil
 
   defp known_group(slug) when is_binary(slug) do
-    if reserved_by_other_module?(slug) do
+    if reserved_by_other_module?(slug) or GroupSlugs.member?(slug) == false do
       nil
     else
       case Groups.fetch_group(slug) do
