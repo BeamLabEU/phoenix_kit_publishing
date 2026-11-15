@@ -687,8 +687,7 @@ defmodule PhoenixKit.Modules.Publishing.Groups do
   # takes them all out of core's sitemap source.
   defp sitemap_changed?(old, saved) do
     old.slug != saved.slug or
-      Map.get(old.data || %{}, "sitemap_exclude", false) !=
-        Map.get(saved.data || %{}, "sitemap_exclude", false)
+      Map.get(old.data, "sitemap_exclude", false) != Map.get(saved.data, "sitemap_exclude", false)
   end
 
   defp delete_and_broadcast_group(db_group, slug, opts) do
