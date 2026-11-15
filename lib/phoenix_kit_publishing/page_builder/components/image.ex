@@ -37,6 +37,7 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
 
   alias Phoenix.HTML.Safe
   alias PhoenixKit.Modules.Shared.Components.Image, as: CoreImage
+  alias PhoenixKit.Modules.Storage
   alias PhoenixKit.ThemeConfig
 
   @light_class "pk-img-light"
@@ -55,8 +56,89 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
     attributes = assigns[:attributes] || %{}
 
     case dark_attributes(attributes) do
-      nil -> CoreImage.render(assigns)
+      nil -> render_single(assigns, attributes)
       dark -> render_pair(assigns, attributes, dark)
+    end
+  end
+
+  # One image: core's markup, with the file's width and height on the <img>
+  # when they are known, so the page does not shift while it loads.
+  defp render_single(assigns, attributes) do
+    html =
+      assigns
+      |> CoreImage.render()
+      |> Safe.to_iodata()
+      |> IO.iodata_to_binary()
+
+    if image?(html),
+      do: Phoenix.HTML.raw(put_dimensions(html, attributes)),
+      else: Phoenix.HTML.raw(html)
+  end
+
+  @doc """
+  The width and height an `<img>` of `attributes` gets: the author's own
+  `width` and `height` (positive integers), else the stored dimensions of
+  the copy of `file_uuid` core serves (the `file_variant` instance when it
+  exists, else the original, whose dimensions fall back to the file's); nil when neither is known (a `src` image, a file without them).
+  """
+  @spec dimensions(map()) :: {pos_integer(), pos_integer()} | nil
+  def dimensions(attributes) do
+    author_dimensions(attributes) || stored_dimensions(attributes)
+  end
+
+  defp author_dimensions(attributes) do
+    with {w, ""} <- Integer.parse(to_string(Map.get(attributes, "width", ""))),
+         {h, ""} <- Integer.parse(to_string(Map.get(attributes, "height", ""))),
+         true <- w > 0 and h > 0 do
+      {w, h}
+    else
+      _ -> nil
+    end
+  end
+
+  defp stored_dimensions(%{"file_uuid" => uuid} = attributes)
+       when is_binary(uuid) and uuid != "" do
+    variant = Map.get(attributes, "file_variant") || "original"
+
+    # Only the copy core serves: the variant when it exists, else the
+    # original. A variant without stored dimensions gets none, never the
+    # original's (a cropped thumbnail has another ratio); the original falls
+    # back to the file row, which describes it.
+    case variant != "original" && Storage.get_file_instance_by_name(uuid, variant) do
+      %{} = instance -> positive_dimensions(instance)
+      _ -> original_dimensions(uuid)
+    end
+  rescue
+    # a uuid that is not one, storage unavailable: no dimensions, never a
+    # failed render
+    _ -> nil
+  end
+
+  defp stored_dimensions(_attributes), do: nil
+
+  defp original_dimensions(uuid) do
+    with nil <- positive_dimensions(Storage.get_file_instance_by_name(uuid, "original")) do
+      positive_dimensions(Storage.get_file(uuid))
+    end
+  end
+
+  defp positive_dimensions(%{width: w, height: h})
+       when is_integer(w) and is_integer(h) and w > 0 and h > 0,
+       do: {w, h}
+
+  defp positive_dimensions(_), do: nil
+
+  # width/height go on the <img> that has none yet; core's h-auto keeps the
+  # ratio while the attributes reserve the box.
+  defp put_dimensions(html, attributes) do
+    case dimensions(attributes) do
+      {w, h} ->
+        Regex.replace(~r/<img(?![^>]*\swidth=)/, html, ~s(<img width="#{w}" height="#{h}"),
+          global: false
+        )
+
+      nil ->
+        html
     end
   end
 
@@ -98,8 +180,8 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
 
     case {image?(light), image?(dark)} do
       {true, true} -> Phoenix.HTML.raw([light, dark])
-      {false, true} -> CoreImage.render(Map.put(assigns, :attributes, dark_attrs))
-      _ -> CoreImage.render(Map.put(assigns, :attributes, light_attrs))
+      {false, true} -> render_single(Map.put(assigns, :attributes, dark_attrs), dark_attrs)
+      _ -> render_single(Map.put(assigns, :attributes, light_attrs), light_attrs)
     end
   end
 
@@ -110,11 +192,14 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
         _ -> marker
       end
 
-    assigns
-    |> Map.put(:attributes, Map.put(attrs, "class", class))
-    |> CoreImage.render()
-    |> Safe.to_iodata()
-    |> IO.iodata_to_binary()
+    html =
+      assigns
+      |> Map.put(:attributes, Map.put(attrs, "class", class))
+      |> CoreImage.render()
+      |> Safe.to_iodata()
+      |> IO.iodata_to_binary()
+
+    if image?(html), do: put_dimensions(html, attrs), else: html
   end
 
   # Core renders a placeholder `<div>` when the source does not resolve.
