@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.20.0 - 2026-11-24
+
+PR #66. Requires phoenix_kit 3.5.0 or later (unchanged floor; the `AdminEditHelper.assign_admin_edit/3` keyword form exists since 3.5.0).
+
+### Added
+
+- **The admin Edit target of public pages is handed to the host layout** through `LayoutWrapper.app_layout`'s `admin_edit_url` / `admin_edit_label` attrs — on the group listing, category archive, post, versioned-post and date-only post pages — so a host account menu (e.g. core's `UserDashboardNav.user_dropdown/1`) can show it.
+
+### Changed
+
+- The Edit target now also requires the `publishing` module permission, not just admin-area access: an admin scoped to another module gets no Edit target anywhere.
+- **The in-page Edit button is opt-in** via `publishing_show_admin_edit_button` (default off; toggle on Settings → Publishing). With it on, the markup is unchanged. Upgrade note: a host whose header does not render `admin_edit_url` shows no Edit link on public pages until the toggle is switched on.
+
 ## 0.19.0 - 2026-11-15
 
 PRs #64 and #65, and the fix for issue #54. **Requires phoenix_kit 3.5.0 or later** (`>= 3.5.0 and < 4.0.0`, the ecosystem-wide floor), and adds V3 of the module's migration chain: run `mix phoenix_kit.update`.
