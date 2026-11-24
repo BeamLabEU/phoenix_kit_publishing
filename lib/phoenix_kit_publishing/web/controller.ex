@@ -1349,8 +1349,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     end)
   end
 
-  defp maybe_assign_admin_edit(conn, path, label),
-    do: PhoenixKitWeb.AdminEditHelper.assign_admin_edit(conn, path, label)
+  # `permission: "publishing"` — the Edit target is only for scopes that hold
+  # the Publishing module permission, not merely admin-area access (an admin
+  # scoped to another module must not be sent into the Publishing editor).
+  # The keyword form exists in every core this module's floor admits.
+  defp maybe_assign_admin_edit(conn, path, label) do
+    PhoenixKitWeb.AdminEditHelper.assign_admin_edit(conn, path,
+      label: label,
+      permission: "publishing"
+    )
+  end
 
   # Category archives link to the categories admin page. Tags have no
   # admin surface of their own — "Body hashtags ARE the tag system" (see

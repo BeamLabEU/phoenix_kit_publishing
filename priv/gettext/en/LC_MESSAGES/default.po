@@ -863,6 +863,12 @@ msgstr "How titles in non-Latin scripts (e.g. Cyrillic) are turned into URL slug
 msgid "Image component inserted"
 msgstr "Image component inserted"
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr "In-Page Edit Button"
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -874,6 +880,16 @@ msgstr "In-Page Language Switcher"
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "In-Page OpenGraph Tags"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
+msgstr "In-page Edit button enabled — admins will see it on listing and post pages"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
 #, elixir-autogen, elixir-format
@@ -1696,6 +1712,11 @@ msgstr "Session paused:"
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Settings"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

@@ -865,6 +865,12 @@ msgstr "Sposób, w jaki tytuły w alfabetach niełacińskich (np. w cyrylicy) s�
 msgid "Image component inserted"
 msgstr "Wstawiono komponent obrazu"
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr "Przycisk edycji na stronie"
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -876,6 +882,16 @@ msgstr "Przełącznik języka na stronie"
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "Tagi OpenGraph na stronie"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Przycisk edycji na stronie wyłączony — administratorzy dotrą do edytora tylko wtedy, gdy twój układ strony pokazuje pozycję edycji (na przykład w menu konta)"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
+msgstr "Przycisk edycji na stronie włączony — administratorzy zobaczą go na stronach list i wpisów"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
 #, elixir-autogen, elixir-format
@@ -1698,6 +1714,11 @@ msgstr "Sesja wstrzymana:"
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Ustawienia"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Wyświetla przycisk edycji na stronach list i wpisów dla administratorów z dostępem do Publishing. Domyślnie wyłączone; włącz, jeśli twój układ strony sam nie pokazuje pozycji edycji (na przykład w menu konta)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

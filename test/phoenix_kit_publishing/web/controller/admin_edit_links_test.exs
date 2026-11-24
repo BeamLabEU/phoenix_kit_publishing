@@ -8,6 +8,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
   TAG archive never gets the "Edit categories" link — tags have no admin
   page of their own (they derive from body `#hashtags`), so linking there
   would send an admin to a page that can't touch the tag at all.
+
+  The in-page button is off by default (`publishing_show_admin_edit_button`),
+  so the links asserted here are the ones the test host layout renders from
+  the `admin_edit_url` / `admin_edit_label` attrs; the hand-off, the
+  permission gate and the button switch are pinned in
+  `AdminEditAccountMenuTest`.
   """
 
   use PhoenixKitPublishing.ConnCase, async: false
@@ -27,7 +33,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
     %Scope{
       user: %User{uuid: Ecto.UUID.generate(), email: "admin@example.com"},
       authenticated?: true,
-      cached_roles: ["Admin"]
+      cached_roles: ["Admin"],
+      cached_permissions: MapSet.new(["publishing"])
     }
   end
 

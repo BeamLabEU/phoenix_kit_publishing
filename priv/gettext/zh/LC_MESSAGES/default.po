@@ -861,6 +861,12 @@ msgstr "非拉丁文字（如西里尔字母）的标题如何转换为 URL slug
 msgid "Image component inserted"
 msgstr "已插入图片组件"
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr "页面内编辑按钮"
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -872,6 +878,16 @@ msgstr "页内语言切换器"
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "页内 OpenGraph 标签"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "已禁用页面内编辑按钮 — 仅当您的布局显示编辑入口（例如在账户菜单中）时，管理员才能进入编辑器"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
+msgstr "已启用页面内编辑按钮 — 管理员将在列表页和文章页看到它"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
 #, elixir-autogen, elixir-format
@@ -1694,6 +1710,11 @@ msgstr "会话已暂停："
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "设置"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "为拥有 Publishing 访问权限的管理员在列表页和文章页显示编辑按钮。默认关闭；如果您的布局本身不显示编辑入口（例如在账户菜单中），请开启。"
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

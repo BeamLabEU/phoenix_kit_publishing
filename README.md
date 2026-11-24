@@ -456,6 +456,7 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_editor_lock_minutes` | `30` | Editor owner-lock timeout (1–480) |
 | `publishing_slug_style` | `transliterate` | `transliterate`, `unicode` or `ascii` |
 | `publishing_show_language_switcher` | `true` | In-page language switcher on public pages |
+| `publishing_show_admin_edit_button` | `false` | In-page Edit button for admins on public pages; off by default because the Edit link is handed to the host layout (render `assigns[:admin_edit_url]`, e.g. in the account menu); turn it on if your header does not show the Edit entry |
 | `publishing_render_og_tags` | `true` | In-page OpenGraph/Twitter meta tags; turn off once your root layout renders them in `<head>` (see below) |
 | `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD on post pages; the author is the post's `author` custom field, else the site |
 | `publishing_sitemap_refresh` | `true` | Regenerate core's sitemap shortly after a public URL appears, disappears or moves (needs the Sitemap module with automatic regeneration on) |

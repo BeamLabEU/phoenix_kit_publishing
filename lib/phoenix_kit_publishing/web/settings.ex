@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @render_cache_key "publishing_render_cache_enabled"
   @show_language_switcher_key "publishing_show_language_switcher"
   @render_og_tags_key "publishing_render_og_tags"
+  @admin_edit_button_key "publishing_show_admin_edit_button"
   @feeds_enabled_key "publishing_feeds_enabled"
   @sitemap_refresh_key "publishing_sitemap_refresh"
   @render_jsonld_key "publishing_render_jsonld"
@@ -95,6 +96,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
       |> assign(
         :render_og_tags,
         Settings.get_boolean_setting(@render_og_tags_key, true)
+      )
+      |> assign(
+        :show_admin_edit_button,
+        Settings.get_boolean_setting(@admin_edit_button_key, false)
       )
       |> assign(:feeds_enabled, Settings.get_boolean_setting(@feeds_enabled_key, true))
       |> assign(:sitemap_refresh, Settings.get_boolean_setting(@sitemap_refresh_key, true))
@@ -272,6 +277,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
              else:
                gettext(
                  "In-page OpenGraph tags disabled — your host layout should render the forwarded :og assign in <head>"
+               )
+           )
+         )}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
+  end
+
+  defp settings_event("toggle_show_admin_edit_button", _params, socket) do
+    new_value = !socket.assigns.show_admin_edit_button
+
+    case Settings.update_boolean_setting(@admin_edit_button_key, new_value) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:show_admin_edit_button, new_value)
+         |> put_flash(
+           :info,
+           if(new_value,
+             do:
+               gettext(
+                 "In-page Edit button enabled — admins will see it on listing and post pages"
+               ),
+             else:
+               gettext(
+                 "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
                )
            )
          )}
@@ -766,6 +798,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
               class="toggle toggle-primary"
               checked={@render_og_tags}
               phx-click="toggle_render_og_tags"
+            />
+          </div>
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-pencil-square" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("In-Page Edit Button")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext(
+                    "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+                  )}
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              aria-label={gettext("In-Page Edit Button")}
+              class="toggle toggle-primary"
+              checked={@show_admin_edit_button}
+              phx-click="toggle_show_admin_edit_button"
             />
           </div>
 

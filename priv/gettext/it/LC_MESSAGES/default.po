@@ -863,6 +863,12 @@ msgstr "Come i titoli scritti in alfabeti non latini (ad es. cirillico) vengono 
 msgid "Image component inserted"
 msgstr "Componente immagine inserito"
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr "Pulsante Modifica nella pagina"
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -874,6 +880,16 @@ msgstr "Selettore di lingua in pagina"
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "Tag OpenGraph in pagina"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Pulsante Modifica nella pagina disattivato — gli amministratori raggiungono l'editor solo se il tuo layout mostra la voce Modifica (ad esempio nel menu dell'account)"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
+msgstr "Pulsante Modifica nella pagina attivato — gli amministratori lo vedranno nelle pagine di elenco e di articolo"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
 #, elixir-autogen, elixir-format
@@ -1696,6 +1712,11 @@ msgstr "Sessione in pausa:"
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Impostazioni"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Mostra un pulsante Modifica nelle pagine di elenco e di articolo per gli amministratori con accesso a Publishing. Disattivato per impostazione predefinita; attivalo se il tuo layout non mostra da solo la voce Modifica (ad esempio nel menu dell'account)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

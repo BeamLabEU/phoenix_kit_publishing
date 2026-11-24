@@ -863,6 +863,12 @@ msgstr "Comment les titres en écriture non latine (par ex. cyrillique) sont con
 msgid "Image component inserted"
 msgstr "Composant image inséré"
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr "Bouton Modifier intégré à la page"
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -874,6 +880,16 @@ msgstr "Sélecteur de langue intégré à la page"
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "Balises OpenGraph intégrées à la page"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Bouton Modifier intégré désactivé — les administrateurs n'accèdent à l'éditeur que si votre mise en page affiche l'entrée Modifier (par exemple dans le menu du compte)"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
+msgstr "Bouton Modifier intégré activé — les administrateurs le verront sur les pages de liste et d'article"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
 #, elixir-autogen, elixir-format
@@ -1696,6 +1712,11 @@ msgstr "Session en pause :"
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Paramètres"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Affiche un bouton Modifier sur les pages de liste et d'article pour les administrateurs ayant accès à Publishing. Désactivé par défaut ; à activer si votre mise en page n'affiche pas elle-même l'entrée Modifier (par exemple dans le menu du compte)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

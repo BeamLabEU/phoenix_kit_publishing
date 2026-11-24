@@ -41,6 +41,11 @@ defmodule PhoenixKitPublishing.Test.Layouts do
   # that publishing's exposed conn assign actually crosses the
   # function-component layout boundary into the host's `Layouts.app`.
   #
+  # Also surfaces the admin Edit target (`:admin_edit_url` / `:admin_edit_label`)
+  # via a `data-testid="host-admin-edit"` link, the way a host's account menu
+  # would read it, so the account-menu hand-off test can pin that the target
+  # crosses the layout boundary.
+  #
   # Note: this layout is called via `Phoenix.Controller.template_render`
   # (controller render path), NOT as a HEEx `<.app>` component, so
   # `attr` declarations would break it — the assigns map is read
@@ -54,7 +59,9 @@ defmodule PhoenixKitPublishing.Test.Layouts do
       Map.merge(assigns, %{
         current_user_email: email,
         translations: translations,
-        og_title: og_title
+        og_title: og_title,
+        admin_edit_url: assigns[:admin_edit_url],
+        admin_edit_label: assigns[:admin_edit_label]
       })
 
     ~H"""
@@ -69,6 +76,9 @@ defmodule PhoenixKitPublishing.Test.Layouts do
       >
         <a :for={t <- @translations} href={t.url} data-lang={t.code}>{t.name}</a>
       </nav>
+      <a :if={@admin_edit_url} data-testid="host-admin-edit" href={@admin_edit_url}>
+        {@admin_edit_label}
+      </a>
       {@inner_content}
     </main>
     """

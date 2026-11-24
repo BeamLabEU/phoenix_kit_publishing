@@ -221,6 +221,29 @@ defmodule PhoenixKit.Modules.Publishing.Web.SettingsLiveTest do
     assert Settings.get_boolean_setting("publishing_unique_views", true)
   end
 
+  test "toggle_show_admin_edit_button flips the in-page Edit button switch, off by default",
+       %{conn: conn} do
+    {:ok, view, html} =
+      conn
+      |> put_test_scope(fake_scope())
+      |> live("/admin/settings/publishing")
+
+    assert html =~ ~s|phx-click="toggle_show_admin_edit_button"|
+    refute Settings.get_boolean_setting("publishing_show_admin_edit_button", false)
+
+    refute has_element?(view, ~s(input[phx-click="toggle_show_admin_edit_button"][checked]))
+
+    render_click(view, "toggle_show_admin_edit_button", %{})
+    assert Settings.get_boolean_setting("publishing_show_admin_edit_button", false)
+    assert has_element?(view, ~s(input[phx-click="toggle_show_admin_edit_button"][checked]))
+    assert has_element?(view, "#flash-info", "In-page Edit button enabled")
+
+    render_click(view, "toggle_show_admin_edit_button", %{})
+    refute Settings.get_boolean_setting("publishing_show_admin_edit_button", false)
+    refute has_element?(view, ~s(input[phx-click="toggle_show_admin_edit_button"][checked]))
+    assert has_element?(view, "#flash-info", "In-page Edit button disabled")
+  end
+
   test "toggle_sitemap_refresh flips Publishing's sitemap-refresh switch", %{conn: conn} do
     {:ok, view, html} =
       conn

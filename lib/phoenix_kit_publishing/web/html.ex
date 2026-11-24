@@ -20,6 +20,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   @timestamp_modes Constants.timestamp_modes()
 
   @og_render_key "publishing_render_og_tags"
+  @admin_edit_button_key "publishing_show_admin_edit_button"
 
   import PhoenixKitWeb.Components.LanguageSwitcher
 
@@ -82,6 +83,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     Settings.get_boolean_setting(@og_render_key, true)
   rescue
     _ -> true
+  end
+
+  # Whether the in-page Edit button renders. Off by default: the Edit target is
+  # handed to the host layout through `app_layout` regardless, so a layout that
+  # renders it (e.g. in its account menu) already shows the entry; a host whose
+  # layout does not turns the button on from /admin/settings/publishing. The
+  # target itself is assigned (and permission-gated) by the controller; this
+  # only decides the button.
+  defp admin_edit_button?(assigns) do
+    assigns[:admin_edit_url] != nil and
+      Settings.get_boolean_setting(@admin_edit_button_key, false)
   end
 
   @doc """
@@ -741,6 +753,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       page_title={@page_title}
       current_path={@conn.request_path}
       phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
+      admin_edit_url={assigns[:admin_edit_url]}
+      admin_edit_label={assigns[:admin_edit_label]}
       module_assigns={
         %{
           phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations],
@@ -804,7 +818,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               </p>
             </div>
             <%!-- Admin Edit Button --%>
-            <%= if assigns[:admin_edit_url] do %>
+            <%= if admin_edit_button?(assigns) do %>
               <a href={@admin_edit_url} class="btn btn-sm btn-outline gap-2">
                 <.icon name="hero-pencil-square" class="w-4 h-4" />
                 {@admin_edit_label || gettext("Edit")}
@@ -2072,6 +2086,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       page_title={@page_title}
       current_path={@conn.request_path}
       phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
+      admin_edit_url={assigns[:admin_edit_url]}
+      admin_edit_label={assigns[:admin_edit_label]}
       module_assigns={
         %{
           phoenix_kit_publishing_translations: assigns[:phoenix_kit_publishing_translations],
@@ -2181,8 +2197,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             flex row still costs its mt-4, leaving an awkward gap under the
             title on single-language public views with no admin session. --%>
           <% show_switcher? = assigns[:show_language_switcher] != false and length(@translations) > 1 %>
+          <% show_edit_button? = admin_edit_button?(assigns) %>
           <div
-            :if={show_switcher? || assigns[:admin_edit_url] || @version_dropdown}
+            :if={show_switcher? || show_edit_button? || @version_dropdown}
             class="flex flex-wrap items-center gap-4 mt-4"
           >
             <%!-- Language Switcher (gated on `publishing_show_language_switcher` —
@@ -2196,7 +2213,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               />
             <% end %>
             <%!-- Admin Edit Button --%>
-            <%= if assigns[:admin_edit_url] do %>
+            <%= if show_edit_button? do %>
               <a href={@admin_edit_url} class="btn btn-sm btn-outline gap-2">
                 <.icon name="hero-pencil-square" class="w-4 h-4" />
                 {@admin_edit_label || gettext("Edit")}

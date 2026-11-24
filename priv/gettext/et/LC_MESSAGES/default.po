@@ -863,6 +863,12 @@ msgstr "Kuidas mitteladina kirjas (nt kirillitsas) pealkirjad muudetakse URL-i s
 msgid "Image component inserted"
 msgstr "Pildikomponent lisatud"
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr "Lehesisene muutmisnupp"
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -874,6 +880,16 @@ msgstr "Lehesisene keelevalija"
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "Lehesisesed OpenGraph sildid"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Lehesisene muutmisnupp keelatud — administraatorid pääsevad redaktorisse ainult siis, kui sinu paigutus näitab muutmiskirjet (näiteks kontomenüüs)"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
+msgstr "Lehesisene muutmisnupp lubatud — administraatorid näevad seda loendi- ja postituslehtedel"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
 #, elixir-autogen, elixir-format
@@ -1696,6 +1712,11 @@ msgstr "Seanss peatatud:"
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Seaded"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Kuvab loendi- ja postituslehtedel muutmisnupu administraatoritele, kellel on Publishingu ligipääs. Vaikimisi väljas; lülita sisse, kui sinu paigutus ei näita muutmiskirjet ise (näiteks kontomenüüs)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format
