@@ -722,6 +722,7 @@ Site-wide keys, all read through `PhoenixKit.Settings`.
 | `publishing_render_cache_enabled` | `true` | Toggle the Markdown render cache (global) |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group override for the render cache |
 | `publishing_show_language_switcher` | `true` | Render the in-page language switcher on listing + post pages. Turn off when the host layout provides one |
+| `publishing_show_admin_edit_button` | `false` | Render the in-page Edit button (listing + post pages) for admins who hold the `publishing` module permission. Off by default: the Edit target always reaches the host's account menu through `app_layout`'s `admin_edit_url` / `admin_edit_label` attrs (see "Admin Edit target"). Turn on for a host whose layout does not render it |
 | `publishing_render_og_tags` | `true` | Render og/twitter/`name="description"` meta tags **in-page** (inside the public body), so previews work even when the host root layout ignores the forwarded `:og`. **Some scrapers read only `<head>`**: the recommended host setup is `<PhoenixKit.Modules.Publishing.Web.HTML.og_meta_tags og={assigns[:og]} />` in the root layout's `<head>` with this setting off (README, "OpenGraph tags belong in `<head>`"); core's own root layout already prints `@og` in `<head>`. Off avoids duplicates. The default stays on |
 | `publishing_render_jsonld` | `true` | schema.org `Article` JSON-LD in-page on post pages, from the same refined `:og` map; `author` is a `Person` from the post's `author` custom field, else the site as an `Organization`. `escape: :html_safe` on the encode so no value can close the script tag early |
 | `publishing_sitemap_refresh` | `true` | Ask core's Sitemap module for a debounced regeneration when a public URL appears, disappears or moves (`SitemapRefresh`). Also needs core's Sitemap module and its automatic regeneration on |
@@ -801,6 +802,23 @@ it, the switcher uses publishing's per-translation URLs — necessary for groups
 with per-language URL slugs, where a simple locale rewrite produces wrong URLs;
 without it (and per-language, for languages with no translation) it falls back to
 the locale-rewrite default.
+
+### Admin Edit target
+
+Every public branch that has an admin counterpart (group listing, category
+archive, post, versioned post, date-only post) calls
+`PhoenixKitWeb.AdminEditHelper.assign_admin_edit/3` with `permission:
+"publishing"`: the scope needs the Publishing module permission, not only
+admin-area access, so an admin scoped to another module gets no link. The
+result (`:admin_edit_url` / `:admin_edit_label`) is handed to the layout through
+`LayoutWrapper.app_layout`'s declared `admin_edit_url` / `admin_edit_label`
+attrs, NOT through `module_assigns` (a `module_assigns` value skips core's
+permission gate). Core's account menu renders it, and a host layout reads
+`assigns[:admin_edit_url]`. The in-page Edit button is separate and OFF by
+default (`publishing_show_admin_edit_button`); with it on, the markup is the
+historical `btn btn-sm btn-outline` link. The category archive's target is the
+categories page; a tag archive has none. `admin_edit_account_menu_test.exs`
+pins the hand-off, the permission gate and the switch.
 
 ## Database & migrations
 

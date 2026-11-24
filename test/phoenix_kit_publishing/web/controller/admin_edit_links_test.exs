@@ -27,7 +27,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditLinksTest do
     %Scope{
       user: %User{uuid: Ecto.UUID.generate(), email: "admin@example.com"},
       authenticated?: true,
-      cached_roles: ["Admin"]
+      cached_roles: ["Admin"],
+      cached_permissions: MapSet.new(["publishing"])
     }
   end
 

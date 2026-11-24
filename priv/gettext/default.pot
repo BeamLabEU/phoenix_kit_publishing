@@ -862,6 +862,12 @@ msgstr ""
 msgid "Image component inserted"
 msgstr ""
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr ""
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -872,6 +878,16 @@ msgstr ""
 #: lib/phoenix_kit_publishing/web/settings.ex:765
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor from the account menu"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
@@ -1694,6 +1710,11 @@ msgstr ""
 #: lib/phoenix_kit_publishing/web/settings.ex:72
 #, elixir-autogen, elixir-format
 msgid "Settings"
+msgstr ""
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
 msgstr ""
 
 #: lib/phoenix_kit_publishing/web/new.ex:504

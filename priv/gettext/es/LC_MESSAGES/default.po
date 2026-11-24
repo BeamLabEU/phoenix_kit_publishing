@@ -863,6 +863,12 @@ msgstr "Cómo se convierten en slugs de URL los títulos en alfabetos no latinos
 msgid "Image component inserted"
 msgstr "Componente de imagen insertado"
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr "Botón Editar en la página"
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -874,6 +880,16 @@ msgstr "Selector de idioma en la página"
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "Etiquetas OpenGraph en la página"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor from the account menu"
+msgstr "Botón Editar en la página desactivado — los administradores acceden al editor desde el menú de la cuenta"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
+msgstr "Botón Editar en la página activado — los administradores lo verán en las páginas de listado y de entrada"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
 #, elixir-autogen, elixir-format
@@ -1696,6 +1712,11 @@ msgstr "Sesión en pausa:"
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Configuración"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
+msgstr "Muestra un botón Editar en las páginas de listado y de entrada para los administradores con acceso a Publishing. Desactivado por defecto: el menú de la cuenta ya enlaza con el editor."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

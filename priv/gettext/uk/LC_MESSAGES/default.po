@@ -865,6 +865,12 @@ msgstr "Як заголовки нелатинськими алфавітами 
 msgid "Image component inserted"
 msgstr "Компонент зображення вставлено"
 
+#: lib/phoenix_kit_publishing/web/settings.ex:808
+#: lib/phoenix_kit_publishing/web/settings.ex:818
+#, elixir-autogen, elixir-format
+msgid "In-Page Edit Button"
+msgstr "Кнопка «Редагувати» на сторінці"
+
 #: lib/phoenix_kit_publishing/web/settings.ex:734
 #: lib/phoenix_kit_publishing/web/settings.ex:744
 #, elixir-autogen, elixir-format
@@ -876,6 +882,16 @@ msgstr "Перемикач мови на сторінці"
 #, elixir-autogen, elixir-format
 msgid "In-Page OpenGraph Tags"
 msgstr "Теги OpenGraph на сторінці"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:306
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button disabled — admins reach the editor from the account menu"
+msgstr "Кнопка «Редагувати» на сторінці вимкнена — адміністратори потрапляють до редактора з меню облікового запису"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:302
+#, elixir-autogen, elixir-format
+msgid "In-page Edit button enabled — admins will see it on listing and post pages"
+msgstr "Кнопка «Редагувати» на сторінці увімкнена — адміністратори побачать її на сторінках списків і записів"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:273
 #, elixir-autogen, elixir-format
@@ -1698,6 +1714,11 @@ msgstr "Сеанс призупинено:"
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Налаштування"
+
+#: lib/phoenix_kit_publishing/web/settings.ex:811
+#, elixir-autogen, elixir-format
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
+msgstr "Показує кнопку «Редагувати» на сторінках списків і записів для адміністраторів із доступом до Publishing. Типово вимкнено: меню облікового запису вже веде до редактора."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format
