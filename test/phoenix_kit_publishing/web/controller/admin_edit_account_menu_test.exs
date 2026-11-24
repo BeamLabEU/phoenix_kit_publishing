@@ -141,12 +141,42 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditAccountMenuTest 
       {:ok, _} = Settings.update_boolean_setting(@button_key, true)
       with_scope(other_module_admin())
 
-      for path <- ["/#{slug}", "/#{slug}/menu-post", "/#{slug}/category/guides"] do
+      for path <- [
+            "/#{slug}",
+            "/#{slug}/menu-post",
+            "/#{slug}/menu-post/v/1",
+            "/#{slug}/category/guides"
+          ] do
         html = conn |> get(path) |> html_response(200)
 
         assert Enum.empty?(host_edit_link(html)), "host layout got an Edit target on #{path}"
         assert Enum.empty?(in_page_button(html)), "in-page Edit button rendered on #{path}"
       end
+    end
+
+    test "the date-only post branch hands the target to a permitted admin and withholds it otherwise",
+         %{conn: conn} do
+      {:ok, group} = Groups.add_group(unique_name(), mode: "timestamp")
+      slug = group["slug"]
+
+      {:ok, post} = Posts.create_post(slug, %{title: "Dated Post", content: "Body"})
+      :ok = Versions.publish_version(slug, post.uuid, 1)
+      {:ok, _} = Posts.update_post(slug, post, %{"published_at" => "2020-06-01T10:00:00Z"}, %{})
+
+      {:ok, _} = Settings.update_boolean_setting(@button_key, true)
+
+      with_scope(other_module_admin())
+      html = conn |> get("/#{slug}/2020-06-01") |> html_response(200)
+      assert html =~ "Dated Post"
+      assert Enum.empty?(host_edit_link(html))
+      assert Enum.empty?(in_page_button(html))
+
+      with_scope(publishing_admin())
+      html = conn |> get("/#{slug}/2020-06-01") |> html_response(200)
+      assert [href] = hrefs(host_edit_link(html))
+      assert href =~ "/admin/publishing/#{slug}/#{post.uuid}/edit"
+      assert text(host_edit_link(html)) == "Edit post"
+      assert [_] = in_page_button(html) |> Enum.to_list()
     end
 
     test "an admin holding the publishing permission gets the in-page button too", %{
@@ -200,6 +230,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AdminEditAccountMenuTest 
 
       post = conn |> get("/#{slug}/menu-post") |> html_response(200)
       assert text(in_page_button(post)) == "Edit post"
+
+      # Same markup as before the setting existed: the button classes, its
+      # icon, and the toolbar row it sits in (the selector the "off" test
+      # proves absent, proven here to match).
+      assert [_] =
+               LazyHTML.query(document(post), "article div.flex.flex-wrap.gap-4.mt-4")
+               |> Enum.to_list()
+
+      assert [_] =
+               LazyHTML.query(
+                 document(post),
+                 "article a.btn.btn-sm.btn-outline.gap-2 .hero-pencil-square"
+               )
+               |> Enum.to_list()
+
       assert [_] = host_edit_link(post) |> Enum.to_list()
     end
 

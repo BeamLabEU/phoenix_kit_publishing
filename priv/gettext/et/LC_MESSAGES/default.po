@@ -883,8 +883,8 @@ msgstr "Lehesisesed OpenGraph sildid"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:306
 #, elixir-autogen, elixir-format
-msgid "In-page Edit button disabled — admins reach the editor from the account menu"
-msgstr "Lehesisene muutmisnupp keelatud — administraatorid pääsevad redaktorisse kontomenüü kaudu"
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Lehesisene muutmisnupp keelatud — administraatorid pääsevad redaktorisse ainult siis, kui sinu paigutus näitab muutmiskirjet (näiteks kontomenüüs)"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:302
 #, elixir-autogen, elixir-format
@@ -1715,8 +1715,8 @@ msgstr "Seaded"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:811
 #, elixir-autogen, elixir-format
-msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
-msgstr "Kuvab loendi- ja postituslehtedel muutmisnupu administraatoritele, kellel on Publishingu ligipääs. Vaikimisi väljas: kontomenüü viitab redaktorile juba ise."
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Kuvab loendi- ja postituslehtedel muutmisnupu administraatoritele, kellel on Publishingu ligipääs. Vaikimisi väljas; lülita sisse, kui sinu paigutus ei näita muutmiskirjet ise (näiteks kontomenüüs)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

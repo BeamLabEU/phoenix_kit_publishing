@@ -885,8 +885,8 @@ msgstr "Теги OpenGraph на сторінці"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:306
 #, elixir-autogen, elixir-format
-msgid "In-page Edit button disabled — admins reach the editor from the account menu"
-msgstr "Кнопка «Редагувати» на сторінці вимкнена — адміністратори потрапляють до редактора з меню облікового запису"
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Кнопка «Редагувати» на сторінці вимкнена — адміністратори потрапляють до редактора, лише якщо ваш макет показує пункт «Редагувати» (наприклад, у меню облікового запису)"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:302
 #, elixir-autogen, elixir-format
@@ -1717,8 +1717,8 @@ msgstr "Налаштування"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:811
 #, elixir-autogen, elixir-format
-msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
-msgstr "Показує кнопку «Редагувати» на сторінках списків і записів для адміністраторів із доступом до Publishing. Типово вимкнено: меню облікового запису вже веде до редактора."
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Показує кнопку «Редагувати» на сторінках списків і записів для адміністраторів із доступом до Publishing. Типово вимкнено; увімкніть, якщо ваш макет сам не показує пункт «Редагувати» (наприклад, у меню облікового запису)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

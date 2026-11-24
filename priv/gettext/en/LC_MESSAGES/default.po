@@ -883,8 +883,8 @@ msgstr "In-Page OpenGraph Tags"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:306
 #, elixir-autogen, elixir-format
-msgid "In-page Edit button disabled — admins reach the editor from the account menu"
-msgstr "In-page Edit button disabled — admins reach the editor from the account menu"
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:302
 #, elixir-autogen, elixir-format
@@ -1715,8 +1715,8 @@ msgstr "Settings"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:811
 #, elixir-autogen, elixir-format
-msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
-msgstr "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

@@ -85,16 +85,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     _ -> true
   end
 
-  # Whether the in-page Edit button renders. Off by default: the Edit target
-  # reaches the host's account menu through `app_layout` regardless, and only a
-  # host without that menu entry turns the button on from
-  # /admin/settings/publishing. The target itself is assigned (and
-  # permission-gated) by the controller; this only decides the button.
+  # Whether the in-page Edit button renders. Off by default: the Edit target is
+  # handed to the host layout through `app_layout` regardless, so a layout that
+  # renders it (e.g. in its account menu) already shows the entry; a host whose
+  # layout does not turns the button on from /admin/settings/publishing. The
+  # target itself is assigned (and permission-gated) by the controller; this
+  # only decides the button.
   defp admin_edit_button?(assigns) do
     assigns[:admin_edit_url] != nil and
       Settings.get_boolean_setting(@admin_edit_button_key, false)
-  rescue
-    _ -> false
   end
 
   @doc """
@@ -2198,8 +2197,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
             flex row still costs its mt-4, leaving an awkward gap under the
             title on single-language public views with no admin session. --%>
           <% show_switcher? = assigns[:show_language_switcher] != false and length(@translations) > 1 %>
+          <% show_edit_button? = admin_edit_button?(assigns) %>
           <div
-            :if={show_switcher? || admin_edit_button?(assigns) || @version_dropdown}
+            :if={show_switcher? || show_edit_button? || @version_dropdown}
             class="flex flex-wrap items-center gap-4 mt-4"
           >
             <%!-- Language Switcher (gated on `publishing_show_language_switcher` —
@@ -2213,7 +2213,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
               />
             <% end %>
             <%!-- Admin Edit Button --%>
-            <%= if admin_edit_button?(assigns) do %>
+            <%= if show_edit_button? do %>
               <a href={@admin_edit_url} class="btn btn-sm btn-outline gap-2">
                 <.icon name="hero-pencil-square" class="w-4 h-4" />
                 {@admin_edit_label || gettext("Edit")}

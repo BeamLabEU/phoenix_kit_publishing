@@ -883,8 +883,8 @@ msgstr "Balises OpenGraph intégrées à la page"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:306
 #, elixir-autogen, elixir-format
-msgid "In-page Edit button disabled — admins reach the editor from the account menu"
-msgstr "Bouton Modifier intégré désactivé — les administrateurs accèdent à l'éditeur depuis le menu du compte"
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Bouton Modifier intégré désactivé — les administrateurs n'accèdent à l'éditeur que si votre mise en page affiche l'entrée Modifier (par exemple dans le menu du compte)"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:302
 #, elixir-autogen, elixir-format
@@ -1715,8 +1715,8 @@ msgstr "Paramètres"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:811
 #, elixir-autogen, elixir-format
-msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
-msgstr "Affiche un bouton Modifier sur les pages de liste et d'article pour les administrateurs ayant accès à Publishing. Désactivé par défaut : le menu du compte renvoie déjà vers l'éditeur."
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Affiche un bouton Modifier sur les pages de liste et d'article pour les administrateurs ayant accès à Publishing. Désactivé par défaut ; à activer si votre mise en page n'affiche pas elle-même l'entrée Modifier (par exemple dans le menu du compte)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

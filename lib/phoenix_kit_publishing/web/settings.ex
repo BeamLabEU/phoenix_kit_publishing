@@ -303,7 +303,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                ),
              else:
                gettext(
-                 "In-page Edit button disabled — admins reach the editor from the account menu"
+                 "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
                )
            )
          )}
@@ -808,7 +808,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                 <p class="font-medium">{gettext("In-Page Edit Button")}</p>
                 <p class="text-xs text-base-content/60">
                   {gettext(
-                    "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
+                    "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
                   )}
                 </p>
               </div>

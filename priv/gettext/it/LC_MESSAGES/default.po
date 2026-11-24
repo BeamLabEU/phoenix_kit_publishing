@@ -883,8 +883,8 @@ msgstr "Tag OpenGraph in pagina"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:306
 #, elixir-autogen, elixir-format
-msgid "In-page Edit button disabled — admins reach the editor from the account menu"
-msgstr "Pulsante Modifica nella pagina disattivato — gli amministratori raggiungono l'editor dal menu dell'account"
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Pulsante Modifica nella pagina disattivato — gli amministratori raggiungono l'editor solo se il tuo layout mostra la voce Modifica (ad esempio nel menu dell'account)"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:302
 #, elixir-autogen, elixir-format
@@ -1715,8 +1715,8 @@ msgstr "Impostazioni"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:811
 #, elixir-autogen, elixir-format
-msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
-msgstr "Mostra un pulsante Modifica nelle pagine di elenco e di articolo per gli amministratori con accesso a Publishing. Disattivato per impostazione predefinita: il menu dell'account rimanda già all'editor."
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Mostra un pulsante Modifica nelle pagine di elenco e di articolo per gli amministratori con accesso a Publishing. Disattivato per impostazione predefinita; attivalo se il tuo layout non mostra da solo la voce Modifica (ad esempio nel menu dell'account)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format

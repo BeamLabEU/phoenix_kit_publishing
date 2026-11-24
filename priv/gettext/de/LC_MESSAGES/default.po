@@ -883,8 +883,8 @@ msgstr "Seiteninterne OpenGraph-Tags"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:306
 #, elixir-autogen, elixir-format
-msgid "In-page Edit button disabled — admins reach the editor from the account menu"
-msgstr "Seiteninterne Bearbeiten-Schaltfläche deaktiviert — Administratoren erreichen den Editor über das Kontomenü"
+msgid "In-page Edit button disabled — admins reach the editor only if your layout shows the Edit entry (for example in the account menu)"
+msgstr "Seiteninterne Bearbeiten-Schaltfläche deaktiviert — Administratoren erreichen den Editor nur, wenn Ihr Layout den Bearbeiten-Eintrag anzeigt (z. B. im Kontomenü)"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:302
 #, elixir-autogen, elixir-format
@@ -1715,8 +1715,8 @@ msgstr "Einstellungen"
 
 #: lib/phoenix_kit_publishing/web/settings.ex:811
 #, elixir-autogen, elixir-format
-msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default: the account menu already links to the editor."
-msgstr "Zeigt auf Listen- und Beitragsseiten eine Bearbeiten-Schaltfläche für Administratoren mit Publishing-Zugriff. Standardmäßig aus: Das Kontomenü verlinkt bereits auf den Editor."
+msgid "Show an Edit button on listing + post pages for admins with Publishing access. Off by default; turn it on if your layout does not show the Edit entry itself (for example in the account menu)."
+msgstr "Zeigt auf Listen- und Beitragsseiten eine Bearbeiten-Schaltfläche für Administratoren mit Publishing-Zugriff. Standardmäßig aus; aktivieren, wenn Ihr Layout den Bearbeiten-Eintrag nicht selbst anzeigt (z. B. im Kontomenü)."
 
 #: lib/phoenix_kit_publishing/web/new.ex:504
 #, elixir-autogen, elixir-format
