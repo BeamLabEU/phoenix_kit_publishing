@@ -33,7 +33,14 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Viewer do
         }
 
   @preview_param "pk_preview"
-  @key_param "key"
+  # Named `*_token` on purpose: Phoenix's default `:filter_parameters`
+  # ("password", "token") and core's credential rule both redact it from the
+  # "Parameters:" log line, so the key never reaches the application log.
+  @key_param "access_token"
+
+  @doc "The query parameter a secret link carries its key in."
+  @spec key_param() :: String.t()
+  def key_param, do: @key_param
 
   @doc "A reader with nothing: no account, no grants."
   @spec anonymous() :: t()
@@ -55,7 +62,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Viewer do
 
   @doc """
   The viewer of a public request. Reads the scope the router assigned, the
-  access cookie and the `?key=` / `?pk_preview=` query parameters.
+  access cookie and the `?access_token=` / `?pk_preview=` query parameters.
   """
   @spec from_conn(Plug.Conn.t()) :: t()
   def from_conn(%Plug.Conn{} = conn) do

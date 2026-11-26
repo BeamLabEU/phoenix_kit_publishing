@@ -15,6 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PostAccess.Grants
+  alias PhoenixKit.Modules.Publishing.PostAccess.Viewer
   alias PhoenixKit.Modules.Publishing.Posts
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
@@ -196,7 +197,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
       path: path,
       key: key
     } do
-      redeemed = get(conn, path <> "?key=" <> key)
+      redeemed = get(conn, path <> "?access_token=" <> key)
 
       assert redirected_to(redeemed) == path
       assert redeemed.resp_cookies[Grants.cookie_name()]
@@ -208,12 +209,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
     end
 
     test "other query parameters survive the redirect", %{conn: conn, path: path, key: key} do
-      redeemed = get(conn, path <> "?utm=x&key=" <> key)
+      redeemed = get(conn, path <> "?utm=x&access_token=" <> key)
       assert redirected_to(redeemed) == path <> "?utm=x"
     end
 
+    test "nested query parameters survive the redirect too", %{conn: conn, path: path, key: key} do
+      redeemed = get(conn, path <> "?f[tag]=x&l[]=1&access_token=" <> key)
+
+      assert redirected_to(redeemed) ==
+               path <> "?" <> Plug.Conn.Query.encode(%{"f" => %{"tag" => "x"}, "l" => ["1"]})
+    end
+
+    test "the key's parameter is one Phoenix's default log filter redacts" do
+      # Phoenix's own default `:filter_parameters` (no host config, no core
+      # hardening): the "Parameters:" log line of the redeeming request.
+      filtered =
+        Phoenix.Logger.filter_values(%{Viewer.key_param() => "the-key"}, ["password", "token"])
+
+      assert filtered == %{Viewer.key_param() => "[FILTERED]"}
+    end
+
     test "a wrong key is a missing post", %{conn: conn, path: path, slug: slug} do
-      denied = get(conn, path <> "?key=" <> String.duplicate("Z", 43))
+      denied = get(conn, path <> "?access_token=" <> String.duplicate("Z", 43))
       assert {denied.status, redirected_to(denied)} == missing_answer(conn, slug)
     end
 
@@ -224,7 +241,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
       rule: rule,
       slug: slug
     } do
-      redeemed = get(conn, path <> "?key=" <> key)
+      redeemed = get(conn, path <> "?access_token=" <> key)
       {:ok, _} = PostAccess.revoke_link(rule.uuid)
 
       after_revoke = redeemed |> recycle() |> get(path)

@@ -326,7 +326,7 @@ A protected page is served with `Cache-Control: private, no-store`,
 `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer` and a
 robots meta tag. Typed passwords and redeemed links live in one encrypted
 cookie (`pk_pub_access`), for `publishing_access_grant_days` days; a secret
-link's `?key=` is swapped for the cookie on the first request and the reader
+link's `?access_token=` is swapped for the cookie on the first request and the reader
 is redirected to the clean URL. Password attempts are limited to 5 a minute
 per address and post (30 per ten minutes per address).
 
@@ -351,15 +351,16 @@ alias PhoenixKit.Modules.Publishing.PostAccess
 {:ok, _} = PostAccess.add_rule({:post, post_uuid}, %{"kind" => "role", "role_uuids" => [role_uuid]})
 {:ok, _} = PostAccess.set_password({:post, post_uuid}, "s3cret", %{"expires_at" => "2026-06-30"})
 {:ok, _rule, key} = PostAccess.create_link({:post, post_uuid}, %{"note" => "ACME Ltd"})
-# the link: PublishingHTML.build_post_url(...) <> "?key=" <> key — the key is not stored
+# the link: PublishingHTML.build_post_url(...) <> "?access_token=" <> key — the key is not stored
 
 PostAccess.authorize_view(PostAccess.access_for_post(post_uuid), scope, %{})
 #=> :ok | {:redeem, rule} | {:error, :not_found | :login | :password | :forbidden}
 ```
 
-Hosts that log query strings should add `"key"` to Phoenix's
-`:filter_parameters`, so a secret link is not written to the request log on
-its one redeeming request.
+The parameter is named `access_token` so Phoenix's default
+`:filter_parameters` (and core's) redact it from the application log. A
+reverse proxy or CDN that logs full URLs still records it on the one
+redeeming request; keep such logs private or strip the query there.
 
 **Not covered:** files. Images and attachments are served by core's storage
 routes by file uuid; a protected post's images stay reachable to anyone who

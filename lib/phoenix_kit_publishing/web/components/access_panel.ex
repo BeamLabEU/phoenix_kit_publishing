@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
   import PhoenixKitWeb.Components.Core.Icon
 
   alias PhoenixKit.Modules.Publishing.PostAccess
+  alias PhoenixKit.Modules.Publishing.PostAccess.Viewer
   alias PhoenixKit.Modules.Publishing.PublishingAccessRule
   alias PhoenixKit.Users.Auth
   alias PhoenixKit.Users.Auth.Scope
@@ -222,7 +223,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
   defp link_url(socket, key) do
     base = socket.assigns.public_url || ""
     separator = if String.contains?(base, "?"), do: "&", else: "?"
-    base <> separator <> "key=" <> key
+    base <> separator <> Viewer.key_param() <> "=" <> key
   end
 
   defp error_message(:password_too_short),

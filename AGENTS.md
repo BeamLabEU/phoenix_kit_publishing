@@ -903,7 +903,7 @@ feature existed (re-record only for a deliberate change to a public page:
   names that action. Failure text is generic; attempts are counted before the
   Bcrypt check.
 - **Secret links** store only `sha256(key)`; the key is shown once in the
-  panel. `?key=` is redeemed into the cookie and the reader is 302'd to the
+  panel. `?access_token=` is redeemed into the cookie and the reader is 302'd to the
   same URL without it (`Referrer-Policy: no-referrer`). `Viewer` accepts only
   a url-safe base64 key of 40–64 characters, so nothing else reaches the
   digest compare.

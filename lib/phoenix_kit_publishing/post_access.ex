@@ -11,7 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     * `user` — one of the chosen users
     * `password` — anyone who typed the post's password (a grant in an
       encrypted cookie, `PostAccess.Grants`)
-    * `token` — a secret link (`?key=…`, redeemed into the same cookie)
+    * `token` — a secret link (`?access_token=…`, redeemed into the same cookie)
 
   By default any one satisfied rule opens the post (`match: "any"`); a post
   set to `"all"` needs one satisfied rule of every kind it has. Holders of the

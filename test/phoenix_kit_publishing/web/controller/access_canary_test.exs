@@ -212,7 +212,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessCanaryTest do
     owner: owner
   } do
     {:ok, _rule, key} = PostAccess.create_link(owner, %{"note" => "client"})
-    redeemed = get(conn, "/#{slug}/post-#{@marker}?key=#{key}")
+    redeemed = get(conn, "/#{slug}/post-#{@marker}?access_token=#{key}")
     granted = recycle(redeemed)
 
     assert granted |> get("/#{slug}/post-#{@marker}") |> html_response(200) =~ "Title #{@marker}"

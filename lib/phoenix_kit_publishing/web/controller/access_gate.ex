@@ -7,7 +7,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
       rules answers `:public`, and the request is served exactly as before.
     * `respond/4` — turns a denial into a response:
       * a secret link → the grant goes into the access cookie and the reader
-        is redirected to the clean URL (no `?key=` in history, logs after
+        is redirected to the clean URL (no `?access_token=` in history, logs after
         this hop, or the `Referer` of the page's links);
       * `:password` → a generic password form (no title, description or
         image of the post), status 401;
@@ -186,11 +186,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
     )
   end
 
-  # The request's own path, without `?key=` — where the reader goes once the
+  # The request's own path, without `?access_token=` — where the reader goes once the
   # grant is in the cookie.
   defp clean_path(conn) do
     conn = fetch_query_params(conn)
-    query = conn.query_params |> Map.drop(["key"]) |> URI.encode_query()
+    # Plug's encoder: the query may hold nested params (`a[b]=c`), which
+    # `URI.encode_query/1` refuses with an exception.
+    query = conn.query_params |> Map.drop([Viewer.key_param()]) |> Plug.Conn.Query.encode()
     path = back_path(conn)
     if query == "", do: path, else: path <> "?" <> query
   end

@@ -57,7 +57,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.AccessPanelLiveTest do
     |> form("#post-access-panel-add", %{"rule" => %{"note" => "ACME"}})
     |> render_submit()
 
-    assert has_element?(view, "#post-access-panel [data-new-link] input[value*='key=']")
+    assert has_element?(view, "#post-access-panel [data-new-link] input[value*='access_token=']")
     [rule] = PostAccess.list_rules({:post, post.uuid})
     assert rule.kind == "token" and rule.note == "ACME"
 
