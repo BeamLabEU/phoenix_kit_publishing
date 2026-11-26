@@ -37,6 +37,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
   alias PhoenixKit.Utils.Routes
+  alias Plug.Conn.Query
 
   @type outcome :: :public | :protected | {:redeem, term()} | {:error, PostAccess.denial()}
 
@@ -192,7 +193,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
     conn = fetch_query_params(conn)
     # Plug's encoder: the query may hold nested params (`a[b]=c`), which
     # `URI.encode_query/1` refuses with an exception.
-    query = conn.query_params |> Map.drop([Viewer.key_param()]) |> Plug.Conn.Query.encode()
+    query = conn.query_params |> Map.drop([Viewer.key_param()]) |> Query.encode()
     path = back_path(conn)
     if query == "", do: path, else: path <> "?" <> query
   end

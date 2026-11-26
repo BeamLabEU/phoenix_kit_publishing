@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Grants do
   the cookie stays well under the 4 KB browsers allow.
   """
 
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
 
   @cookie "pk_pub_access"
@@ -72,7 +73,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Grants do
   defp secure?(%Plug.Conn{scheme: :https}), do: true
 
   defp secure?(_conn) do
-    case PhoenixKit.Modules.Publishing.Web.HTML.public_origin() do
+    case PublishingHTML.public_origin() do
       "https://" <> _ -> true
       _ -> false
     end

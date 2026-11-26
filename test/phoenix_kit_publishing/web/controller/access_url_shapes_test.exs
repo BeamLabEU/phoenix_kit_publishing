@@ -21,6 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessUrlShapesTest do
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
+  alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   alias PhoenixKit.Settings
 
   setup do
@@ -92,11 +93,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessUrlShapesTest do
       day: day
     } do
       {:ok, read} = Publishing.read_post_by_uuid(hidden[:uuid], "en", 1)
-      url = Publishing.Web.HTML.build_post_url(slug, read, "en")
+      url = PublishingHTML.build_post_url(slug, read, "en")
       assert url =~ "/#{slug}/#{day}/09:05"
 
       cached = %{read | uuid: hidden[:uuid]} |> Map.put(:access_protected, true)
-      assert Publishing.Web.HTML.build_post_url(slug, cached, "en", %{day => 1}) =~ "/09:05"
+      assert PublishingHTML.build_post_url(slug, cached, "en", %{day => 1}) =~ "/09:05"
     end
   end
 

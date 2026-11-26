@@ -22,6 +22,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
   alias PhoenixKit.Users.Roles
   alias PhoenixKitPublishing.LiveCase
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
+  alias Plug.Conn.Query
 
   @title "Weekly report for ACME"
 
@@ -258,7 +259,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
       redeemed = get(conn, path <> "?f[tag]=x&l[]=1&access_token=" <> key)
 
       assert redirected_to(redeemed) ==
-               path <> "?" <> Plug.Conn.Query.encode(%{"f" => %{"tag" => "x"}, "l" => ["1"]})
+               path <> "?" <> Query.encode(%{"f" => %{"tag" => "x"}, "l" => ["1"]})
     end
 
     test "the key's parameter is one Phoenix's default log filter redacts" do

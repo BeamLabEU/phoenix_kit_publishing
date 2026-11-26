@@ -470,28 +470,32 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
           insert_rule(owner, "password", %{"hash" => hash, "rev" => 1}, attrs, opts)
 
         [rule | extra] ->
-          config = %{"hash" => hash, "rev" => revision(rule) + 1}
-
-          # One password per owner: a second row (two first saves racing)
-          # would keep accepting its old password after the rotation.
-          Enum.each(extra, fn row -> repo().delete(row) end)
-
-          # A rotation without an end date keeps the one the rule has: a new
-          # password must not quietly lift an expiry the admin set. Removing
-          # an end date is deleting the rule and adding it again.
-          rule
-          |> Rule.changeset(%{
-            config: config,
-            expires_at: parse_expiry(attr(attrs, "expires_at")) || rule.expires_at,
-            note: blank_to_nil(attr(attrs, "note")) || rule.note
-          })
-          |> repo().update()
-          |> after_write(owner, "password_rotated", opts)
+          rotate_password(owner, rule, extra, hash, attrs, opts)
       end
     end
   end
 
   def set_password(_owner, _password, _attrs, _opts), do: {:error, :password_too_short}
+
+  defp rotate_password(owner, rule, extra, hash, attrs, opts) do
+    config = %{"hash" => hash, "rev" => revision(rule) + 1}
+
+    # One password per owner: a second row (two first saves racing) would
+    # keep accepting its old password after the rotation.
+    Enum.each(extra, fn row -> repo().delete(row) end)
+
+    # A rotation without an end date keeps the one the rule has: a new
+    # password must not quietly lift an expiry the admin set. Removing an
+    # end date is deleting the rule and adding it again.
+    rule
+    |> Rule.changeset(%{
+      config: config,
+      expires_at: parse_expiry(attr(attrs, "expires_at")) || rule.expires_at,
+      note: blank_to_nil(attr(attrs, "note")) || rule.note
+    })
+    |> repo().update()
+    |> after_write(owner, "password_rotated", opts)
+  end
 
   @doc """
   Creates a secret link for a post. Returns the key ONCE — only its digest is
