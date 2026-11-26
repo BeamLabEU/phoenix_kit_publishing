@@ -1684,12 +1684,19 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
 
   # Before the module chain's V4 has run (code deployed ahead of the
   # migration) the rules table is missing, and no post can be protected yet.
+  # Only a MISSING table reads as "nothing protected": any other error
+  # raises, so a transient failure can never fill the listing cache with
+  # every protected post marked public.
   defp listing_protected_uuids(post_uuids) do
     PostAccess.protected_post_uuids(post_uuids)
   rescue
     error in Postgrex.Error ->
-      Logger.warning("[DBStorage] access rules unreadable: #{inspect(error.postgres[:code])}")
-      %{}
+      if error.postgres[:code] == :undefined_table do
+        Logger.warning("[DBStorage] access rules table missing (module chain V4 not run)")
+        %{}
+      else
+        reraise error, __STACKTRACE__
+      end
   end
 
   # ===========================================================================

@@ -275,7 +275,13 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         |> Enum.filter(&is_binary/1)
         |> PostAccess.protected_post_uuids()
       rescue
-        _ in Postgrex.Error -> %{}
+        # Only a missing table (V4 not run yet) means nothing is protected;
+        # any other error raises rather than hand core's sitemap every
+        # protected post as public.
+        error in Postgrex.Error ->
+          if error.postgres[:code] == :undefined_table,
+            do: %{},
+            else: reraise(error, __STACKTRACE__)
       end
 
     if map_size(protected) == 0,
