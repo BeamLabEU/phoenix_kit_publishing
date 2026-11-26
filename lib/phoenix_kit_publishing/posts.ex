@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   alias PhoenixKit.Modules.Publishing.Hashtags
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PublishingVersion
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Shared
@@ -200,9 +201,42 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   def list_posts(group_slug, preferred_language \\ nil)
 
   def list_posts(group_slug, language) when is_binary(language),
-    do: DBStorage.list_posts_with_metadata(group_slug, nil, public_urls: true)
+    do:
+      group_slug |> DBStorage.list_posts_with_metadata(nil, public_urls: true) |> mark_protected()
 
-  def list_posts(group_slug, _language), do: DBStorage.list_posts_with_metadata(group_slug)
+  def list_posts(group_slug, _language),
+    do: group_slug |> DBStorage.list_posts_with_metadata() |> mark_protected()
+
+  # A post with access rules carries `access_protected: true` and
+  # `metadata.sitemap_exclude: true`: core's Sitemap source reads this list
+  # and leaves an excluded post out, so a protected URL never reaches the
+  # sitemap; the admin listing shows the lock from the same flag. A public
+  # post's map is untouched.
+  defp mark_protected(posts) do
+    protected =
+      try do
+        posts
+        |> Enum.map(& &1[:uuid])
+        |> Enum.filter(&is_binary/1)
+        |> PostAccess.protected_post_uuids()
+      rescue
+        _ in Postgrex.Error -> MapSet.new()
+      end
+
+    if MapSet.size(protected) == 0 do
+      posts
+    else
+      Enum.map(posts, fn post ->
+        if MapSet.member?(protected, post[:uuid]) do
+          post
+          |> Map.put(:access_protected, true)
+          |> Map.update(:metadata, %{sitemap_exclude: true}, &Map.put(&1, :sitemap_exclude, true))
+        else
+          post
+        end
+      end)
+    end
+  end
 
   @doc "Lists posts filtered by status (e.g. 'trashed', 'published')."
   @spec list_posts_by_status(String.t(), String.t()) :: [map()]
@@ -902,6 +936,9 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
     version_data = version.data || %{}
 
     %{
+      # The post's identity, so the old-slug 301 can be refused for a
+      # protected post the reader may not open (`SlugResolution`).
+      uuid: post.uuid,
       slug: post.slug,
       url_slug: content.url_slug,
       language: content.language,
@@ -977,6 +1014,9 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
       with {:ok, db_post} <- tx_result,
            {:ok, post} <- read_back_created_post(group_slug, db_post, mode, primary_language) do
+        # A group's default access rules are copied onto every new post
+        # (before the listing is rebuilt, so it carries the post's flag).
+        :ok = PostAccess.copy_group_defaults(group.uuid, db_post.uuid, opts)
         ListingCache.regenerate(group_slug)
         PublishingPubSub.broadcast_post_created(group_slug, post)
         {:ok, post}

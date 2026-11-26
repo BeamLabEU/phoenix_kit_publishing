@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingGroup
   alias PhoenixKit.Modules.Publishing.PublishingPost
@@ -1329,6 +1330,10 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
           preload: [group: g],
           select: {p, v}
         )
+        # A link from one post to a protected one must not print the
+        # protected post's title (or reveal its URL) to every reader of the
+        # linking post: it renders as an unresolved link instead.
+        |> PostAccess.visible_query()
         |> repo().all()
       end
 
@@ -1648,6 +1653,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       |> Enum.map(& &1.uuid)
 
     all_contents_by_version = batch_load_contents(version_uuids_needed)
+    protected = listing_protected_uuids(post_uuids)
 
     posts
     |> Enum.filter(fn post -> active_by_post[post.uuid] != nil end)
@@ -1663,7 +1669,27 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
       post
       |> Mapper.to_listing_map(version, contents, all_versions)
       |> Map.put(:category_uuids, PublishingVersion.get_category_uuids(version))
+      |> mark_protected(protected)
     end)
+  end
+
+  # Every public reader of the listing cache filters on this flag
+  # (`PostAccess.public?/1`); a public post's map carries no new key, so a
+  # site without rules caches exactly what it cached before.
+  defp mark_protected(entry, protected) do
+    if MapSet.member?(protected, entry.uuid),
+      do: Map.put(entry, :access_protected, true),
+      else: entry
+  end
+
+  # Before the module chain's V4 has run (code deployed ahead of the
+  # migration) the rules table is missing, and no post can be protected yet.
+  defp listing_protected_uuids(post_uuids) do
+    PostAccess.protected_post_uuids(post_uuids)
+  rescue
+    error in Postgrex.Error ->
+      Logger.warning("[DBStorage] access rules unreadable: #{inspect(error.postgres[:code])}")
+      MapSet.new()
   end
 
   # ===========================================================================
