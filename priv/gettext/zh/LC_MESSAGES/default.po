@@ -4460,6 +4460,11 @@ msgstr "账户的电子邮件地址，每行一个"
 msgid "Ends on"
 msgstr "截止日期"
 
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:1
+#, elixir-autogen, elixir-format
+msgid "No end date (remove the current one)"
+msgstr "无结束日期（移除当前日期）"
+
 #: lib/phoenix_kit_publishing/web/html.ex:2496
 #, elixir-autogen, elixir-format
 msgid "Enter the password you were given to open it."

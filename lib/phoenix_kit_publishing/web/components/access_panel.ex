@@ -374,6 +374,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
             {gettext("Ends on")}
             <input type="date" name="rule[expires_at]" class="input input-xs" />
           </label>
+          <%!-- A new password keeps the current end date unless one is
+               typed above or this box lifts it. --%>
+          <label
+            :if={@adding == "password" and Enum.any?(@gates, &(&1.kind == "password" and &1.expires_at))}
+            class="flex items-center gap-2 text-xs"
+            data-no-end-date
+          >
+            <input type="checkbox" name="rule[no_end_date]" value="true" class="checkbox checkbox-xs" />
+            {gettext("No end date (remove the current one)")}
+          </label>
           <div class="flex justify-end gap-1">
             <button type="button" phx-click="cancel_add" phx-target={@myself} class="btn btn-ghost btn-xs">
               {gettext("Cancel")}

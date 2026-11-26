@@ -4480,6 +4480,11 @@ msgstr "Kontode e-posti aadressid, üks rea kohta"
 msgid "Ends on"
 msgstr "Lõpeb"
 
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:1
+#, elixir-autogen, elixir-format
+msgid "No end date (remove the current one)"
+msgstr "Lõppkuupäev puudub (eemalda praegune)"
+
 #: lib/phoenix_kit_publishing/web/html.ex:2496
 #, elixir-autogen, elixir-format
 msgid "Enter the password you were given to open it."

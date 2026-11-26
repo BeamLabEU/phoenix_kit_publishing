@@ -63,6 +63,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.AccessPanelLiveTest do
     assert has_element?(view, "#post-access-panel [data-access-summary]", "Public")
   end
 
+  test "a new password can lift the current end date with the No end date box", %{
+    conn: conn,
+    group: group,
+    post: post
+  } do
+    {:ok, _} =
+      PostAccess.set_password({:post, post.uuid}, "first one", %{"expires_at" => "2099-01-01"})
+
+    view = editor(conn, group, post)
+    view |> element("#post-access-panel button[phx-value-kind=password]") |> render_click()
+    assert has_element?(view, "#post-access-panel [data-no-end-date]")
+
+    view
+    |> form("#post-access-panel-add",
+      rule: %{"password" => "second one", "expires_at" => "", "no_end_date" => "true"}
+    )
+    |> render_submit()
+
+    [rule] = Enum.filter(PostAccess.list_rules({:post, post.uuid}), &(&1.kind == "password"))
+    assert rule.expires_at == nil
+  end
+
   test "a role rule naming a role that no longer exists says so", %{post: post} do
     gone = "019cce93-0000-7000-8000-00000000dead"
 

@@ -439,7 +439,8 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     "role_uuids" => :role_uuids,
     "user_uuids" => :user_uuids,
     "note" => :note,
-    "expires_at" => :expires_at
+    "expires_at" => :expires_at,
+    "no_end_date" => :no_end_date
   }
 
   # Form params arrive with string keys, code passes atoms; both are read.
@@ -453,7 +454,9 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   @doc """
   Sets the password of a post or group default. An existing password rule is
   rotated in place: a new hash and a higher revision, which invalidates every
-  grant readers hold for the old one.
+  grant readers hold for the old one. A rotation keeps the rule's end date
+  unless `attrs` gives a new one (`"expires_at"`) or lifts it
+  (`"no_end_date" => true`).
   """
   @spec set_password(owner(), String.t(), map(), keyword()) ::
           {:ok, Rule.t()} | {:error, term()}
@@ -485,12 +488,17 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     Enum.each(extra, fn row -> repo().delete(row) end)
 
     # A rotation without an end date keeps the one the rule has: a new
-    # password must not quietly lift an expiry the admin set. Removing an
-    # end date is deleting the rule and adding it again.
+    # password must not quietly lift an expiry the admin set. Lifting it is
+    # explicit: `"no_end_date" => true` (the panel's "No end date" box).
+    expires_at =
+      if attr(attrs, "no_end_date") in [true, "true", "on"],
+        do: nil,
+        else: parse_expiry(attr(attrs, "expires_at")) || rule.expires_at
+
     rule
     |> Rule.changeset(%{
       config: config,
-      expires_at: parse_expiry(attr(attrs, "expires_at")) || rule.expires_at,
+      expires_at: expires_at,
       note: blank_to_nil(attr(attrs, "note")) || rule.note
     })
     |> repo().update()

@@ -4500,6 +4500,11 @@ msgstr "Adresy e-mail kont, jeden w wierszu"
 msgid "Ends on"
 msgstr "Kończy się"
 
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:1
+#, elixir-autogen, elixir-format
+msgid "No end date (remove the current one)"
+msgstr "Bez daty końcowej (usuń obecną)"
+
 #: lib/phoenix_kit_publishing/web/html.ex:2496
 #, elixir-autogen, elixir-format
 msgid "Enter the password you were given to open it."

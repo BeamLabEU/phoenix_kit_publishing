@@ -180,6 +180,9 @@ defmodule PhoenixKit.Modules.Publishing.PostAccessTest do
 
       {:ok, rotated} = PostAccess.set_password(owner, "rotated one", %{"expires_at" => ""})
       assert rotated.expires_at == until
+
+      {:ok, lifted} = PostAccess.set_password(owner, "lifted one", %{"no_end_date" => "true"})
+      assert lifted.expires_at == nil
     end
 
     test "a rotation leaves one password: a second row stops working too", %{

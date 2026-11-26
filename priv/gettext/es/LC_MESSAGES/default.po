@@ -4480,6 +4480,11 @@ msgstr "Direcciones de correo de las cuentas, una por línea"
 msgid "Ends on"
 msgstr "Termina el"
 
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:1
+#, elixir-autogen, elixir-format
+msgid "No end date (remove the current one)"
+msgstr "Sin fecha de fin (quitar la actual)"
+
 #: lib/phoenix_kit_publishing/web/html.ex:2496
 #, elixir-autogen, elixir-format
 msgid "Enter the password you were given to open it."
