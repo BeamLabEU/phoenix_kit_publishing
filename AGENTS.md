@@ -927,6 +927,13 @@ feature existed (re-record only for a deliberate change to a public page:
   only posts the reader may open (`Language.has_content_for_language?/3`,
   `PostAccess.openable_entries/2`). `access_url_shapes_test.exs`.
 
+- **No rules table, no rules.** `PostAccess.rules_table?/0` probes for the
+  table once (cached per repo in `:persistent_term`; a miss is asked again
+  after 30 s), and `list_rules/1`, `protected_post_uuids/1` and
+  `visible_query/1` answer "nothing protected" while it is missing, so code
+  deployed before V4 serves every post as public instead of a 500
+  (`access_pre_v4_test.exs`). A new read of the rules table goes through
+  one of those three.
 - **The missing-post answer is equal in everything but timing.** For a
   secret-link post (and, by default, a signed-in reader without the right)
   the status, `Location`, headers, cookies and body are those of a slug that

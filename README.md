@@ -362,6 +362,12 @@ The parameter is named `access_token` so Phoenix's default
 reverse proxy or CDN that logs full URLs still records it on the one
 redeeming request; keep such logs private or strip the query there.
 
+**Before the migration runs.** Access rules live in a table the module's
+own migration chain creates (V4, `mix phoenix_kit.update`). Code deployed
+ahead of it finds no table and treats every post as public on every surface,
+as before the feature; the rules take effect within half a minute of the
+migration running.
+
 **Not covered:** files. Images and attachments are served by core's storage
 routes by file uuid; a protected post's images stay reachable to anyone who
 has their URL. Put confidential files in a private library, or keep them out

@@ -65,15 +65,84 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   # Reading
   # ===========================================================================
 
+  @probe_absent_ms 30_000
+
+  @doc """
+  True when the access-rules table exists (module chain V4 has run). Code
+  deployed before the migration finds no table: every read here then answers
+  "no rules", so every post is public on every surface, exactly as before the
+  feature, instead of a 500. A found table is remembered for the life of the
+  node; a missing one is asked again after #{div(@probe_absent_ms, 1000)} s, so the
+  rules take effect soon after the migration runs. Kept in `:persistent_term`
+  per repo. A database that cannot answer the probe counts as "present": the
+  real query then fails as it would have.
+  """
+  @spec rules_table?() :: boolean()
+  def rules_table? do
+    key = probe_key()
+
+    case :persistent_term.get(key, nil) do
+      true ->
+        true
+
+      {false, until} ->
+        if System.monotonic_time(:millisecond) < until, do: false, else: probe(key)
+
+      nil ->
+        probe(key)
+    end
+  end
+
+  @doc false
+  # Forgets the probe's answer (tests, and a host that just migrated).
+  @spec reset_rules_table_probe() :: :ok
+  def reset_rules_table_probe do
+    :persistent_term.erase(probe_key())
+    :ok
+  end
+
+  defp probe_key, do: {__MODULE__, :rules_table, repo()}
+
+  defp probe(key) do
+    name =
+      case Rule.__schema__(:prefix) do
+        nil -> Rule.__schema__(:source)
+        prefix -> "#{prefix}.#{Rule.__schema__(:source)}"
+      end
+
+    case repo().query("SELECT to_regclass($1) IS NOT NULL", [name]) do
+      {:ok, %{rows: [[true]]}} ->
+        :persistent_term.put(key, true)
+        true
+
+      {:ok, %{rows: [[false]]}} ->
+        Logger.warning(
+          "[PostAccess] no access-rules table (module chain V4 not run): every post is public"
+        )
+
+        :persistent_term.put(key, {false, System.monotonic_time(:millisecond) + @probe_absent_ms})
+        false
+
+      _error ->
+        true
+    end
+  rescue
+    _ -> true
+  end
+
   @doc "Every rule of a post (gates and the settings row), oldest first."
   @spec list_rules(owner()) :: [Rule.t()]
-  def list_rules({:post, post_uuid}) do
+  def list_rules(owner) do
+    if rules_table?(), do: read_rules(owner), else: []
+  end
+
+  defp read_rules({:post, post_uuid}) do
     with_uuid(post_uuid, [], fn uuid ->
       repo().all(from(r in Rule, where: r.post_uuid == ^uuid, order_by: [asc: r.inserted_at]))
     end)
   end
 
-  def list_rules({:group, group_uuid}) do
+  defp read_rules({:group, group_uuid}) do
     with_uuid(group_uuid, [], fn uuid ->
       repo().all(from(r in Rule, where: r.group_uuid == ^uuid, order_by: [asc: r.inserted_at]))
     end)
@@ -133,6 +202,10 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   def protected_post_uuids([]), do: %{}
 
   def protected_post_uuids(post_uuids) when is_list(post_uuids) do
+    if rules_table?(), do: read_protected(post_uuids), else: %{}
+  end
+
+  defp read_protected(post_uuids) do
     from(r in Rule,
       where: r.post_uuid in ^post_uuids and r.kind in ^@gate_kinds,
       distinct: true,
@@ -149,6 +222,10 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   """
   @spec visible_query(Ecto.Queryable.t()) :: Ecto.Query.t()
   def visible_query(query) do
+    if rules_table?(), do: filter_visible(query), else: Ecto.Queryable.to_query(query)
+  end
+
+  defp filter_visible(query) do
     protected =
       from(r in Rule,
         where: not is_nil(r.post_uuid) and r.kind in ^@gate_kinds,
