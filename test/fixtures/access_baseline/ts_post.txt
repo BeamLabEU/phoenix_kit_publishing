@@ -59,7 +59,7 @@ content-type: text/html; charset=utf-8
   
   
   <script>
-(function () {
+  (function () {
   if (window.__pkHelixScroll) return;
   window.__pkHelixScroll = true;
 
@@ -130,8 +130,8 @@ content-type: text/html; charset=utf-8
     init();
   }
 })();
-</script>
 
+</script>
   <article class="post-container mx-auto px-6 py-8 max-w-4xl">
     
     <nav class="mb-1">
