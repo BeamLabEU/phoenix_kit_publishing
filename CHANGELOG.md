@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Public pages work under a nonce Content-Security-Policy** (#67; core's `guides/content-security-policy.md`). The inline scripts of the public templates (reading progress, heading rail, timeline rail, the helix scroll fallback, the comment form's fetch) and their styles (plus the scrollbar and note-panel styles) carry the host's nonce, read through `PhoenixKit.Modules.Publishing.Web.CSP`, which feature-detects core's `PhoenixKitWeb.CSP`: on a core without it the pages render as before. The stylesheets inside a rendered post body (galleries, showcase, notes, dark images) carry no nonce on purpose: the body is cached and the same for every reader. They are styles only, so a strict `script-src` is not affected; under a strict `style-src` they, and inline `style="…"` attributes, still need `'unsafe-inline'`.
+
 ## 0.20.0 - 2026-11-24
 
 PR #66. Requires phoenix_kit 3.5.0 or later (unchanged floor; the `AdminEditHelper.assign_admin_edit/3` keyword form exists since 3.5.0).

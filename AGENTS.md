@@ -550,6 +550,37 @@ takes the dangerous tools away on every host (with that one warning) until `@mar
   `mix hex.audit` run in the alias; an unused lock entry or a retired transitive
   package fails the run with no test or compile error in sight.
 
+### Content-Security-Policy
+
+The module works under a host's nonce policy (`script-src 'self' 'nonce-…'`;
+core's `guides/content-security-policy.md`). Core's `PhoenixKitWeb.CSP` is
+newer than this module's core floor, so nothing here calls it directly:
+
+- **An inline `<script>` / `<style>` rendered per request** (the public
+  templates in `web/html.ex`: reading progress, heading rail, timeline rail,
+  helix fallback, comment fetch, scrollbar and note-panel styles) takes the
+  nonce from `PhoenixKit.Modules.Publishing.Web.CSP` (feature-detected; `nil`
+  / `""` on an older core): `<script nonce={CSP.nonce(:script)}>`
+  in HEEx, `"<style#{CSP.attr(:style)}>"` in a string. The
+  tag is written in the template and its text comes from a `*_js/0` /
+  `*_css/0` function, so the tag is never part of a constant string.
+- ⚠️ **A nonce never goes into the rendered post body.** The body is cached
+  (render cache) and the same for every reader: the stylesheets `Renderer`
+  and `PageBuilder.Components.Image` append to it (`@helix_css`,
+  `@showcase_css`, the note sheets, gallery keyframes, the dark-image sheet)
+  stay bare `<style>`, and `Renderer` recognises them by exact text. They are
+  styles only; a host with a strict `style-src` has to allow them another way.
+- **No inline event handlers** (`onclick=` …): no nonce covers an attribute.
+  Use a `phx-` binding or a hook. The module ships no JS file of its own, and
+  the published core has no `data-pk-*` listeners.
+- `ProjectDocsLive` (a nested view on bare `Phoenix.LiveView`) has
+  `on_mount(PhoenixKit.Modules.Publishing.Web.CSP)`.
+
+`test/phoenix_kit_publishing/web/csp_inline_tags_test.exs` fails on a tag
+without the nonce (the two cached-body files and the JSON-LD data block are
+its listed exemptions) and on an inline handler in `lib/`. Inline `style="…"`
+attributes are not covered (the host keeps `style-src-attr 'unsafe-inline'`).
+
 ## Architecture
 
 A library, not an application: no endpoint, no repo, no supervision tree of its

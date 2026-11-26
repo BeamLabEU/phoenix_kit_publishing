@@ -19,6 +19,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.ProjectDocsLive do
   use Phoenix.LiveView
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
+  # The page's CSP nonce, handed over by the hub in the session: this view is on
+  # bare `Phoenix.LiveView`, so core's `on_mount` is not there.
+  on_mount(PhoenixKit.Modules.Publishing.Web.CSP)
+
   alias PhoenixKit.Modules.Languages
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.Groups

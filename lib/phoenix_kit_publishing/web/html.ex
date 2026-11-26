@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
+  alias PhoenixKit.Modules.Publishing.Web.CSP
   alias PhoenixKit.Modules.Storage
   alias PhoenixKit.Settings
 
@@ -212,7 +213,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     thin = if style == "thin", do: "scrollbar-width: thin;", else: ""
 
     """
-    <style>
+    <style#{CSP.attr(:style)}>
     :root {
       scrollbar-color: var(--color-primary, #6b7280) var(--color-base-300, #d1d5db);
       #{thin}
@@ -243,19 +244,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       <div class="pk-reading-progress" aria-hidden="true">
         <div class="pk-reading-progress__bar" id="pk-progress-bar"></div>
       </div>
-      {Phoenix.HTML.raw(reading_progress_assets())}
+      <style nonce={CSP.nonce(:style)}>
+        <%= Phoenix.HTML.raw(reading_progress_css()) %>
+      </style>
+      <script nonce={CSP.nonce(:script)}>
+        <%= Phoenix.HTML.raw(reading_progress_js()) %>
+      </script>
     <% end %>
     """
   end
 
-  defp reading_progress_assets do
+  defp reading_progress_css do
     """
-    <style>
     .pk-reading-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 60; pointer-events: none; background: transparent; }
     .pk-reading-progress__bar { height: 100%; width: 0; background: var(--color-primary, #6b7280); transition: width .1s linear; }
     @media (prefers-reduced-motion: reduce) { .pk-reading-progress__bar { transition: none; } }
-    </style>
-    <script>
+    """
+  end
+
+  defp reading_progress_js do
+    """
     (function () {
       if (window.__pkReadingProgress) return;
       window.__pkReadingProgress = true;
@@ -272,7 +280,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       if (document.readyState !== 'loading') update();
       else document.addEventListener('DOMContentLoaded', update);
     })();
-    </script>
     """
   end
 
@@ -290,7 +297,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     ~H"""
     <%= if @enabled do %>
       <div id="pk-headings-config" data-label={gettext("On this page")} hidden></div>
-      {Phoenix.HTML.raw(reading_headings_assets())}
+      <style nonce={CSP.nonce(:style)}>
+        <%= Phoenix.HTML.raw(reading_headings_css()) %>
+      </style>
+      <script nonce={CSP.nonce(:script)}>
+        <%= Phoenix.HTML.raw(reading_headings_js()) %>
+      </script>
     <% end %>
     """
   end
@@ -318,13 +330,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   """
   def helix_scroll_fallback(assigns) do
     ~H"""
-    {Phoenix.HTML.raw(helix_scroll_fallback_script())}
+    <script nonce={CSP.nonce(:script)}>
+      <%= Phoenix.HTML.raw(helix_scroll_fallback_script()) %>
+    </script>
     """
   end
 
   defp helix_scroll_fallback_script do
     ~S"""
-    <script>
     (function () {
       if (window.__pkHelixScroll) return;
       window.__pkHelixScroll = true;
@@ -396,13 +409,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         init();
       }
     })();
-    </script>
     """
   end
 
-  defp reading_headings_assets do
+  defp reading_headings_css do
     ~S"""
-    <style>
     .pk-heading-rail { position: fixed; top: 6vh; right: .5rem; height: 88vh; z-index: 40; }
     @media (max-width: 1024px) { .pk-heading-rail { display: none; } }
     .pk-heading-rail__item { position: absolute; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: flex-end; gap: .5rem; text-decoration: none; padding: .35rem .5rem; border-radius: 9999px; transition: background-color .15s ease; }
@@ -418,8 +429,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     @keyframes pk-heading-flash { 0% { box-shadow: 0 0 0 0 var(--color-primary, #4f46e5); } 30% { box-shadow: 0 0 0 6px var(--color-primary, #4f46e5); } 100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); } }
     .pk-heading-flash { animation: pk-heading-flash 1.2s ease-out 1; border-radius: .25rem; }
     @media (prefers-reduced-motion: reduce) { .pk-heading-flash { animation: none; outline: 2px solid var(--color-primary, #4f46e5); } }
-    </style>
-    <script>
+    """
+  end
+
+  defp reading_headings_js do
+    ~S"""
     (function () {
       if (window.__pkHeadingRail) return;
       window.__pkHeadingRail = true;
@@ -523,7 +537,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       if (document.readyState !== 'loading') init();
       else document.addEventListener('DOMContentLoaded', init);
     })();
-    </script>
     """
   end
 
@@ -554,14 +567,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         hidden
       >
       </div>
-      {Phoenix.HTML.raw(scroll_timeline_assets())}
+      <style nonce={CSP.nonce(:style)}>
+        <%= Phoenix.HTML.raw(scroll_timeline_css()) %>
+      </style>
+      <script nonce={CSP.nonce(:script)}>
+        <%= Phoenix.HTML.raw(scroll_timeline_js()) %>
+      </script>
     <% end %>
     """
   end
 
-  defp scroll_timeline_assets do
+  defp scroll_timeline_css do
     ~S"""
-    <style>
     .pk-timeline-rail { position: fixed; top: 6vh; right: .5rem; height: 88vh; z-index: 40; }
     @media (max-width: 1024px) { .pk-timeline-rail { display: none; } }
     .pk-timeline-rail__item { position: absolute; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: flex-end; gap: .5rem; text-decoration: none; font-size: .7rem; line-height: 1; color: var(--color-base-content, #6b7280); opacity: .5; padding: .35rem .6rem; border-radius: 9999px; transition: color .15s ease, opacity .15s ease, background-color .15s ease; }
@@ -582,8 +599,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     @keyframes pk-timeline-flash { 0% { box-shadow: 0 0 0 0 var(--color-primary, #4f46e5); } 30% { box-shadow: 0 0 0 4px var(--color-primary, #4f46e5); } 100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); } }
     .pk-timeline-flash { animation: pk-timeline-flash 1.2s ease-out 1; }
     @media (prefers-reduced-motion: reduce) { .pk-timeline-flash { animation: none; outline: 2px solid var(--color-primary, #4f46e5); } }
-    </style>
-    <script>
+    """
+  end
+
+  defp scroll_timeline_js do
+    ~S"""
     (function () {
       if (window.__pkTimelineRail) return;
       window.__pkTimelineRail = true;
@@ -742,7 +762,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       if (document.readyState !== 'loading') init();
       else document.addEventListener('DOMContentLoaded', init);
     })();
-    </script>
     """
   end
 
@@ -1752,9 +1771,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   # place — no page reload, scroll and the open panel (:target) survive.
   # Without JS (or on any fetch failure) the plain form POST still works.
   # Same inline-script pattern as reading_progress/1 on these dead views.
-  defp comment_fetch_assets do
+  defp comment_fetch_js do
     """
-    <script>
     (function () {
       if (window.__pkCommentFetch) return;
       window.__pkCommentFetch = true;
@@ -1841,7 +1859,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           });
       });
     })();
-    </script>
     """
   end
 
@@ -2028,7 +2045,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         </aside>
       </div>
     </section>
-    <style>
+    <style nonce={CSP.nonce(:style)}>
       /* .pk-open mirrors :target — replacing a :target node in the DOM
          (the fetch enhancement's section swap) makes browsers drop the
          :target match, so the script re-opens the hash's panel by class. */
@@ -2382,7 +2399,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
           top-level comment carries the form action. --%>
         <% comments_url = build_post_url(@group_slug, @post, @current_language) %>
         <div :if={assigns[:comments_enabled]} class="hidden" aria-hidden="true">
-          {Phoenix.HTML.raw(comment_fetch_assets())}
+          <script nonce={CSP.nonce(:script)}>
+            <%= Phoenix.HTML.raw(comment_fetch_js()) %>
+          </script>
         </div>
         <section :if={assigns[:comments_enabled]} id="comments" class="mt-10 border-t pt-6">
           {Publishing.Comments.content_styles()}
