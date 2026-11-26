@@ -6,13 +6,15 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.RateLimit do
   empty bucket.
 
   Runs on core's Hammer backend (`PhoenixKit.Users.RateLimiter.Backend`, the
-  one core's sign-in limits use). If that backend is not running the attempt
-  is allowed and a warning logged — Bcrypt still costs every guess ~100 ms.
+  one core's sign-in limits use). If that backend cannot answer, the same
+  limits are counted in this node's own ETS table (`PostAccess.LocalLimits`),
+  with one warning logged; if that is missing too, the attempt is refused.
   Limits are per node.
   """
 
   require Logger
 
+  alias PhoenixKit.Modules.Publishing.PostAccess.LocalLimits
   alias PhoenixKit.Users.RateLimiter.Backend
   alias PhoenixKit.Utils.IpAddress
 
@@ -44,15 +46,36 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.RateLimit do
       {:deny, _retry_after} -> {:error, :rate_limited}
     end
   rescue
-    error ->
-      Logger.warning(
-        "[PostAccess] rate limiter unavailable (#{inspect(error.__struct__)}); attempt allowed"
-      )
-
-      :ok
+    _error -> local_hit(key, window, limit)
   catch
-    :exit, _ ->
-      Logger.warning("[PostAccess] rate limiter unavailable; attempt allowed")
-      :ok
+    :exit, _ -> local_hit(key, window, limit)
+  end
+
+  # Core's backend could not answer: the same limits on this node's own ETS
+  # counter (`LocalLimits`), so an outage never turns the limit off. When
+  # that is not running either, the attempt is refused.
+  @doc false
+  @spec local_hit(String.t(), pos_integer(), pos_integer()) :: :ok | {:error, :rate_limited}
+  def local_hit(key, window, limit) do
+    warn_once()
+
+    case LocalLimits.hit(key, window, limit) do
+      {:allow, _count} -> :ok
+      {:deny, _count} -> {:error, :rate_limited}
+      :unavailable -> {:error, :rate_limited}
+    end
+  end
+
+  @warned_key {__MODULE__, :fallback_warned}
+
+  defp warn_once do
+    unless :persistent_term.get(@warned_key, false) do
+      :persistent_term.put(@warned_key, true)
+
+      Logger.warning(
+        "[PostAccess] core's rate limiter is unavailable; password attempts are " <>
+          "limited by this node's own counter until it is back"
+      )
+    end
   end
 end

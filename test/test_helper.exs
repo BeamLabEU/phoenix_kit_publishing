@@ -127,6 +127,7 @@ end
 # Views dedups cookieless visitors per day through this table's owner; without
 # it `publishing_unique_views` silently degrades to counting every open.
 {:ok, _pid} = PhoenixKit.Modules.Publishing.Views.VisitorTable.start_link([])
+{:ok, _pid} = PhoenixKit.Modules.Publishing.PostAccess.LocalLimits.start_link([])
 
 # Web.Listing's `handle_params/3` spawns a stale-fixer task via
 # Task.Supervisor.start_child(PhoenixKit.TaskSupervisor, …) — start that

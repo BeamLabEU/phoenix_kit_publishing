@@ -836,6 +836,9 @@ defmodule PhoenixKit.Modules.Publishing do
       # Owns the per-day visitor table behind publishing_unique_views, swept
       # once a day; without it the counter counts every open.
       PhoenixKit.Modules.Publishing.Views.VisitorTable,
+      # The password limiter's fallback counter (PostAccess.LocalLimits): used
+      # while core's rate-limit backend is down, so attempts stay limited.
+      PhoenixKit.Modules.Publishing.PostAccess.LocalLimits,
       # Per-post render cache (Renderer.render_post_cached/1). Without this the
       # cache GenServer never starts, so every published view re-renders markdown
       # and logs a per-request warning. max_size bounds growth — the cache key
