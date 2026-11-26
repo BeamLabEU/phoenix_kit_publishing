@@ -48,7 +48,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     alias PhoenixKit.Migrations.Postgres.Helpers
 
     test "current_version/0 and version_table/0" do
-      assert Migrations.current_version() == 3
+      assert Migrations.current_version() == 4
       assert Migrations.version_table() == "phoenix_kit_publishing_groups"
     end
 
@@ -100,14 +100,14 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # `migrated_version_runtime/1` (both default their target to
     # `initial_version/0`, well under the ceiling) — 0, 1 and 2 must all
     # stay reachable for every public builder.
-    test "validate_target! admits 0 to 3, and nothing above current_version/0" do
-      for target <- [0, 1, 2, 3] do
+    test "validate_target! admits 0 to 4, and nothing above current_version/0" do
+      for target <- [0, 1, 2, 3, 4] do
         assert Migrations.up_statements("public", target) |> is_list()
         assert Migrations.down_statements("public", target) |> is_list()
       end
 
-      assert_raise ArgumentError, fn -> Migrations.up_statements("public", 4) end
-      assert_raise ArgumentError, fn -> Migrations.down_statements("public", 4) end
+      assert_raise ArgumentError, fn -> Migrations.up_statements("public", 5) end
+      assert_raise ArgumentError, fn -> Migrations.down_statements("public", 5) end
     end
 
     # This chain interpolates the prefix into every object it creates, and
@@ -310,7 +310,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     end
 
     test "up stamps the version marker, and stamps it last, for every target" do
-      for target <- [1, 2, 3] do
+      for target <- [1, 2, 3, 4] do
         statements = Migrations.up_statements("public", target)
 
         assert List.last(statements) ==
@@ -322,7 +322,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       end
 
       assert List.last(Migrations.up_statements()) ==
-               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:3'",
+               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:4'",
              "the default target is current_version/0"
     end
 
@@ -536,6 +536,52 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     end
   end
 
+  describe "V4 — the access-rules table" do
+    test "V4 adds exactly the access-rules table and its guarded objects, before the marker" do
+      v3 = Migrations.up_statements("public", 3)
+      v4 = Migrations.up_statements("public", 4)
+      added = Enum.drop(v4, -1) -- Enum.drop(v3, -1)
+
+      assert length(added) == 6
+      assert Enum.all?(added, &(&1 =~ "phoenix_kit_publishing_access_rules"))
+
+      assert hd(added) =~
+               "CREATE TABLE IF NOT EXISTS public.phoenix_kit_publishing_access_rules ("
+
+      assert List.last(v4) ==
+               "COMMENT ON TABLE public.phoenix_kit_publishing_groups IS 'pkpub_schema:4'"
+    end
+
+    test "its varchar widths are PublishingAccessRule.column_widths/0" do
+      create =
+        Enum.find(
+          Migrations.up_statements("public", 4),
+          &String.starts_with?(
+            &1,
+            "CREATE TABLE IF NOT EXISTS public.phoenix_kit_publishing_access_rules ("
+          )
+        )
+
+      parsed =
+        ~r/"(\w+)" character varying\((\d+)\)/
+        |> Regex.scan(create)
+        |> Map.new(fn [_, col, width] ->
+          {String.to_existing_atom(col), String.to_integer(width)}
+        end)
+
+      assert parsed == PhoenixKit.Modules.Publishing.PublishingAccessRule.column_widths()
+    end
+
+    test "down below V4 only moves the marker: the table and its rules stay" do
+      for prefix <- ["public", "publishing_alt"] do
+        assert Migrations.down_statements(prefix, 3) ==
+                 ["COMMENT ON TABLE #{prefix}.phoenix_kit_publishing_groups IS 'pkpub_schema:3'"]
+
+        refute Enum.any?(Migrations.down_statements(prefix, 0), &(&1 =~ ~r/DROP TABLE/i))
+      end
+    end
+  end
+
   describe "the chain can never destroy any of the 7 tables" do
     # Compared against the WHOLE expected content, not scanned for a
     # forbidden substring — a substring check only sees statements the
@@ -548,7 +594,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
     # appears, in any target — and that each block drops on ONE of the two
     # V2 tables, through the guard's own shape match, never by a name.
     test "down/1 emits the two V2 index removals below V2 and the marker bookkeeping, nothing else" do
-      for prefix <- ["public", "publishing_alt"], target <- [0, 1, 2, 3] do
+      for prefix <- ["public", "publishing_alt"], target <- [0, 1, 2, 3, 4] do
         statements = Migrations.down_statements(prefix, target)
 
         {removals, rest} = Enum.split_with(statements, &String.starts_with?(&1, "DO $$"))
@@ -642,6 +688,14 @@ defmodule PhoenixKitPublishing.MigrationsTest do
       # V2 — the only two objects this chain adds to core's shape.
       {"CREATE INDEX", "idx_publishing_groups_media_folder"},
       {"CREATE INDEX", "idx_publishing_versions_media_folder"},
+      # V4 — the access-rules table, the one table this chain creates
+      # that core never had.
+      {"CREATE TABLE", "phoenix_kit_publishing_access_rules"},
+      {"DO", "phoenix_kit_publishing_access_rules_pkey"},
+      {"CREATE INDEX", "idx_publishing_access_rules_post"},
+      {"CREATE INDEX", "idx_publishing_access_rules_group"},
+      {"DO", "fk_publishing_access_rules_post"},
+      {"DO", "fk_publishing_access_rules_group"},
       {"COMMENT ON TABLE", "phoenix_kit_publishing_groups"}
     ]
 
@@ -658,8 +712,8 @@ defmodule PhoenixKitPublishing.MigrationsTest do
                missing:    #{inspect(Enum.sort(@up_operations) -- Enum.sort(actual))}
 
                Every statement this chain emits runs against a core-created
-               table. Adding one is a chain version (V2+), not something to
-               slip past this list.
+               table or V4's own access-rules table. Adding one is a chain
+               version (V2+), not something to slip past this list.
                """
       end
     end

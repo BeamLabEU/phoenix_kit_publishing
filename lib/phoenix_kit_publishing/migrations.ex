@@ -224,6 +224,17 @@ defmodule PhoenixKitPublishing.Migrations do
   (an extra column is harmless to older code, and this chain never destroys
   data). A re-run of V3 then finds it in place.
 
+  ### V4 adds the access-rules table
+
+  V4 creates `phoenix_kit_publishing_access_rules` (per-post access control,
+  `PublishingAccessRule`): the first table this chain creates that core
+  never had, so the 7-table "core creates them" story above does not apply
+  to it — on every install it comes from here. Primary key, two btree
+  indexes (`post_uuid`, `group_uuid`) and two cascading foreign keys (to
+  posts and groups), all through the same semantic guards as V1. A site
+  with no rows in it behaves exactly as before V4. `down/1` below V4 only
+  moves the marker; the table and its rules stay.
+
   ### Phase 2 — creation leaves core's baseline at the next squash cycle
 
   When core cuts its next baseline, module-owned tables are simply not
@@ -263,6 +274,7 @@ defmodule PhoenixKitPublishing.Migrations do
   use Ecto.Migration
 
   alias PhoenixKit.Migrations.Postgres.Helpers
+  alias PhoenixKit.Modules.Publishing.PublishingAccessRule
   alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingGroup
@@ -270,7 +282,7 @@ defmodule PhoenixKitPublishing.Migrations do
   alias PhoenixKit.Modules.Publishing.PublishingVersion
 
   @initial_version 1
-  @current_version 3
+  @current_version 4
   @default_prefix "public"
   @marker_prefix "pkpub_schema:"
 
@@ -281,6 +293,7 @@ defmodule PhoenixKitPublishing.Migrations do
   @categories "phoenix_kit_publishing_categories"
   @post_categories "phoenix_kit_publishing_post_categories"
   @post_views "phoenix_kit_publishing_post_views"
+  @access_rules "phoenix_kit_publishing_access_rules"
 
   # V2's two objects — with V3's `data` column on the categories table, the
   # only things this chain has created that core's baseline does not. Named in core's `idx_publishing_<table>_<what>`
@@ -430,7 +443,8 @@ defmodule PhoenixKitPublishing.Migrations do
     else
       v1_statements(prefix) ++
         v2_statements(prefix, target) ++
-        v3_statements(prefix, target) ++ marker_statements(prefix, target)
+        v3_statements(prefix, target) ++
+        v4_statements(prefix, target) ++ marker_statements(prefix, target)
     end
   end
 
@@ -471,6 +485,65 @@ defmodule PhoenixKitPublishing.Migrations do
   defp marker_statements(prefix, target) do
     ["COMMENT ON TABLE #{Helpers.qualify_table(@groups, prefix)} IS '#{@marker_prefix}#{target}'"]
   end
+
+  # ── V4 statement builder ────────────────────────────────────────────────
+
+  # Per-post access control: one new table, `phoenix_kit_publishing_access_rules`,
+  # created by this chain alone (core never had it). A rule belongs to a post
+  # or, as a group's default for new posts, to a group; both foreign keys
+  # cascade, so a post or group deleted for good takes its rules along. No
+  # CHECK constraint (the "one owner" and kind rules live in
+  # `PublishingAccessRule.changeset/2`), matching the rest of the chain. The
+  # same guards as V1 make a re-run a no-op; `down/1` below V4 leaves the
+  # table and its rows where they are, like every rollback of this chain.
+  defp v4_statements(prefix, target) when target >= 4 do
+    uuid_default = Helpers.uuid_v7_call(prefix)
+    q_rules = Helpers.qualify_table(@access_rules, prefix)
+    q_posts = Helpers.qualify_table(@posts, prefix)
+    q_groups = Helpers.qualify_table(@groups, prefix)
+    aw = PublishingAccessRule.column_widths()
+
+    [
+      """
+      CREATE TABLE IF NOT EXISTS #{q_rules} (
+        "uuid" uuid DEFAULT #{uuid_default} NOT NULL,
+        "post_uuid" uuid,
+        "group_uuid" uuid,
+        "kind" character varying(#{aw.kind}) NOT NULL,
+        "config" jsonb DEFAULT '{}'::jsonb NOT NULL,
+        "note" character varying(#{aw.note}),
+        "expires_at" timestamp with time zone,
+        "revoked_at" timestamp with time zone,
+        "created_by_uuid" uuid,
+        "inserted_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      )
+      """,
+      pkey_guard(@access_rules, q_rules, ["uuid"]),
+      index_guard(
+        "idx_publishing_access_rules_post",
+        q_rules,
+        false,
+        "btree",
+        ["post_uuid"],
+        [:asc],
+        nil
+      ),
+      index_guard(
+        "idx_publishing_access_rules_group",
+        q_rules,
+        false,
+        "btree",
+        ["group_uuid"],
+        [:asc],
+        nil
+      ),
+      fk_guard(q_rules, "fk_publishing_access_rules_post", "post_uuid", q_posts, "CASCADE"),
+      fk_guard(q_rules, "fk_publishing_access_rules_group", "group_uuid", q_groups, "CASCADE")
+    ]
+  end
+
+  defp v4_statements(_prefix, _target), do: []
 
   # ── V3 statement builder ────────────────────────────────────────────────
 
