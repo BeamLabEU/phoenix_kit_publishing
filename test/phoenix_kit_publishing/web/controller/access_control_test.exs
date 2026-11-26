@@ -311,6 +311,24 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
       assert get(conn, path) |> html_response(200) =~ @title
     end
 
+    test "the old-slug 301 to a protected post is never cacheable", %{
+      conn: conn,
+      post: post,
+      slug: slug,
+      role: role
+    } do
+      {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
+      {:ok, _} = Posts.update_post(slug, read, %{"slug" => "weekly-renamed"}, %{})
+
+      with_scope(user_scope(["User", role.name]))
+      moved = get(conn, "/#{slug}/weekly")
+
+      assert moved.status == 301
+      assert redirected_to(moved, 301) =~ "weekly-renamed"
+      # A shared cache replaying this Location to anyone would name the post.
+      assert protected_headers?(moved)
+    end
+
     test "a wrong role answers like a missing post by default", %{
       conn: conn,
       path: path,

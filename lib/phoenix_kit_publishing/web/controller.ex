@@ -975,6 +975,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp parse_url_time(nil), do: {:ok, nil}
   defp parse_url_time(time), do: Time.from_iso8601(time <> ":00")
 
+  # A redirect for a protected post (`PostRendering.mark_protected/1`, the
+  # old-slug 301 of `SlugResolution`): uncacheable, unindexed, no Referer.
+  defp redirect_301(conn, {:protected, url}),
+    do: conn |> AccessGate.protect() |> redirect_301(url)
+
   defp redirect_301(conn, url) do
     conn
     |> put_status(301)

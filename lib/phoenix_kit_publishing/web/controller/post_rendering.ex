@@ -37,7 +37,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @typedoc "What a post render hands the controller to respond with."
   @type render_result ::
           {:ok, map()}
-          | {:redirect_301, String.t()}
+          | {:redirect_301, String.t() | {:protected, String.t()}}
           | {:error, term()}
           | {:access, term(), map()}
 
@@ -52,9 +52,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def render_post(conn, group_slug, identifier, language) do
     # For slug mode, resolve URL slug to internal slug first
     # This enables per-language URL slugs and 301 redirects for old slugs
-    openable? = &(AccessGate.check(conn, &1) in [:public, :protected])
+    access = &AccessGate.check(conn, &1)
 
-    case SlugResolution.resolve_url_slug(group_slug, identifier, language, openable?: openable?) do
+    case SlugResolution.resolve_url_slug(group_slug, identifier, language, access: access) do
       {:redirect, redirect_url} ->
         # Old URL slug - 301 redirect to current URL
         {:redirect_301, redirect_url}
@@ -99,8 +99,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @doc false
   # Tags a render of a protected post, so the controller adds the protected
   # response headers and the robots meta.
+  # A redirect (the canonical-URL 301) becomes `{:protected, url}`: the
+  # controller sends it with the protected headers, so no shared cache
+  # replays a protected post's Location to another reader.
   @spec mark_protected(render_result()) :: render_result()
   def mark_protected({:ok, assigns}), do: {:ok, Map.put(assigns, :access_protected, true)}
+
+  def mark_protected({:redirect_301, url}) when is_binary(url),
+    do: {:redirect_301, {:protected, url}}
+
   def mark_protected(other), do: other
 
   defp render_live_post(conn, group_slug, identifier, language, post) do
