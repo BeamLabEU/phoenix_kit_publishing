@@ -48,6 +48,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.AccessPanelLiveTest do
     assert has_element?(view, "#post-access-panel [data-access-summary]", "signed-in readers")
   end
 
+  test "a group-only event sent to a post's panel changes nothing and crashes nothing", %{
+    conn: conn,
+    group: group,
+    post: post
+  } do
+    view = editor(conn, group, post)
+
+    for event <- ["apply_defaults", "preview_apply"] do
+      view |> with_target("#post-access-panel") |> render_click(event, %{})
+    end
+
+    assert Process.alive?(view.pid)
+    assert has_element?(view, "#post-access-panel [data-access-summary]", "Public")
+  end
+
   test "a secret link is shown once, with its key", %{conn: conn, group: group, post: post} do
     view = editor(conn, group, post)
 

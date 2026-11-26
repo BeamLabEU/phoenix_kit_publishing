@@ -161,16 +161,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
 
   defp do_event("dismiss_link", _params, socket), do: {:noreply, assign(socket, :new_link, nil)}
 
-  defp do_event("preview_apply", params, socket) do
-    {:group, group_uuid} = socket.assigns.owner
+  defp do_event("preview_apply", params, %{assigns: %{owner: {:group, group_uuid}}} = socket) do
     keep = params["keep_custom"] == "true"
     count = PostAccess.preview_group_defaults(group_uuid, keep_custom: keep)
     {:noreply, assign(socket, apply_preview: count, keep_custom: keep)}
   end
 
-  defp do_event("apply_defaults", _params, socket) do
-    {:group, group_uuid} = socket.assigns.owner
-
+  defp do_event("apply_defaults", _params, %{assigns: %{owner: {:group, group_uuid}}} = socket) do
     {:ok, count} =
       PostAccess.apply_group_defaults(
         group_uuid,
