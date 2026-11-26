@@ -36,6 +36,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Views
+  alias PhoenixKit.Modules.Publishing.Web.Controller.AccessGate
   alias PhoenixKit.Modules.Publishing.Web.Controller.Fallback
   alias PhoenixKit.Modules.Publishing.Web.Controller.Feed
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
@@ -197,6 +198,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   from the page's fetch enhancement (`x-pk-comment-fetch` header) get a
   JSON verdict instead so the client can swap the thread in place.
   """
+  def create_comment(conn, %{"pk_access" => "unlock"} = params) do
+    # The protected-post password form posts here too: core declares one
+    # POST route for publishing's public pages, and it names this action.
+    if public_enabled?(), do: AccessGate.unlock(conn, params), else: render_404(conn)
+  end
+
   def create_comment(conn, params) do
     group_slug = params["group"]
 
@@ -234,9 +241,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     set_gettext_locale(language)
     post_uuid = params["post_uuid"]
 
-    post =
-      Listing.chronological_posts(group_slug, language)
-      |> Enum.find(&(&1[:uuid] == post_uuid))
+    post = comment_target(conn, group_slug, language, post_uuid)
 
     back_path =
       case post do
@@ -265,6 +270,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
 
       true ->
         submit_comment(conn, post, params, back_path)
+    end
+  end
+
+  # The published post the comment is for. A protected post takes comments
+  # only from a reader who may open it; to anyone else it does not exist.
+  defp comment_target(conn, group_slug, language, post_uuid) do
+    case Listing.chronological_posts(group_slug, language, nil, include_protected: true)
+         |> Enum.find(&(&1[:uuid] == post_uuid)) do
+      nil ->
+        nil
+
+      post ->
+        if AccessGate.check(conn, post) in [:public, :protected], do: post
     end
   end
 
@@ -503,6 +521,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
         listing_url = PublishingHTML.group_listing_path(assigns.current_language, group_slug)
 
         conn
+        |> maybe_protect_listing(assigns)
         |> assign(:page_title, assigns.page_title)
         |> assign(:group, assigns.group)
         |> assign(:posts, assigns.posts)
@@ -723,6 +742,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           PublishingHTML.build_post_url(group_slug, assigns.post, assigns.current_language)
 
         conn
+        |> maybe_protect(assigns)
         |> assign(:page_title, assigns.page_title)
         |> assign(:group_slug, assigns.group_slug)
         |> assign(:group_name, Map.get(assigns, :group_name) || assigns.group_slug)
@@ -754,6 +774,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       {:redirect_301, url} ->
         redirect_301(conn, url)
 
+      {:access, outcome, post} ->
+        AccessGate.respond(conn, outcome, post, &handle_not_found/2)
+
       {:error, reason} ->
         handle_not_found(conn, reason)
     end
@@ -763,6 +786,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
     case PostRendering.render_versioned_post(conn, group_slug, post_slug, version, language) do
       {:ok, assigns} ->
         conn
+        |> maybe_protect(assigns)
         |> assign(:page_title, assigns.page_title)
         |> assign(:group_slug, assigns.group_slug)
         |> assign(:group_name, Map.get(assigns, :group_name) || assigns.group_slug)
@@ -793,6 +817,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       {:redirect_301, url} ->
         redirect_301(conn, url)
 
+      {:access, outcome, post} ->
+        AccessGate.respond(conn, outcome, post, &handle_not_found/2)
+
       {:error, reason} ->
         handle_not_found(conn, reason)
     end
@@ -805,6 +832,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
           PublishingHTML.build_post_url(group_slug, assigns.post, assigns.current_language)
 
         conn
+        |> maybe_protect(assigns)
         |> assign(:page_title, assigns.page_title)
         |> assign(:group_slug, assigns.group_slug)
         |> assign(:group_name, Map.get(assigns, :group_name) || assigns.group_slug)
@@ -839,6 +867,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       {:redirect_301, url} ->
         redirect_301(conn, url)
 
+      {:access, outcome, post} ->
+        AccessGate.respond(conn, outcome, post, &handle_not_found/2)
+
       {:error, reason} ->
         handle_not_found(conn, reason)
     end
@@ -858,6 +889,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
       {:render_404} ->
         render_404(conn)
     end
+  end
+
+  # A protected post's page (the reader is allowed in): never cached by a
+  # shared cache, never indexed, no Referer to the pages it links.
+  defp maybe_protect(conn, %{access_protected: true}), do: AccessGate.protect(conn)
+  defp maybe_protect(conn, _assigns), do: conn
+
+  # A listing that shows this reader protected posts (the group lists them
+  # to readers who may open them) is that reader's page: no shared caching.
+  defp maybe_protect_listing(conn, assigns) do
+    listed =
+      Map.get(assigns, :posts, []) ++
+        Map.get(assigns, :featured_posts, []) ++ Map.get(assigns, :newest_posts, [])
+
+    if Enum.any?(listed, &(is_map(&1) and Map.get(&1, :access_protected) == true)),
+      do: conn |> put_resp_header("cache-control", "private, no-store"),
+      else: conn
   end
 
   defp render_404(conn) do

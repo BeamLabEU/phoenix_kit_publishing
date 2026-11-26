@@ -25,9 +25,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution do
   - `{:ok, identifier}` for resolved internal slug
   - `:passthrough` for direct use
   """
-  @spec resolve_url_slug(String.t(), tuple(), String.t()) ::
+  @spec resolve_url_slug(String.t(), tuple() | atom(), String.t(), keyword()) ::
           {:redirect, String.t()} | {:ok, {:slug, String.t()}} | :passthrough
-  def resolve_url_slug(group_slug, {:slug, url_slug}, language) do
+  def resolve_url_slug(group_slug, identifier, language, opts \\ [])
+
+  def resolve_url_slug(group_slug, {:slug, url_slug}, language, opts) do
     # Resolve base language codes (de, en) to stored dialect codes (de-DE, en-US)
     # before DB queries, since content rows store full BCP-47 dialect codes
     db_language = resolve_language_for_db(language)
@@ -48,23 +50,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution do
         # Not found in current slugs - check previous slugs for 301 redirect
         case Publishing.find_by_previous_url_slug(group_slug, db_language, url_slug) do
           {:ok, cached_post} ->
-            # Found in previous slugs - redirect to current URL. The cache path
-            # carries `:language_slugs`; the DB path (db_content_to_post_map/1)
-            # does not, so fall back to the row's own `:url_slug` (the canonical
-            # custom slug for this language, which the DB map DOES carry) before
-            # the internal `:slug`. Without this, a post with a custom url_slug
-            # 301s to /group/<internal-slug> instead of the canonical URL.
-            current_url_slug =
-              Map.get(
-                cached_post[:language_slugs] || %{},
-                db_language,
-                cached_post[:url_slug] || cached_post.slug
-              )
-
-            redirect_url =
-              build_post_redirect_url(group_slug, cached_post, language, current_url_slug)
-
-            {:redirect, redirect_url}
+            redirect_to_current_slug(group_slug, cached_post, language, db_language, opts)
 
           {:error, _} ->
             :passthrough
@@ -73,7 +59,37 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution do
   end
 
   # Non-slug modes pass through directly
-  def resolve_url_slug(_group_slug, _identifier, _language), do: :passthrough
+  def resolve_url_slug(_group_slug, _identifier, _language, _opts), do: :passthrough
+
+  # A protected post the reader may not open gets no redirect: the 301 would
+  # name its current URL. `:passthrough` lets the read fail like any unknown
+  # slug. Callers without the `:openable?` option (none on the public path)
+  # get the redirect as before.
+  defp redirect_to_current_slug(group_slug, cached_post, language, db_language, opts) do
+    openable? = Keyword.get(opts, :openable?, fn _post -> true end)
+
+    if openable?.(cached_post) do
+      # Found in previous slugs - redirect to current URL. The cache path
+      # carries `:language_slugs`; the DB path (db_content_to_post_map/1)
+      # does not, so fall back to the row's own `:url_slug` (the canonical
+      # custom slug for this language, which the DB map DOES carry) before
+      # the internal `:slug`. Without this, a post with a custom url_slug
+      # 301s to /group/<internal-slug> instead of the canonical URL.
+      current_url_slug =
+        Map.get(
+          cached_post[:language_slugs] || %{},
+          db_language,
+          cached_post[:url_slug] || cached_post.slug
+        )
+
+      redirect_url =
+        build_post_redirect_url(group_slug, cached_post, language, current_url_slug)
+
+      {:redirect, redirect_url}
+    else
+      :passthrough
+    end
+  end
 
   @doc """
   Resolves a URL slug to the internal post slug.

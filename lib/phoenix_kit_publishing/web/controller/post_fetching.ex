@@ -13,6 +13,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostFetching do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.PostAccess
+  alias PhoenixKit.Modules.Publishing.Web.Controller.AccessGate
 
   # ============================================================================
   # Main Fetch Functions
@@ -48,7 +50,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostFetching do
   """
   @spec list_posts_with_cache(String.t()) :: [map()]
   def list_posts_with_cache(group_slug) do
-    list_posts_with_listing_cache(group_slug)
+    group_slug
+    |> list_posts_with_listing_cache()
+    |> Enum.filter(&PostAccess.public?/1)
+  end
+
+  @doc """
+  Every cached post of the group, protected ones included — for the URL
+  arithmetic (date counts, slug lookups) that must agree with routing, never
+  for anything a reader sees. Public surfaces use `list_posts_with_cache/1`
+  (public posts only) or `visible_posts_with_cache/3`.
+  """
+  @spec list_all_posts_with_cache(String.t()) :: [map()]
+  def list_all_posts_with_cache(group_slug), do: list_posts_with_listing_cache(group_slug)
+
+  @doc """
+  The posts a listing shows this request's reader: the public ones, plus the
+  protected ones they may open when the group lists protected posts
+  (`PostAccess.visible_entries/3`).
+  """
+  @spec visible_posts_with_cache(String.t(), Plug.Conn.t(), map()) :: [map()]
+  def visible_posts_with_cache(group_slug, conn, group) do
+    group_slug
+    |> list_posts_with_listing_cache()
+    |> PostAccess.visible_entries(AccessGate.viewer(conn), group["uuid"])
   end
 
   defp list_posts_with_listing_cache(group_slug) do
