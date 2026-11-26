@@ -63,6 +63,23 @@ defmodule PhoenixKit.Modules.Publishing.Web.AccessPanelLiveTest do
     assert has_element?(view, "#post-access-panel [data-access-summary]", "Public")
   end
 
+  test "a role rule naming a role that no longer exists says so", %{post: post} do
+    gone = "019cce93-0000-7000-8000-00000000dead"
+
+    {:ok, _} =
+      PostAccess.add_rule({:post, post.uuid}, %{"kind" => "role", "role_uuids" => [gone]})
+
+    html =
+      render_component(AccessPanel,
+        id: "post-access-panel",
+        owner: {:post, post.uuid},
+        scope: fake_scope()
+      )
+
+    assert html =~ "a deleted role"
+    refute html =~ "Roles: ?"
+  end
+
   test "a secret link is shown once, with its key", %{conn: conn, group: group, post: post} do
     view = editor(conn, group, post)
 

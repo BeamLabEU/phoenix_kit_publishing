@@ -4572,6 +4572,11 @@ msgstr "角色"
 msgid "Roles: %{roles}"
 msgstr "角色：%{roles}"
 
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:452
+#, elixir-autogen, elixir-format
+msgid "a deleted role"
+msgstr "已删除的角色"
+
 #: lib/phoenix_kit_publishing/web/components/access_panel.ex:444
 #: lib/phoenix_kit_publishing/web/components/access_panel.ex:462
 #, elixir-autogen, elixir-format

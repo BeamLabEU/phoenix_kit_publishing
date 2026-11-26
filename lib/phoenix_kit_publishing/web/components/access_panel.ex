@@ -44,7 +44,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
       |> assign_new(:apply_preview, fn -> nil end)
       |> assign_new(:keep_custom, fn -> true end)
 
-    {:ok, if(reload?, do: load(socket), else: socket)}
+    # A new owner (the same panel id showing another post) starts without
+    # the previous owner's freshly made link on screen.
+    {:ok, if(reload?, do: socket |> assign(:new_link, nil) |> load(), else: socket)}
   end
 
   defp load(socket) do
@@ -447,7 +449,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
 
   defp rule_label(%{kind: "role", config: config}, names) do
     roles =
-      config |> Map.get("role_uuids", []) |> Enum.map_join(", ", &Map.get(names, &1, "?"))
+      config
+      |> Map.get("role_uuids", [])
+      |> Enum.map_join(", ", &Map.get_lazy(names, &1, fn -> gettext("a deleted role") end))
 
     gettext("Roles: %{roles}", roles: roles)
   end
