@@ -269,6 +269,33 @@ defmodule PhoenixKit.Modules.Publishing.PostAccessTest do
 
       assert PostAccess.authorize_view(a, with_grant(signed_in([role.name]), pw)) == :ok
     end
+
+    test "all: an expired kind closes the post instead of dropping out", %{
+      owner: owner,
+      role: role
+    } do
+      {:ok, _} = PostAccess.put_settings(owner, %{"match" => "all"})
+      past = DateTime.add(DateTime.utc_now(), -60, :second)
+      {:ok, pw} = PostAccess.set_password(owner, "pass word", %{"expires_at" => past})
+      a = access(owner)
+
+      # "role AND password until <past>" must not become "role".
+      assert PostAccess.authorize_view(a, signed_in([role.name])) == {:error, :not_found}
+
+      assert PostAccess.authorize_view(a, with_grant(signed_in([role.name]), pw)) ==
+               {:error, :not_found}
+
+      assert PostAccess.authorize_view(a, editor()) == :ok
+    end
+
+    test "any: an expired kind only narrows", %{owner: owner, role: role} do
+      past = DateTime.add(DateTime.utc_now(), -60, :second)
+      {:ok, _} = PostAccess.set_password(owner, "pass word", %{"expires_at" => past})
+      a = access(owner)
+
+      assert PostAccess.authorize_view(a, signed_in([role.name])) == :ok
+      assert PostAccess.authorize_view(a, anon()) == {:error, :login}
+    end
   end
 
   test "an expired rule grants nothing and the post stays closed", %{owner: owner} do

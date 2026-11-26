@@ -227,10 +227,21 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
 
     cond do
       viewer.bypass? -> :ok
+      match == "all" and dead_kind?(rules, active) -> {:error, :not_found}
       satisfied?(active, match, viewer, now) -> :ok
       redeemable = redeemable_token(active, viewer) -> {:redeem, redeemable}
       true -> {:error, denial(active, match, viewer, now)}
     end
+  end
+
+  # With `match: "all"` every kind the post has is a requirement. A kind
+  # whose rules have all expired (or, for links, been revoked) can no longer
+  # be met, so nobody gets in: dropping the requirement instead would let an
+  # expiry WIDEN access ("role AND password until June" becoming "role" in
+  # July), where with "any" it only ever narrows it.
+  defp dead_kind?(rules, active) do
+    live = MapSet.new(active, & &1.kind)
+    Enum.any?(rules, &(not MapSet.member?(live, &1.kind)))
   end
 
   @doc """
