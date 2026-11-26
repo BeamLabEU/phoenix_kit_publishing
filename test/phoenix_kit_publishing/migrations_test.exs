@@ -3,6 +3,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.MediaFolders
+  alias PhoenixKit.Modules.Publishing.PublishingAccessRule
   alias PhoenixKitPublishing.Migrations
 
   @moduledoc """
@@ -569,7 +570,7 @@ defmodule PhoenixKitPublishing.MigrationsTest do
           {String.to_existing_atom(col), String.to_integer(width)}
         end)
 
-      assert parsed == PhoenixKit.Modules.Publishing.PublishingAccessRule.column_widths()
+      assert parsed == PublishingAccessRule.column_widths()
     end
 
     test "down below V4 only moves the marker: the table and its rules stay" do

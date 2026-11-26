@@ -10,6 +10,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
 
   use PhoenixKitPublishing.ConnCase, async: false
 
+  alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Comments, as: PublishingComments
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.PostAccess
@@ -282,7 +283,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
     end
 
     test "a versioned URL is gated too", %{conn: conn, path: path, post: post, slug: slug} do
-      {:ok, read} = PhoenixKit.Modules.Publishing.read_post_by_uuid(post.uuid, "en", 1)
+      {:ok, read} = Publishing.read_post_by_uuid(post.uuid, "en", 1)
       {:ok, _} = Posts.update_post(slug, read, %{"allow_version_access" => "true"}, %{})
 
       conn = get(conn, path <> "/v/1")

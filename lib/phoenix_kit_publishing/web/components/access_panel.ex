@@ -24,6 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
   import PhoenixKitWeb.Components.Core.Icon
 
   alias PhoenixKit.Modules.Publishing.PostAccess
+  alias PhoenixKit.Modules.Publishing.PublishingAccessRule
   alias PhoenixKit.Users.Auth
   alias PhoenixKit.Users.Auth.Scope
   alias PhoenixKit.Users.Roles
@@ -54,7 +55,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
       :gates,
       Enum.filter(
         rules,
-        &(&1.kind in PhoenixKit.Modules.Publishing.PublishingAccessRule.gate_kinds())
+        &(&1.kind in PublishingAccessRule.gate_kinds())
       )
     )
     |> assign(:summary, PostAccess.summary(rules))
@@ -448,7 +449,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
 
   defp rule_label(%{kind: "role", config: config}, names) do
     roles =
-      config |> Map.get("role_uuids", []) |> Enum.map(&Map.get(names, &1, "?")) |> Enum.join(", ")
+      config |> Map.get("role_uuids", []) |> Enum.map_join(", ", &Map.get(names, &1, "?"))
 
     gettext("Roles: %{roles}", roles: roles)
   end

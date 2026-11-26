@@ -99,7 +99,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     end
   end
 
-  @doc "The match mode (`\"any\"` / `\"all\"`) a rule list carries."
+  @doc ~S|The match mode ("any" / "all") a rule list carries.|
   @spec match_of([Rule.t()]) :: String.t()
   def match_of(rules) do
     case Enum.find(rules, &(&1.kind == "settings")) do
@@ -390,25 +390,34 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   """
   @spec add_rule(owner(), map(), keyword()) :: {:ok, Rule.t()} | {:error, term()}
   def add_rule(owner, attrs, opts \\ []) do
-    kind = attrs["kind"] || attrs[:kind]
+    kind = attr(attrs, "kind")
 
-    config =
-      case kind do
-        "role" -> %{"role_uuids" => uuid_list(attrs["role_uuids"] || attrs[:role_uuids])}
-        "user" -> %{"user_uuids" => uuid_list(attrs["user_uuids"] || attrs[:user_uuids])}
-        "signed_in" -> %{}
-        _ -> :invalid
-      end
+    case rule_config(kind, attrs) do
+      :invalid -> {:error, :invalid_kind}
+      %{"role_uuids" => []} -> {:error, :empty_rule}
+      %{"user_uuids" => []} -> {:error, :empty_rule}
+      config -> insert_rule(owner, kind, config, attrs, opts)
+    end
+  end
 
-    cond do
-      config == :invalid ->
-        {:error, :invalid_kind}
+  defp rule_config("role", attrs), do: %{"role_uuids" => uuid_list(attr(attrs, "role_uuids"))}
+  defp rule_config("user", attrs), do: %{"user_uuids" => uuid_list(attr(attrs, "user_uuids"))}
+  defp rule_config("signed_in", _attrs), do: %{}
+  defp rule_config(_kind, _attrs), do: :invalid
 
-      kind in ["role", "user"] and Enum.all?(Map.values(config), &(&1 == [])) ->
-        {:error, :empty_rule}
+  @attr_atoms %{
+    "kind" => :kind,
+    "role_uuids" => :role_uuids,
+    "user_uuids" => :user_uuids,
+    "note" => :note,
+    "expires_at" => :expires_at
+  }
 
-      true ->
-        insert_rule(owner, kind, config, attrs, opts)
+  # Form params arrive with string keys, code passes atoms; both are read.
+  defp attr(attrs, key) do
+    case Map.fetch(attrs, key) do
+      {:ok, value} -> value
+      :error -> Map.get(attrs, Map.fetch!(@attr_atoms, key))
     end
   end
 
@@ -437,8 +446,8 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
           rule
           |> Rule.changeset(%{
             config: config,
-            expires_at: parse_expiry(attrs["expires_at"] || attrs[:expires_at]),
-            note: blank_to_nil(attrs["note"] || attrs[:note])
+            expires_at: parse_expiry(attr(attrs, "expires_at")),
+            note: blank_to_nil(attr(attrs, "note"))
           })
           |> repo().update()
           |> after_write(owner, "password_rotated", opts)
@@ -467,13 +476,15 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   @doc "Revokes a secret link: readers who redeemed it lose access at once."
   @spec revoke_link(String.t(), keyword()) :: {:ok, Rule.t()} | {:error, term()}
   def revoke_link(rule_uuid, opts \\ []) do
-    with %Rule{kind: "token"} = rule <- get_rule(rule_uuid) do
-      rule
-      |> Rule.changeset(%{revoked_at: DateTime.truncate(DateTime.utc_now(), :second)})
-      |> repo().update()
-      |> after_write(owner_of(rule), "link_revoked", opts)
-    else
-      _ -> {:error, :not_found}
+    case get_rule(rule_uuid) do
+      %Rule{kind: "token"} = rule ->
+        rule
+        |> Rule.changeset(%{revoked_at: DateTime.truncate(DateTime.utc_now(), :second)})
+        |> repo().update()
+        |> after_write(owner_of(rule), "link_revoked", opts)
+
+      _ ->
+        {:error, :not_found}
     end
   end
 
@@ -740,8 +751,8 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
       column => uuid,
       kind: kind,
       config: config,
-      note: blank_to_nil(attrs["note"] || attrs[:note]),
-      expires_at: parse_expiry(attrs["expires_at"] || attrs[:expires_at]),
+      note: blank_to_nil(attr(attrs, "note")),
+      expires_at: parse_expiry(attr(attrs, "expires_at")),
       created_by_uuid: ActivityLog.actor_uuid(opts)
     })
     |> repo().insert()

@@ -7,6 +7,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccessTest do
 
   use PhoenixKitPublishing.DataCase, async: false
 
+  alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PostAccess.Viewer
@@ -388,7 +389,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccessTest do
     {:ok, _open} = Posts.create_post(group["slug"], %{title: "Open", slug: "open", content: "o"})
     {:ok, _} = PostAccess.add_rule(owner, %{"kind" => "signed_in"})
 
-    entries = PhoenixKit.Modules.Publishing.DBStorage.list_posts_for_listing(group["slug"])
+    entries = DBStorage.list_posts_for_listing(group["slug"])
     protected = Enum.filter(entries, &(&1[:access_protected] == true))
 
     assert [%{slug: "report"}] = protected

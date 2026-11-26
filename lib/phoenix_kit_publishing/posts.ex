@@ -223,18 +223,18 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
         _ in Postgrex.Error -> MapSet.new()
       end
 
-    if MapSet.size(protected) == 0 do
-      posts
+    if MapSet.size(protected) == 0,
+      do: posts,
+      else: Enum.map(posts, &mark_if_protected(&1, protected))
+  end
+
+  defp mark_if_protected(post, protected) do
+    if MapSet.member?(protected, post[:uuid]) do
+      post
+      |> Map.put(:access_protected, true)
+      |> Map.update(:metadata, %{sitemap_exclude: true}, &Map.put(&1, :sitemap_exclude, true))
     else
-      Enum.map(posts, fn post ->
-        if MapSet.member?(protected, post[:uuid]) do
-          post
-          |> Map.put(:access_protected, true)
-          |> Map.update(:metadata, %{sitemap_exclude: true}, &Map.put(&1, :sitemap_exclude, true))
-        else
-          post
-        end
-      end)
+      post
     end
   end
 

@@ -124,28 +124,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
     with true <- Publishing.enabled?(),
          %PublishingPost{} = post <- unlock_target(params),
          access when not is_nil(access) <- PostAccess.access_for_post(post.uuid) do
-      post_map = %{uuid: post.uuid}
-
       case RateLimit.check(conn, post.uuid) do
         {:error, :rate_limited} ->
           render_password_form(
             conn,
-            post_map,
+            %{uuid: post.uuid},
             gettext("Too many attempts. Please wait a minute and try again."),
             429
           )
 
         :ok ->
-          case PostAccess.check_password(access, to_string(params["password"] || "")) do
-            {:ok, rule} ->
-              conn
-              |> Grants.put(rule.uuid, PostAccess.revision(rule))
-              |> protect()
-              |> redirect(to: back_path(conn))
-
-            :error ->
-              render_password_form(conn, post_map, gettext("That password didn't work."), 401)
-          end
+          try_password(conn, post, access, to_string(params["password"] || ""))
       end
     else
       _ ->
@@ -153,6 +142,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
         |> put_status(:not_found)
         |> put_view(html: PhoenixKitWeb.ErrorHTML)
         |> render(:"404")
+    end
+  end
+
+  defp try_password(conn, post, access, password) do
+    case PostAccess.check_password(access, password) do
+      {:ok, rule} ->
+        conn
+        |> Grants.put(rule.uuid, PostAccess.revision(rule))
+        |> protect()
+        |> redirect(to: back_path(conn))
+
+      :error ->
+        render_password_form(conn, %{uuid: post.uuid}, gettext("That password didn't work."), 401)
     end
   end
 

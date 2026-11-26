@@ -25,6 +25,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessCanaryTest do
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Modules.Sitemap.Sources.Publishing, as: SitemapSource
   alias PhoenixKit.Settings
+  alias PhoenixKit.Users.Roles
   alias PhoenixKitPublishing.Test.Repo, as: TestRepo
 
   @marker "zqcanary"
@@ -249,7 +250,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessCanaryTest do
 
   defp protect(:role, owner, _slug) do
     {:ok, role} =
-      PhoenixKit.Users.Roles.create_role(%{name: "Canary #{System.unique_integer([:positive])}"})
+      Roles.create_role(%{name: "Canary #{System.unique_integer([:positive])}"})
 
     {:ok, _} = PostAccess.add_rule(owner, %{"kind" => "role", "role_uuids" => [role.uuid]})
   end

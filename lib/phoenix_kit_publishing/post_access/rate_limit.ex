@@ -13,6 +13,8 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.RateLimit do
 
   require Logger
 
+  alias PhoenixKit.Users.RateLimiter.Backend
+
   @per_post {5, 60_000}
   @per_address {30, 600_000}
 
@@ -23,9 +25,8 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.RateLimit do
     {post_limit, post_window} = @per_post
     {ip_limit, ip_window} = @per_address
 
-    with :ok <- hit("pkpub_unlock:ip:#{address}", ip_window, ip_limit),
-         :ok <- hit("pkpub_unlock:post:#{post_uuid}:#{address}", post_window, post_limit) do
-      :ok
+    with :ok <- hit("pkpub_unlock:ip:#{address}", ip_window, ip_limit) do
+      hit("pkpub_unlock:post:#{post_uuid}:#{address}", post_window, post_limit)
     end
   end
 
@@ -48,7 +49,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.RateLimit do
   end
 
   defp hit(key, window, limit) do
-    case PhoenixKit.Users.RateLimiter.Backend.hit(key, window, limit) do
+    case Backend.hit(key, window, limit) do
       {:allow, _count} -> :ok
       {:deny, _retry_after} -> {:error, :rate_limited}
     end

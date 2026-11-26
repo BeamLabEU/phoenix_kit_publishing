@@ -9,6 +9,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.AccessPanelLiveTest do
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.Versions
+  alias PhoenixKit.Modules.Publishing.Web.Components.AccessPanel
   alias PhoenixKit.Settings
 
   setup do
@@ -96,7 +98,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.AccessPanelLiveTest do
     }
 
     {:noreply, _} =
-      PhoenixKit.Modules.Publishing.Web.Components.AccessPanel.handle_event(
+      AccessPanel.handle_event(
         "delete_rule",
         %{"uuid" => rule.uuid},
         socket
@@ -114,8 +116,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.AccessPanelLiveTest do
     {:ok, open} =
       Posts.create_post(group["slug"], %{title: "Open note", slug: "open-note", content: "y"})
 
-    :ok = PhoenixKit.Modules.Publishing.Versions.publish_version(group["slug"], open.uuid, 1)
-    :ok = PhoenixKit.Modules.Publishing.Versions.publish_version(group["slug"], post.uuid, 1)
+    :ok = Versions.publish_version(group["slug"], open.uuid, 1)
+    :ok = Versions.publish_version(group["slug"], post.uuid, 1)
     {:ok, _} = PostAccess.add_rule({:post, post.uuid}, %{"kind" => "signed_in"})
 
     {:ok, view, _html} =
