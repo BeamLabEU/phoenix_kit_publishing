@@ -162,6 +162,26 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
       refute limited.resp_cookies[Grants.cookie_name()]
     end
 
+    test "behind a TLS-terminating proxy the cookie is still Secure", %{
+      conn: conn,
+      path: path,
+      post: post
+    } do
+      {:ok, _} = Settings.update_setting("site_url", "https://pk.example")
+
+      # The proxy speaks plain http to the app: conn.scheme is :http.
+      right =
+        post(conn, path, %{
+          "pk_access" => "unlock",
+          "post_uuid" => post.uuid,
+          "password" => "open sesame"
+        })
+
+      assert right.resp_cookies[Grants.cookie_name()][:secure] == true
+    after
+      Settings.update_setting("site_url", "")
+    end
+
     test "a forged X-Forwarded-For does not reset the limit", %{
       conn: conn,
       path: path,

@@ -61,9 +61,23 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Grants do
       max_age: days * 86_400,
       http_only: true,
       same_site: "Lax",
-      secure: conn.scheme == :https,
+      secure: secure?(conn),
       path: "/"
     )
+  end
+
+  # Secure when the request came over TLS or the site's public origin is
+  # https: behind a TLS-terminating proxy `conn.scheme` says `:http` on
+  # every request, which left the cookie without `Secure`.
+  defp secure?(%Plug.Conn{scheme: :https}), do: true
+
+  defp secure?(_conn) do
+    case PhoenixKit.Modules.Publishing.Web.HTML.public_origin() do
+      "https://" <> _ -> true
+      _ -> false
+    end
+  rescue
+    _ -> false
   end
 
   defp cap(grants) when map_size(grants) <= @max_grants, do: grants
