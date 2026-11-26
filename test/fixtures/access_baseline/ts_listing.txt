@@ -1,0 +1,148 @@
+200
+cache-control: max-age=0, private, must-revalidate
+content-type: text/html; charset=utf-8
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="csrf-token" content="<csrf>">
+    <title>Baseline News</title>
+  </head>
+  <body>
+    <main data-current-user-email="">
+  
+  
+  
+  <nav data-testid="host-publishing-translations" data-count="1" data-og-title="Baseline News">
+    <a href="/baseline-news" data-lang="en">EN</a>
+  </nav>
+  
+  <main data-current-user-email="">
+  
+  
+  
+  <nav data-testid="host-publishing-translations" data-count="1" data-og-title="Baseline News">
+    <a href="/baseline-news" data-lang="en">EN</a>
+  </nav>
+  
+  <div data-phoenix-kit class="contents">
+  <style data-pk-mobile-inputs>
+  @media (pointer: coarse) and (max-width: 767px) {
+    :is(#admin-drawer, [data-phoenix-kit]) :is(input:not([type=checkbox], [type=radio], [type=range], [type=file], [type=color], [type=hidden]), select, textarea) {
+      font-size: max(16px, 1em);
+    }
+  }
+</style>
+  
+  
+  <meta property="og:type" content="website">
+  
+    <meta property="og:title" content="Baseline News">
+    <meta name="twitter:title" content="Baseline News">
+  
+  
+  
+  <meta property="og:url" content="http://www.example.com/baseline-news">
+  <meta property="og:locale" content="en">
+  <meta property="og:site_name" content="PhoenixKit">
+  <meta name="twitter:card" content="summary">
+
+  
+  
+  <link rel="alternate" type="application/rss+xml" title="Baseline News" href="/baseline-news/feed.xml">
+  
+  
+  <div class="group-index-container max-w-6xl mx-auto px-6 py-8">
+    
+    
+    
+    <header class="mb-8">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-4xl font-bold mb-2">
+            Baseline News
+          </h1>
+          
+        </div>
+        
+        
+      </div>
+      
+      
+      
+      
+    </header>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    
+    
+
+    
+    
+    
+      
+          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <article class="card bg-base-200 transition motion-safe:hover:-translate-y-1 shadow-md hover:shadow-lg" data-post-date="<date>">
+  
+  <div class="card-body">
+    
+    
+    
+    
+    <h2 class="card-title text-xl">
+      <a href="/baseline-news/<date>" data-phx-link="redirect" data-phx-link-state="push" class="hover:text-primary">Baseline News Item</a>
+    </h2>
+
+    
+      
+      <p class="text-base-content/70 line-clamp-3 grow-0 text-sm">
+        News body.
+      </p>
+    
+
+    
+    <div class="card-actions justify-between items-center mt-auto pt-4">
+      
+        <time class="text-xs text-base-content/60" datetime="<ts>">
+          <human-date>
+        </time>
+      
+
+      <a href="/baseline-news/<date>" data-phx-link="redirect" data-phx-link-state="push" class="btn btn-sm btn-primary">
+        Read More →
+      </a>
+    </div>
+  </div>
+</article>
+          </div>
+      
+      
+      
+    
+
+    
+  </div>
+
+</div>
+</main>
+</main>
+  </body>
+</html>
