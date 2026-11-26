@@ -60,6 +60,7 @@ PhoenixKit.Modules.Publishing.enable_system()
 - **Admin Interface** — Full CRUD with inline status controls, skeleton loading, trash management
 - **Public Routes** — SEO-friendly URLs with smart language/date fallbacks, pagination, breadcrumbs
 - **Featured Images** — Media library integration through core's media picker
+- **Per-post access control** — only signed-in readers, chosen roles or users, a password, or secret links may open a post (see "Access control")
 
 ## URL Modes
 
@@ -83,7 +84,7 @@ Single-language mode omits the language segment automatically.
 
 ## Architecture
 
-### Database Schema (7 tables)
+### Database Schema (8 tables)
 
 ```
 Group (1) ──→ (many) Post (1) ──→ (many) Version (1) ──→ (many) Content
@@ -179,6 +180,15 @@ primary key `(post_uuid, category_uuid)`; both FKs cascade.
 One `(post_uuid, view_date)` row incremented in place; no per-request rows,
 no reader PII. Composite primary key `(post_uuid, view_date)`; `post_uuid`
 FK cascades. Queried schemaless (no Ecto schema module) via `Publishing.Views`.
+
+#### `phoenix_kit_publishing_access_rules` — Who may open a post (module chain V4)
+
+One row per rule: `post_uuid` (a post's rule) or `group_uuid` (a group's
+default for new posts), `kind` (`signed_in`, `role`, `user`, `password`,
+`token`, or the non-gating `settings`), `config` (role uuids, user uuids, a
+Bcrypt hash and revision, a SHA-256 key digest, the match mode), `note`,
+`expires_at`, `revoked_at` (links), `created_by_uuid`. Both FKs cascade. The
+only table this chain creates that core never had.
 
 All tables use UUIDv7 primary keys. Language fallback chain: requested language → site default → first available.
 
@@ -279,6 +289,82 @@ Building many post URLs
 yourself, pass `Web.HTML.url_context(language)` in place of the language to
 `build_post_url/4`, with `build_date_counts/1` for a timestamp group: the
 settings are then read once, and no URL costs a query.
+
+## Access control
+
+A post can be closed to everyone but some readers — the typical case is a
+weekly report for one client. Open the post in the editor and use the
+**Access** panel under the form (it saves on its own; rules belong to the
+post, not to a version):
+
+| Rule | Who gets in |
+|------|-------------|
+| Signed-in readers | anyone with an account |
+| Roles | readers holding one of the chosen core roles |
+| Users | the chosen accounts (typed as e-mail addresses) |
+| Password | anyone who types it (set again to rotate: every earlier reader is locked out) |
+| Secret link | whoever opens the link; one link per recipient, each with a note, an end date and a Revoke button. The link is shown once, when it is made |
+
+Any one rule is enough by default; "Every kind of rule must pass" asks for
+all of them (a role *and* the password). Every rule can end on a date. Editors
+(the `publishing` permission) always get in; the panel's **Preview as
+anonymous** link opens the public page as a stranger would see it. A post
+with rules shows a lock in the admin listing, and "Protected posts only"
+filters the list.
+
+What a reader without access sees:
+
+- **secret-link post** — exactly what a missing post shows (the group
+  listing with "Showing closest match"), so nobody can tell it exists;
+- **password** — a plain password form, without the post's title,
+  description, image or meta tags;
+- **role / user / signed-in** — the sign-in page, then back to the post;
+  a signed-in reader without the right gets the missing-post answer, or a
+  403 page with `publishing_access_forbidden_status` set to `"403"`.
+
+A protected page is served with `Cache-Control: private, no-store`,
+`X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer` and a
+robots meta tag. Typed passwords and redeemed links live in one encrypted
+cookie (`pk_pub_access`), for `publishing_access_grant_days` days; a secret
+link's `?key=` is swapped for the cookie on the first request and the reader
+is redirected to the clean URL. Password attempts are limited to 5 a minute
+per address and post (30 per ten minutes per address).
+
+A protected post is left out of everything public: the group listing and its
+pages, search results and counts, RSS feeds, tag and category archives and
+their counts, prev/next and related posts, the sitemap, `list_published/2`
+and `category_counts/2`, and `[[post:…]]` links from other posts (they render
+as plain text). A group can instead **list protected posts to the readers
+who may open them** (group edit page, "Default access for new posts"); such a
+listing is then sent with `Cache-Control: private, no-store`.
+
+**Group defaults.** The same panel on a group's edit page holds the rules
+every NEW post of the group starts with (no secret links — those are per
+recipient). "Apply to existing posts…" shows how many posts it would change,
+optionally keeping posts that have rules of their own, before it changes them.
+
+**From code** (`PhoenixKit.Modules.Publishing.PostAccess`):
+
+```elixir
+alias PhoenixKit.Modules.Publishing.PostAccess
+
+{:ok, _} = PostAccess.add_rule({:post, post_uuid}, %{"kind" => "role", "role_uuids" => [role_uuid]})
+{:ok, _} = PostAccess.set_password({:post, post_uuid}, "s3cret", %{"expires_at" => "2026-06-30"})
+{:ok, _rule, key} = PostAccess.create_link({:post, post_uuid}, %{"note" => "ACME Ltd"})
+# the link: PublishingHTML.build_post_url(...) <> "?key=" <> key — the key is not stored
+
+PostAccess.authorize_view(PostAccess.access_for_post(post_uuid), scope, %{})
+#=> :ok | {:redeem, rule} | {:error, :not_found | :login | :password | :forbidden}
+```
+
+Hosts that log query strings should add `"key"` to Phoenix's
+`:filter_parameters`, so a secret link is not written to the request log on
+its one redeeming request.
+
+**Not covered:** files. Images and attachments are served by core's storage
+routes by file uuid; a protected post's images stay reachable to anyone who
+has their URL. Put confidential files in a private library, or keep them out
+of protected posts.
 
 ## Public pages at the site root
 
@@ -465,6 +551,8 @@ Supported components: `Image`, `Hero`, `CTA`, `Headline`, `Subheadline`, `Video`
 | `publishing_memory_cache_enabled` | `true` | Listing cache toggle |
 | `publishing_render_cache_enabled` | `true` | Render cache global toggle |
 | `publishing_render_cache_enabled_<slug>` | `true` | Per-group render cache |
+| `publishing_access_grant_days` | `30` | How long a typed password or a redeemed secret link keeps a browser in (1–365 days) |
+| `publishing_access_forbidden_status` | `"404"` | What a signed-in reader without the right role sees: `"404"` (the same answer as a missing post, the default) or `"403"` (a "you don't have access" page) |
 | `publishing_media_folder_uuid` | — | The module's media folder, written by the ready-made media hook (see below) |
 
 ### OpenGraph tags belong in `<head>`
@@ -642,7 +730,7 @@ language gets the site origin and the prefixed path.
 ## Removing this module
 
 There is deliberately **no automated uninstall**.
-`PhoenixKitPublishing.Migrations.down/1` never drops any of the 7 tables or a
+`PhoenixKitPublishing.Migrations.down/1` never drops any of its 8 tables or a
 row in them, for any target version — a host that merely removes this
 dependency from `mix.exs` has not consented to deleting every content group,
 post, version, per-language content row, category, category assignment, and
@@ -659,9 +747,10 @@ a deliberate, manual operator step:
 -- (posts.active_version_uuid points forward to the live version,
 -- versions.post_uuid points back to the owning post), so dropping the tables
 -- one at a time fails with "other objects depend on it". A single DROP TABLE
--- listing all 7 resolves the cycle itself, without naming any constraint —
+-- listing all of them resolves the cycle itself, without naming any constraint —
 -- which matters on a host whose constraints were renamed.
 DROP TABLE
+  phoenix_kit_publishing_access_rules,
   phoenix_kit_publishing_post_views,
   phoenix_kit_publishing_post_categories,
   phoenix_kit_publishing_categories,
