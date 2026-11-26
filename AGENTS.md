@@ -916,13 +916,19 @@ feature existed (re-record only for a deliberate change to a public page:
 - **Every write rebuilds the group's listing cache** (it carries the
   protected flag) and asks for a sitemap refresh.
 
-Known residuals (documented, not closed): files (above, "What this module
-does NOT do"); a timestamp post's URL shape — `group_date_counts/1` counts
-protected posts, so a public post sharing their date keeps its time segment,
-and a date-only URL with two posts redirects to the first time even when that
-post is protected (which then answers as missing); `Language.has_content_for_language?/2`
-counts a protected post's languages when deciding whether a URL segment is a
-language with content.
+- **URL shapes count public posts only.** A timestamp post's date-only URL
+  is chosen over the date's PUBLIC posts (`build_date_counts/1`,
+  `Posts.count_posts_on_date/2`, `list_public_times_on_date/2`), and a
+  protected post's own URL always carries its time (`build_post_url/4`,
+  from the `:access_protected` flag or, with no counts passed, by uuid). The
+  date-only route falls back to the date's protected posts only when it has
+  no public one, and only to those the reader may open or could be admitted
+  to (`PostRendering.date_only_times/3`). The language-segment check counts
+  only posts the reader may open (`Language.has_content_for_language?/3`,
+  `PostAccess.openable_entries/2`). `access_url_shapes_test.exs`.
+
+Known residual (documented, not closed): files (above, "What this module
+does NOT do").
 
 ## Database & migrations
 
@@ -964,9 +970,8 @@ reports it as an info-level extra column. V4 creates
 core never had, so it comes from this chain on every install — with its
 primary key, `post_uuid` / `group_uuid` btree indexes and two cascading
 foreign keys, all through V1's semantic guards; down below V4 only moves the
-marker. Its objects are in `ExpectedSchema` (added by hand in the generator's
-format; regenerate with core's `generate_module_manifest.exs` at the next
-chain change). See
+marker. Its objects are in `ExpectedSchema` (generated with core's
+`generate_module_manifest.exs`; regenerate it at every chain change). See
 `PhoenixKitPublishing.Migrations`' moduledoc for the full ownership
 writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL` safety-net
 section here.

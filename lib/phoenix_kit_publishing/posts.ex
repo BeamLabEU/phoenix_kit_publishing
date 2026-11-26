@@ -45,12 +45,30 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   @spec db_post?(map()) :: boolean()
   def db_post?(post), do: not is_nil(post[:uuid])
 
-  @doc "Counts posts on a specific date for a group."
+  @doc """
+  Counts the PUBLIC posts on a date (no access rule) — the count that decides
+  whether a timestamp post's URL needs its time segment. A protected post is
+  left out: counted, it would give a public sibling's URL a time segment and
+  so tell every reader a hidden post shares the date (a protected post's own
+  URL always carries its time, `PublishingHTML.build_post_url/4`).
+  """
   @spec count_posts_on_date(String.t(), Date.t() | String.t()) :: non_neg_integer()
   def count_posts_on_date(group_slug, date) do
+    date = if is_binary(date), do: Date.from_iso8601!(date), else: date
+
     group_slug
-    |> list_times_on_date(date)
+    |> DBStorage.list_posts_timestamp_mode(Constants.status_published(), date: date)
+    |> reject_protected()
+    |> Enum.map(&(Time.to_string(&1.post_time) |> String.slice(0, 5)))
+    |> Enum.uniq()
     |> length()
+  rescue
+    e ->
+      Logger.warning(
+        "[Publishing] count_posts_on_date failed for #{group_slug}/#{date}: #{inspect(e)}"
+      )
+
+      0
   end
 
   @doc "Lists time values for posts on a specific date."
@@ -73,20 +91,18 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
   end
 
   @doc """
-  The times on `date` a READER can open: `list_times_on_date/2` without the
-  posts still scheduled ahead. A date-only URL resolves through this, so with
-  two embargoed posts on a date it no longer redirects to (and so reveals)
-  the first one's time.
+  The times on `date` ANY reader can open: `list_times_on_date/2` without the
+  posts still scheduled ahead and without protected posts (access rules). A
+  date-only URL resolves through this, so with two embargoed or protected
+  posts on a date it does not redirect to (and so reveal) the first one's
+  time. `list_protected_posts_on_date/2` lists the others, for a caller that
+  authorizes each one itself.
   """
   @spec list_public_times_on_date(String.t(), Date.t() | String.t()) :: [String.t()]
   def list_public_times_on_date(group_slug, date) do
-    date = if is_binary(date), do: Date.from_iso8601!(date), else: date
-
     group_slug
-    |> DBStorage.list_posts_timestamp_mode(Constants.status_published(), date: date)
-    |> Enum.reject(
-      &Constants.scheduled_ahead?(%{mode: "timestamp", date: &1.post_date, time: &1.post_time})
-    )
+    |> live_timestamp_posts_on_date(date)
+    |> reject_protected()
     |> Enum.map(&(Time.to_string(&1.post_time) |> String.slice(0, 5)))
     |> Enum.uniq()
     |> Enum.sort()
@@ -97,6 +113,45 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
       )
 
       []
+  end
+
+  @doc """
+  The live (published, not scheduled ahead) posts on `date` that have access
+  rules, as `PublishingPost` rows — what the date-only route may still
+  resolve to for a reader it authorizes post by post, when the date has no
+  public post at all.
+  """
+  @spec list_protected_posts_on_date(String.t(), Date.t() | String.t()) :: [map()]
+  def list_protected_posts_on_date(group_slug, date) do
+    posts = live_timestamp_posts_on_date(group_slug, date)
+    protected = protected_uuids(posts)
+    Enum.filter(posts, &Map.has_key?(protected, &1.uuid))
+  rescue
+    e ->
+      Logger.warning(
+        "[Publishing] list_protected_posts_on_date failed for #{group_slug}: #{inspect(e)}"
+      )
+
+      []
+  end
+
+  defp live_timestamp_posts_on_date(group_slug, date) do
+    date = if is_binary(date), do: Date.from_iso8601!(date), else: date
+
+    group_slug
+    |> DBStorage.list_posts_timestamp_mode(Constants.status_published(), date: date)
+    |> Enum.reject(
+      &Constants.scheduled_ahead?(%{mode: "timestamp", date: &1.post_date, time: &1.post_time})
+    )
+  end
+
+  defp reject_protected(posts) do
+    protected = protected_uuids(posts)
+    Enum.reject(posts, &Map.has_key?(protected, &1.uuid))
+  end
+
+  defp protected_uuids(posts) do
+    posts |> Enum.map(& &1.uuid) |> PostAccess.protected_post_uuids()
   end
 
   @doc """

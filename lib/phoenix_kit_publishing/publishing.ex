@@ -234,6 +234,7 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate count_posts_on_date(group_slug, date), to: Posts
   defdelegate list_times_on_date(group_slug, date), to: Posts
   defdelegate list_public_times_on_date(group_slug, date), to: Posts
+  defdelegate list_protected_posts_on_date(group_slug, date), to: Posts
   defdelegate read_post_by_datetime(group_slug, date, time), to: DBStorage
   defdelegate find_by_url_slug(group_slug, language, url_slug), to: Posts
   defdelegate find_by_previous_url_slug(group_slug, language, url_slug), to: Posts

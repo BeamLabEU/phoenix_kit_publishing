@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
@@ -2703,7 +2704,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     case post.mode do
       mode when mode in @timestamp_modes ->
         date = get_timestamp_date(post)
-        post_count = lookup_date_count(date_counts, group_slug, date)
+        post_count = timestamp_date_count(post, date_counts, group_slug, date)
         tail = if post_count > 1, do: [date, get_timestamp_time(post)], else: [date]
         build_public_path(context_segments(ctx, [group_slug | tail]))
 
@@ -2889,7 +2890,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       mode when mode in @timestamp_modes ->
         # For timestamp mode, use date/time from DB fields
         date = get_timestamp_date(post)
-        post_count = lookup_date_count(date_counts, group_slug, date)
+        post_count = timestamp_date_count(post, date_counts, group_slug, date)
 
         if post_count > 1 do
           format_timestamp_date_with_time(post)
@@ -3602,11 +3603,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   """
   @spec build_date_counts([map()]) :: %{optional(String.t()) => pos_integer()}
   def build_date_counts(posts) do
+    # Public posts only (`Posts.count_posts_on_date/2` and the date-only
+    # route count the same set): a protected post sharing the date must not
+    # give a public post's URL its time segment, and a protected post's own
+    # URL always has one (`timestamp_date_count/4`).
     posts
-    |> Enum.filter(&(&1.mode in @timestamp_modes))
+    |> Enum.filter(&(&1.mode in @timestamp_modes and Map.get(&1, :access_protected) != true))
     |> Enum.map(&get_timestamp_date/1)
     |> Enum.frequencies()
   end
+
+  # A protected post's URL always carries its time: the date-only form
+  # resolves among the PUBLIC posts of the date, so it would name a public
+  # sibling. Listing-cache entries carry the `:access_protected` flag; a
+  # map without it (a post page, the fallback) is checked by uuid when no
+  # counts were passed, the path that queries the database anyway.
+  defp timestamp_date_count(post, date_counts, group_slug, date) do
+    if protected_post_map?(post, date_counts),
+      do: 2,
+      else: lookup_date_count(date_counts, group_slug, date)
+  end
+
+  defp protected_post_map?(%{access_protected: true}, _date_counts), do: true
+
+  defp protected_post_map?(%{uuid: uuid}, nil) when is_binary(uuid),
+    do: PostAccess.protected?(uuid)
+
+  defp protected_post_map?(_post, _date_counts), do: false
 
   # Looks up date count from pre-computed map, falling back to DB query
   defp lookup_date_count(nil, group_slug, date) do

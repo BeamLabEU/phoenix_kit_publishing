@@ -378,7 +378,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   end
 
   defp handle_date_posts(conn, group_slug, date, language) do
-    case Publishing.list_public_times_on_date(group_slug, date) do
+    case date_only_times(conn, group_slug, date) do
       [] ->
         render_post(conn, group_slug, {:slug, date}, language)
 
@@ -389,6 +389,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
         canonical_language = Language.get_canonical_url_language(language)
         redirect_url = build_timestamp_url(group_slug, date, first_time, canonical_language)
         {:redirect, redirect_url}
+    end
+  end
+
+  # The times a date-only URL chooses from: the date's public posts. Only
+  # when it has none are its protected posts considered, each one the
+  # reader may open or could be admitted to (a password form, a sign-in);
+  # a secret-link post, or one a signed-in reader may not open, stays out,
+  # so the date answers exactly as an empty one. Protected posts' own URLs
+  # always carry the time, so this only serves links made before a post
+  # was protected.
+  defp date_only_times(conn, group_slug, date) do
+    case Publishing.list_public_times_on_date(group_slug, date) do
+      [] ->
+        group_slug
+        |> Publishing.list_protected_posts_on_date(date)
+        |> Enum.filter(
+          &(AccessGate.check(conn, &1) not in [{:error, :not_found}, {:error, :forbidden}])
+        )
+        |> Enum.map(&(Time.to_string(&1.post_time) |> String.slice(0, 5)))
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      times ->
+        times
     end
   end
 

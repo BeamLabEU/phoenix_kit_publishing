@@ -75,6 +75,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
 
   defp path_post(db_post, contents) do
     %{
+      uuid: db_post.uuid,
       mode: db_post.mode,
       slug: db_post.slug,
       date: db_post.post_date,
