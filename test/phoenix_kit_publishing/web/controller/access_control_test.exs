@@ -162,6 +162,27 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
       refute limited.resp_cookies[Grants.cookie_name()]
     end
 
+    test "a forged X-Forwarded-For does not reset the limit", %{
+      conn: conn,
+      path: path,
+      post: post
+    } do
+      # A public peer (no proxy in front): its own forwarded header is the
+      # client's to write, so every guess claiming a new address still
+      # counts against the peer.
+      peer = {203, 0, 113, System.unique_integer([:positive]) |> rem(250)}
+
+      attempt = fn n, password ->
+        %{conn | remote_ip: peer}
+        |> put_req_header("x-forwarded-for", "198.51.100.#{n}")
+        |> post(path, %{"pk_access" => "unlock", "post_uuid" => post.uuid, "password" => password})
+      end
+
+      for n <- 1..5, do: attempt.(n, "x")
+
+      assert response(attempt.(6, "open sesame"), 429) =~ "Too many attempts"
+    end
+
     test "an unlock for a post of another group is a 404", %{conn: conn, post: post} do
       {:ok, other} = Groups.add_group("other-#{System.unique_integer([:positive])}", mode: "slug")
 

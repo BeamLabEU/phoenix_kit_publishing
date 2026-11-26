@@ -14,6 +14,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.RateLimit do
   require Logger
 
   alias PhoenixKit.Users.RateLimiter.Backend
+  alias PhoenixKit.Utils.IpAddress
 
   @per_post {5, 60_000}
   @per_address {30, 600_000}
@@ -30,23 +31,12 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.RateLimit do
     end
   end
 
-  # The LAST forwarded hop (the one the site's proxy appended — the first is
-  # the client's to forge), else the socket address; the same reading as
-  # `Views`' visitor hash.
-  defp client_address(conn) do
-    forwarded =
-      conn
-      |> Plug.Conn.get_req_header("x-forwarded-for")
-      |> Enum.join(",")
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-      |> List.last()
-
-    forwarded || conn.remote_ip |> :inet.ntoa() |> to_string()
-  rescue
-    _ -> "unknown"
-  end
+  # Core's reading of the client address (`IpAddress.extract_from_conn/1`,
+  # the one its sign-in limits key on): a forwarded hop is believed only
+  # from a peer that is a proxy (loopback/private, or `:trusted_proxies`).
+  # Reading `x-forwarded-for` from any peer let a client send a new address
+  # with every guess and never meet the limit.
+  defp client_address(conn), do: IpAddress.extract_from_conn(conn)
 
   defp hit(key, window, limit) do
     case Backend.hit(key, window, limit) do
