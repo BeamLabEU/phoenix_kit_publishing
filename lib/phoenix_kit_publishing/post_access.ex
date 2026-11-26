@@ -465,18 +465,25 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     else
       hash = Bcrypt.hash_pwd_salt(password)
 
-      case Enum.find(list_rules(owner), &(&1.kind == "password")) do
-        nil ->
+      case Enum.filter(list_rules(owner), &(&1.kind == "password")) do
+        [] ->
           insert_rule(owner, "password", %{"hash" => hash, "rev" => 1}, attrs, opts)
 
-        %Rule{} = rule ->
+        [rule | extra] ->
           config = %{"hash" => hash, "rev" => revision(rule) + 1}
 
+          # One password per owner: a second row (two first saves racing)
+          # would keep accepting its old password after the rotation.
+          Enum.each(extra, fn row -> repo().delete(row) end)
+
+          # A rotation without an end date keeps the one the rule has: a new
+          # password must not quietly lift an expiry the admin set. Removing
+          # an end date is deleting the rule and adding it again.
           rule
           |> Rule.changeset(%{
             config: config,
-            expires_at: parse_expiry(attr(attrs, "expires_at")),
-            note: blank_to_nil(attr(attrs, "note"))
+            expires_at: parse_expiry(attr(attrs, "expires_at")) || rule.expires_at,
+            note: blank_to_nil(attr(attrs, "note")) || rule.note
           })
           |> repo().update()
           |> after_write(owner, "password_rotated", opts)
@@ -597,15 +604,25 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
         :ok
 
       rules ->
-        Enum.each(rules, &copy_rule(&1, post_uuid, opts))
+        # All or nothing: a partial copy can WIDEN access (the settings row
+        # with match "all" missing, or one kind of an "all" set).
+        {:ok, _} =
+          repo().transaction(fn -> Enum.each(rules, &copy_rule(&1, post_uuid, opts)) end)
+
         :ok
     end
   rescue
     # A database without V4 yet (code deployed before the migration) must
-    # still create posts.
-    error in [Postgrex.Error, Ecto.QueryError] ->
-      Logger.warning("[PostAccess] group defaults not copied: #{inspect(error.__struct__)}")
-      :ok
+    # still create posts: no rules table means no group defaults either.
+    # Any other failure raises, so the post is not left looking protected
+    # to the admin while it is public.
+    error in Postgrex.Error ->
+      if error.postgres[:code] == :undefined_table do
+        Logger.warning("[PostAccess] group defaults not copied: no access-rules table")
+        :ok
+      else
+        reraise error, __STACKTRACE__
+      end
   end
 
   defp defaults_to_copy(group_uuid) do
@@ -631,7 +648,9 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
       expires_at: rule.expires_at,
       created_by_uuid: ActivityLog.actor_uuid(opts)
     })
-    |> repo().insert()
+    # Raises: both callers run it in a transaction, which must roll back
+    # (apply_group_defaults/2 has already deleted the post's own rules).
+    |> repo().insert!()
   end
 
   @doc """

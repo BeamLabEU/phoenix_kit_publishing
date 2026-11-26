@@ -173,6 +173,34 @@ defmodule PhoenixKit.Modules.Publishing.PostAccessTest do
       assert {:ok, _} = PostAccess.check_password(access(owner), "new secret")
     end
 
+    test "a rotation without an end date keeps the rule's end date", %{owner: owner} do
+      until = DateTime.add(DateTime.utc_now(), 7 * 86_400, :second) |> DateTime.truncate(:second)
+      {:ok, dated} = PostAccess.set_password(owner, "dated one", %{"expires_at" => until})
+      assert dated.expires_at == until
+
+      {:ok, rotated} = PostAccess.set_password(owner, "rotated one", %{"expires_at" => ""})
+      assert rotated.expires_at == until
+    end
+
+    test "a rotation leaves one password: a second row stops working too", %{
+      owner: owner,
+      post: post
+    } do
+      # Two first saves racing could each insert a password row.
+      PhoenixKit.RepoHelper.repo().insert!(%PublishingAccessRule{
+        post_uuid: post.uuid,
+        kind: "password",
+        config: %{"hash" => Bcrypt.hash_pwd_salt("second row"), "rev" => 1}
+      })
+
+      assert {:ok, _} = PostAccess.check_password(access(owner), "second row")
+      {:ok, _} = PostAccess.set_password(owner, "only this one")
+
+      assert PostAccess.check_password(access(owner), "second row") == :error
+      assert PostAccess.check_password(access(owner), "open sesame") == :error
+      assert {:ok, _} = PostAccess.check_password(access(owner), "only this one")
+    end
+
     test "the hash is Bcrypt and the password itself is nowhere", %{rule: rule} do
       assert "$2b$" <> _ = rule.config["hash"]
       refute inspect(rule) =~ "open sesame"
@@ -347,6 +375,29 @@ defmodule PhoenixKit.Modules.Publishing.PostAccessTest do
   end
 
   describe "group defaults" do
+    test "a copy that fails part-way leaves the post's own rules in place", %{
+      group: group,
+      post: post,
+      owner: owner
+    } do
+      {:ok, _} = PostAccess.set_password(owner, "post's own")
+
+      # A default row the changeset refuses (written around it): its copy
+      # fails after the post's own rules were deleted.
+      PhoenixKit.RepoHelper.repo().insert!(%PublishingAccessRule{
+        group_uuid: group["uuid"],
+        kind: "bogus",
+        config: %{}
+      })
+
+      assert_raise Ecto.InvalidChangesetError, fn ->
+        PostAccess.apply_group_defaults(group["uuid"])
+      end
+
+      assert PostAccess.protected?(post.uuid)
+      assert {:ok, _} = PostAccess.check_password(access(owner), "post's own")
+    end
+
     test "a new post copies the group's rules (never links)", %{group: group, role: role} do
       gowner = {:group, group["uuid"]}
       {:ok, _} = PostAccess.add_rule(gowner, %{"kind" => "role", "role_uuids" => [role.uuid]})
