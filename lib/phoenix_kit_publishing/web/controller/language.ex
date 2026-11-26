@@ -13,6 +13,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.PostAccess
+  alias PhoenixKit.Modules.Publishing.PostAccess.Viewer
 
   # ============================================================================
   # Language Detection
@@ -27,8 +29,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
 
   Returns {detected_language, adjusted_params}
   """
-  @spec detect_language_or_group(String.t() | nil, map()) :: {String.t(), map()}
-  def detect_language_or_group(language_param, params) do
+  @spec detect_language_or_group(String.t() | nil, map(), Viewer.t() | nil) :: {String.t(), map()}
+  def detect_language_or_group(language_param, params, viewer \\ nil) do
     # First check if it's a known/predefined language
     # Then check if content exists for this language in the group (handles unknown languages like "af")
     group_slug = params["group"]
@@ -49,7 +51,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
 
       # Unknown language code but content exists for it in this group
       # This handles content in unknown language codes like "af", "test", etc.
-      group_slug && has_content_for_language?(group_slug, language_param) ->
+      group_slug && has_content_for_language?(group_slug, language_param, viewer) ->
         {language_param, params}
 
       # Not a language - shift parameters (group slug in language position)
@@ -85,16 +87,19 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
 
   Returns {:language_detected, language, adjusted_params} or :not_a_language
   """
-  @spec detect_language_in_group_param(map()) ::
+  @spec detect_language_in_group_param(map(), Viewer.t() | nil) ::
           {:language_detected, String.t(), map()} | :not_a_language
+  def detect_language_in_group_param(params, viewer \\ nil)
+
   def detect_language_in_group_param(
-        %{"group" => potential_lang, "path" => [_ | _] = path} = _params
+        %{"group" => potential_lang, "path" => [_ | _] = path} = _params,
+        viewer
       )
       when is_binary(potential_lang) do
     [actual_group | rest_path] = path
 
     group_exists = group_exists?(actual_group)
-    has_content = has_content_for_language?(actual_group, potential_lang)
+    has_content = has_content_for_language?(actual_group, potential_lang, viewer)
 
     # Check if there's a group with slug matching actual_group
     # AND if there's content for potential_lang in that group
@@ -106,7 +111,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
     end
   end
 
-  def detect_language_in_group_param(_params), do: :not_a_language
+  def detect_language_in_group_param(_params, _viewer), do: :not_a_language
 
   # ============================================================================
   # Language Validation
@@ -446,26 +451,28 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Language do
   Check if any post in the group has content for the given language.
   Uses listing cache when available for fast lookups.
   """
-  @spec has_content_for_language?(String.t(), String.t()) :: boolean()
-  def has_content_for_language?(group_slug, language) do
+  @spec has_content_for_language?(String.t(), String.t(), Viewer.t() | nil) :: boolean()
+  def has_content_for_language?(group_slug, language, viewer \\ nil) do
     # Try cache first for fast lookup
-    case ListingCache.read(group_slug) do
-      {:ok, posts} ->
-        Enum.any?(posts, fn post ->
-          language in (post.available_languages || [])
-        end)
+    posts =
+      case ListingCache.read(group_slug) do
+        {:ok, posts} ->
+          posts
 
-      {:error, _} ->
-        # Cache miss — fall back to the SAME source the cache is built from
-        # (active/published version), not list_posts/2 (latest, incl. drafts).
-        # This keeps "does this public group serve content for <language>?"
-        # answering on published content whether the cache is warm or not.
-        posts = DBStorage.list_posts_for_listing(group_slug)
+        {:error, _} ->
+          # Cache miss — fall back to the SAME source the cache is built from
+          # (active/published version), not list_posts/2 (latest, incl. drafts).
+          # This keeps "does this public group serve content for <language>?"
+          # answering on published content whether the cache is warm or not.
+          DBStorage.list_posts_for_listing(group_slug)
+      end
 
-        Enum.any?(posts, fn post ->
-          language in (post.available_languages || [])
-        end)
-    end
+    # Only posts this reader may open count: a language only a protected
+    # post has must not turn the URL segment into a language for everyone
+    # (the answer would differ from an unknown segment's, and so name it).
+    posts
+    |> PostAccess.openable_entries(viewer)
+    |> Enum.any?(fn post -> language in (post.available_languages || []) end)
   rescue
     _ -> false
   end

@@ -182,6 +182,24 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     end
   end
 
+  @doc """
+  Listing-cache entries this viewer may OPEN: the public ones plus the
+  protected ones `authorize_view/2` lets them into, whether or not the group
+  lists protected posts. For decisions that must not count a post the reader
+  cannot open (is this URL segment a language with content?), never for
+  what a listing shows (`visible_entries/3`).
+  """
+  @spec openable_entries([map()], Viewer.t() | nil) :: [map()]
+  def openable_entries(entries, viewer) do
+    {_public, protected} = Enum.split_with(entries, &public?/1)
+
+    cond do
+      protected == [] -> entries
+      not Viewer.may_hold_access?(viewer) -> Enum.filter(entries, &public?/1)
+      true -> keep_openable(entries, Map.new(openable(protected, viewer), &{&1, true}))
+    end
+  end
+
   defp openable(protected, viewer) do
     protected_uuids = Enum.map(protected, & &1[:uuid])
 

@@ -34,6 +34,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.PostAccess.Viewer
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Views
   alias PhoenixKit.Modules.Publishing.Web.Controller.AccessGate
@@ -102,7 +103,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   - [group_slug, date, time] -> Timestamp mode post
   """
   def show(conn, _params) do
-    conn = route_params_only(conn)
+    # The reader, built once per request (`AccessGate.viewer/1` reads it).
+    conn =
+      conn
+      |> route_params_only()
+      |> put_private(:publishing_viewer, Viewer.from_conn(conn))
 
     # `/blog/%FF` decodes to a byte Postgres refuses in a text comparison: a 500
     # from the first lookup, the fallback's included. No slug, language or date
@@ -136,7 +141,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp do_show(conn, %{"language" => language_param} = params) do
     # Detect if 'language' param is actually a language code or a group slug.
     # This allows the same route to work for both single and multi-language setups.
-    {language, adjusted_params} = Language.detect_language_or_group(language_param, params)
+    {language, adjusted_params} =
+      Language.detect_language_or_group(language_param, params, AccessGate.viewer(conn))
 
     conn =
       conn
@@ -163,7 +169,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   defp do_show(conn, params) do
     if Publishing.enabled?() and public_enabled?() do
       # Check if the first segment (group) is actually a language with content
-      case Language.detect_language_in_group_param(params) do
+      case Language.detect_language_in_group_param(params, AccessGate.viewer(conn)) do
         {:language_detected, language, adjusted_params} ->
           # First segment was a language code with content - use localized logic
           conn =
