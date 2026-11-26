@@ -6,7 +6,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
   # loaded for the page only.
 
   alias PhoenixKit.Modules.Publishing.API.{Common, Presenter, Refs}
-  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage}
+  alias PhoenixKit.Modules.Publishing.{Constants, DBStorage, PostAccess}
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
 
   @default_limit 20
@@ -26,8 +26,10 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
            page(group.slug, status, allow, input["cursor"], limit, now, tz) do
       next = if more?, do: encode_cursor(List.last(page)), else: nil
       date_counts = Listing.group_date_counts(group.slug)
+      # One query for the page: which posts are protected (their URLs keep the time).
+      protected = page |> Enum.map(& &1.uuid) |> PostAccess.protected_post_uuids()
 
-      posts = Enum.map(page, &present(&1, group, now, tz, date_counts))
+      posts = Enum.map(page, &present(&1, group, now, tz, date_counts, protected))
 
       {:ok,
        Common.with_warnings(
@@ -181,7 +183,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
 
   # --- one row (HEAVY: versions and contents of this post only) --------------------------------
 
-  defp present(db_post, group, now, tz, date_counts) do
+  defp present(db_post, group, now, tz, date_counts, protected) do
     versions = DBStorage.list_versions(db_post.uuid)
     shown = Enum.find(versions, &(&1.uuid == db_post.active_version_uuid)) || List.last(versions)
     contents = if shown, do: DBStorage.list_contents(shown.uuid), else: []
@@ -189,7 +191,8 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPosts do
     Presenter.post_summary(db_post, group, versions, contents,
       now: now,
       tz: tz,
-      date_counts: date_counts
+      date_counts: date_counts,
+      protected: protected
     )
   end
 end

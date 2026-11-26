@@ -319,6 +319,35 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
     assert Enum.count(sql, &(&1 =~ "jsonb_exists_any")) == 1
   end
 
+  test "a protected timestamp post keeps its time in public_paths; its public sibling does not" do
+    g = Fx.group!(mode: "timestamp")
+    date = Date.add(Date.utc_today(), -2)
+
+    [open, hidden] =
+      for {title, minute} <- [{"Open", 20}, {"Hidden", 5}] do
+        post = Fx.post!(g["slug"], %{title: title})
+
+        Repo.get_by(PhoenixKit.Modules.Publishing.PublishingPost, uuid: post[:uuid])
+        |> Ecto.Changeset.change(post_date: date, post_time: Time.new!(9, minute, 0))
+        |> Repo.update!()
+
+        Fx.publish!(g["slug"], post[:uuid])
+        post
+      end
+
+    {:ok, _} =
+      PhoenixKit.Modules.Publishing.PostAccess.add_rule({:post, hidden[:uuid]}, %{
+        "kind" => "signed_in"
+      })
+
+    {:ok, %{"posts" => posts}} = ApiCase.call("publishing.list_posts", %{"group" => g["slug"]})
+    paths = Map.new(posts, &{&1["id"], &1["public_paths"] |> Map.values() |> hd()})
+    day = Date.to_iso8601(date)
+
+    assert paths[open[:uuid]] =~ ~r{/#{day}$}
+    assert paths[hidden[:uuid]] =~ ~r{/#{day}/09:05$}
+  end
+
   test "the date counts of a timestamp group are computed once per page, not once per post" do
     g = Fx.group!(mode: "timestamp")
 
