@@ -927,6 +927,16 @@ feature existed (re-record only for a deliberate change to a public page:
   only posts the reader may open (`Language.has_content_for_language?/3`,
   `PostAccess.openable_entries/2`). `access_url_shapes_test.exs`.
 
+- **The missing-post answer is equal in everything but timing.** For a
+  secret-link post (and, by default, a signed-in reader without the right)
+  the status, `Location`, headers, cookies and body are those of a slug that
+  never existed (`access_control_test.exs` compares them). The work behind
+  them is not: the post is read and its rules queried (about one indexed
+  query) before the missing-post handler runs, and an old slug or a
+  date-only URL of such a post does its lookup first too. Accepted: a
+  timing difference of that size is not a practical oracle over the
+  network, and padding every miss would cost every reader.
+
 Known residual (documented, not closed): files (above, "What this module
 does NOT do").
 
