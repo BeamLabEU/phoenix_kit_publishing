@@ -863,6 +863,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Edit do
                 {gettext("Convert to readable URLs")}
               </.button>
             </div>
+            <%!-- Default access for the group's new posts (PostAccess). Outside
+              the group form: the panel saves on its own. --%>
+            <div :if={@group["uuid"]} class="mt-8">
+              <.live_component
+                module={PhoenixKit.Modules.Publishing.Web.Components.AccessPanel}
+                id="group-access-panel"
+                owner={{:group, @group["uuid"]}}
+                scope={@phoenix_kit_current_scope}
+              />
+            </div>
             <%!-- Outside the group form — the modal carries its own selector
               <form>s and HTML forbids nesting them. --%>
             <.ai_translate_modal ai_translate={FormGlue.ai_translate_config(assigns)} />

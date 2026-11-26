@@ -4854,6 +4854,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Editor do
           </div>
         </div>
       </.form>
+      <%!-- Access — outside the editor form (the panel has forms of its own
+           and saves on its own: rules belong to the post, not a version). --%>
+      <div :if={@post && @post[:uuid]} class="mt-6 lg:ml-auto lg:w-80">
+        <.live_component
+          module={PhoenixKit.Modules.Publishing.Web.Components.AccessPanel}
+          id="post-access-panel"
+          owner={{:post, @post[:uuid]}}
+          scope={@phoenix_kit_current_scope}
+          public_url={@public_url && (assigns[:endpoint_url] || "") <> @public_url}
+        />
+      </div>
     </div>
     </div>
 

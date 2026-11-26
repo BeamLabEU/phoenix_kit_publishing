@@ -63,6 +63,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
       |> assign(:pending_post_updates, %{})
       |> assign(:visible_count, 20)
       |> assign(:post_search, "")
+      |> assign(:only_protected, false)
       |> assign(:post_view_mode, default_mode)
       |> assign(:post_status_counts, status_counts)
       |> assign(:mount_group_slug, group_slug)
@@ -120,6 +121,13 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     {:noreply,
      socket
      |> assign(:post_search, String.slice(q, 0, 100))
+     |> assign(:visible_count, 20)}
+  end
+
+  def handle_event("toggle_only_protected", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:only_protected, not socket.assigns.only_protected)
      |> assign(:visible_count, 20)}
   end
 
@@ -666,6 +674,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
     end
   end
 
+  # "Protected only" — posts with access rules (`access_protected`, set by
+  # `Posts.list_posts/2`).
+  defp filter_protected(posts, false), do: posts
+  defp filter_protected(posts, true), do: Enum.filter(posts, &(&1[:access_protected] == true))
+
   defp load_date_time_settings do
     Settings.get_settings_cached(
       ["date_format", "time_format", "time_zone"],
@@ -1071,6 +1084,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
           loading_indicator
           class="mb-3 max-w-xs"
         />
+        <label :if={not @loading} class="mb-3 flex items-center gap-2 text-sm" data-protected-filter>
+          <input
+            type="checkbox"
+            checked={@only_protected}
+            phx-click="toggle_only_protected"
+            class="checkbox checkbox-sm"
+          />
+          <.icon name="hero-lock-closed" class="w-4 h-4" /> {gettext("Protected posts only")}
+        </label>
 
         <%= if @loading do %>
           <%!-- Skeleton placeholders matching post card layout.
@@ -1099,7 +1121,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
             <% end %>
           </div>
         <% else %>
-          <% filtered_posts = filter_posts_by_search(@posts, @post_search) %>
+          <% filtered_posts =
+            @posts
+            |> filter_posts_by_search(@post_search)
+            |> filter_protected(@only_protected) %>
           <%= if filtered_posts == [] do %>
             <%= cond do %>
               <% @post_search != "" and @posts != [] -> %>
@@ -1147,6 +1172,14 @@ defmodule PhoenixKit.Modules.Publishing.Web.Listing do
                       <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-base-content/60">
                         <span>
                           {format_datetime(post, @phoenix_kit_current_user, @date_time_settings)}
+                        </span>
+                        <span
+                          :if={post[:access_protected]}
+                          class="badge badge-xs badge-warning gap-1"
+                          title={gettext("Only some readers can open this post")}
+                          data-access-lock
+                        >
+                          <.icon name="hero-lock-closed" class="w-3 h-3" /> {gettext("Protected")}
                         </span>
                         <span :if={@view_totals[post.uuid]} class="inline-flex items-center gap-1">
                           <.icon name="hero-eye" class="w-3 h-3" />
