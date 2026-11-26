@@ -15,7 +15,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Viewer do
   alias PhoenixKit.Users.Auth.Scope
 
   defstruct user_uuid: nil,
-            role_names: MapSet.new(),
+            role_names: [],
             bypass?: false,
             anonymous?: true,
             grants: %{},
@@ -24,7 +24,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Viewer do
 
   @type t :: %__MODULE__{
           user_uuid: String.t() | nil,
-          role_names: MapSet.t(),
+          role_names: [String.t()],
           bypass?: boolean(),
           anonymous?: boolean(),
           grants: map(),
@@ -47,7 +47,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Viewer do
     %__MODULE__{
       user_uuid: user_uuid,
       anonymous?: is_nil(user_uuid),
-      role_names: MapSet.new(Scope.user_roles(scope)),
+      role_names: Scope.user_roles(scope),
       bypass?: Scope.can?(scope, "publishing"),
       grants: if(is_map(grants), do: grants, else: %{})
     }

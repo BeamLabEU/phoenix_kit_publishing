@@ -43,7 +43,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccessTest do
   defp anon, do: Viewer.anonymous()
 
   defp signed_in(roles \\ ["User"], uuid \\ @user_uuid),
-    do: %Viewer{user_uuid: uuid, anonymous?: false, role_names: MapSet.new(roles)}
+    do: %Viewer{user_uuid: uuid, anonymous?: false, role_names: roles}
 
   defp editor, do: %Viewer{user_uuid: @other_uuid, anonymous?: false, bypass?: true}
 

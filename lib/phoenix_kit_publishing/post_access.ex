@@ -126,11 +126,11 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   def protected?(post_uuid), do: access_for_post(post_uuid) != nil
 
   @doc """
-  The uuids of a group's protected posts (any gating rule), as a set — one
-  query for a whole listing.
+  Which of these posts are protected (any gating rule), as a map
+  `%{uuid => true}` — one query for a whole listing.
   """
-  @spec protected_post_uuids(String.t() | [String.t()]) :: MapSet.t()
-  def protected_post_uuids([]), do: MapSet.new()
+  @spec protected_post_uuids([String.t()]) :: %{optional(String.t()) => true}
+  def protected_post_uuids([]), do: %{}
 
   def protected_post_uuids(post_uuids) when is_list(post_uuids) do
     from(r in Rule,
@@ -139,7 +139,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
       select: r.post_uuid
     )
     |> repo().all()
-    |> MapSet.new()
+    |> Map.new(&{&1, true})
   end
 
   @doc """
@@ -178,7 +178,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
       protected == [] -> entries
       not Viewer.may_hold_access?(viewer) -> public
       not list_protected?(list_rules({:group, group_uuid})) -> public
-      true -> keep_openable(entries, MapSet.new(openable(protected, viewer)))
+      true -> keep_openable(entries, Map.new(openable(protected, viewer), &{&1, true}))
     end
   end
 
@@ -196,7 +196,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   end
 
   defp keep_openable(entries, openable) do
-    Enum.filter(entries, &(public?(&1) or MapSet.member?(openable, &1[:uuid])))
+    Enum.filter(entries, &(public?(&1) or Map.has_key?(openable, &1[:uuid])))
   end
 
   # ===========================================================================
@@ -264,12 +264,12 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
           active
       end
 
-    kinds = MapSet.new(unsatisfied, & &1.kind)
+    kinds = unsatisfied |> Enum.map(& &1.kind) |> Enum.uniq()
 
     cond do
-      MapSet.member?(kinds, "password") -> :password
-      Enum.any?(@login_kinds, &MapSet.member?(kinds, &1)) and viewer.anonymous? -> :login
-      Enum.any?(@login_kinds, &MapSet.member?(kinds, &1)) -> :forbidden
+      "password" in kinds -> :password
+      Enum.any?(@login_kinds, &(&1 in kinds)) and viewer.anonymous? -> :login
+      Enum.any?(@login_kinds, &(&1 in kinds)) -> :forbidden
       true -> :not_found
     end
   end
@@ -294,7 +294,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
       |> Map.get("role_uuids", [])
       |> List.wrap()
       |> role_names()
-      |> Enum.any?(&MapSet.member?(viewer.role_names, &1))
+      |> Enum.any?(&(&1 in viewer.role_names))
   end
 
   defp grants?(%Rule{kind: kind} = rule, viewer, now) when kind in ["password", "token"] do
@@ -655,18 +655,18 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
 
     if Keyword.get(opts, :keep_custom, false) do
       with_rules = protected_or_configured(posts)
-      Enum.reject(posts, &MapSet.member?(with_rules, &1))
+      Enum.reject(posts, &Map.has_key?(with_rules, &1))
     else
       posts
     end
   end
 
-  defp protected_or_configured([]), do: MapSet.new()
+  defp protected_or_configured([]), do: %{}
 
   defp protected_or_configured(post_uuids) do
     from(r in Rule, where: r.post_uuid in ^post_uuids, distinct: true, select: r.post_uuid)
     |> repo().all()
-    |> MapSet.new()
+    |> Map.new(&{&1, true})
   end
 
   # ===========================================================================

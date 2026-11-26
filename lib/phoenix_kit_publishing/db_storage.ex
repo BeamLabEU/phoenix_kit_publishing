@@ -1677,7 +1677,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   # (`PostAccess.public?/1`); a public post's map carries no new key, so a
   # site without rules caches exactly what it cached before.
   defp mark_protected(entry, protected) do
-    if MapSet.member?(protected, entry.uuid),
+    if Map.has_key?(protected, entry.uuid),
       do: Map.put(entry, :access_protected, true),
       else: entry
   end
@@ -1689,7 +1689,7 @@ defmodule PhoenixKit.Modules.Publishing.DBStorage do
   rescue
     error in Postgrex.Error ->
       Logger.warning("[DBStorage] access rules unreadable: #{inspect(error.postgres[:code])}")
-      MapSet.new()
+      %{}
   end
 
   # ===========================================================================

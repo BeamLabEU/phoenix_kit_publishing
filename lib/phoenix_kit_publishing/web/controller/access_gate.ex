@@ -198,8 +198,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
   defp back_path(conn) do
     path = conn.request_path
 
-    if is_binary(path) and String.starts_with?(path, "/") and
-         not String.starts_with?(path, "//") and not String.contains?(path, "\\"),
+    if String.starts_with?(path, "/") and not String.starts_with?(path, "//") and
+         not String.contains?(path, "\\"),
        do: path,
        else: "/"
   end
