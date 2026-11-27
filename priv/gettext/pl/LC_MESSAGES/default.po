@@ -270,7 +270,7 @@ msgstr "Dane list w pamięci podręcznej przyspieszają strony list. Pamięć po
 msgid "Cached rendered HTML for published posts. Uses content-hash keys so edits auto-invalidate."
 msgstr "Pamięć podręczna wyrenderowanego HTML opublikowanych wpisów. Używa kluczy opartych na skrócie treści, więc edycje automatycznie ją unieważniają."
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:379
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:389
 #: lib/phoenix_kit_publishing/web/editor.ex:4939
 #: lib/phoenix_kit_publishing/web/editor.ex:5000
 #, elixir-autogen, elixir-format
@@ -4198,7 +4198,7 @@ msgstr "Pokaż kategorie na kartach"
 msgid "The group's categories above the listing; readers can pick one or several."
 msgstr "Kategorie grupy nad listą; czytelnicy mogą wybrać jedną lub kilka."
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:381
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:391
 #: lib/phoenix_kit_publishing/web/editor.ex:4497
 #, elixir-autogen, elixir-format
 msgid "Add"
@@ -4400,7 +4400,7 @@ msgstr "Ten wpis jest opublikowany: zapisanie zmieni jego URL z %{old} na %{new}
 msgid "Translations keep their own URL slugs."
 msgstr "Tłumaczenia zachowują własne slugi URL."
 
-#: lib/phoenix_kit_publishing/post_access.ex:766
+#: lib/phoenix_kit_publishing/post_access.ex:855
 #, elixir-autogen, elixir-format
 msgid "%{count} chosen user"
 msgid_plural "%{count} chosen users"
@@ -4408,7 +4408,7 @@ msgstr[0] "%{count} wybrany użytkownik"
 msgstr[1] "%{count} wybranych użytkowników"
 msgstr[2] "%{count} wybranych użytkowników"
 
-#: lib/phoenix_kit_publishing/post_access.ex:772
+#: lib/phoenix_kit_publishing/post_access.ex:861
 #, elixir-autogen, elixir-format
 msgid "%{count} secret link"
 msgid_plural "%{count} secret links"
@@ -4416,7 +4416,7 @@ msgstr[0] "%{count} tajny link"
 msgstr[1] "%{count} tajne linki"
 msgstr[2] "%{count} tajnych linków"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:461
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:471
 #, elixir-autogen, elixir-format
 msgid "%{count} user"
 msgid_plural "%{count} users"
@@ -4424,7 +4424,7 @@ msgstr[0] "%{count} użytkownik"
 msgstr[1] "%{count} użytkowników"
 msgstr[2] "%{count} użytkowników"
 
-#: lib/phoenix_kit_publishing/post_access.ex:782
+#: lib/phoenix_kit_publishing/post_access.ex:871
 #, elixir-autogen, elixir-format
 msgid "(until %{date})"
 msgstr "(do %{date})"
@@ -4457,7 +4457,7 @@ msgstr[0] "Zastosowano do %{count} wpisu."
 msgstr[1] "Zastosowano do %{count} wpisów."
 msgstr[2] "Zastosowano do %{count} wpisów."
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:411
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:421
 #, elixir-autogen, elixir-format
 msgid "Apply to existing posts…"
 msgstr "Zastosuj do istniejących wpisów…"
@@ -4467,7 +4467,7 @@ msgstr "Zastosuj do istniejących wpisów…"
 msgid "Ask whoever shared it with you to give your account access."
 msgstr "Poproś osobę, która ją udostępniła, o nadanie dostępu Twojemu kontu."
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:414
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:424
 #, elixir-autogen, elixir-format
 msgid "Change %{count} post"
 msgid_plural "Change %{count} posts"
@@ -4500,7 +4500,7 @@ msgstr "Adresy e-mail kont, jeden w wierszu"
 msgid "Ends on"
 msgstr "Kończy się"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:1
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:385
 #, elixir-autogen, elixir-format
 msgid "No end date (remove the current one)"
 msgstr "Bez daty końcowej (usuń obecną)"
@@ -4520,22 +4520,22 @@ msgstr "Każdy rodzaj reguły musi być spełniony"
 msgid "Have an account? Sign in instead"
 msgstr "Masz konto? Zaloguj się"
 
-#: lib/phoenix_kit_publishing/post_access.ex:751
+#: lib/phoenix_kit_publishing/post_access.ex:840
 #, elixir-autogen, elixir-format
 msgid "Hidden — every rule has expired or was revoked"
 msgstr "Ukryty — każda reguła wygasła lub została unieważniona"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:407
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:417
 #, elixir-autogen, elixir-format
 msgid "Keep posts that have rules of their own"
 msgstr "Zachowaj wpisy, które mają własne reguły"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:393
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:403
 #, elixir-autogen, elixir-format
 msgid "List protected posts to the readers who may open them"
 msgstr "Pokazuj chronione wpisy czytelnikom, którzy mogą je otworzyć"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:427
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:437
 #, elixir-autogen, elixir-format
 msgid "Make public"
 msgstr "Udostępnij publicznie"
@@ -4545,7 +4545,7 @@ msgstr "Udostępnij publicznie"
 msgid "New password"
 msgstr "Nowe hasło"
 
-#: lib/phoenix_kit_publishing/web/controller/access_gate.ex:99
+#: lib/phoenix_kit_publishing/web/controller/access_gate.ex:100
 #, elixir-autogen, elixir-format
 msgid "Not available"
 msgstr "Niedostępne"
@@ -4560,13 +4560,13 @@ msgstr "Notatka (opcjonalnie)"
 msgid "Only some readers can open this post"
 msgstr "Tylko niektórzy czytelnicy mogą otworzyć ten wpis"
 
-#: lib/phoenix_kit_publishing/post_access.ex:752
+#: lib/phoenix_kit_publishing/post_access.ex:841
 #, elixir-autogen, elixir-format
 msgid "Only: %{who}"
 msgstr "Tylko: %{who}"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:442
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:464
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:452
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:474
 #: lib/phoenix_kit_publishing/web/html.ex:2506
 #, elixir-autogen, elixir-format
 msgid "Password"
@@ -4582,7 +4582,7 @@ msgstr "Podgląd jako anonim"
 msgid "Protected"
 msgstr "Chroniony"
 
-#: lib/phoenix_kit_publishing/web/controller/access_gate.ex:179
+#: lib/phoenix_kit_publishing/web/controller/access_gate.ex:180
 #, elixir-autogen, elixir-format
 msgid "Protected page"
 msgstr "Chroniona strona"
@@ -4592,12 +4592,12 @@ msgstr "Chroniona strona"
 msgid "Protected posts only"
 msgstr "Tylko chronione wpisy"
 
-#: lib/phoenix_kit_publishing/post_access.ex:735
+#: lib/phoenix_kit_publishing/post_access.ex:824
 #, elixir-autogen, elixir-format
 msgid "Public — anyone can open this post"
 msgstr "Publiczny — każdy może otworzyć ten wpis"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:424
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:434
 #, elixir-autogen, elixir-format
 msgid "Remove every rule and secret link? Anyone will be able to open this post."
 msgstr "Usunąć wszystkie reguły i tajne linki? Każdy będzie mógł otworzyć ten wpis."
@@ -4607,23 +4607,23 @@ msgstr "Usunąć wszystkie reguły i tajne linki? Każdy będzie mógł otworzy�
 msgid "Revoke"
 msgstr "Unieważnij"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:440
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:450
 #, elixir-autogen, elixir-format
 msgid "Roles"
 msgstr "Role"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:456
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:466
 #, elixir-autogen, elixir-format
 msgid "Roles: %{roles}"
 msgstr "Role: %{roles}"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:454
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:464
 #, elixir-autogen, elixir-format
 msgid "a deleted role"
 msgstr "usunięta rola"
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:445
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:465
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:455
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:475
 #, elixir-autogen, elixir-format
 msgid "Secret link"
 msgstr "Tajny link"
@@ -4633,8 +4633,8 @@ msgstr "Tajny link"
 msgid "Secret link created. Copy it now — it is not shown again."
 msgstr "Utworzono tajny link. Skopiuj go teraz — nie zostanie pokazany ponownie."
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:439
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:448
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:449
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:458
 #, elixir-autogen, elixir-format
 msgid "Signed-in readers"
 msgstr "Zalogowani czytelnicy"
@@ -4644,7 +4644,7 @@ msgstr "Zalogowani czytelnicy"
 msgid "That didn't save. Please check the values and try again."
 msgstr "Nie zapisano. Sprawdź wartości i spróbuj ponownie."
 
-#: lib/phoenix_kit_publishing/web/controller/access_gate.ex:157
+#: lib/phoenix_kit_publishing/web/controller/access_gate.ex:158
 #, elixir-autogen, elixir-format
 msgid "That password didn't work."
 msgstr "To hasło nie zadziałało."
@@ -4659,12 +4659,12 @@ msgstr "Hasło musi mieć co najmniej 4 znaki."
 msgid "This page is protected"
 msgstr "Ta strona jest chroniona"
 
-#: lib/phoenix_kit_publishing/web/controller/access_gate.ex:132
+#: lib/phoenix_kit_publishing/web/controller/access_gate.ex:133
 #, elixir-autogen, elixir-format
 msgid "Too many attempts. Please wait a minute and try again."
 msgstr "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie."
 
-#: lib/phoenix_kit_publishing/web/components/access_panel.ex:441
+#: lib/phoenix_kit_publishing/web/components/access_panel.ex:451
 #, elixir-autogen, elixir-format
 msgid "Users"
 msgstr "Użytkownicy"
@@ -4684,22 +4684,22 @@ msgstr "Nie możesz zmienić dostępu."
 msgid "You don't have access to this page"
 msgstr "Nie masz dostępu do tej strony"
 
-#: lib/phoenix_kit_publishing/post_access.ex:747
+#: lib/phoenix_kit_publishing/post_access.ex:836
 #, elixir-autogen, elixir-format
 msgid "and"
 msgstr "i"
 
-#: lib/phoenix_kit_publishing/post_access.ex:769
+#: lib/phoenix_kit_publishing/post_access.ex:858
 #, elixir-autogen, elixir-format
 msgid "anyone with the password"
 msgstr "każdy, kto zna hasło"
 
-#: lib/phoenix_kit_publishing/post_access.ex:748
+#: lib/phoenix_kit_publishing/post_access.ex:837
 #, elixir-autogen, elixir-format
 msgid "or"
 msgstr "lub"
 
-#: lib/phoenix_kit_publishing/post_access.ex:761
+#: lib/phoenix_kit_publishing/post_access.ex:850
 #, elixir-autogen, elixir-format
 msgid "readers with the role %{roles}"
 msgstr "czytelnicy z rolą %{roles}"
@@ -4709,7 +4709,7 @@ msgstr "czytelnicy z rolą %{roles}"
 msgid "revoked"
 msgstr "unieważniony"
 
-#: lib/phoenix_kit_publishing/post_access.ex:757
+#: lib/phoenix_kit_publishing/post_access.ex:846
 #, elixir-autogen, elixir-format
 msgid "signed-in readers"
 msgstr "zalogowani czytelnicy"

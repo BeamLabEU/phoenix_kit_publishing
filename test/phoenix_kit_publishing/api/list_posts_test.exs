@@ -1,7 +1,7 @@
 defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
   use PhoenixKit.DataCase, async: false
 
-  alias PhoenixKit.Modules.Publishing.{Groups, Posts, Versions}
+  alias PhoenixKit.Modules.Publishing.{Groups, PostAccess, Posts, PublishingPost, Versions}
   alias PhoenixKitPublishing.Test.ApiCase
   alias PhoenixKitPublishing.Test.ApiFixtures, as: Fx
   alias PhoenixKitPublishing.Test.Repo
@@ -327,7 +327,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
       for {title, minute} <- [{"Open", 20}, {"Hidden", 5}] do
         post = Fx.post!(g["slug"], %{title: title})
 
-        Repo.get_by(PhoenixKit.Modules.Publishing.PublishingPost, uuid: post[:uuid])
+        Repo.get_by(PublishingPost, uuid: post[:uuid])
         |> Ecto.Changeset.change(post_date: date, post_time: Time.new!(9, minute, 0))
         |> Repo.update!()
 
@@ -336,7 +336,7 @@ defmodule PhoenixKit.Modules.Publishing.API.ListPostsTest do
       end
 
     {:ok, _} =
-      PhoenixKit.Modules.Publishing.PostAccess.add_rule({:post, hidden[:uuid]}, %{
+      PostAccess.add_rule({:post, hidden[:uuid]}, %{
         "kind" => "signed_in"
       })
 
