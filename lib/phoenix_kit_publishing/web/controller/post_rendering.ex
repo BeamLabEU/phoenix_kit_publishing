@@ -84,6 +84,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
             render_live_post(conn, group_slug, identifier, language, post)
 
           :protected ->
+            # The flag rides on the post: its own URLs keep their time
+            # segment, and its files render as kit URLs the file guard sees.
+            post = Map.put(post, :access_protected, true)
             conn |> render_live_post(group_slug, identifier, language, post) |> mark_protected()
 
           denial ->
@@ -254,6 +257,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
             render_version_if_browsable(conn, group_slug, internal_slug, version, language, post)
 
           :protected ->
+            post = Map.put(post, :access_protected, true)
+
             conn
             |> render_version_if_browsable(group_slug, internal_slug, version, language, post)
             |> mark_protected()
@@ -433,6 +438,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   """
   @spec render_post_content(map(), keyword()) :: String.t()
   def render_post_content(post, opts \\ []) do
+    # A protected post's files render as signed kit URLs, never a public
+    # bucket's own: only the kit's file route asks the file guard.
+    signed? = Map.get(post, :access_protected) == true
+    opts = if signed?, do: Keyword.put(opts, :signed_files, true), else: opts
+
+    Renderer.with_signed_files(signed?, fn -> do_render_post_content(post, opts) end)
+  end
+
+  defp do_render_post_content(post, opts) do
     html =
       case Renderer.render_post(post, opts) do
         {:ok, html} ->

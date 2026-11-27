@@ -3645,10 +3645,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   """
   @spec featured_image_url(map(), String.t()) :: String.t() | nil
   def featured_image_url(post, variant \\ "medium") do
-    post.metadata
-    |> Map.get(:featured_image_uuid)
-    |> resolve_featured_image_url(variant)
+    uuid = Map.get(post.metadata, :featured_image_uuid)
+
+    # A protected post's image goes through the kit's file route (the one
+    # core's file access guard watches), never a public bucket's own URL.
+    if Map.get(post, :access_protected) == true,
+      do: signed_featured_image_url(uuid, variant),
+      else: resolve_featured_image_url(uuid, variant)
   end
+
+  defp signed_featured_image_url(uuid, variant) when is_binary(uuid) and uuid != "" do
+    case Storage.get_file(uuid) do
+      nil ->
+        nil
+
+      _file ->
+        variant =
+          if Storage.get_file_instance_by_name(uuid, variant), do: variant, else: "original"
+
+        Storage.URLSigner.signed_url(uuid, variant)
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp signed_featured_image_url(_uuid, _variant), do: nil
 
   defp resolve_featured_image_url(nil, _variant), do: nil
   defp resolve_featured_image_url("", _variant), do: nil

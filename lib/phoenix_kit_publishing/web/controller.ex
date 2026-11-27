@@ -1067,27 +1067,35 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller do
   # The dimensions + mime power the `og:image:*` hint tags that
   # Telegram / Facebook use to render the preview card before they've
   # actually fetched the bytes.
-  defp og_image_meta(_post, %{"image_uuid" => uuid}) when is_binary(uuid) and uuid != "" do
-    image_meta_for_uuid(uuid)
+  defp og_image_meta(post, %{"image_uuid" => uuid}) when is_binary(uuid) and uuid != "" do
+    image_meta_for_uuid(uuid, protected_post?(post))
   end
 
   defp og_image_meta(post, _og_override) do
     uuid = Map.get(post.metadata, :featured_image_uuid)
 
     if is_binary(uuid) and uuid != "" do
-      image_meta_for_uuid(uuid)
+      image_meta_for_uuid(uuid, protected_post?(post))
     else
       %{url: nil}
     end
   end
 
-  defp image_meta_for_uuid(uuid) do
+  # A protected post's OG image is a signed kit URL too (`featured_image_url/2`).
+  defp protected_post?(post), do: Map.get(post, :access_protected) == true
+
+  defp image_meta_for_uuid(uuid, protected?) do
     # Prefer `large` — the visible variant on the OG card. Fall back to
     # `original` when large isn't generated. Either way `url` (below) is
     # always set from featured_image_url/2; only width/height/mime_type
     # are absent when neither variant record exists.
     variant = get_variant(uuid, "large") || get_variant(uuid, "original")
-    url = PublishingHTML.featured_image_url(%{metadata: %{featured_image_uuid: uuid}}, "large")
+
+    url =
+      PublishingHTML.featured_image_url(
+        %{metadata: %{featured_image_uuid: uuid}, access_protected: protected?},
+        "large"
+      )
 
     case variant do
       %{width: w, height: h, mime_type: mime} ->

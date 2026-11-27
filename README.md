@@ -368,10 +368,16 @@ ahead of it finds no table and treats every post as public on every surface,
 as before the feature; the rules take effect within half a minute of the
 migration running.
 
-**Not covered:** files. Images and attachments are served by core's storage
-routes by file uuid; a protected post's images stay reachable to anyone who
-has their URL. Put confidential files in a private library, or keep them out
-of protected posts.
+**Files.** With a core that ships the file access guard
+(`PhoenixKit.Modules.Storage.AccessGuard`), a file only protected posts use
+(featured, OG and inline images, audio, `/file/…` links in the body) is served
+only to readers who may open one of those posts, and to editors and media
+managers; anyone else gets core's missing-file answer. A protected post renders
+its files as signed kit URLs, so a public bucket's own URL never bypasses the
+check. A file a public post also shows stays public, and so does one another
+module shows publicly while a protected post uses it too: give the protected
+post its own copy. On an older core files are not guarded: keep confidential
+files in a private library.
 
 ## Public pages at the site root
 

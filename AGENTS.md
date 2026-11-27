@@ -137,11 +137,11 @@ Deliberate non-features, so nobody adds them assuming they were missed.
 - **No guest commenting.** The comments seam requires a logged-in user because
   the comments schema `validate_required`s `user_uuid`; guest support is a
   cross-repo change in the comments module first.
-- **No access control for files.** Per-post access (`PostAccess`) gates the
-  post's pages and every listing, never its images and attachments: core
-  serves those by file uuid through its own storage routes. A protected post's
-  images stay reachable to anyone holding their URL. Confidential files go in
-  a private library (core's time-window URLs), not in a protected post's body.
+- **No file access control of its own.** A protected post's files are
+  guarded through core's file access guard (`Publishing.file_access_guard/2`
+  → `PostAccess.FileGuard`, the optional `PhoenixKit.Module` callback, no
+  `@impl` so an older core still compiles it); on a core without the guard
+  they are served to anyone holding their URL.
 - **No media folders unless the host opts in.** Group media folders
   (`MediaFolders`) exist only once the host configures
   `:attachments_parent_folder`; post folders inside them only with
@@ -944,8 +944,24 @@ feature existed (re-record only for a deliberate change to a public page:
   timing difference of that size is not a practical oracle over the
   network, and padding every miss would cost every reader.
 
-Known residual (documented, not closed): files (above, "What this module
-does NOT do").
+- **Files of protected posts** (`PostAccess.FileGuard`, answered for core's
+  `Storage.AccessGuard` through `Publishing.file_access_guard/2`). An index
+  `%{file_uuid => [post_uuid]}` of the files ONLY protected posts use (every
+  version and language: version `featured_image_uuid` / `audio_uuid`, content
+  `featured_image_uuid` / `featured_image_id` / `og.image_uuid`, body
+  `file_uuid="…"` and `/file/<uuid>/` refs; minus those a public post's LIVE
+  version shows) lives in `:persistent_term` for 60 s and is dropped by every
+  `ListingCache.regenerate/2`; a file outside it is `:allow` after a map
+  lookup. Inside it: `:private` for `publishing` / `media` holders and for a
+  reader `authorize_view/2` admits to one of the posts, `:deny` otherwise. A
+  protected post renders its files as signed kit URLs
+  (`Renderer.with_signed_files/2`, the `:sf` render-cache key token,
+  `PageBuilder.Components.Image.signed_src/1`, `featured_image_url/2` and the
+  OG image on the post's `:access_protected` flag), so a public bucket's URL
+  never bypasses the guard. Residuals: another node sees a new protected
+  file within 60 s; a file another module shows publicly while a protected
+  post also uses it is guarded too. `post_access/file_guard_test.exs` (its
+  end-to-end case is tagged `:needs_unreleased_core`).
 
 ## Database & migrations
 

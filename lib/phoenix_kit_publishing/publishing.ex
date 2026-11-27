@@ -29,6 +29,7 @@ defmodule PhoenixKit.Modules.Publishing do
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PermissionBackfill
+  alias PhoenixKit.Modules.Publishing.PostAccess.FileGuard
   alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   # ============================================================================
@@ -890,6 +891,16 @@ defmodule PhoenixKit.Modules.Publishing do
   @impl PhoenixKit.Module
   @spec api_tools() :: [PhoenixKit.API.Tool.t()]
   def api_tools, do: API.tools()
+
+  # Core's file access guard (`PhoenixKit.Modules.Storage.AccessGuard`, an
+  # optional `PhoenixKit.Module` callback): a file only protected posts use is
+  # served to the readers who may open one of them (`PostAccess.FileGuard`).
+  # No `@impl`: a core without the callback still compiles this module, and
+  # simply never asks.
+  @doc false
+  @spec file_access_guard(map(), Plug.Conn.t()) :: :allow | :private | :deny
+  def file_access_guard(file, conn),
+    do: FileGuard.check(file, conn)
 
   # ============================================================================
   # Shared Helpers (used across submodules)
