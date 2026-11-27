@@ -12,10 +12,12 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuardTest do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Groups
   alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.ListingCache.CacheSync
   alias PhoenixKit.Modules.Publishing.PageBuilder.Components.Image
   alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PostAccess.FileGuard
   alias PhoenixKit.Modules.Publishing.Posts
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Versions
   alias PhoenixKit.Settings
@@ -148,6 +150,27 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuardTest do
 
     # ...so its result (here: "nothing guarded") must not be kept.
     refute FileGuard.store_if_unchanged(marker, %{}, System.monotonic_time(:millisecond) + 60_000)
+    assert FileGuard.check(image, anon_conn()) == :deny
+  end
+
+  test "a write's listing rebuild tells every node to drop its index", %{slug: slug} do
+    PublishingPubSub.subscribe_to_cache_invalidations()
+    ListingCache.regenerate(slug)
+    origin = node()
+    assert_receive {:file_guard_invalidated, ^origin}, 1_000
+  end
+
+  test "a peer's broadcast drops this node's index; its own echo does not", %{image: image} do
+    FileGuard.index()
+    built = FileGuard.current_marker()
+    assert {:index, _, _} = built
+
+    # The node's own broadcast comes back to it too: no second drop.
+    assert {:noreply, _} = CacheSync.handle_info({:file_guard_invalidated, node()}, %{})
+    assert FileGuard.current_marker() == built
+
+    assert {:noreply, _} = CacheSync.handle_info({:file_guard_invalidated, :peer@elsewhere}, %{})
+    assert {:stale, _} = FileGuard.current_marker()
     assert FileGuard.check(image, anon_conn()) == :deny
   end
 

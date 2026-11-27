@@ -25,6 +25,7 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.CacheSync do
 
   alias PhoenixKit.Modules.Publishing.GroupSlugs
   alias PhoenixKit.Modules.Publishing.ListingCache
+  alias PhoenixKit.Modules.Publishing.PostAccess.FileGuard
   alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
 
   @spec start_link(keyword()) :: GenServer.on_start()
@@ -59,6 +60,13 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache.CacheSync do
   # The origin node keeps the listing it just installed.
   def handle_info({:cache_regenerated, group_slug, origin}, state) do
     if origin != node(), do: ListingCache.erase_local(group_slug)
+    {:noreply, state}
+  end
+
+  # A peer dropped its index of protected posts' files after a write; this
+  # node's copy may miss the post's new rule (`PostAccess.FileGuard`).
+  def handle_info({:file_guard_invalidated, origin}, state) do
+    if origin != node(), do: FileGuard.invalidate()
     {:noreply, state}
   end
 

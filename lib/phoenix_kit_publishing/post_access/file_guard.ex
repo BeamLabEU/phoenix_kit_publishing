@@ -18,8 +18,9 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
       * `:deny` for everyone else: core answers it as a missing file.
 
   The index of guarded files is built in a few queries and kept in
-  `:persistent_term` for #{60} s; every listing rebuild (each post or rule
-  write, `ListingCache.regenerate/2`) drops it on this node. A deep-zoom view
+  `:persistent_term` for #{60} s; every listing rebuild after a write (each
+  post or rule write, `ListingCache.regenerate/2`) drops it on every node
+  (`invalidate_everywhere/0`, over the kit's PubSub). A deep-zoom view
   asks once per tile, so a file outside the index costs a map lookup.
 
   What it cannot see: a file another module (a product page, a profile)
@@ -36,6 +37,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
   alias PhoenixKit.Modules.Publishing.PublishingContent
   alias PhoenixKit.Modules.Publishing.PublishingPost
   alias PhoenixKit.Modules.Publishing.PublishingVersion
+  alias PhoenixKit.Modules.Publishing.PubSub, as: PublishingPubSub
   alias PhoenixKit.Users.Auth.Scope
 
   @ttl_ms 60_000
@@ -91,6 +93,22 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
     :ok
   rescue
     _ -> :ok
+  end
+
+  @doc """
+  Drops the index on this node and tells every other node to drop theirs
+  (`PubSub.broadcast_file_guard_invalidated/1`, received by `CacheSync`). The
+  60 s lifetime stays as the backstop for a node the broadcast misses.
+  """
+  @spec invalidate_everywhere() :: :ok
+  def invalidate_everywhere do
+    invalidate()
+    PublishingPubSub.broadcast_file_guard_invalidated()
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    :exit, _ -> :ok
   end
 
   @doc """

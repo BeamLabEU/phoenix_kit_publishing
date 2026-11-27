@@ -546,6 +546,18 @@ defmodule PhoenixKit.Modules.Publishing.PubSub do
     Manager.broadcast(cache_invalidation_topic(), {:cache_regenerated, group_slug, origin})
   end
 
+  @doc """
+  Broadcasts, on the same node-level topic, that `origin` dropped its index of
+  the files protected posts use (`{:file_guard_invalidated, origin}`): every
+  OTHER node's `CacheSync` drops its own (`PostAccess.FileGuard`), so a newly
+  protected post's files are guarded on every node at once, not after the
+  index's 60 s lifetime.
+  """
+  @spec broadcast_file_guard_invalidated(node()) :: broadcast_result
+  def broadcast_file_guard_invalidated(origin \\ node()) do
+    Manager.broadcast(cache_invalidation_topic(), {:file_guard_invalidated, origin})
+  end
+
   # ============================================================================
   # AI Translation Progress
   # ============================================================================

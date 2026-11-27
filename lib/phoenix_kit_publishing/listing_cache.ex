@@ -140,8 +140,9 @@ defmodule PhoenixKit.Modules.Publishing.ListingCache do
   def regenerate(group_slug, opts \\ []) do
     broadcast? = Keyword.get(opts, :broadcast, true)
     # Every post and access-rule write lands here: the files guarded for
-    # protected posts may have changed too (`PostAccess.FileGuard`).
-    FileGuard.invalidate()
+    # protected posts may have changed too (`PostAccess.FileGuard`). A
+    # write's rebuild tells every node; a cold-cache refill only this one.
+    if broadcast?, do: FileGuard.invalidate_everywhere(), else: FileGuard.invalidate()
     # A sequence number, not a clock: it is taken BEFORE the DB read, and the
     # install step compares it against the sequence of the latest erase or
     # install (see `install_snapshot/4`). `:started_seq` is a test seam only:

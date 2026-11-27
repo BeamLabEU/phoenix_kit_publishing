@@ -951,16 +951,18 @@ feature existed (re-record only for a deliberate change to a public page:
   `featured_image_uuid` / `featured_image_id` / `og.image_uuid`, body
   `file_uuid="…"` and `/file/<uuid>/` refs; minus those a public post's LIVE
   version shows) lives in `:persistent_term` for 60 s and is dropped by every
-  `ListingCache.regenerate/2`; a file outside it is `:allow` after a map
+  `ListingCache.regenerate/2` — on every node after a write
+  (`FileGuard.invalidate_everywhere/0` broadcasts `{:file_guard_invalidated,
+  origin}` on the cache-invalidation topic, `CacheSync` drops the peers'
+  copies), the 60 s lifetime being the backstop; a file outside it is `:allow` after a map
   lookup. Inside it: `:private` for `publishing` / `media` holders and for a
   reader `authorize_view/2` admits to one of the posts, `:deny` otherwise. A
   protected post renders its files as signed kit URLs
   (`Renderer.with_signed_files/2`, the `:sf` render-cache key token,
   `PageBuilder.Components.Image.signed_src/1`, `featured_image_url/2` and the
   OG image on the post's `:access_protected` flag), so a public bucket's URL
-  never bypasses the guard. Residuals: another node sees a new protected
-  file within 60 s; a file another module shows publicly while a protected
-  post also uses it is guarded too. `post_access/file_guard_test.exs` (its
+  never bypasses the guard. Residual (accepted): a file another module
+  shows publicly while a protected post also uses it is guarded too. `post_access/file_guard_test.exs` (its
   end-to-end case is tagged `:needs_unreleased_core`).
 
 ## Database & migrations
