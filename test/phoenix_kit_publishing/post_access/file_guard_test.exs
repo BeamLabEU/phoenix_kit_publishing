@@ -140,6 +140,30 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuardTest do
     assert FileGuard.check(image, anon_conn()) == :allow
   end
 
+  test "an index built before an invalidation is not stored over it", %{image: image} do
+    # A build starts (reads the marker), a rule changes meanwhile...
+    FileGuard.invalidate()
+    marker = FileGuard.current_marker()
+    FileGuard.invalidate()
+
+    # ...so its result (here: "nothing guarded") must not be kept.
+    refute FileGuard.store_if_unchanged(marker, %{}, System.monotonic_time(:millisecond) + 60_000)
+    assert FileGuard.check(image, anon_conn()) == :deny
+  end
+
+  test "a signing failure renders the placeholder, never core's public-URL lookup" do
+    # Not a uuid core can sign: the rescue must drop the file reference.
+    attrs = %{"file_uuid" => MediaFixtures.file!().uuid}
+
+    signed =
+      Renderer.with_signed_files(true, fn ->
+        Image.signed_src(Map.put(attrs, "file_variant", :not_a_string))
+      end)
+
+    refute Map.has_key?(signed, "file_uuid")
+    refute Map.has_key?(signed, "src")
+  end
+
   test "a protected post's body renders its files as signed kit URLs", %{inline: inline} do
     attrs = %{"file_uuid" => inline.uuid}
     assert Image.signed_src(attrs) == attrs

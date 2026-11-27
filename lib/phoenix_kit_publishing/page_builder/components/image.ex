@@ -213,7 +213,9 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
         |> Map.put_new_lazy("alt", fn -> storage_alt(uuid) end)
     end
   rescue
-    _ -> attributes
+    # Never fall back to core's lookup, which may hand out the public
+    # bucket's URL: no file reference, so core renders its placeholder.
+    _ -> Map.drop(attributes, ["file_uuid", "src"])
   end
 
   defp storage_alt(uuid) do

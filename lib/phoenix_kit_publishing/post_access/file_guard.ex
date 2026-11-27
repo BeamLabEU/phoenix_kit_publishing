@@ -85,7 +85,9 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
   @doc "Drops this node's index (a post or a rule changed)."
   @spec invalidate() :: :ok
   def invalidate do
-    :persistent_term.erase(key())
+    # A marker, not an erase: a build that started before this cannot store
+    # its (older) index over it (`store_if_unchanged/3`).
+    :persistent_term.put(key(), {:stale, System.unique_integer([:monotonic])})
     :ok
   rescue
     _ -> :ok
@@ -100,15 +102,33 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
     now = System.monotonic_time(:millisecond)
 
     case :persistent_term.get(key(), nil) do
-      {index, until} when until > now ->
+      {:index, index, until} when until > now ->
         index
 
-      _ ->
+      marker ->
         index = if PostAccess.rules_table?(), do: build(), else: %{}
-        :persistent_term.put(key(), {index, now + @ttl_ms})
+        store_if_unchanged(marker, index, now + @ttl_ms)
         index
     end
   end
+
+  @doc false
+  # Stores a freshly built index only while the slot still holds what it
+  # held when the build started: an invalidation in between (a rule added
+  # during the build) wins, and the next request builds again.
+  @spec store_if_unchanged(term(), map(), integer()) :: boolean()
+  def store_if_unchanged(marker, index, until) do
+    if :persistent_term.get(key(), nil) == marker do
+      :persistent_term.put(key(), {:index, index, until})
+      true
+    else
+      false
+    end
+  end
+
+  @doc false
+  @spec current_marker() :: term()
+  def current_marker, do: :persistent_term.get(key(), nil)
 
   defp key, do: {__MODULE__, PhoenixKit.RepoHelper.repo()}
 
