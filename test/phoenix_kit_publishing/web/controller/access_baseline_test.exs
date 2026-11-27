@@ -158,14 +158,16 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessBaselineTest do
     |> String.replace(~r/(name="_csrf_token"[^>]*value=")[^"]*"/, "\\1<csrf>\"")
     |> String.replace(~r/(name="csrf-token" content=")[^"]*"/, "\\1<csrf>\"")
     |> String.replace(~r/(name="ft"[^>]*value=")[^"]*"/, "\\1<ft>\"")
-    |> String.replace(~r/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?/, "<ts>")
-    |> String.replace(~r/~U\[[^\]]*\]|~N\[[^\]]*\]|~D\[[^\]]*\]|~T\[[^\]]*\]/, "<sigil>")
-    |> String.replace(~r/\d{4}-\d{2}-\d{2}/, "<date>")
-    |> String.replace(~r/\b\d{2}:\d{2}(:\d{2})?\b/, "<time>")
+    # RFC 822 dates (feeds) before the <time> pass below cuts one apart:
+    # lastBuildDate is today.
     |> String.replace(
       ~r/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}/,
       "<rfc822>"
     )
+    |> String.replace(~r/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?/, "<ts>")
+    |> String.replace(~r/~U\[[^\]]*\]|~N\[[^\]]*\]|~D\[[^\]]*\]|~T\[[^\]]*\]/, "<sigil>")
+    |> String.replace(~r/\d{4}-\d{2}-\d{2}/, "<date>")
+    |> String.replace(~r/\b\d{2}:\d{2}(:\d{2})?\b/, "<time>")
     |> String.replace(
       ~r/\b(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}/,
       "<human-date>"

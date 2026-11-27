@@ -10,13 +10,13 @@ content-type: application/rss+xml; charset=utf-8
 <description>Baseline News</description>
 <language>en</language>
 <atom:link href="http://www.example.com/baseline-news/feed.xml" rel="self" type="application/rss+xml"/>
-<lastBuildDate>Thu, 26 Nov 2026 <time> +0000</lastBuildDate>
+<lastBuildDate><rfc822></lastBuildDate>
 <generator>PhoenixKit Publishing</generator>
 <item>
 <title>Baseline News Item</title>
 <link>http://www.example.com/baseline-news/<date></link>
 <guid isPermaLink="true">http://www.example.com/baseline-news/<date></guid>
-<pubDate>Thu, 26 Nov 2026 <time> +0000</pubDate>
+<pubDate><rfc822></pubDate>
 <description><![CDATA[News body.]]></description>
 </item>
 </channel>

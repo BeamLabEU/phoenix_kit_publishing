@@ -10,20 +10,20 @@ content-type: application/rss+xml; charset=utf-8
 <description>Baseline Blog · elixir</description>
 <language>en</language>
 <atom:link href="http://www.example.com/baseline-blog/tag/elixir/feed.xml" rel="self" type="application/rss+xml"/>
-<lastBuildDate>Thu, 26 Nov 2026 <time> +0000</lastBuildDate>
+<lastBuildDate><rfc822></lastBuildDate>
 <generator>PhoenixKit Publishing</generator>
 <item>
 <title>Baseline Two</title>
 <link>http://www.example.com/baseline-blog/baseline-two</link>
 <guid isPermaLink="true">http://www.example.com/baseline-blog/baseline-two</guid>
-<pubDate>Thu, 26 Nov 2026 <time> +0000</pubDate>
+<pubDate><rfc822></pubDate>
 <description><![CDATA[Second body, also #elixir.]]></description>
 </item>
 <item>
 <title>Baseline One</title>
 <link>http://www.example.com/baseline-blog/baseline-one</link>
 <guid isPermaLink="true">http://www.example.com/baseline-blog/baseline-one</guid>
-<pubDate>Thu, 26 Nov 2026 <time> +0000</pubDate>
+<pubDate><rfc822></pubDate>
 <description><![CDATA[First body about #elixir and things.]]></description>
 </item>
 </channel>
