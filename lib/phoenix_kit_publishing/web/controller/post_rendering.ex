@@ -28,7 +28,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @status_published Constants.status_published()
 
   # Suppress dialyzer false positive for defensive fallback pattern
-  @dialyzer {:nowarn_function, render_post_content: 2}
+  @dialyzer {:nowarn_function, do_render_post_content: 2}
 
   @typedoc "A post identifier as `Routing.parse_path/1` resolves it."
   @type post_identifier ::
