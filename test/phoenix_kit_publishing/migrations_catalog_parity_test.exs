@@ -43,11 +43,12 @@ defmodule PhoenixKitPublishing.MigrationsCatalogParityTest do
     existing_host = catalog_shape("public")
     fresh = catalog_shape(@prefix)
 
-    # Guard against a vacuous pass: 7 tables' worth of columns, 20
-    # constraints (7 PK + 1 UNIQUE + 12 FK) and 32 indexes (V1's 22 + the
-    # 8 constraint-backing ones + V2's 2).
-    assert Enum.count(existing_host, &match?({:constraint, _, _}, &1)) == 20
-    assert Enum.count(existing_host, &match?({:index, _, _}, &1)) == 32
+    # Guard against a vacuous pass: 8 tables' worth of columns, 23
+    # constraints (7 PK + 1 UNIQUE + 12 FK, and V4's PK + 2 FK) and 35
+    # indexes (V1's 22 + the 8 constraint-backing ones + V2's 2, and V4's
+    # 2 + its PK's).
+    assert Enum.count(existing_host, &match?({:constraint, _, _}, &1)) == 23
+    assert Enum.count(existing_host, &match?({:index, _, _}, &1)) == 35
 
     assert fresh -- existing_host == []
     assert existing_host -- fresh == []
@@ -55,10 +56,12 @@ defmodule PhoenixKitPublishing.MigrationsCatalogParityTest do
 
   # V1 on its own is still core's baseline, exactly — V2's two indexes are
   # the whole difference between the two.
-  test "V1 alone matches core's baseline; V2 adds exactly the two media-folder indexes, V3 one column" do
+  test "V1 alone matches core's baseline; V2 adds exactly the two media-folder indexes, V3 one column, V4 one table" do
     Migrations.up_statements(@prefix, 1) |> Enum.each(&Repo.query!/1)
 
-    core_baseline = Enum.reject(catalog_shape("public"), &(v2_index?(&1) or v3_column?(&1)))
+    core_baseline =
+      Enum.reject(catalog_shape("public"), &(v2_index?(&1) or v3_column?(&1) or v4_object?(&1)))
+
     v1 = catalog_shape(@prefix)
 
     assert Enum.count(catalog_shape("public"), &v2_index?/1) == 2
@@ -87,6 +90,10 @@ defmodule PhoenixKitPublishing.MigrationsCatalogParityTest do
 
   defp v3_column?({:column, "phoenix_kit_publishing_categories", {"data", _, _, _, _}}), do: true
   defp v3_column?(_row), do: false
+
+  # V4's table, with everything on it.
+  defp v4_object?({_kind, "phoenix_kit_publishing_access_rules", _}), do: true
+  defp v4_object?(_row), do: false
 
   defp catalog_shape(schema) do
     strip = &String.replace(&1 || "", "#{schema}.", "")

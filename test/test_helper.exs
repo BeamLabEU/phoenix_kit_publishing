@@ -127,6 +127,7 @@ end
 # Views dedups cookieless visitors per day through this table's owner; without
 # it `publishing_unique_views` silently degrades to counting every open.
 {:ok, _pid} = PhoenixKit.Modules.Publishing.Views.VisitorTable.start_link([])
+{:ok, _pid} = PhoenixKit.Modules.Publishing.PostAccess.LocalLimits.start_link([])
 
 # Web.Listing's `handle_params/3` spawns a stale-fixer task via
 # Task.Supervisor.start_child(PhoenixKit.TaskSupervisor, …) — start that
@@ -175,5 +176,16 @@ end
 # Integration tests are excluded only when the database cannot be reached. Every
 # core API the suite once probed for (the machine API's executor, the canonical URL
 # helpers, ModuleChainCheck, the built-in file references) ships in 3.5.0, this
-# module's floor, so nothing else is ever excluded.
-ExUnit.start(exclude: if(repo_available, do: [], else: [:integration]))
+# module's floor; beyond that only the tag below is excluded.
+
+# Tests for behaviour that exists in local core but not in the released pin.
+# They fail against Hex because the feature isn't there yet, so the default
+# run skips them:
+#
+#     PHOENIX_KIT_PATH=../phoenix_kit mix test --include needs_unreleased_core
+#
+# Currently: core's file access guard (`PhoenixKit.Modules.Storage.AccessGuard`,
+# file_guard_test.exs). Delete each from the tests and this line once the pin
+# catches up.
+exclude = if(repo_available, do: [], else: [:integration])
+ExUnit.start(exclude: exclude ++ [:needs_unreleased_core])

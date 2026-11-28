@@ -405,6 +405,35 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
                   {"<#{Regex.escape(tag)}(?=[\\s>\\/])([^>]*)>", tag, classes}
                 end)
 
+  @signed_files_key {__MODULE__, :signed_files}
+
+  @doc """
+  Runs `fun` with stored files rendered as signed kit URLs
+  (`URLSigner.signed_url/3`) instead of whatever `Storage.get_public_url*`
+  hands out (a public bucket's own URL on such an install). A protected
+  post's body is rendered this way: only the kit's file route asks core's
+  file access guard (`PostAccess.FileGuard`). Pass `signed_files: true` to
+  `render_post/2` in the same call, so the render cache keeps the two apart.
+  """
+  @spec with_signed_files(boolean(), (-> result)) :: result when result: term()
+  def with_signed_files(false, fun), do: fun.()
+
+  def with_signed_files(true, fun) do
+    previous = Process.put(@signed_files_key, true)
+
+    try do
+      fun.()
+    after
+      if previous,
+        do: Process.put(@signed_files_key, previous),
+        else: Process.delete(@signed_files_key)
+    end
+  end
+
+  @doc "True inside `with_signed_files(true, …)`."
+  @spec signed_files?() :: boolean()
+  def signed_files?, do: Process.get(@signed_files_key) == true
+
   @doc """
   Renders a post's markdown content to HTML.
 
@@ -2107,7 +2136,11 @@ defmodule PhoenixKit.Modules.Publishing.Renderer do
         _ -> ""
       end
 
-    "#{@cache_version}:publishing_post:#{post.group}:#{identifier}:#{post.language}:#{content_hash}#{style_token}"
+    # A protected post's render holds signed kit file URLs instead of public
+    # bucket ones (`with_signed_files/2`): never the same cached HTML.
+    signed_token = if Keyword.get(opts, :signed_files) == true, do: ":sf", else: ""
+
+    "#{@cache_version}:publishing_post:#{post.group}:#{identifier}:#{post.language}:#{content_hash}#{style_token}#{signed_token}"
   end
 
   defp url_prefix_marker do

@@ -1,0 +1,6 @@
+302
+cache-control: max-age=0, private, must-revalidate
+content-type: text/html; charset=utf-8
+location: /baseline-blog
+
+<html><body>You are being <a href="/baseline-blog">redirected</a>.</body></html>

@@ -36,9 +36,12 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
   """
 
   alias Phoenix.HTML.Safe
+  alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Shared.Components.Image, as: CoreImage
   alias PhoenixKit.Modules.Storage
+  alias PhoenixKit.Modules.Storage.URLSigner
   alias PhoenixKit.ThemeConfig
+  alias PhoenixKit.Utils.Multilang
 
   @light_class "pk-img-light"
   @dark_class "pk-img-dark"
@@ -64,8 +67,11 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
   # One image: core's markup, with the file's width and height on the <img>
   # when they are known, so the page does not shift while it loads.
   defp render_single(assigns, attributes) do
+    attributes = signed_src(attributes)
+
     html =
       assigns
+      |> Map.put(:attributes, attributes)
       |> CoreImage.render()
       |> Safe.to_iodata()
       |> IO.iodata_to_binary()
@@ -171,6 +177,53 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
 
   # The dark image's own source attributes, or nil when none is given.
   # `dark_src` wins over `dark_file_uuid`, as `src` does over `file_uuid`.
+  # Inside `Renderer.with_signed_files/2` (a protected post's body) a stored
+  # file is given a signed kit URL as its `src`, so the browser loads it
+  # through the file route core's access guard watches, never from a public
+  # bucket's own URL. The Storage alt core would have looked up comes along;
+  # `file_uuid` stays for the dimensions. An unknown file is left alone (core
+  # renders its placeholder).
+  @doc false
+  @spec signed_src(map()) :: map()
+  def signed_src(attributes) do
+    uuid = present(Map.get(attributes, "file_uuid"))
+
+    if (Renderer.signed_files?() and uuid) && is_nil(present(Map.get(attributes, "src"))) do
+      sign(attributes, uuid)
+    else
+      attributes
+    end
+  end
+
+  defp sign(attributes, uuid) do
+    case Storage.get_file(uuid) do
+      nil ->
+        attributes
+
+      _file ->
+        wanted = Map.get(attributes, "file_variant") || "original"
+
+        variant =
+          if wanted != "original" and is_nil(Storage.get_file_instance_by_name(uuid, wanted)),
+            do: "original",
+            else: wanted
+
+        attributes
+        |> Map.put("src", URLSigner.signed_url(uuid, variant))
+        |> Map.put_new_lazy("alt", fn -> storage_alt(uuid) end)
+    end
+  rescue
+    # Never fall back to core's lookup, which may hand out the public
+    # bucket's URL: no file reference, so core renders its placeholder.
+    _ -> Map.drop(attributes, ["file_uuid", "src"])
+  end
+
+  defp storage_alt(uuid) do
+    Storage.translated_alt_by_uuid(uuid, Multilang.current_locale()) || ""
+  rescue
+    _ -> ""
+  end
+
   defp dark_attributes(attributes) do
     src = present(Map.get(attributes, "dark_src"))
     uuid = present(Map.get(attributes, "dark_file_uuid"))
@@ -206,6 +259,8 @@ defmodule PhoenixKit.Modules.Publishing.PageBuilder.Components.Image do
   end
 
   defp render_core(assigns, attrs, marker) do
+    attrs = signed_src(attrs)
+
     class =
       case Map.get(attrs, "class") do
         value when is_binary(value) and value != "" -> marker <> " " <> value

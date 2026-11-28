@@ -11,6 +11,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
+  alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PublishingCategory
   alias PhoenixKit.Modules.Publishing.Renderer
   alias PhoenixKit.Modules.Publishing.Shared
@@ -2112,7 +2113,11 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
         }
       }
     >
-      <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} />
+      <.og_meta_tags :if={og_tags_enabled?()} og={assigns[:og]} /><meta
+        :if={assigns[:publishing_protected]}
+        name="robots"
+        content="noindex, nofollow"
+      />
       <.jsonld_script
         :if={jsonld_enabled?()}
         og={assigns[:og]}
@@ -2466,6 +2471,87 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   end
 
   @doc """
+  The password form of a protected post (`AccessGate`). Generic on purpose:
+  no title, description, image or meta tags of the post — only that the page
+  needs a password. Posts back to the page's own URL, where the comment route
+  hands `pk_access=unlock` to `AccessGate.unlock/2`.
+  """
+  def access_password(assigns) do
+    ~H"""
+    <PhoenixKitWeb.Components.LayoutWrapper.app_layout
+      flash={@flash}
+      page_title={@page_title}
+      current_path={@conn.request_path}
+      phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
+    >
+      <meta name="robots" content="noindex, nofollow" />
+      <div class="mx-auto max-w-md px-6 py-16" id="pk-access-password">
+        <div class="card bg-base-100 shadow">
+          <div class="card-body gap-4">
+            <h1 class="card-title text-xl">
+              <.icon name="hero-lock-closed" class="w-5 h-5" />
+              {gettext("This page is protected")}
+            </h1>
+            <p class="text-base-content/70">
+              {gettext("Enter the password you were given to open it.")}
+            </p>
+            <div :if={@access_error} class="alert alert-error text-sm" role="alert">
+              {@access_error}
+            </div>
+            <form method="post" action={@access_action} class="space-y-3">
+              <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
+              <input type="hidden" name="pk_access" value="unlock" />
+              <input type="hidden" name="post_uuid" value={@access_post_uuid} />
+              <label class="form-control w-full">
+                <span class="label-text mb-1">{gettext("Password")}</span>
+                <input
+                  type="password"
+                  name="password"
+                  required
+                  autocomplete="current-password"
+                  autofocus
+                  class="input input-bordered w-full"
+                />
+              </label>
+              <button type="submit" class="btn btn-primary w-full">{gettext("Open")}</button>
+            </form>
+            <p :if={is_nil(assigns[:phoenix_kit_current_scope])} class="text-sm text-base-content/60">
+              <.link href={@access_login_url} class="link">
+                {gettext("Have an account? Sign in instead")}
+              </.link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </PhoenixKitWeb.Components.LayoutWrapper.app_layout>
+    """
+  end
+
+  @doc """
+  The 403 page a signed-in reader without the right sees when the site
+  shows it (`publishing_access_forbidden_status` = `"403"`); by default such
+  a reader gets the missing-post answer instead.
+  """
+  def access_forbidden(assigns) do
+    ~H"""
+    <PhoenixKitWeb.Components.LayoutWrapper.app_layout
+      flash={@flash}
+      page_title={@page_title}
+      current_path={@conn.request_path}
+      phoenix_kit_current_scope={assigns[:phoenix_kit_current_scope]}
+    >
+      <meta name="robots" content="noindex, nofollow" />
+      <div class="mx-auto max-w-md px-6 py-16 text-center" id="pk-access-forbidden">
+        <h1 class="text-xl font-semibold">{gettext("You don't have access to this page")}</h1>
+        <p class="mt-2 text-base-content/70">
+          {gettext("Ask whoever shared it with you to give your account access.")}
+        </p>
+      </div>
+    </PhoenixKitWeb.Components.LayoutWrapper.app_layout>
+    """
+  end
+
+  @doc """
   The origin (`scheme://host[:port]`, no trailing slash) absolute public URLs
   are built on — og:url, JSON-LD, feed links, the admin's public-URL copy.
   The same source of truth as core's `PhoenixKit.Utils.Routes.base_url/0`:
@@ -2618,7 +2704,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
     case post.mode do
       mode when mode in @timestamp_modes ->
         date = get_timestamp_date(post)
-        post_count = lookup_date_count(date_counts, group_slug, date)
+        post_count = timestamp_date_count(post, date_counts, group_slug, date)
         tail = if post_count > 1, do: [date, get_timestamp_time(post)], else: [date]
         build_public_path(context_segments(ctx, [group_slug | tail]))
 
@@ -2804,7 +2890,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
       mode when mode in @timestamp_modes ->
         # For timestamp mode, use date/time from DB fields
         date = get_timestamp_date(post)
-        post_count = lookup_date_count(date_counts, group_slug, date)
+        post_count = timestamp_date_count(post, date_counts, group_slug, date)
 
         if post_count > 1 do
           format_timestamp_date_with_time(post)
@@ -3517,11 +3603,33 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   """
   @spec build_date_counts([map()]) :: %{optional(String.t()) => pos_integer()}
   def build_date_counts(posts) do
+    # Public posts only (`Posts.count_posts_on_date/2` and the date-only
+    # route count the same set): a protected post sharing the date must not
+    # give a public post's URL its time segment, and a protected post's own
+    # URL always has one (`timestamp_date_count/4`).
     posts
-    |> Enum.filter(&(&1.mode in @timestamp_modes))
+    |> Enum.filter(&(&1.mode in @timestamp_modes and Map.get(&1, :access_protected) != true))
     |> Enum.map(&get_timestamp_date/1)
     |> Enum.frequencies()
   end
+
+  # A protected post's URL always carries its time: the date-only form
+  # resolves among the PUBLIC posts of the date, so it would name a public
+  # sibling. Listing-cache entries carry the `:access_protected` flag; a
+  # map without it (a post page, the fallback) is checked by uuid when no
+  # counts were passed, the path that queries the database anyway.
+  defp timestamp_date_count(post, date_counts, group_slug, date) do
+    if protected_post_map?(post, date_counts),
+      do: 2,
+      else: lookup_date_count(date_counts, group_slug, date)
+  end
+
+  defp protected_post_map?(%{access_protected: true}, _date_counts), do: true
+
+  defp protected_post_map?(%{uuid: uuid}, nil) when is_binary(uuid),
+    do: PostAccess.protected?(uuid)
+
+  defp protected_post_map?(_post, _date_counts), do: false
 
   # Looks up date count from pre-computed map, falling back to DB query
   defp lookup_date_count(nil, group_slug, date) do
@@ -3537,10 +3645,31 @@ defmodule PhoenixKit.Modules.Publishing.Web.HTML do
   """
   @spec featured_image_url(map(), String.t()) :: String.t() | nil
   def featured_image_url(post, variant \\ "medium") do
-    post.metadata
-    |> Map.get(:featured_image_uuid)
-    |> resolve_featured_image_url(variant)
+    uuid = Map.get(post.metadata, :featured_image_uuid)
+
+    # A protected post's image goes through the kit's file route (the one
+    # core's file access guard watches), never a public bucket's own URL.
+    if Map.get(post, :access_protected) == true,
+      do: signed_featured_image_url(uuid, variant),
+      else: resolve_featured_image_url(uuid, variant)
   end
+
+  defp signed_featured_image_url(uuid, variant) when is_binary(uuid) and uuid != "" do
+    case Storage.get_file(uuid) do
+      nil ->
+        nil
+
+      _file ->
+        variant =
+          if Storage.get_file_instance_by_name(uuid, variant), do: variant, else: "original"
+
+        Storage.URLSigner.signed_url(uuid, variant)
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp signed_featured_image_url(_uuid, _variant), do: nil
 
   defp resolve_featured_image_url(nil, _variant), do: nil
   defp resolve_featured_image_url("", _variant), do: nil

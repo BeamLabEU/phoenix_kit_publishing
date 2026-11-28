@@ -1,0 +1,24 @@
+404
+cache-control: max-age=0, private, must-revalidate
+content-type: text/html; charset=utf-8
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="csrf-token" content="<csrf>">
+    <title>Test</title>
+  </head>
+  <body>
+    <main data-current-user-email="">
+  
+  
+  
+  <nav data-testid="host-publishing-translations" data-count="0">
+    
+  </nav>
+  
+  Not Found
+</main>
+  </body>
+</html>

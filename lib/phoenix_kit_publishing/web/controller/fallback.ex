@@ -35,11 +35,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
 
   alias PhoenixKit.Modules.Publishing
   alias PhoenixKit.Modules.Publishing.Constants
+  alias PhoenixKit.Modules.Publishing.PostAccess
+  alias PhoenixKit.Modules.Publishing.Web.Controller.AccessGate
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostRendering
   alias PhoenixKit.Modules.Publishing.Web.Controller.SlugResolution
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
+
+  @viewer_key :publishing_fallback_viewer
 
   # ============================================================================
   # Main Entry Point
@@ -51,6 +55,21 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   @spec handle_not_found(Plug.Conn.t(), term()) ::
           {:redirect_with_flash, String.t(), String.t()} | {:render_404}
   def handle_not_found(conn, reason) do
+    # The fallback looks posts up by slug and date to redirect to a sibling
+    # language or time. A protected post the reader may not open must never
+    # be such a target: the redirect alone would confirm it exists. The
+    # reader is kept for the lookups below (`openable?/1`); without it they
+    # treat the reader as anonymous.
+    Process.put(@viewer_key, AccessGate.viewer(conn))
+
+    try do
+      do_handle_not_found(conn, reason)
+    after
+      Process.delete(@viewer_key)
+    end
+  end
+
+  defp do_handle_not_found(conn, reason) do
     # Try to fall back to nearest valid parent in the breadcrumb chain
     case attempt_breadcrumb_fallback(conn, reason) do
       {:ok, redirect_path} ->
@@ -227,6 +246,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
 
   defp browsable_version_url(group_slug, internal_slug, version, language) do
     with {:ok, post} <- Publishing.read_post(group_slug, internal_slug, language, version),
+         true <- openable?(post),
          false <- PostRendering.served_by_fallback_language?(post, language),
          true <- PostRendering.publicly_browsable_version?(group_slug, post, version) do
       {:ok, PostRendering.build_version_url(group_slug, post, language, version)}
@@ -251,8 +271,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   # Finds a post by its slug using a direct DB query
   defp find_post_by_slug(group_slug, post_slug) do
     case Publishing.read_post(group_slug, post_slug) do
-      {:ok, post} -> {:ok, post}
+      {:ok, post} -> if openable?(post), do: {:ok, post}, else: :not_found
       {:error, _} -> :not_found
+    end
+  end
+
+  # True when the reader of this request may open the post (always for a
+  # post without access rules).
+  defp openable?(post) do
+    case PostAccess.access_for_post(post[:uuid]) do
+      nil -> true
+      access -> PostAccess.authorize_view(access, Process.get(@viewer_key)) == :ok
     end
   end
 
@@ -418,7 +447,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Fallback do
   # 302-ping-pong between each other forever.
   defp published_timestamp_url(group_slug, identifier, date, time, lang) do
     with {:ok, post} <- Publishing.read_post(group_slug, identifier, lang),
-         true <- Constants.published?(post.metadata.status) and not future_timestamp_post?(post) do
+         true <- Constants.published?(post.metadata.status) and not future_timestamp_post?(post),
+         true <- openable?(post) do
       {:ok, build_timestamp_url(group_slug, date, time, lang)}
     else
       _ -> nil

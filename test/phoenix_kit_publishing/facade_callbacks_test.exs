@@ -52,6 +52,10 @@ defmodule PhoenixKit.Modules.Publishing.FacadeCallbacksTest do
       assert PhoenixKit.Modules.Publishing.ListingCache.LockTableOwner in Publishing.children()
     end
 
+    test "children declares the password limiter's fallback counter" do
+      assert PhoenixKit.Modules.Publishing.PostAccess.LocalLimits in Publishing.children()
+    end
+
     test "children declares the :publishing_posts render cache with a bounded size" do
       # Regression: the render cache (Renderer.render_post_cached/1) was never
       # supervised, so caching silently no-op'd and every published view

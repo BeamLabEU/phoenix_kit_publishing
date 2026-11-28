@@ -58,8 +58,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   A language served from its own domain (core's `:canonical_host_resolver`) gets that domain and no
   language segment; any other language gets the site origin and the prefixed path.
   """
-  def public_paths(db_post, contents, date_counts \\ nil) do
-    post = path_post(db_post, contents)
+  def public_paths(db_post, contents, date_counts \\ nil, protected \\ nil) do
+    post = path_post(db_post, contents, protected)
 
     contents
     |> Enum.map(& &1.language)
@@ -73,8 +73,21 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
     end)
   end
 
+  # `protected` is the page's protected-post set (`PostAccess.protected_post_uuids/1`, one
+  # query per page): with it, a protected timestamp post's URL keeps its time segment even
+  # though counts are passed. Without it (one post, no counts) the URL builder checks the
+  # uuid itself.
+  defp path_post(db_post, contents, protected) do
+    base = path_post(db_post, contents)
+
+    if is_map(protected) and Map.has_key?(protected, db_post.uuid),
+      do: Map.put(base, :access_protected, true),
+      else: base
+  end
+
   defp path_post(db_post, contents) do
     %{
+      uuid: db_post.uuid,
       mode: db_post.mode,
       slug: db_post.slug,
       date: db_post.post_date,
@@ -107,7 +120,8 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
   @doc """
   The post summary. `contents` are the language rows of the version shown (the live one,
   else the latest). Options: `:now`, `:tz` (hoisted once per page) and `:date_counts`
-  (`Listing.group_date_counts/1`, computed once per page).
+  (`Listing.group_date_counts/1`, computed once per page) and `:protected` (the page's
+  `PostAccess.protected_post_uuids/1`, one query per page).
   """
   def post_summary(db_post, group, versions, contents, opts \\ []) do
     status = status(db_post, versions, opts[:now], opts[:tz])
@@ -137,7 +151,7 @@ defmodule PhoenixKit.Modules.Publishing.API.Presenter do
         Map.put(
           summary,
           "public_paths",
-          public_paths(%{db_post | group: group}, contents, opts[:date_counts])
+          public_paths(%{db_post | group: group}, contents, opts[:date_counts], opts[:protected])
         ),
       else: summary
   end

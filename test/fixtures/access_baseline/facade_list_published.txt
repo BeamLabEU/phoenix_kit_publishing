@@ -1,0 +1,34 @@
+{:ok,
+ [
+   entries: [
+     [
+       categories: [],
+       custom: [],
+       description: nil,
+       excerpt: "Second body, also #elixir.",
+       featured_image_url: nil,
+       featured_image_uuid: nil,
+       published_at: "<ts>",
+       title: "Baseline Two",
+       url: "/baseline-blog/baseline-two",
+       uuid: "<uuid>"
+     ],
+     [
+       categories: [],
+       custom: [],
+       description: nil,
+       excerpt: "First body about #elixir and things.",
+       featured_image_url: nil,
+       featured_image_uuid: nil,
+       published_at: "<ts>",
+       title: "Baseline One",
+       url: "/baseline-blog/baseline-one",
+       uuid: "<uuid>"
+     ]
+   ],
+   language: "en",
+   page: 1,
+   per_page: 20,
+   total: 2,
+   total_pages: 1
+ ]}

@@ -126,15 +126,22 @@ Deliberate non-features, so nobody adds them assuming they were missed.
   still *creates* all 7 on every install (V135 baseline for
   groups/posts/versions/contents, V159 for categories/post_categories/
   post_views, V164 rebuilds one index). V1 of this chain is a pure adoption
-  of that current shape, V2 only adds two expression indexes and V3 one
-  column, `data` on categories (see "Database & migrations" below and the
-  chain's own moduledoc); no table or constraint has changed through it, and
-  a rollback never drops a column's contents.
+  of that current shape, V2 only adds two expression indexes, V3 one
+  column, `data` on categories, and V4 one table of its own,
+  `phoenix_kit_publishing_access_rules` (see "Database & migrations" below
+  and the chain's own moduledoc); no core-created table or constraint has
+  changed shape through it, and a rollback never drops a column, a table or
+  their contents.
 - **No all-groups public overview.** If one returns it returns as an opt-in
   reserved route, not as a catch-all sibling.
 - **No guest commenting.** The comments seam requires a logged-in user because
   the comments schema `validate_required`s `user_uuid`; guest support is a
   cross-repo change in the comments module first.
+- **No file access control of its own.** A protected post's files are
+  guarded through core's file access guard (`Publishing.file_access_guard/2`
+  → `PostAccess.FileGuard`, the optional `PhoenixKit.Module` callback, no
+  `@impl` so an older core still compiles it); on a core without the guard
+  they are served to anyone holding their URL.
 - **No media folders unless the host opts in.** Group media folders
   (`MediaFolders`) exist only once the host configures
   `:attachments_parent_folder`; post folders inside them only with
@@ -427,6 +434,7 @@ User-driven actions (`mode: "manual"`):
 | `publishing.category.reordered` | `publishing_group` |
 | `publishing.comment.created` / `.replied` | `publishing_post` |
 | `publishing.module.enabled` / `.disabled` | `publishing_module` |
+| `publishing.access.changed` | `publishing_post` (a post's rules) / `publishing_group` (a group's defaults) — metadata `change` (`signed_in_added`, `password_rotated`, `link_revoked`, `cleared`, `defaults_applied`, …) and `rule_kind`; never a password, hash, key or digest |
 | `publishing.translation.requested` | `publishing_post` — written only by the machine API's `translate_post` (mode `auto`, API metadata plus `group_slug`, `version`, `targets`, `enqueued`, `conflicts`), because the per-language Oban jobs log as the key owner without API attribution |
 
 Self-healing actions (`mode: "auto"`, no actor):
@@ -599,8 +607,9 @@ lib/phoenix_kit_publishing/
 ├── stale_fixer.ex, activity_log.ex, group_settings.ex, comments.ex, gettext.ex
 ├── media_folders.ex, media_adoption.ex, media_reorganizer.ex   # group media folders
 ├── listing_cache.ex (+ cache_sync, lock_table_owner), group_slugs.ex, renderer.ex
+├── post_access.ex (+ post_access/viewer, grants, rate_limit)   # per-post access control
 ├── page_builder.ex (+ parser, renderer, components/)
-├── schemas/               # 6 Ecto schemas
+├── schemas/               # 7 Ecto schemas
 └── web/                   # admin LiveViews, public Controller (+ 9 submodules), HTML
 ```
 
@@ -759,6 +768,8 @@ Site-wide keys, all read through `PhoenixKit.Settings`.
 | `publishing_sitemap_refresh` | `true` | Ask core's Sitemap module for a debounced regeneration when a public URL appears, disappears or moves (`SitemapRefresh`). Also needs core's Sitemap module and its automatic regeneration on |
 | `publishing_feeds_enabled` | `true` | RSS 2.0 per group at `/<group>/feed.xml` (localized variants too; newest 50 published posts for the language). `feed.xml` is a reserved tail segment in `Routing.parse_path/1`. Off → 404, never the smart fallback (a feed URL must not redirect to HTML). Canonical-prefix 301s ARE emitted feed-to-feed, matching `rel="self"` |
 | `publishing_unique_views` | `true` | One view per visitor per post per day: a session carrying the dedup marker is the visitor, a cookieless request is a keyed hash of its address (the LAST `x-forwarded-for` hop, the one the site's proxy appended — the first is the client's to forge — else `remote_ip`) held for the day in `Views.VisitorTable`, capped at 500k rows a day, never the raw address; readers behind one address count once until their browser keeps the marker. Off → every page open counts |
+| `publishing_access_grant_days` | `30` | How long a typed password or a redeemed secret link stays in the reader's access cookie (1–365) |
+| `publishing_access_forbidden_status` | `"404"` | A signed-in reader without the right: `"404"` answers exactly as a missing post (default), `"403"` renders `Web.HTML.access_forbidden/1` |
 | `publishing_translation_endpoint_uuid` | unset | Admin override for the AI endpoint used by translation |
 | `publishing_translation_prompt_uuid` | unset | Admin override for the AI prompt used by translation |
 
@@ -854,6 +865,106 @@ historical `btn btn-sm btn-outline` link. The category archive's target is the
 categories page; a tag archive has none. `admin_edit_account_menu_test.exs`
 pins the hand-off, the permission gate and the switch.
 
+## Per-post access control
+
+`Publishing.PostAccess` (resolver, writes, summary), `PostAccess.Viewer`
+(who is asking), `PostAccess.Grants` (the encrypted `pk_pub_access` cookie),
+`PostAccess.RateLimit` (password attempts, core's Hammer backend),
+`Web.Controller.AccessGate` (the controller side) and
+`Web.Components.AccessPanel` (the editor and group-edit panel). Rules live in
+`phoenix_kit_publishing_access_rules` (chain V4, schema
+`PublishingAccessRule`); a post with no gating rule is public, and a site with
+no rules renders every public surface byte-for-byte as before —
+`access_baseline_test.exs` compares against snapshots recorded before the
+feature existed (re-record only for a deliberate change to a public page:
+`PK_RECORD_BASELINE=1 mix test <that file>`).
+
+- **The name `Publishing.Access` was taken** (the admin sub-permissions), so
+  the resolver is `PostAccess`. Don't merge them: one answers "may this admin
+  manage groups", the other "may this reader open this post".
+- **Decision order in `PostRendering`: access FIRST**, right after the read,
+  before the draft/stub/fallback-language checks — so a post a reader may not
+  open answers the same whatever else is true of it. `:not_found` (secret-link
+  posts, all rules expired, and by default `:forbidden`) goes through the
+  controller's own `handle_not_found(conn, :not_found)`: byte-for-byte the
+  missing-post answer, with no access headers. `access_control_test.exs`
+  compares the two responses.
+- **Every path that can name a post checks it:** the post, versioned and
+  date-only URLs (`AccessGate.check/2` in `PostRendering`), the old-slug 301
+  (`SlugResolution.resolve_url_slug/4`'s `:openable?`), the smart fallback's
+  sibling-language/time targets (`Fallback.openable?/1`, reader kept in the
+  process dictionary for the duration of `handle_not_found/2`), the comment
+  POST (`comment_target/4`), `[[post:…]]` link targets
+  (`DBStorage.list_published_link_targets/1` through `visible_query/1`) and
+  core's sitemap (`Posts.list_posts/2` marks a protected post
+  `metadata.sitemap_exclude: true`, which core's source honours).
+- **The password form posts through `create_comment/2`** (`pk_access=unlock`):
+  core declares exactly one POST route for publishing's public pages and it
+  names that action. Failure text is generic; attempts are counted before the
+  Bcrypt check.
+- **Secret links** store only `sha256(key)`; the key is shown once in the
+  panel. `?access_token=` is redeemed into the cookie and the reader is 302'd to the
+  same URL without it (`Referrer-Policy: no-referrer`). `Viewer` accepts only
+  a url-safe base64 key of 40–64 characters, so nothing else reaches the
+  digest compare.
+- **Editors bypass** (`Scope.can?(scope, "publishing")`); `?pk_preview=anonymous`
+  drops scope and cookie for that request.
+- **Group defaults** are rule rows with `group_uuid`; `Posts.create_post/2`
+  copies them (never tokens) before the listing rebuild. The group's
+  `settings` row also carries `list_protected` (list protected posts to the
+  readers who may open them, off by default).
+- **Every write rebuilds the group's listing cache** (it carries the
+  protected flag) and asks for a sitemap refresh.
+
+- **URL shapes count public posts only.** A timestamp post's date-only URL
+  is chosen over the date's PUBLIC posts (`build_date_counts/1`,
+  `Posts.count_posts_on_date/2`, `list_public_times_on_date/2`), and a
+  protected post's own URL always carries its time (`build_post_url/4`,
+  from the `:access_protected` flag or, with no counts passed, by uuid). The
+  date-only route falls back to the date's protected posts only when it has
+  no public one, and only to those the reader may open or could be admitted
+  to (`PostRendering.date_only_times/3`). The language-segment check counts
+  only posts the reader may open (`Language.has_content_for_language?/3`,
+  `PostAccess.openable_entries/2`). `access_url_shapes_test.exs`.
+
+- **No rules table, no rules.** `PostAccess.rules_table?/0` probes for the
+  table once (cached per repo in `:persistent_term`; a miss is asked again
+  on each read), and `list_rules/1`, `protected_post_uuids/1` and
+  `visible_query/1` answer "nothing protected" while it is missing, so code
+  deployed before V4 serves every post as public instead of a 500
+  (`access_pre_v4_test.exs`). A new read of the rules table goes through
+  one of those three.
+- **The missing-post answer is equal in everything but timing.** For a
+  secret-link post (and, by default, a signed-in reader without the right)
+  the status, `Location`, headers, cookies and body are those of a slug that
+  never existed (`access_control_test.exs` compares them). The work behind
+  them is not: the post is read and its rules queried (about one indexed
+  query) before the missing-post handler runs, and an old slug or a
+  date-only URL of such a post does its lookup first too. Accepted: a
+  timing difference of that size is not a practical oracle over the
+  network, and padding every miss would cost every reader.
+
+- **Files of protected posts** (`PostAccess.FileGuard`, answered for core's
+  `Storage.AccessGuard` through `Publishing.file_access_guard/2`). An index
+  `%{file_uuid => [post_uuid]}` of the files ONLY protected posts use (every
+  version and language: version `featured_image_uuid` / `audio_uuid`, content
+  `featured_image_uuid` / `featured_image_id` / `og.image_uuid`, body
+  `file_uuid="…"` and `/file/<uuid>/` refs; minus those a public post's LIVE
+  version shows) lives in `:persistent_term` for 60 s and is dropped by every
+  `ListingCache.regenerate/2` — on every node after a write
+  (`FileGuard.invalidate_everywhere/0` broadcasts `{:file_guard_invalidated,
+  origin}` on the cache-invalidation topic, `CacheSync` drops the peers'
+  copies), the 60 s lifetime being the backstop; a file outside it is `:allow` after a map
+  lookup. Inside it: `:private` for `publishing` / `media` holders and for a
+  reader `authorize_view/2` admits to one of the posts, `:deny` otherwise. A
+  protected post renders its files as signed kit URLs
+  (`Renderer.with_signed_files/2`, the `:sf` render-cache key token,
+  `PageBuilder.Components.Image.signed_src/1`, `featured_image_url/2` and the
+  OG image on the post's `:access_protected` flag). The guard applies to kit
+  routes. A private bucket is required to protect the storage origin. Residual (accepted): a file another module
+  shows publicly while a protected post also uses it is guarded too. `post_access/file_guard_test.exs` (its
+  end-to-end case is tagged `:needs_unreleased_core`).
+
 ## Database & migrations
 
 Core's `V135` squash baseline still **creates** the group/post/version/content
@@ -889,7 +1000,13 @@ adds `data jsonb NOT NULL DEFAULT '{}'` to `phoenix_kit_publishing_categories`
 (`ADD COLUMN IF NOT EXISTS`; core's `ModuleOwnedTables` lists the table as
 this module's, which sanctions altering it); a rollback below V3 only moves
 the marker and leaves the column and its contents. `mix phoenix_kit.repair`
-reports it as an info-level extra column. See
+reports it as an info-level extra column. V4 creates
+`phoenix_kit_publishing_access_rules` (per-post access control) — a table
+core never had, so it comes from this chain on every install — with its
+primary key, `post_uuid` / `group_uuid` btree indexes and two cascading
+foreign keys, all through V1's semantic guards; down below V4 only moves the
+marker. Its objects are in `ExpectedSchema` (generated with core's
+`generate_module_manifest.exs`; regenerate it at every chain change). See
 `PhoenixKitPublishing.Migrations`' moduledoc for the full ownership
 writeup, including why there is no `ADD COLUMN`/`DROP NOT NULL` safety-net
 section here.
@@ -1008,6 +1125,7 @@ repeat loop in Commands is the stability check.
 | Language routing and dialects | Segment ≠ identity, every dialect match is case-insensitive, only the primary goes prefixless, and the editor resolves base → dialect through `resolve_language_for_post/2` before deciding new-vs-existing translation. | [dev_docs/guides/language-routing.md](dev_docs/guides/language-routing.md) |
 | OpenGraph metadata | `build_og_data/4` layers derived defaults → per-post `content.data["og"]` override → the optional `phoenix_kit_og` plugin, highest last; the plugin seam stays fully guarded (`Code.ensure_loaded?` + `function_exported?` + rescue) so a host without it falls back unchanged. The in-page copy is gated per request by `publishing_render_og_tags` and deliberately sits outside the render cache, so toggling takes effect immediately. | `@moduledoc` on `Web.Controller` |
 | Language switcher | `:phoenix_kit_publishing_translations` is exposed regardless of `publishing_show_language_switcher`, so a host can render its own switcher either way. | Host-consumable conn assigns, above |
+| Per-post access control | One resolver, `PostAccess.authorize_view/2`, and one filter: `PostAccess.visible_query/1` for database listings, the listing cache's `:access_protected` flag (`PostAccess.public?/1`) for cached ones. `PostFetching.list_posts_with_cache/1` returns PUBLIC posts only, so every reader-facing listing (listing, search, feeds, archives, related, prev/next, `list_published/2`, `category_counts/2`) is closed by default; `list_all_posts_with_cache/1` is for URL arithmetic only (`group_date_counts/1`). A NEW public surface reads one of those two, or asks `AccessGate.check/2` for a single post — see "Per-post access control" below. | `@moduledoc` on `Publishing.PostAccess` |
 | Comments seam | Optional and guarded: no production dep, every call `Code.ensure_loaded?` + rescued, and rendering needs module installed AND enabled AND the group's `comments_enabled`. Submission is Phoenix-first (no JS) via POST routes in core's dispatch scope to `Controller.create_comment/2`, guarded in this order: module/public/group gates → honeypot (`website` field; filled = pretend success) → signed `Phoenix.Token` time trap (3s–1 day) → post-in-published-set → logged-in user. Every outcome redirects back with a flash; moderation uses the comments module's own admin. | `@moduledoc` on `Publishing.Comments` |
 
 ## Versioning & releases

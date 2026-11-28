@@ -110,11 +110,18 @@ defmodule PhoenixKit.Modules.Publishing.API.RendererAssumptionTest do
     "x&lowbar;",
     "x&hyphen;"
   ]
+  # Comrak 1.2 (mdex 0.14.9) no longer decodes entities before it autolinks, so the
+  # entity spellings below stopped producing links there (they still do under 0.14.8, and
+  # the rule flags them either way). The literal spellings are weighted up so both
+  # versions keep producing well over a thousand unsafe links: the coverage floor below
+  # stays a measure of the rule, not of one Comrak release.
   @words ["mailto", "xmpp", "&#109;ailto", "x&#109;pp", "&#120;mpp", "ftp", "javascript", "data"]
+  @words @words ++ ["xmpp", "xmpp", "ftp", "javascript"]
   @colons [":", ":", "&colon;", "&#58;", "&#x3a;", "&#058;", "&#x3A;", "&COLON;", "::", "://"]
   @colons @colons ++ ["&colon;//", ":&#47;&#47;", ":/", "&colon;&sol;&sol;", ":&sol;/"]
+  @colons @colons ++ ["://", "://", ":", ":"]
   @locals ["a", "a.b", "", "x-y", "&#97;"]
-  @ats ["@", "@", "&#64;", "&commat;", "@@"]
+  @ats ["@", "@", "&#64;", "&commat;", "@@", "@"]
   @domains ["b.c", "b.c.d", "example.org", "b", ""]
 
   defp address do

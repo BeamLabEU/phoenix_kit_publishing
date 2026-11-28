@@ -32,6 +32,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   @slug_style_key "publishing_slug_style"
   @valid_slug_styles ~w(transliterate unicode ascii)
   @pagination_style_key "publishing_pagination_style"
+  @access_forbidden_key "publishing_access_forbidden_status"
 
   # The settings strip. Tabs are `patch` links carrying `?tab=`, so a reload,
   # the back button and a deep link from the docs all land on the same
@@ -102,6 +103,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
         Settings.get_boolean_setting(@admin_edit_button_key, false)
       )
       |> assign(:feeds_enabled, Settings.get_boolean_setting(@feeds_enabled_key, true))
+      |> assign(:access_forbidden_status, Settings.get_setting(@access_forbidden_key, "404"))
       |> assign(:sitemap_refresh, Settings.get_boolean_setting(@sitemap_refresh_key, true))
       |> assign(:render_jsonld, Settings.get_boolean_setting(@render_jsonld_key, true))
       |> assign(:unique_views, Settings.get_boolean_setting(@unique_views_key, true))
@@ -435,6 +437,22 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
 
   defp settings_event("change_pagination_style", _params, socket), do: {:noreply, socket}
 
+  defp settings_event("change_access_forbidden_status", %{"status" => status}, socket)
+       when status in ["404", "403"] do
+    case Settings.update_setting(@access_forbidden_key, status) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:access_forbidden_status, status)
+         |> put_flash(:info, gettext("Access setting updated"))}
+
+      {:error, _} ->
+        write_failed(socket)
+    end
+  end
+
+  defp settings_event("change_access_forbidden_status", _params, socket), do: {:noreply, socket}
+
   # Three numbers that were previously not settable at all. `posts_per_page`
   # is the sharpest case: the reader was already there in the code, so the
   # setting existed and simply had no control — changing it meant editing the
@@ -445,6 +463,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
   # a box is a preference, and refusing it outright over a typo helps nobody.
   @number_settings %{
     "publishing_posts_per_page" => {1, 200, 20},
+    "publishing_access_grant_days" => {1, 365, 30},
     "publishing_reading_wpm" => {50, 1000, 200},
     "publishing_editor_lock_minutes" => {1, 480, 30}
   }
@@ -959,6 +978,47 @@ defmodule PhoenixKit.Modules.Publishing.Web.Settings do
                   {gettext("Page numbers — « 1 … 6 7 8 … 62 »"), "numbered"},
                   {gettext("Compact — Page 7 of 62, with a page box"), "compact"},
                   {gettext("Previous and next only"), "simple"}
+                ]}
+              />
+            </form>
+          </div>
+
+          <.number_setting
+            field="publishing_access_grant_days"
+            value={@publishing_access_grant_days}
+            label={gettext("Protected posts: days a password or secret link keeps a reader in")}
+            hint={
+              gettext(
+                "After this, the reader types the password or opens the link again. Rotating a password or revoking a link ends it at once."
+              )
+            }
+            min="1"
+            max="365"
+          />
+
+          <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-lock-closed" class="w-5 h-5 text-base-content/70" />
+              <div>
+                <p class="font-medium">{gettext("Protected posts: a signed-in reader without access sees")}</p>
+                <p class="text-xs text-base-content/60">
+                  {gettext("“Not found” does not even tell them the post exists.")}
+                </p>
+              </div>
+            </div>
+            <form
+              id="setting-access-forbidden-status"
+              phx-change="change_access_forbidden_status"
+              class="w-full max-w-80"
+            >
+              <.select
+                name="status"
+                value={@access_forbidden_status}
+                class="select-sm"
+                aria-label={gettext("Protected posts: a signed-in reader without access sees")}
+                options={[
+                  {gettext("The same answer as a missing post"), "404"},
+                  {gettext("A “you don’t have access” page (403)"), "403"}
                 ]}
               />
             </form>

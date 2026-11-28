@@ -1,0 +1,214 @@
+200
+cache-control: max-age=0, private, must-revalidate
+content-type: text/html; charset=utf-8
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="csrf-token" content="<csrf>">
+    <title>Baseline Two</title>
+  </head>
+  <body>
+    <main data-current-user-email="">
+  
+  
+  
+  <nav data-testid="host-publishing-translations" data-count="1" data-og-title="Baseline Two">
+    <a href="/baseline-blog/baseline-two" data-lang="en">EN</a>
+  </nav>
+  
+  <main data-current-user-email="">
+  
+  
+  
+  <nav data-testid="host-publishing-translations" data-count="1" data-og-title="Baseline Two">
+    <a href="/baseline-blog/baseline-two" data-lang="en">EN</a>
+  </nav>
+  
+  <div data-phoenix-kit class="contents">
+  <style data-pk-mobile-inputs>
+  @media (pointer: coarse) and (max-width: 767px) {
+    :is(#admin-drawer, [data-phoenix-kit]) :is(input:not([type=checkbox], [type=radio], [type=range], [type=file], [type=color], [type=hidden]), select, textarea) {
+      font-size: max(16px, 1em);
+    }
+  }
+</style>
+  
+  
+  <meta property="og:type" content="article">
+  
+    <meta property="og:title" content="Baseline Two">
+    <meta name="twitter:title" content="Baseline Two">
+  
+  
+    <meta name="description" content="Second body, also #elixir.">
+    <meta property="og:description" content="Second body, also #elixir.">
+    <meta name="twitter:description" content="Second body, also #elixir.">
+  
+  
+  <meta property="og:url" content="http://www.example.com/baseline-blog/baseline-two">
+  <meta property="og:locale" content="en">
+  <meta property="og:site_name" content="PhoenixKit">
+  <meta name="twitter:card" content="summary">
+
+  <script type="application/ld+json">
+  {"@context":"https:\/\/schema.org","@type":"Article","author":{"@type":"Organization","name":"PhoenixKit"},"datePublished":"<ts>","description":"Second body, also #elixir.","headline":"Baseline Two","inLanguage":"en","mainEntityOfPage":"http:\/\/www.example.com\/baseline-blog\/baseline-two","publisher":{"@type":"Organization","name":"PhoenixKit"}}
+</script>
+  
+  
+  
+  <script>
+  (function () {
+  if (window.__pkHelixScroll) return;
+  window.__pkHelixScroll = true;
+
+  function init() {
+    // Where the CSS works, leave it entirely alone.
+    if (window.CSS && CSS.supports && CSS.supports('animation-timeline: view()')) return;
+
+    var figures = document.querySelectorAll('.pk-helix--scroll');
+    if (!figures.length) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var scenes = [];
+    figures.forEach(function (fig) {
+      var anims = [];
+      fig.querySelectorAll('.pk-helix__card').forEach(function (card) {
+        var list = card.getAnimations ? card.getAnimations({ subtree: true }) : [];
+        list.forEach(function (a) {
+          try { a.pause(); } catch (e) { return; }
+          anims.push(a);
+        });
+      });
+      if (!anims.length) return;
+
+      // One virtual clock for the whole gallery: the cards' own delays
+      // supply their phase, exactly as they do when it runs on time.
+      var span = 0;
+      anims.forEach(function (a) {
+        var t = a.effect && a.effect.getTiming ? a.effect.getTiming().duration : 0;
+        if (typeof t === 'number' && t > span) span = t;
+      });
+      if (!span) return;
+      scenes.push({ el: fig, anims: anims, span: span });
+    });
+    if (!scenes.length) return;
+
+    var ticking = false;
+    function apply() {
+      ticking = false;
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      scenes.forEach(function (s) {
+        var r = s.el.getBoundingClientRect();
+        // 0 as the figure's top edge reaches the bottom of the viewport,
+        // 1 as its bottom edge leaves the top — the same span the CSS
+        // `cover` range describes.
+        var total = r.height + vh;
+        var p = total > 0 ? (vh - r.top) / total : 0;
+        p = p < 0 ? 0 : p > 1 ? 1 : p;
+        var t = p * s.span;
+        s.anims.forEach(function (a) {
+          try { a.currentTime = t; } catch (e) {}
+        });
+      });
+    }
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(apply);
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    apply();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
+</script>
+  <article class="post-container mx-auto px-6 py-8 max-w-4xl">
+    
+    <nav class="mb-1">
+      
+      <a href="/baseline-blog" data-phx-link="redirect" data-phx-link-state="push" class="inline-flex items-center gap-1 text-xs text-base-content/50 hover:text-primary transition-colors" aria-label="Back to Baseline Blog">
+        <span class="hero-arrow-left w-3 h-3"></span> Baseline Blog
+      </a>
+    </nav>
+    
+    
+
+    
+    
+
+    
+    
+    
+    
+    
+    
+    <header class="mb-8 border-b pb-6">
+      
+      
+      <h1 class="text-3xl font-bold">
+        Baseline Two
+      </h1>
+      <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div class="flex items-center gap-2 text-sm text-base-content/70 ">
+  <span class="hero-calendar w-4 h-4"></span>
+  <time datetime="<ts>">
+    <human-date>
+  </time>
+</div>
+        
+      </div>
+      
+      
+      
+      
+      
+      
+      
+    </header>
+    
+    
+    
+    
+    <div class="markdown-content max-w-none">
+      <p class="my-4 leading-relaxed">Second body, also <a class="link link-primary" href="/baseline-blog/tag/elixir">#elixir</a>.</p>
+    </div>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <footer class="mt-6 border-t pt-2">
+      <a href="/baseline-blog" data-phx-link="redirect" data-phx-link-state="push" class="inline-flex items-center gap-1 text-xs text-base-content/50 hover:text-primary transition-colors" aria-label="Back to Baseline Blog">
+        <span class="hero-arrow-left w-3 h-3"></span> Baseline Blog
+      </a>
+    </footer>
+  </article>
+
+</div>
+</main>
+</main>
+  </body>
+</html>

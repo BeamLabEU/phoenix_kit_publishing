@@ -1,0 +1,30 @@
+200
+cache-control: max-age=0, private, must-revalidate
+content-type: application/rss+xml; charset=utf-8
+
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+<title>Baseline Blog</title>
+<link>http://www.example.com/baseline-blog</link>
+<description>Baseline Blog</description>
+<language>en</language>
+<atom:link href="http://www.example.com/baseline-blog/feed.xml" rel="self" type="application/rss+xml"/>
+<lastBuildDate><rfc822></lastBuildDate>
+<generator>PhoenixKit Publishing</generator>
+<item>
+<title>Baseline Two</title>
+<link>http://www.example.com/baseline-blog/baseline-two</link>
+<guid isPermaLink="true">http://www.example.com/baseline-blog/baseline-two</guid>
+<pubDate><rfc822></pubDate>
+<description><![CDATA[Second body, also #elixir.]]></description>
+</item>
+<item>
+<title>Baseline One</title>
+<link>http://www.example.com/baseline-blog/baseline-one</link>
+<guid isPermaLink="true">http://www.example.com/baseline-blog/baseline-one</guid>
+<pubDate><rfc822></pubDate>
+<description><![CDATA[First body about #elixir and things.]]></description>
+</item>
+</channel>
+</rss>

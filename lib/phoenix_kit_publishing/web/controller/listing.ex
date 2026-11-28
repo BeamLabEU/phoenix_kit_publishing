@@ -81,7 +81,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
           per_page = get_per_page_setting()
 
           # Try cache first, fall back to DB query
-          all_posts_unfiltered = PostFetching.list_posts_with_cache(group_slug)
+          all_posts_unfiltered = PostFetching.visible_posts_with_cache(group_slug, conn, group)
           published_posts = filter_published(all_posts_unfiltered)
 
           # Resolve posts for the requested language, with fallback handling
@@ -726,8 +726,10 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   """
   @spec group_date_counts(String.t()) :: map()
   def group_date_counts(group_slug) do
+    # Every post, protected ones included: the counts decide URL shapes,
+    # which must agree with routing (`Posts.list_times_on_date/2`).
     group_slug
-    |> PostFetching.list_posts_with_cache()
+    |> PostFetching.list_all_posts_with_cache()
     |> filter_published()
     |> PublishingHTML.build_date_counts()
   end
@@ -891,11 +893,17 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.Listing do
   page's prev/next navigation. Deliberately independent of the group's
   `listing_sort`: feeds and chronological neighbors always mean "newest first".
   """
-  @spec chronological_posts(String.t(), String.t(), pos_integer() | nil) :: [map()]
-  def chronological_posts(group_slug, language, limit \\ nil) do
+  @spec chronological_posts(String.t(), String.t(), pos_integer() | nil, keyword()) :: [map()]
+  def chronological_posts(group_slug, language, limit \\ nil, opts \\ []) do
+    # Public posts only, unless the caller authorizes each protected one
+    # itself (`include_protected: true` — the comment POST does).
+    source =
+      if Keyword.get(opts, :include_protected, false),
+        do: PostFetching.list_all_posts_with_cache(group_slug),
+        else: PostFetching.list_posts_with_cache(group_slug)
+
     posts =
-      group_slug
-      |> PostFetching.list_posts_with_cache()
+      source
       |> filter_published()
       |> filter_by_exact_language(group_slug, language)
       |> resolve_posts_for_language(language)

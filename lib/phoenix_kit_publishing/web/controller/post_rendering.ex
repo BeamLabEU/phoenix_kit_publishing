@@ -17,6 +17,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.ListingCache
   alias PhoenixKit.Modules.Publishing.Renderer
+  alias PhoenixKit.Modules.Publishing.Web.Controller.AccessGate
   alias PhoenixKit.Modules.Publishing.Web.Controller.Language
   alias PhoenixKit.Modules.Publishing.Web.Controller.Listing
   alias PhoenixKit.Modules.Publishing.Web.Controller.PostFetching
@@ -27,14 +28,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   @status_published Constants.status_published()
 
   # Suppress dialyzer false positive for defensive fallback pattern
-  @dialyzer {:nowarn_function, render_post_content: 2}
+  @dialyzer {:nowarn_function, do_render_post_content: 2}
 
   @typedoc "A post identifier as `Routing.parse_path/1` resolves it."
   @type post_identifier ::
           {:slug, String.t()} | {:timestamp, String.t() | Date.t(), String.t() | Time.t()}
 
   @typedoc "What a post render hands the controller to respond with."
-  @type render_result :: {:ok, map()} | {:redirect_301, String.t()} | {:error, term()}
+  @type render_result ::
+          {:ok, map()}
+          | {:redirect_301, String.t() | {:protected, String.t()}}
+          | {:error, term()}
+          | {:access, term(), map()}
 
   # ============================================================================
   # Main Rendering Functions
@@ -47,7 +52,9 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def render_post(conn, group_slug, identifier, language) do
     # For slug mode, resolve URL slug to internal slug first
     # This enables per-language URL slugs and 301 redirects for old slugs
-    case SlugResolution.resolve_url_slug(group_slug, identifier, language) do
+    access = &AccessGate.check(conn, &1)
+
+    case SlugResolution.resolve_url_slug(group_slug, identifier, language, access: access) do
       {:redirect, redirect_url} ->
         # Old URL slug - 301 redirect to current URL
         {:redirect_301, redirect_url}
@@ -68,30 +75,64 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   def render_resolved_post(conn, group_slug, identifier, language) do
     case PostFetching.fetch_post(group_slug, identifier, language) do
       {:ok, post} ->
-        cond do
-          not Constants.published?(post.metadata.status) or Constants.scheduled_ahead?(post) ->
-            log_404(conn, group_slug, identifier, language, :unpublished)
-            {:error, :unpublished}
+        # Access first: a post the reader may not open answers the same way
+        # whatever else is true of it (draft, stub, fallback language), so
+        # the answer tells nothing about the post. A post without rules is
+        # `:public` and takes the path below unchanged.
+        case AccessGate.check(conn, post) do
+          :public ->
+            render_live_post(conn, group_slug, identifier, language, post)
 
-          # The editor's "Add language" writes {title: "Untitled", content: ""}
-          # onto the ACTIVE version — instantly public. An untranslated stub
-          # must read as a MISSING translation, not an empty published page:
-          # :not_found sends it straight to the group listing with the
-          # closest-match flash (Fallback treats :not_found as a missing
-          # post, so it never tries the other languages). The primary
-          # language can't hit this — publishing requires a real primary
-          # title.
-          stub_translation?(post) ->
-            log_404(conn, group_slug, identifier, language, :not_found)
-            {:error, :not_found}
+          :protected ->
+            # The flag rides on the post: its own URLs keep their time
+            # segment, and its files render as kit URLs the file guard sees.
+            post = Map.put(post, :access_protected, true)
+            conn |> render_live_post(group_slug, identifier, language, post) |> mark_protected()
 
-          true ->
-            render_published_post(conn, group_slug, post, language)
+          denial ->
+            {:access, denial, post}
         end
 
       {:error, reason} ->
         log_404(conn, group_slug, identifier, language, reason)
         {:error, reason}
+    end
+  end
+
+  @doc false
+  # Tags a render of a protected post, so the controller adds the protected
+  # response headers and the robots meta.
+  # A redirect (the canonical-URL 301) becomes `{:protected, url}`: the
+  # controller sends it with the protected headers, so no shared cache
+  # replays a protected post's Location to another reader.
+  @spec mark_protected(render_result()) :: render_result()
+  def mark_protected({:ok, assigns}), do: {:ok, Map.put(assigns, :access_protected, true)}
+
+  def mark_protected({:redirect_301, url}) when is_binary(url),
+    do: {:redirect_301, {:protected, url}}
+
+  def mark_protected(other), do: other
+
+  defp render_live_post(conn, group_slug, identifier, language, post) do
+    cond do
+      not Constants.published?(post.metadata.status) or Constants.scheduled_ahead?(post) ->
+        log_404(conn, group_slug, identifier, language, :unpublished)
+        {:error, :unpublished}
+
+      # The editor's "Add language" writes {title: "Untitled", content: ""}
+      # onto the ACTIVE version — instantly public. An untranslated stub
+      # must read as a MISSING translation, not an empty published page:
+      # :not_found sends it straight to the group listing with the
+      # closest-match flash (Fallback treats :not_found as a missing
+      # post, so it never tries the other languages). The primary
+      # language can't hit this — publishing requires a real primary
+      # title.
+      stub_translation?(post) ->
+        log_404(conn, group_slug, identifier, language, :not_found)
+        {:error, :not_found}
+
+      true ->
+        render_published_post(conn, group_slug, post, language)
     end
   end
 
@@ -211,22 +252,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   defp render_browsable_version(conn, group_slug, internal_slug, version, language) do
     case Publishing.read_post(group_slug, internal_slug, language, version) do
       {:ok, post} ->
-        # "Browse older versions" has to mean PREVIOUSLY published, not
-        # currently published: publishing a new version archives the one it
-        # replaces, so a live-status-only check made every historical URL 404
-        # and left the dropdown unable to hold more than the active version.
-        # A version that never shipped (plain draft, no published_at) stays
-        # private.
-        if publicly_browsable_version?(group_slug, post, version) do
-          respond_with_browsable_version(conn, group_slug, post, version, language)
-        else
-          log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
-          {:error, :unpublished}
+        case AccessGate.check(conn, post) do
+          :public ->
+            render_version_if_browsable(conn, group_slug, internal_slug, version, language, post)
+
+          :protected ->
+            post = Map.put(post, :access_protected, true)
+
+            conn
+            |> render_version_if_browsable(group_slug, internal_slug, version, language, post)
+            |> mark_protected()
+
+          denial ->
+            {:access, denial, post}
         end
 
       {:error, reason} ->
         log_404(conn, group_slug, {:slug, internal_slug, version}, language, reason)
         {:error, reason}
+    end
+  end
+
+  defp render_version_if_browsable(conn, group_slug, internal_slug, version, language, post) do
+    # "Browse older versions" has to mean PREVIOUSLY published, not
+    # currently published: publishing a new version archives the one it
+    # replaces, so a live-status-only check made every historical URL 404
+    # and left the dropdown unable to hold more than the active version.
+    # A version that never shipped (plain draft, no published_at) stays
+    # private.
+    if publicly_browsable_version?(group_slug, post, version) do
+      respond_with_browsable_version(conn, group_slug, post, version, language)
+    else
+      log_404(conn, group_slug, {:slug, internal_slug, version}, language, :unpublished)
+      {:error, :unpublished}
     end
   end
 
@@ -332,7 +390,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   end
 
   defp handle_date_posts(conn, group_slug, date, language) do
-    case Publishing.list_public_times_on_date(group_slug, date) do
+    case date_only_times(conn, group_slug, date) do
       [] ->
         render_post(conn, group_slug, {:slug, date}, language)
 
@@ -346,6 +404,30 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
     end
   end
 
+  # The times a date-only URL chooses from: the date's public posts. Only
+  # when it has none are its protected posts considered, each one the
+  # reader may open or could be admitted to (a password form, a sign-in);
+  # a secret-link post, or one a signed-in reader may not open, stays out,
+  # so the date answers exactly as an empty one. Protected posts' own URLs
+  # always carry the time, so this only serves links made before a post
+  # was protected.
+  defp date_only_times(conn, group_slug, date) do
+    case Publishing.list_public_times_on_date(group_slug, date) do
+      [] ->
+        group_slug
+        |> Publishing.list_protected_posts_on_date(date)
+        |> Enum.filter(
+          &(AccessGate.check(conn, &1) not in [{:error, :not_found}, {:error, :forbidden}])
+        )
+        |> Enum.map(&(Time.to_string(&1.post_time) |> String.slice(0, 5)))
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      times ->
+        times
+    end
+  end
+
   # ============================================================================
   # Content Rendering
   # ============================================================================
@@ -356,6 +438,15 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.PostRendering do
   """
   @spec render_post_content(map(), keyword()) :: String.t()
   def render_post_content(post, opts \\ []) do
+    # A protected post's files render as signed kit URLs, never a public
+    # bucket's own: only the kit's file route asks the file guard.
+    signed? = Map.get(post, :access_protected) == true
+    opts = if signed?, do: Keyword.put(opts, :signed_files, true), else: opts
+
+    Renderer.with_signed_files(signed?, fn -> do_render_post_content(post, opts) end)
+  end
+
+  defp do_render_post_content(post, opts) do
     html =
       case Renderer.render_post(post, opts) do
         {:ok, html} ->

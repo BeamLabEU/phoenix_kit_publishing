@@ -29,6 +29,7 @@ defmodule PhoenixKit.Modules.Publishing do
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.LanguageHelpers
   alias PhoenixKit.Modules.Publishing.PermissionBackfill
+  alias PhoenixKit.Modules.Publishing.PostAccess.FileGuard
   alias PhoenixKit.Modules.Publishing.SlugHelpers
   alias PhoenixKit.Modules.Publishing.Web.HTML, as: PublishingHTML
   # ============================================================================
@@ -234,6 +235,7 @@ defmodule PhoenixKit.Modules.Publishing do
   defdelegate count_posts_on_date(group_slug, date), to: Posts
   defdelegate list_times_on_date(group_slug, date), to: Posts
   defdelegate list_public_times_on_date(group_slug, date), to: Posts
+  defdelegate list_protected_posts_on_date(group_slug, date), to: Posts
   defdelegate read_post_by_datetime(group_slug, date, time), to: DBStorage
   defdelegate find_by_url_slug(group_slug, language, url_slug), to: Posts
   defdelegate find_by_previous_url_slug(group_slug, language, url_slug), to: Posts
@@ -835,6 +837,9 @@ defmodule PhoenixKit.Modules.Publishing do
       # Owns the per-day visitor table behind publishing_unique_views, swept
       # once a day; without it the counter counts every open.
       PhoenixKit.Modules.Publishing.Views.VisitorTable,
+      # The password limiter's fallback counter (PostAccess.LocalLimits): used
+      # while core's rate-limit backend is down, so attempts stay limited.
+      PhoenixKit.Modules.Publishing.PostAccess.LocalLimits,
       # Per-post render cache (Renderer.render_post_cached/1). Without this the
       # cache GenServer never starts, so every published view re-renders markdown
       # and logs a per-request warning. max_size bounds growth — the cache key
@@ -886,6 +891,16 @@ defmodule PhoenixKit.Modules.Publishing do
   @impl PhoenixKit.Module
   @spec api_tools() :: [PhoenixKit.API.Tool.t()]
   def api_tools, do: API.tools()
+
+  # Core's file access guard (`PhoenixKit.Modules.Storage.AccessGuard`, an
+  # optional `PhoenixKit.Module` callback): a file only protected posts use is
+  # served to the readers who may open one of them (`PostAccess.FileGuard`).
+  # No `@impl`: a core without the callback still compiles this module, and
+  # simply never asks.
+  @doc false
+  @spec file_access_guard(map(), Plug.Conn.t()) :: :allow | :private | :deny
+  def file_access_guard(file, conn),
+    do: FileGuard.check(file, conn)
 
   # ============================================================================
   # Shared Helpers (used across submodules)

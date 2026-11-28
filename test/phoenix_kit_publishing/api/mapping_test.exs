@@ -153,8 +153,12 @@ defmodule PhoenixKit.Modules.Publishing.API.MappingTest do
   test "a static scan finds no {:error, atom} / {:error, atom, ...} or rollback(atom) in the sources that the table does not cover" do
     known =
       MapSet.new(
+        # `PostAccess` (per-post access control): a reader's denial
+        # (`authorize_view/2`) and the Access panel's write errors. No API
+        # tool calls `PostAccess`, so none of them can reach `Common`.
         @error_atoms ++
-          ~w(group_not_active wrong_group no_translated_name not_configured other_library miss comments_unavailable)a
+          ~w(group_not_active wrong_group no_translated_name not_configured other_library miss comments_unavailable)a ++
+          ~w(password login forbidden invalid_kind empty_rule password_too_short rate_limited)a
       )
 
     atoms =
