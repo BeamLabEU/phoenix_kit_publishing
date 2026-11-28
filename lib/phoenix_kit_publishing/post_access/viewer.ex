@@ -16,6 +16,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Viewer do
 
   defstruct user_uuid: nil,
             role_names: [],
+            role_uuids: nil,
             bypass?: false,
             anonymous?: true,
             grants: %{},
@@ -25,6 +26,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Viewer do
   @type t :: %__MODULE__{
           user_uuid: String.t() | nil,
           role_names: [String.t()],
+          role_uuids: MapSet.t() | nil,
           bypass?: boolean(),
           anonymous?: boolean(),
           grants: map(),

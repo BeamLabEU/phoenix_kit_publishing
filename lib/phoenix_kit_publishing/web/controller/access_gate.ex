@@ -27,6 +27,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
   use Gettext, backend: PhoenixKitPublishing.Gettext
 
   alias PhoenixKit.Modules.Publishing
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.DBStorage
   alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PostAccess.Grants
@@ -135,7 +136,7 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
           )
 
         :ok ->
-          try_password(conn, post, access, to_string(params["password"] || ""))
+          try_password(conn, post, access, params["password"])
       end
     else
       _ ->
@@ -163,8 +164,18 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessGate do
     with uuid when is_binary(uuid) <- params["post_uuid"],
          group when is_binary(group) <- params["group"],
          {:ok, uuid} <- Ecto.UUID.cast(uuid),
-         %PublishingPost{trashed_at: nil, group: %PublishingGroup{slug: ^group}} = post <-
-           DBStorage.get_post_by_uuid(uuid, [:group]) do
+         %PublishingPost{
+           trashed_at: nil,
+           group: %PublishingGroup{slug: ^group, status: "active"},
+           active_version: %{status: "published"}
+         } = post <-
+           DBStorage.get_post_by_uuid(uuid, [:group, :active_version]),
+         false <-
+           Constants.scheduled_ahead?(%{
+             mode: post.mode,
+             date: post.post_date,
+             time: post.post_time
+           }) do
       post
     else
       _ -> nil

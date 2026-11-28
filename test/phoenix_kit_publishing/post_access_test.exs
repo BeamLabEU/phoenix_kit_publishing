@@ -397,6 +397,11 @@ defmodule PhoenixKit.Modules.Publishing.PostAccessTest do
         PostAccess.apply_group_defaults(group["uuid"])
       end
 
+      assert_raise Ecto.InvalidChangesetError, fn ->
+        Posts.create_post(group["slug"], %{title: "New", slug: "new"})
+      end
+
+      refute Repo.get_by(PublishingPost, group_uuid: group["uuid"], slug: "new")
       assert PostAccess.protected?(post.uuid)
       assert {:ok, _} = PostAccess.check_password(access(owner), "post's own")
     end

@@ -365,19 +365,19 @@ redeeming request; keep such logs private or strip the query there.
 **Before the migration runs.** Access rules live in a table the module's
 own migration chain creates (V4, `mix phoenix_kit.update`). Code deployed
 ahead of it finds no table and treats every post as public on every surface,
-as before the feature; the rules take effect within half a minute of the
-migration running.
+as before the feature. Subsequent reads see rules created after migration.
 
 **Files.** With a core that ships the file access guard
 (`PhoenixKit.Modules.Storage.AccessGuard`), a file only protected posts use
 (featured, OG and inline images, audio, `/file/…` links in the body) is served
 only to readers who may open one of those posts, and to editors and media
-managers; anyone else gets core's missing-file answer. A protected post renders
-its files as signed kit URLs, so a public bucket's own URL never bypasses the
-check. A file a public post also shows stays public, and so does one another
-module shows publicly while a protected post uses it too: give the protected
-post its own copy. On an older core files are not guarded: keep confidential
-files in a private library.
+managers. Other readers get core's missing-file response. Protected posts
+render signed kit URLs. For confidential files, use private bucket storage
+as well. Anyone with a direct public bucket URL can still fetch the object.
+A live public publishing post that uses the same file keeps it public.
+The guard cannot see usage in other modules, so use separate copies when
+sharing a file with a public page outside Publishing. On older core versions,
+the kit file route does not enforce post access rules.
 
 ## Public pages at the site root
 

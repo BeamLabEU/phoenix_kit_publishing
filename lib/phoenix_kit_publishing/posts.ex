@@ -1075,9 +1075,6 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
 
       with {:ok, db_post} <- tx_result,
            {:ok, post} <- read_back_created_post(group_slug, db_post, mode, primary_language) do
-        # A group's default access rules are copied onto every new post
-        # (before the listing is rebuilt, so it carries the post's flag).
-        :ok = PostAccess.copy_group_defaults(group.uuid, db_post.uuid, opts)
         ListingCache.regenerate(group_slug)
         PublishingPubSub.broadcast_post_created(group_slug, post)
         {:ok, post}
@@ -1193,7 +1190,8 @@ defmodule PhoenixKit.Modules.Publishing.Posts do
              title: Shared.get_option(opts, :title) || "",
              content: content,
              url_slug: post_slug
-           }) do
+           }),
+         :ok <- PostAccess.copy_group_defaults(db_post.group_uuid, db_post.uuid, opts) do
       db_post
     else
       {:error, reason} -> repo.rollback(reason)

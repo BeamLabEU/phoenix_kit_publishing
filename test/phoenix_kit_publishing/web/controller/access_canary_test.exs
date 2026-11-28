@@ -208,7 +208,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessCanaryTest do
   test "the reader holding the grant sees the post, and nothing leaks beside it", %{
     conn: conn,
     slug: slug,
-    secret: secret,
     owner: owner
   } do
     {:ok, _rule, key} = PostAccess.create_link(owner, %{"note" => "client"})

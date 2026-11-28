@@ -65,15 +65,13 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   # Reading
   # ===========================================================================
 
-  @probe_absent_ms 30_000
-
   @doc """
   True when the access-rules table exists (module chain V4 has run). Code
   deployed before the migration finds no table: every read here then answers
   "no rules", so every post is public on every surface, exactly as before the
   feature, instead of a 500. A found table is remembered for the life of the
-  node; a missing one is asked again after #{div(@probe_absent_ms, 1000)} s, so the
-  rules take effect soon after the migration runs. Kept in `:persistent_term`
+  node. A missing table is checked again on the next read so a migration
+  followed by a rule write takes effect immediately. Kept in `:persistent_term`
   per repo. A database that cannot answer the probe counts as "present": the
   real query then fails as it would have.
   """
@@ -81,16 +79,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   def rules_table? do
     key = probe_key()
 
-    case :persistent_term.get(key, nil) do
-      true ->
-        true
-
-      {false, until} ->
-        if System.monotonic_time(:millisecond) < until, do: false, else: probe(key)
-
-      nil ->
-        probe(key)
-    end
+    :persistent_term.get(key, nil) == true or probe(key)
   end
 
   @doc false
@@ -116,11 +105,14 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
         true
 
       {:ok, %{rows: [[false]]}} ->
-        Logger.warning(
-          "[PostAccess] no access-rules table (module chain V4 not run): every post is public"
-        )
+        unless :persistent_term.get(key, nil) == :absent do
+          Logger.warning(
+            "[PostAccess] no access-rules table (module chain V4 not run): every post is public"
+          )
 
-        :persistent_term.put(key, {false, System.monotonic_time(:millisecond) + @probe_absent_ms})
+          :persistent_term.put(key, :absent)
+        end
+
         false
 
       _error ->
@@ -280,10 +272,9 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   defp openable(protected, viewer) do
     protected_uuids = Enum.map(protected, & &1[:uuid])
 
-    rules_by_post =
-      from(r in Rule, where: r.post_uuid in ^protected_uuids)
-      |> repo().all()
-      |> Enum.group_by(& &1.post_uuid)
+    rules = repo().all(from r in Rule, where: r.post_uuid in ^protected_uuids)
+    viewer = load_role_uuids(viewer, rules)
+    rules_by_post = Enum.group_by(rules, & &1.post_uuid)
 
     for uuid <- protected_uuids,
         authorize_view(to_access(Map.get(rules_by_post, uuid, [])), viewer) == :ok,
@@ -319,6 +310,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     viewer = viewer || Viewer.anonymous()
     now = DateTime.utc_now()
     active = Enum.filter(rules, &active?(&1, now))
+    viewer = load_role_uuids(viewer, active)
 
     cond do
       viewer.bypass? -> :ok
@@ -396,11 +388,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
 
   defp grants?(%Rule{kind: "role", config: config}, viewer, _now) do
     not viewer.anonymous? and
-      config
-      |> Map.get("role_uuids", [])
-      |> List.wrap()
-      |> role_names()
-      |> Enum.any?(&(&1 in viewer.role_names))
+      Enum.any?(List.wrap(config["role_uuids"]), &MapSet.member?(viewer.role_uuids, &1))
   end
 
   defp grants?(%Rule{kind: kind} = rule, viewer, now) when kind in ["password", "token"] do
@@ -434,8 +422,24 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     end)
   end
 
-  # Role rules store core role uuids; the scope holds role NAMES. One query,
-  # only when a signed-in reader meets a role rule.
+  defp load_role_uuids(
+         %Viewer{role_uuids: nil, bypass?: false, anonymous?: false} = viewer,
+         rules
+       ) do
+    if Enum.any?(rules, &(&1.kind == "role")) do
+      uuids =
+        repo().all(
+          from r in PhoenixKit.Users.Role, where: r.name in ^viewer.role_names, select: r.uuid
+        )
+
+      %{viewer | role_uuids: MapSet.new(uuids)}
+    else
+      viewer
+    end
+  end
+
+  defp load_role_uuids(viewer, _rules), do: viewer
+
   defp role_names([]), do: []
 
   defp role_names(uuids) do
@@ -545,24 +549,30 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
     else
       hash = Bcrypt.hash_pwd_salt(password)
 
-      case Enum.filter(list_rules(owner), &(&1.kind == "password")) do
-        [] ->
-          insert_rule(owner, "password", %{"hash" => hash, "rev" => 1}, attrs, opts)
-
-        [rule | extra] ->
-          rotate_password(owner, rule, extra, hash, attrs, opts)
-      end
+      write_owner_rule(owner, opts, fn ->
+        save_password(owner, hash, attrs, opts)
+      end)
     end
   end
 
   def set_password(_owner, _password, _attrs, _opts), do: {:error, :password_too_short}
 
-  defp rotate_password(owner, rule, extra, hash, attrs, opts) do
+  defp save_password(owner, hash, attrs, opts) do
+    case Enum.filter(list_rules(owner), &(&1.kind == "password")) do
+      [] ->
+        {insert(owner, "password", %{"hash" => hash, "rev" => 1}, attrs, opts), "password_added"}
+
+      [rule | extra] ->
+        {rotate_password(rule, extra, hash, attrs), "password_rotated"}
+    end
+  end
+
+  defp rotate_password(rule, extra, hash, attrs) do
     config = %{"hash" => hash, "rev" => revision(rule) + 1}
 
     # One password per owner: a second row (two first saves racing) would
     # keep accepting its old password after the rotation.
-    Enum.each(extra, fn row -> repo().delete(row) end)
+    Enum.each(extra, fn rule -> repo().delete!(rule) end)
 
     # A rotation without an end date keeps the one the rule has: a new
     # password must not quietly lift an expiry the admin set. Lifting it is
@@ -579,7 +589,6 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
       note: blank_to_nil(attr(attrs, "note")) || rule.note
     })
     |> repo().update()
-    |> after_write(owner, "password_rotated", opts)
   end
 
   @doc """
@@ -641,24 +650,23 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   """
   @spec put_settings(owner(), map(), keyword()) :: {:ok, Rule.t()} | {:error, term()}
   def put_settings(owner, settings, opts \\ []) do
-    existing = Enum.find(list_rules(owner), &(&1.kind == "settings"))
-    current = (existing && existing.config) || %{}
+    write_owner_rule(owner, opts, fn ->
+      existing = Enum.find(list_rules(owner), &(&1.kind == "settings"))
+      current = (existing && existing.config) || %{}
 
-    config =
-      current
-      |> maybe_put_setting("match", fetch_setting(settings, "match"), ~w(any all))
-      |> maybe_put_bool("list_protected", fetch_setting(settings, "list_protected"))
+      config =
+        current
+        |> maybe_put_setting("match", fetch_setting(settings, "match"), ~w(any all))
+        |> maybe_put_bool("list_protected", fetch_setting(settings, "list_protected"))
 
-    case existing do
-      nil ->
-        insert_rule(owner, "settings", config, %{}, opts)
+      case existing do
+        nil ->
+          {insert(owner, "settings", config, %{}, opts), "settings_added"}
 
-      rule ->
-        rule
-        |> Rule.changeset(%{config: config})
-        |> repo().update()
-        |> after_write(owner, "settings", opts)
-    end
+        rule ->
+          {repo().update(Rule.changeset(rule, %{config: config})), "settings"}
+      end
+    end)
   end
 
   @setting_atoms %{"match" => :match, "list_protected" => :list_protected}
@@ -700,18 +708,6 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
 
         :ok
     end
-  rescue
-    # A database without V4 yet (code deployed before the migration) must
-    # still create posts: no rules table means no group defaults either.
-    # Any other failure raises, so the post is not left looking protected
-    # to the admin while it is public.
-    error in Postgrex.Error ->
-      if error.postgres[:code] == :undefined_table do
-        Logger.warning("[PostAccess] group defaults not copied: no access-rules table")
-        :ok
-      else
-        reraise error, __STACKTRACE__
-      end
   end
 
   defp defaults_to_copy(group_uuid) do
@@ -881,6 +877,36 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
   def get_rule(uuid), do: with_uuid(uuid, nil, &repo().get(Rule, &1))
 
   defp insert_rule(owner, kind, config, attrs, opts) do
+    owner
+    |> insert(kind, config, attrs, opts)
+    |> after_write(owner, "#{kind}_added", opts)
+  end
+
+  # Lock the parent even on the first save, when there is no rule row to lock.
+  # Broadcast and rebuild caches only once the new revision has committed.
+  defp write_owner_rule({kind, uuid} = owner, opts, write) do
+    schema = if kind == :post, do: PublishingPost, else: PublishingGroup
+
+    result =
+      repo().transaction(fn ->
+        lock =
+          from row in schema, where: row.uuid == ^uuid, select: row.uuid, lock: "FOR UPDATE"
+
+        repo().one(lock) || repo().rollback(:not_found)
+
+        case write.() do
+          {{:ok, rule}, action} -> {rule, action}
+          {{:error, reason}, _action} -> repo().rollback(reason)
+        end
+      end)
+
+    case result do
+      {:ok, {rule, action}} -> after_write({:ok, rule}, owner, action, opts)
+      error -> error
+    end
+  end
+
+  defp insert(owner, kind, config, attrs, opts) do
     {column, uuid} = owner_column(owner)
 
     %Rule{}
@@ -893,7 +919,6 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess do
       created_by_uuid: ActivityLog.actor_uuid(opts)
     })
     |> repo().insert()
-    |> after_write(owner, "#{kind}_added", opts)
   end
 
   defp after_write({:ok, rule} = ok, owner, what, opts) do

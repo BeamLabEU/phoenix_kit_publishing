@@ -113,6 +113,10 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuardTest do
     reader = unlocked |> recycle() |> get("/#{slug}")
     assert FileGuard.check(image, reader) == :private
 
+    :ok = Versions.unpublish_post(slug, post.uuid)
+    assert FileGuard.check(image, reader) == :deny
+    :ok = Versions.publish_version(slug, post.uuid, 1)
+
     {:ok, _} = PostAccess.set_password({:post, post.uuid}, "rotated pw")
     assert FileGuard.check(image, reader) == :deny
   end
@@ -142,14 +146,14 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuardTest do
     assert FileGuard.check(image, anon_conn()) == :allow
   end
 
-  test "an index built before an invalidation is not stored over it", %{image: image} do
+  test "readers ignore a stale build that finishes after invalidation", %{image: image} do
     # A build starts (reads the marker), a rule changes meanwhile...
     FileGuard.invalidate()
-    marker = FileGuard.current_marker()
+    marker = FileGuard.current_generation()
     FileGuard.invalidate()
 
     # ...so its result (here: "nothing guarded") must not be kept.
-    refute FileGuard.store_if_unchanged(marker, %{}, System.monotonic_time(:millisecond) + 60_000)
+    FileGuard.store_index(marker, %{}, System.monotonic_time(:millisecond) + 60_000)
     assert FileGuard.check(image, anon_conn()) == :deny
   end
 
@@ -162,15 +166,15 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuardTest do
 
   test "a peer's broadcast drops this node's index; its own echo does not", %{image: image} do
     FileGuard.index()
-    built = FileGuard.current_marker()
-    assert {:index, _, _} = built
+    built = FileGuard.current_generation()
+    assert is_reference(built)
 
     # The node's own broadcast comes back to it too: no second drop.
     assert {:noreply, _} = CacheSync.handle_info({:file_guard_invalidated, node()}, %{})
-    assert FileGuard.current_marker() == built
+    assert FileGuard.current_generation() == built
 
     assert {:noreply, _} = CacheSync.handle_info({:file_guard_invalidated, :peer@elsewhere}, %{})
-    assert {:stale, _} = FileGuard.current_marker()
+    refute FileGuard.current_generation() == built
     assert FileGuard.check(image, anon_conn()) == :deny
   end
 

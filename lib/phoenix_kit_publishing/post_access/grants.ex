@@ -13,7 +13,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Grants do
     * a revoked or deleted secret link stops working because its rule does;
     * a grant lives `publishing_access_grant_days` days (default 30).
 
-  At most #{50} grants are kept (the oldest expiring first are dropped), so
+  At most 32 grants are kept (the oldest expiring first are dropped), so
   the cookie stays well under the 4 KB browsers allow.
   """
 
@@ -21,7 +21,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Grants do
   alias PhoenixKit.Settings
 
   @cookie "pk_pub_access"
-  @max_grants 50
+  @max_grants 32
   @default_days 30
 
   @doc "The cookie's name."
@@ -54,8 +54,9 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Grants do
       |> read()
       |> Enum.filter(fn {_uuid, grant} -> is_map(grant) and (grant["e"] || 0) > now end)
       |> Map.new()
-      |> Map.put(rule_uuid, %{"r" => revision, "e" => expires})
+      |> Map.delete(rule_uuid)
       |> cap()
+      |> Map.put(rule_uuid, %{"r" => revision, "e" => expires})
 
     Plug.Conn.put_resp_cookie(conn, @cookie, grants,
       encrypt: true,
@@ -81,12 +82,12 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.Grants do
     _ -> false
   end
 
-  defp cap(grants) when map_size(grants) <= @max_grants, do: grants
+  defp cap(grants) when map_size(grants) < @max_grants, do: grants
 
   defp cap(grants) do
     grants
     |> Enum.sort_by(fn {_uuid, grant} -> -grant["e"] end)
-    |> Enum.take(@max_grants)
+    |> Enum.take(@max_grants - 1)
     |> Map.new()
   end
 

@@ -52,6 +52,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
   defp load(socket) do
     rules = PostAccess.list_rules(socket.assigns.owner)
 
+    roles = safe_roles()
+
     socket
     |> assign(:rules, rules)
     |> assign(
@@ -64,8 +66,8 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
     |> assign(:summary, PostAccess.summary(rules))
     |> assign(:match, PostAccess.match_of(rules))
     |> assign(:list_protected, PostAccess.list_protected?(rules))
-    |> assign(:roles, safe_roles())
-    |> assign(:role_names, role_name_map())
+    |> assign(:roles, roles)
+    |> assign(:role_names, Map.new(roles, &{&1.uuid, &1.name}))
   end
 
   defp safe_roles do
@@ -73,8 +75,6 @@ defmodule PhoenixKit.Modules.Publishing.Web.Components.AccessPanel do
   rescue
     _ -> []
   end
-
-  defp role_name_map, do: Map.new(safe_roles(), &{&1.uuid, &1.name})
 
   # ===========================================================================
   # Events — each one re-checks the scope (a form can be posted by hand).

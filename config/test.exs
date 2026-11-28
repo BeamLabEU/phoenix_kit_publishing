@@ -5,20 +5,11 @@ import Config
 #   createdb phoenix_kit_publishing_test
 config :phoenix_kit_publishing, ecto_repos: [PhoenixKitPublishing.Test.Repo]
 
-# `PGDATABASE` lets this suite point at a database the test role isn't
-# allowed to CREATE (a shared instance). Left unset, this falls back to the
-# previous hard-coded name, so CI is unaffected.
-pg_test_db =
-  case System.get_env("PGDATABASE") do
-    value when is_binary(value) and value != "" -> String.trim(value)
-    _ -> "phoenix_kit_publishing_test#{System.get_env("MIX_TEST_PARTITION")}"
-  end
-
 config :phoenix_kit_publishing, PhoenixKitPublishing.Test.Repo,
   username: System.get_env("PGUSER", "postgres"),
   password: System.get_env("PGPASSWORD", "postgres"),
   hostname: System.get_env("PGHOST", "localhost"),
-  database: pg_test_db,
+  database: "phoenix_kit_publishing_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 

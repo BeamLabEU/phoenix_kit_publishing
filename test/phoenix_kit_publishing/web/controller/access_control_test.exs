@@ -90,6 +90,39 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessControlTest do
       assert protected_headers?(conn)
     end
 
+    test "unpublishing the post closes its password form", %{
+      conn: conn,
+      path: path,
+      post: post,
+      slug: slug
+    } do
+      :ok = Versions.unpublish_post(slug, post.uuid)
+
+      denied =
+        post(conn, path, %{
+          "pk_access" => "unlock",
+          "post_uuid" => post.uuid,
+          "password" => "open sesame"
+        })
+
+      assert denied.status == 404
+      refute denied.resp_cookies[Grants.cookie_name()]
+    end
+
+    test "a full grant cookie fits the browser and retains the newest grant", %{conn: conn} do
+      conn = %{conn | secret_key_base: String.duplicate("s", 64)}
+
+      Enum.reduce(1..55, conn, fn _, request ->
+        uuid = Ecto.UUID.generate()
+        response = Grants.put(request, uuid, 1) |> Plug.Conn.send_resp(200, "")
+        [header] = get_resp_header(response, "set-cookie")
+        assert byte_size(header) < 4096
+        next = Plug.Test.recycle_cookies(conn, response)
+        assert Map.has_key?(Grants.read(next), uuid)
+        next
+      end)
+    end
+
     test "a wrong password re-shows the form, the right one opens the post", %{
       conn: conn,
       path: path,

@@ -929,7 +929,7 @@ feature existed (re-record only for a deliberate change to a public page:
 
 - **No rules table, no rules.** `PostAccess.rules_table?/0` probes for the
   table once (cached per repo in `:persistent_term`; a miss is asked again
-  after 30 s), and `list_rules/1`, `protected_post_uuids/1` and
+  on each read), and `list_rules/1`, `protected_post_uuids/1` and
   `visible_query/1` answer "nothing protected" while it is missing, so code
   deployed before V4 serves every post as public instead of a 500
   (`access_pre_v4_test.exs`). A new read of the rules table goes through
@@ -960,8 +960,8 @@ feature existed (re-record only for a deliberate change to a public page:
   protected post renders its files as signed kit URLs
   (`Renderer.with_signed_files/2`, the `:sf` render-cache key token,
   `PageBuilder.Components.Image.signed_src/1`, `featured_image_url/2` and the
-  OG image on the post's `:access_protected` flag), so a public bucket's URL
-  never bypasses the guard. Residual (accepted): a file another module
+  OG image on the post's `:access_protected` flag). The guard applies to kit
+  routes. A private bucket is required to protect the storage origin. Residual (accepted): a file another module
   shows publicly while a protected post also uses it is guarded too. `post_access/file_guard_test.exs` (its
   end-to-end case is tagged `:needs_unreleased_core`).
 

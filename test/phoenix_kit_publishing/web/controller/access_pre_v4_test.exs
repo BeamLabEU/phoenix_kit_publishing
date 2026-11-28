@@ -51,6 +51,12 @@ defmodule PhoenixKit.Modules.Publishing.Web.Controller.AccessPreV4Test do
     assert {:ok, _} = Publishing.list_published(slug)
   end
 
+  test "the first read after migration sees the rules table" do
+    refute PostAccess.rules_table?()
+    TestRepo.query!("ALTER TABLE zz_rules_away RENAME TO phoenix_kit_publishing_access_rules")
+    assert PostAccess.rules_table?()
+  end
+
   test "post, listing, feed and date-only pages render as public", %{
     conn: conn,
     slug: slug,

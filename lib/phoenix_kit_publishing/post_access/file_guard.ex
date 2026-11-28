@@ -31,6 +31,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
 
   import Ecto.Query
 
+  alias PhoenixKit.Modules.Publishing.Constants
   alias PhoenixKit.Modules.Publishing.PostAccess
   alias PhoenixKit.Modules.Publishing.PostAccess.Viewer
   alias PhoenixKit.Modules.Publishing.PublishingAccessRule, as: Rule
@@ -43,7 +44,7 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
   @ttl_ms 60_000
 
   # The same references `FileReferences` / `MediaAdoption` read in a body.
-  @body_refs ~r/(?:file_uuid=["']|\/file\/)([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/
+  @body_refs ~r/(?:file_uuid\s*=\s*["']|\/file\/)([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/
 
   @type answer :: :allow | :private | :deny
 
@@ -77,19 +78,26 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
   end
 
   defp openable?(post_uuid, conn) do
-    case PostAccess.access_for_post(post_uuid) do
-      # The rules went since the index was built: the post is public.
-      nil -> true
-      access -> PostAccess.authorize_view(access, Viewer.from_conn(conn)) == :ok
+    # A reader's grant applies only while the owning post is live.
+    case repo().one(
+           from p in live_posts(),
+             where: p.uuid == ^post_uuid,
+             select: %{mode: p.mode, date: p.post_date, time: p.post_time}
+         ) do
+      nil ->
+        false
+
+      post ->
+        not Constants.scheduled_ahead?(post) and
+          PostAccess.authorize_view(PostAccess.access_for_post(post_uuid), Viewer.from_conn(conn)) ==
+            :ok
     end
   end
 
   @doc "Drops this node's index (a post or a rule changed)."
   @spec invalidate() :: :ok
   def invalidate do
-    # A marker, not an erase: a build that started before this cannot store
-    # its (older) index over it (`store_if_unchanged/3`).
-    :persistent_term.put(key(), {:stale, System.unique_integer([:monotonic])})
+    :persistent_term.put({key(), :generation}, make_ref())
     :ok
   rescue
     _ -> :ok
@@ -119,34 +127,27 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
   def index do
     now = System.monotonic_time(:millisecond)
 
+    generation = current_generation()
+
     case :persistent_term.get(key(), nil) do
-      {:index, index, until} when until > now ->
+      {^generation, index, until} when until > now ->
         index
 
-      marker ->
+      _ ->
         index = if PostAccess.rules_table?(), do: build(), else: %{}
-        store_if_unchanged(marker, index, now + @ttl_ms)
-        index
+        store_index(generation, index, now + @ttl_ms)
+        if current_generation() == generation, do: index, else: index()
     end
   end
 
+  # Invalidation changes a separate slot. A late writer can replace the
+  # cached value, but readers can never accept it under a newer generation.
   @doc false
-  # Stores a freshly built index only while the slot still holds what it
-  # held when the build started: an invalidation in between (a rule added
-  # during the build) wins, and the next request builds again.
-  @spec store_if_unchanged(term(), map(), integer()) :: boolean()
-  def store_if_unchanged(marker, index, until) do
-    if :persistent_term.get(key(), nil) == marker do
-      :persistent_term.put(key(), {:index, index, until})
-      true
-    else
-      false
-    end
-  end
+  def store_index(generation, index, until),
+    do: :persistent_term.put(key(), {generation, index, until})
 
   @doc false
-  @spec current_marker() :: term()
-  def current_marker, do: :persistent_term.get(key(), nil)
+  def current_generation, do: :persistent_term.get({key(), :generation}, nil)
 
   defp key, do: {__MODULE__, PhoenixKit.RepoHelper.repo()}
 
@@ -196,21 +197,31 @@ defmodule PhoenixKit.Modules.Publishing.PostAccess.FileGuard do
     patterns = Enum.map(files, &"%#{&1}%")
     wanted = MapSet.new(files)
 
-    from(p in PublishingPost,
-      join: v in PublishingVersion,
-      on: v.uuid == p.active_version_uuid,
+    now = DateTime.utc_now()
+    tz = Constants.site_tz()
+
+    from([p, v] in live_posts(),
       left_join: c in PublishingContent,
       on: c.version_uuid == v.uuid,
-      where: is_nil(p.trashed_at) and p.uuid not in ^protected,
+      where: p.uuid not in ^protected,
       where:
         fragment("? ILIKE ANY(?)", c.content, ^patterns) or
           fragment("?::text ILIKE ANY(?)", c.data, ^patterns) or
           fragment("?::text ILIKE ANY(?)", v.data, ^patterns),
-      select: {v.data, c.data, c.content}
+      select: {%{mode: p.mode, date: p.post_date, time: p.post_time}, v.data, c.data, c.content}
     )
     |> repo().all()
-    |> Enum.flat_map(fn {vdata, cdata, body} -> refs(vdata, cdata, body) end)
+    |> Enum.reject(fn {post, _, _, _} -> Constants.scheduled_ahead?(post, now, tz) end)
+    |> Enum.flat_map(fn {_, vdata, cdata, body} -> refs(vdata, cdata, body) end)
     |> Enum.filter(&MapSet.member?(wanted, &1))
+  end
+
+  defp live_posts do
+    from(p in PublishingPost,
+      join: v in assoc(p, :active_version),
+      join: g in assoc(p, :group),
+      where: is_nil(p.trashed_at) and g.status == "active" and v.status == "published"
+    )
   end
 
   defp refs(vdata, cdata, body) do
